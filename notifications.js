@@ -322,36 +322,37 @@ const originalMethods = {
   };
 });
 
-// Initialize notification system
-let notificationSystem = null;
-
 function initNotifications() {
   if (notificationSystem) return;
   
-  // Ensure the container exists in the DOM before creating the system
-  if (!document.getElementById('notification-container') && !document.body) {
-    // Too early, try again in a moment
-    setTimeout(initNotifications, 50);
-    return;
+  // Ensure the container exists in the DOM or create it immediately
+  let container = document.getElementById('notification-container');
+  if (!container && document.body) {
+    container = document.createElement('div');
+    container.id = 'notification-container';
+    container.className = 'notification-container';
+    document.body.appendChild(container);
   }
 
   notificationSystem = new NotificationSystem();
   window.notifications = notificationSystem;
 
   // Restore badge state immediately
-  const savedCount = parseInt(localStorage.getItem('signal_share_unread_count') || '0', 10);
-  if (savedCount > 0) {
-    notificationSystem.setUnreadCount(savedCount);
-  }
-  console.log("[Notifications] System Initialized.");
+  try {
+    const savedCount = parseInt(localStorage.getItem('signal_share_unread_count') || '0', 10);
+    if (savedCount > 0) {
+      notificationSystem.setUnreadCount(savedCount);
+    }
+  } catch (e) {}
+  
+  console.log("[Notifications] System Aggressively Initialized.");
 }
 
-// Start as soon as possible
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initNotifications);
-} else {
-  initNotifications();
-}
+// Start IMMEDIATELY
+initNotifications();
+// And also try again on DOM ready just in case body wasn't ready
+document.addEventListener('DOMContentLoaded', initNotifications);
+window.addEventListener('load', initNotifications);
 
 // Make the class globally available
 window.NotificationSystem = NotificationSystem;
@@ -389,12 +390,68 @@ window.renderNotificationsHistory = function() {
   } else {
     if (emptyState) emptyState.style.display = "none";
     if (clearButton) clearButton.style.display = "block";
-    history.forEach(item => {
+    
+    history.forEach((item, index) => {
       const li = document.createElement("li");
+      li.className = "notification-history-item";
       li.style.padding = "12px";
       li.style.background = "var(--bg-elevated, rgba(255,255,255,0.05))";
       li.style.borderRadius = "8px";
-      li.innerHTML = `<strong style="display:block;font-size:0.95rem;margin-bottom:4px;">${item.title}</strong><span style="font-size:0.85rem;color:var(--text-muted, #ccc);">${item.message}</span>`;
+      li.style.position = "relative";
+      li.style.overflow = "hidden";
+      li.style.touchAction = "pan-y";
+      li.style.transition = "transform 0.2s ease, opacity 0.2s ease";
+      
+      li.innerHTML = `
+        <div class="swipe-content" style="pointer-events:none;">
+          <strong style="display:block;font-size:0.95rem;margin-bottom:4px;">${item.title}</strong>
+          <span style="font-size:0.85rem;color:var(--text-muted, #ccc);">${item.message}</span>
+        </div>
+        <div class="swipe-bg" style="position:absolute;top:0;right:-100%;width:100%;height:100%;background:rgba(239, 68, 68, 0.2);display:flex;align-items:center;padding-left:20px;pointer-events:none;">
+           <span style="color: #ef4444; font-size: 0.8rem; font-weight: bold;">Clear</span>
+        </div>
+      `;
+
+      // Swipe logic
+      let startX = 0;
+      let currentX = 0;
+      let isSwiping = false;
+
+      li.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+        isSwiping = true;
+        li.style.transition = 'none';
+      }, { passive: true });
+
+      li.addEventListener('touchmove', (e) => {
+        if (!isSwiping) return;
+        currentX = e.touches[0].clientX - startX;
+        if (currentX > 0) currentX = 0;
+        if (currentX < -150) currentX = -150;
+        li.style.transform = `translateX(${currentX}px)`;
+      }, { passive: true });
+
+      li.addEventListener('touchend', () => {
+        isSwiping = false;
+        li.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease';
+        
+        if (currentX < -80) {
+          li.style.transform = 'translateX(-120%)';
+          li.style.opacity = '0';
+          setTimeout(() => {
+            if (window.notifications) {
+              const currentHistory = window.notifications.getHistory();
+              currentHistory.splice(index, 1);
+              window.notifications.saveHistory(currentHistory);
+              window.renderNotificationsHistory();
+            }
+          }, 300);
+        } else {
+          li.style.transform = 'translateX(0)';
+        }
+        currentX = 0;
+      });
+
       list.appendChild(li);
     });
   }
