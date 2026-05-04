@@ -19,7 +19,7 @@ window.MessengerRealtime = class MessengerRealtime {
     // Tiny delay to ensure client readiness
     setTimeout(() => {
       const userId = this.state.currentUser.id;
-      const channelName = `m_l_${userId.slice(0, 5)}`; // Ultra-short name
+      const channelName = `messenger_live_${userId.slice(0, 8)}`; 
       
       console.log("[Realtime] Connecting to hardened channel:", channelName);
       

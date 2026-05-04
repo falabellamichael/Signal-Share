@@ -21,12 +21,6 @@ function getMessageAttachmentKind(type = "") {
 export function createSupabaseClient() {
   if (window.__supabaseClient) return window.__supabaseClient;
   const client = window.supabase.createClient(apiContext.APP_CONFIG.supabaseUrl, apiContext.APP_CONFIG.supabaseAnonKey, {
-    realtime: {
-      params: {
-        eventsPerSecond: 10
-      },
-      transport: 'websocket' // Force websocket to bypass some transport failures
-    },
     db: {
       schema: 'public'
     }

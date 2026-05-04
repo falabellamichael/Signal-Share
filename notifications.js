@@ -249,16 +249,35 @@ const originalMethods = {
 });
 
 // Initialize notification system
-let notificationSystem = new NotificationSystem();
-window.notifications = notificationSystem;
+let notificationSystem = null;
 
-// Restore badge state immediately
-(function restoreBadge() {
-  const savedCount = parseInt(localStorage.getItem('signal_share_unread_count') || '0', 10);
-  if (savedCount > 0 && window.notifications) {
-    window.notifications.setUnreadCount(savedCount);
+function initNotifications() {
+  if (notificationSystem) return;
+  
+  // Ensure the container exists in the DOM before creating the system
+  if (!document.getElementById('notification-container') && !document.body) {
+    // Too early, try again in a moment
+    setTimeout(initNotifications, 50);
+    return;
   }
-})();
+
+  notificationSystem = new NotificationSystem();
+  window.notifications = notificationSystem;
+
+  // Restore badge state immediately
+  const savedCount = parseInt(localStorage.getItem('signal_share_unread_count') || '0', 10);
+  if (savedCount > 0) {
+    notificationSystem.setUnreadCount(savedCount);
+  }
+  console.log("[Notifications] System Initialized.");
+}
+
+// Start as soon as possible
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initNotifications);
+} else {
+  initNotifications();
+}
 
 // Make the class globally available
 window.NotificationSystem = NotificationSystem;

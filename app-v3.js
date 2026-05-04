@@ -2146,7 +2146,7 @@ async function handleMessageSubmit(event) {
     // 7. BROADCAST INSTANTLY to the other user
     if (state.messagesChannel) {
       const recipientId = getThreadPartnerId(state.directThreads.find(t => t.id === state.activeThreadId));
-      const targetChannelName = `m_l_${recipientId.slice(0, 5)}`;
+      const targetChannelName = `messenger_live_${recipientId.slice(0, 8)}`;
       
       const tempChannel = state.supabase.channel(targetChannelName);
       tempChannel.subscribe((status) => {
