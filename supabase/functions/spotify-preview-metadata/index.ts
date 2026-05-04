@@ -31,8 +31,11 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: "Method not allowed." }, 405);
   }
 
-  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-    return jsonResponse({ error: "Spotify credentials are not configured." }, 400);
+  if (!SPOTIFY_CLIENT_ID) {
+    return jsonResponse({ error: "Client ID Missing" }, 400);
+  }
+  if (!SPOTIFY_CLIENT_SECRET) {
+    return jsonResponse({ error: "Client Secret Missing" }, 400);
   }
 
   const url = new URL(request.url);

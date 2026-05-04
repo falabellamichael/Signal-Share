@@ -2561,16 +2561,25 @@ function createExternalPreviewStage(source, options = {}) {
   const overlay = document.createElement("div"); overlay.className = "external-preview-overlay"; const badge = document.createElement("span"); badge.className = "external-preview-badge"; badge.textContent = formatProviderName(source.provider); const title = document.createElement("strong"); title.className = "external-preview-title"; title.textContent = source.title; const description = document.createElement("p"); description.className = "external-preview-copy"; description.textContent = note || source.creator || "External media preview";
   overlay.append(badge, title, description); stage.append(image, overlay);
   if (source.provider === "youtube") { void applyExternalPreviewMetadata(stage, image, title, badge, source); loadPreviewImageCandidates(stage, image, resolveYouTubePreviewCandidates(source)); }
-  else if (source.provider === "spotify") { void applyExternalPreviewMetadata(stage, image, title, badge, source); }
+  else if (source.provider === "spotify") { 
+    badge.textContent = "Loading Artist...";
+    void applyExternalPreviewMetadata(stage, image, title, badge, source); 
+  }
   return stage;
 }
 
 async function applyExternalPreviewMetadata(stage, image, titleElement, badgeElement, source) {
-  const metadata = await getExternalPreviewMetadata(source); if (!stage.isConnected || !metadata) return;
+  const metadata = await getExternalPreviewMetadata(source); if (!stage.isConnected) return;
   const providerName = formatProviderName(source.provider);
+  if (!metadata || metadata.error) {
+    badgeElement.textContent = `${metadata?.error || "Error"} • ${providerName}`;
+    return;
+  }
   if (typeof metadata.title === "string" && metadata.title.trim()) { const previewTitle = metadata.title.trim(); titleElement.textContent = previewTitle; image.alt = `${previewTitle} preview`; }
   if (typeof metadata.creator === "string" && metadata.creator.trim()) {
     badgeElement.textContent = `${metadata.creator.trim()} • ${providerName}`;
+  } else {
+    badgeElement.textContent = providerName;
   }
   if (source.provider === "spotify" && typeof metadata.thumbnailUrl === "string" && metadata.thumbnailUrl.trim()) loadPreviewImageCandidates(stage, image, [metadata.thumbnailUrl.trim()]);
 }
@@ -2591,7 +2600,17 @@ async function getSpotifyPreviewMetadata(source) {
   externalPreviewCache.set(cacheKey, request); return request;
 }
 
-async function fetchSpotifyPreviewCatalogMetadata(source, sourceUrl) { if (!state.supabase || state.backendMode !== "supabase" || !state.currentUser) return null; const functionName = getSpotifyPreviewFunctionName(); if (!functionName) return null; try { const { data, error } = await state.supabase.functions.invoke(functionName, { body: { url: sourceUrl, market: getSpotifyPreviewMarket() } }); if (error || !data || typeof data !== "object") return null; return { title: typeof data.title === "string" ? data.title.trim() : "", creator: typeof data.creator === "string" ? data.creator.trim() : "", thumbnailUrl: typeof data.thumbnailUrl === "string" ? data.thumbnailUrl.trim() : "" }; } catch { return null; } }
+async function fetchSpotifyPreviewCatalogMetadata(source, sourceUrl) { 
+  if (!state.supabase || state.backendMode !== "supabase" || !state.currentUser) return { error: "Not Signed In" }; 
+  const functionName = getSpotifyPreviewFunctionName(); 
+  if (!functionName) return { error: "Config Missing" }; 
+  try { 
+    const { data, error } = await state.supabase.functions.invoke(functionName, { body: { url: sourceUrl, market: getSpotifyPreviewMarket() } }); 
+    if (error) return { error: "API Error" };
+    if (!data || data.error) return { error: data?.error || "Empty Response" }; 
+    return { title: typeof data.title === "string" ? data.title.trim() : "", creator: typeof data.creator === "string" ? data.creator.trim() : "", thumbnailUrl: typeof data.thumbnailUrl === "string" ? data.thumbnailUrl.trim() : "" }; 
+  } catch (err) { return { error: "Network Error" }; } 
+}
 async function fetchSpotifyPreviewOEmbedMetadata(sourceUrl) { 
   const response = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(sourceUrl)}`).catch(() => null); 
   if (!response?.ok) return null; 
