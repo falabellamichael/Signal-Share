@@ -13,30 +13,35 @@ window.MessengerRealtime = class MessengerRealtime {
   init() {
     if (!this.state.supabase || !this.state.currentUser) return;
     this.stop(); 
-    const userId = this.state.currentUser.id;
-    const channelName = `messenger_live_${userId.slice(0, 8)}`;
     
-    console.log("[Realtime] Connecting to:", channelName);
-    
-    this.channel = this.state.supabase.channel(channelName)
-      .on("postgres_changes", { 
-        event: "INSERT", 
-        schema: "public", 
-        table: "messages" 
-      }, (payload) => {
-        this.handleNewMessage(payload.new);
-      })
-      .on("broadcast", { event: "new-message" }, (payload) => {
-        console.log("[Realtime] Instant Broadcast received:", payload);
-        this.handleNewMessage(payload.payload);
-      })
-      .subscribe((status, err) => {
-        console.log("[Realtime] Status:", status);
-        if (err || status === "CHANNEL_ERROR") {
-          console.error("[Realtime] Connection issue. Retrying in 3s...", err);
-          setTimeout(() => this.init(), 3000);
-        }
-      });
+    // Tiny delay to ensure client readiness
+    setTimeout(() => {
+      const userId = this.state.currentUser.id;
+      const channelName = `m_l_${userId.slice(0, 5)}`; // Ultra-short name
+      
+      console.log("[Realtime] Connecting to hardened channel:", channelName);
+      
+      this.channel = this.state.supabase.channel(channelName)
+        .on("postgres_changes", { 
+          event: "INSERT", 
+          schema: "public", 
+          table: "messages" 
+        }, (payload) => {
+          this.handleNewMessage(payload.new);
+        })
+        .on("broadcast", { event: "new-message" }, (payload) => {
+          this.handleNewMessage(payload.payload);
+        })
+        .subscribe((status, err) => {
+          if (status === "SUBSCRIBED") {
+            console.log("[Realtime] Connected.");
+          }
+          if (err || status === "CHANNEL_ERROR") {
+            console.error("[Realtime] Transport issue. Retrying...", err);
+            setTimeout(() => this.init(), 5000);
+          }
+        });
+    }, 1000);
   }
 
   handleNewMessage(rawData) {
