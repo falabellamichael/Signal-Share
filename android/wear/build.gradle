@@ -1,0 +1,61 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace = "io.signalshare.wear"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    defaultConfig {
+        applicationId "io.signalshare.app"
+        minSdkVersion 30
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0.0"
+        buildConfigField "String", "SIGNAL_SHARE_URL", "\"https://falabellamichael.github.io/Signal-Share/\""
+        buildConfigField "String", "SUPABASE_URL", "\"https://gswptxeikjmihdjxoiar.supabase.co\""
+        buildConfigField "String", "SUPABASE_ANON_KEY", "\"sb_publishable_gIwGxzf1C4cD55l9XS16wg_Qn-LuYqT\""
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.core:core:$androidxCoreVersion"
+    implementation "androidx.wear:wear:1.4.0"
+    implementation "androidx.wear:wear-remote-interactions:1.1.0"
+    implementation "com.google.android.gms:play-services-wearable:19.0.0"
+    implementation "com.google.guava:guava:33.4.0-android"
+    implementation platform("com.google.firebase:firebase-bom:34.7.0")
+    implementation "com.google.firebase:firebase-messaging"
+    
+    // WorkManager for background polling
+    implementation "androidx.work:work-runtime:2.11.2"
+}
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Watch push notifications won't work")
+}

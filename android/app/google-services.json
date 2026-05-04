@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1095207843635",
+    "project_id": "signal-share",
+    "storage_bucket": "signal-share.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1095207843635:android:34cd945f778b5be4893046",
+        "android_client_info": {
+          "package_name": "io.signalshare.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMvO4V3tPZa3jeUCpdfoNah0Ob3O5n1sQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

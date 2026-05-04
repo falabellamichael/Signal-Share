@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.npm-cache/
+.gradle-cache/
+.tmp-wear/
+
+# Build outputs
+dist/
+android/app/build/
+android/.gradle/
+android/local.properties
+
+# Supabase
+supabase/.temp/
+
+# IDEs and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Android/Capacitor
+.android-home/
+.android-user-home/
+.sandbox-home/
+local.properties
+
+# Misc
+.aider.tags.cache.v4/
+scratch/
+System.Drawing.Drawing2D.GraphicsPath

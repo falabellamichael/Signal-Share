@@ -1,0 +1,25 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build HIP program",
+            "type": "shell",
+            "command": "cmd",
+            "args": [
+                "/c",
+                "\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat\" && \"C:\\Program Files\\AMD\\ROCm\\6.1\\bin\\hipcc.bat\" \"${file}\" -o \"${fileDirname}\\${fileBasenameNoExtension}.exe\""
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Compiler: HIPCC (Windows) via MSVC Environment"
+        }
+    ]
+}

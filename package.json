@@ -1,0 +1,28 @@
+{
+  "name": "signal-share-mobile",
+  "private": true,
+  "version": "1.1.0",
+  "description": "Signal Share PWA and Capacitor wrapper scaffold.",
+  "scripts": {
+    "prepare:web": "powershell -ExecutionPolicy Bypass -File ./scripts/prepare-capacitor-web.ps1",
+    "cap:sync": "npm run prepare:web && npx cap sync android",
+    "cap:open": "npx cap open android",
+    "start": "node backend/server.js"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/push-notifications": "^8.0.0",
+    "express": "^5.2.1"
+  },
+  "main": "app.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
+

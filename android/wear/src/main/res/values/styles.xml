@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SignalShareWear" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@drawable/wear_screen_background</item>
+        <item name="colorPrimary">#0E1821</item>
+        <item name="colorPrimaryDark">#091118</item>
+        <item name="colorAccent">#67D1D1</item>
+    </style>
+</resources>

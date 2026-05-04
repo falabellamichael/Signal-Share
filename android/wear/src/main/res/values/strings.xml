@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Signal Share</string>
+    <string name="brand_glyph">SS</string>
+    <string name="companion_badge">Watch companion</string>
+
+    <string name="default_detail_title">Glanceable Signal Share</string>
+    <string name="default_detail_body">Media in Motion</string>
+
+    <string name="feed_title">Latest feed</string>
+    <string name="feed_summary">Public posts, highlights, and quick checks.</string>
+    <string name="feed_detail">Public posts from Signal Share.</string>
+    <string name="feed_loading">Loading the newest public post...</string>
+    <string name="feed_meta_default">PUBLIC FEED</string>
+    <string name="feed_preview">Latest feed preview image</string>
+    <string name="feed_open_phone_summary">Open the newest media post on your phone.</string>
+    <string name="feed_open_phone_meta">PHONE MEDIA</string>
+    <string name="feed_latest_post_title">Latest post</string>
+    <string name="feed_latest_post_preview">Latest post preview image</string>
+    <string name="feed_latest_user_post_signed_out">Sign in to show your latest post.</string>
+    <string name="feed_latest_user_post_empty">No posts from your account yet.</string>
+    <string name="feed_latest_user_post_meta">YOUR POST</string>
+
+    <string name="messages_title">Direct messenger</string>
+    <string name="messages_summary">Fast replies to your existing direct threads.</string>
+    <string name="messages_detail">Sign in on the watch, pick a recent thread, and send short replies without opening the full phone messenger.</string>
+    <string name="messages_meta_default">WATCH INBOX</string>
+    <string name="messages_panel_title">Watch inbox</string>
+    <string name="messages_panel_default">Sign in with the same Signal Share account you use on the site, then choose a thread to reply.</string>
+    <string name="messages_preview_default">Choose a thread to load the latest messages.</string>
+    <string name="watch_email_hint">Email</string>
+    <string name="watch_password_hint">Password</string>
+    <string name="watch_sign_in">Sign in</string>
+    <string name="watch_message_hint">Reply to thread</string>
+    <string name="watch_send_message">Send reply</string>
+    <string name="messages_signed_out">Signed out</string>
+    <string name="messages_signing_in">Signing in...</string>
+    <string name="messages_loading_threads">Loading recent threads...</string>
+    <string name="messages_no_threads">No direct threads yet.</string>
+    <string name="messages_unread_none">No unread messages</string>
+    <string name="messages_unread_one">1 unread message</string>
+    <string name="messages_unread_count">%d unread messages</string>
+    <string name="messages_session_expired">Watch session expired. Sign in again.</string>
+    <string name="messages_send_error">Message could not be sent right now.</string>
+    <string name="messages_thread_prefix">Thread</string>
+    <string name="messages_refresh_done">Inbox refreshed.</string>
+    <string name="messages_card_signed_out">Sign in to reply from the watch.</string>
+    <string name="messages_card_empty">No recent direct threads yet.</string>
+    <string name="messages_card_ready">Tap to open your watch inbox.</string>
+
+    <string name="media_title">Now playing</string>
+    <string name="media_summary">Playback controls for the current media session.</string>
+    <string name="media_detail">Control media on your watch or phone.</string>
+    <string name="media_meta_default">PLAYBACK CONTROL</string>
+    <string name="media_panel_title">Now playing controls</string>
+    <string name="media_panel_default">Watch playback controls.</string>
+    <string name="media_panel_idle">Nothing is playing right now. Start media on your phone or watch, then refresh here.</string>
+    <string name="media_panel_syncing_phone">Checking what is playing on your phone...</string>
+    <string name="media_panel_phone_unavailable">Phone playback data is not available yet. Open or update the phone app, then refresh.</string>
+    <string name="media_prev">Prev</string>
+    <string name="media_play_pause">Play/Pause</string>
+    <string name="media_next">Next</string>
+    <string name="media_action_done">Media action sent.</string>
+    <string name="media_card_ready">Tap to open watch playback controls.</string>
+    <string name="media_card_active">Watch playback controls are ready.</string>
+    <string name="media_card_action_sent">Playback command sent.</string>
+    <string name="media_card_idle">Nothing is playing right now.</string>
+    <string name="media_card_syncing_phone">Checking your phone playback...</string>
+    <string name="media_card_phone_unavailable">Phone playback is not available yet.</string>
+    <string name="media_unknown_title">Current playback</string>
+    <string name="media_state_playing">Playing</string>
+    <string name="media_state_paused">Paused</string>
+    <string name="media_state_buffering">Buffering</string>
+    <string name="media_state_active">Active</string>
+    <string name="media_access_button">Grant access</string>
+    <string name="media_access_title">Allow now playing access</string>
+    <string name="media_access_summary">Signal Share needs phone notification access to read live media titles and source apps. This is different from ordinary app notifications.</string>
+    <string name="media_access_meta">PHONE ACCESS NEEDED</string>
+    <string name="media_access_unavailable">Open your phone settings and enable notification access for Signal Share. Regular app notifications being on is not enough.</string>
+    <string name="media_phone_meta">PHONE PLAYBACK</string>
+    <string name="media_listener_label">Signal Share now playing access</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_meta_default">THEMES AND ALERTS</string>
+    <string name="notification_settings">System alert settings</string>
+    <string name="notification_settings_unavailable">Open watch settings and enable sound and vibration for Signal Share notifications.</string>
+    <string name="watch_notifications_toggle_on">Watch Alerts: ON</string>
+    <string name="watch_notifications_toggle_off">Watch Alerts: OFF</string>
+    <string name="theme_midnight">Midnight</string>
+    <string name="theme_tide">Tide</string>
+    <string name="theme_ember">Ember</string>
+    <string name="theme_glacier">Glacier</string>
+    <string name="theme_grove">Grove</string>
+    <string name="theme_solar">Solar</string>
+
+    <string name="refresh_title">Roadmap</string>
+    <string name="refresh_detail">The watch module now has a live feed preview, a simple signed-in inbox, and media buttons. Next best additions are unread counts, new-thread creation, and richer playback state.</string>
+
+    <string name="open_phone">Open on phone</string>
+    <string name="open_spotify">Open Spotify</string>
+    <string name="back_home">Back</string>
+    <string name="refresh">Refresh</string>
+    <string name="open_phone_unavailable">No browser or handoff target is available on this watch.</string>
+    <string name="open_spotify_unavailable">Spotify is not available on this watch.</string>
+    <string name="sign_in_failed">Sign in failed. Check email, password, and activation.</string>
+    <string name="threads_failed">Threads could not be loaded right now.</string>
+    <string name="messages_failed">Messages could not be loaded right now.</string>
+    <string name="feed_failed">Latest feed could not be loaded right now.</string>
+    <string name="feed_empty">No public posts are available yet.</string>
+    <string name="feed_open_latest">Open latest post</string>
+    <string name="open_phone_success">Opening on phone...</string>
+    <string name="posted_media_already_playing">Already playing on phone.</string>
+    <string name="back_to_threads">Back to inbox</string>
+    <string name="sign_out">Sign out</string>
+</resources>

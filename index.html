@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Signal Share</title>
+    <meta
+      name="description"
+      content="Signal Share is a bold media-sharing website for images, video, and audio."
+    />
+    <meta name="theme-color" content="#0f1720" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Signal Share" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg?v=2" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=2" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css?v=85" />
+    <link rel="stylesheet" href="./notifications.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brand" href="#top" aria-label="Signal Share home">
+          <span class="brand-mark" aria-hidden="true">
+            <span class="brand-glyph brand-glyph-back">S</span>
+            <span class="brand-glyph brand-glyph-front">S</span>
+          </span>
+          <span class="brand-copy">
+            <strong>Signal Share</strong>
+            <span>Media in motion</span>
+          </span>
+        </a>
+
+        <div class="header-tools">
+          <nav class="site-nav" aria-label="Primary">
+            <a href="#compose">Upload</a>
+            <a href="#messages" id="messagesNavLink" aria-controls="messages" aria-expanded="false">
+              Messages
+            </a>
+            <a href="#feed">Feed</a>
+            <a href="#account">Account</a>
+            <button id="notificationsLauncherButton" aria-controls="notificationsPanel" aria-expanded="false" title="Notifications" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; position: relative; color: inherit; padding: 0 8px;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+              <span id="notificationBadge" style="display: none; position: absolute; bottom: -4px; right: 0px; background: var(--color-error, #e53e3e); color: white; border-radius: 50%; font-size: 10px; width: 16px; height: 16px; justify-content: center; align-items: center; font-weight: bold; line-height: 1;">0</span>
+            </button>
+            <a href="#profileView" id="profileNavLink" aria-controls="profileView" aria-expanded="false" title="Profile" style="display: flex; align-items: center; position: relative; margin-left: 8px;">
+              <span class="profile-badge profile-nav-avatar" id="profileNavAvatar" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 50%; margin: 0; padding: 0;">--</span>
+            </a>
+          </nav>
+
+          <button
+            class="button button-secondary settings-toggle"
+            id="settingsToggleButton"
+            type="button"
+            aria-expanded="false"
+            aria-controls="settingsPanel"
+          >
+            Settings
+          </button>
+        </div>
+      </header>
+
+
+
+      <section class="settings-panel" id="settingsPanel" aria-hidden="true" hidden>
+        <div class="settings-backdrop" id="settingsBackdrop"></div>
+
+        <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+          <button
+            class="settings-close"
+            id="settingsCloseButton"
+            type="button"
+            aria-label="Close settings"
+          >
+            Close
+          </button>
+
+          <div class="settings-head">
+            <p class="eyebrow">Preferences</p>
+            <h2 id="settingsTitle">Shape your view</h2>
+            <p>
+              Personalize the interface without changing the shared feed. Theme, motion, spacing,
+              and dock position stay saved in this browser.
+            </p>
+          </div>
+
+          <div id="settingsMainPage">
+            <div class="settings-section">
+              <div class="settings-section-head">
+                <strong>Theme</strong>
+                <span>Pick the room you want to work in.</span>
+              </div>
+
+              <div class="theme-grid" id="themeGrid">
+                <button class="theme-swatch" data-theme-option="sunset" type="button" aria-pressed="false">
+                  <span class="theme-preview theme-preview-sunset"></span>
+                  <strong>Sunset</strong>
+                  <span>Warm default</span>
+                </button>
+
+                <button class="theme-swatch" data-theme-option="midnight" type="button" aria-pressed="false">
+                  <span class="theme-preview theme-preview-midnight"></span>
+                  <strong>Midnight</strong>
+                  <span>Dark mode</span>
+                </button>
+
+                <button class="theme-swatch" data-theme-option="gallery" type="button" aria-pressed="false">
+                  <span class="theme-preview theme-preview-gallery"></span>
+                  <strong>Gallery</strong>
+                  <span>Neutral light</span>
+                </button>
+
+                <button class="theme-swatch" data-theme-option="aurora" type="button" aria-pressed="false">
+                  <span class="theme-preview theme-preview-aurora"></span>
+                  <strong>Aurora</strong>
+                  <span>Cool studio</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="settings-fields">
+              <label class="settings-field">
+                <span>Density</span>
+                <select id="densitySelect">
+                  <option value="airy">Airy</option>
+                  <option value="compact">Compact</option>
+                </select>
+              </label>
+
+              <label class="settings-field">
+                <span>Motion</span>
+                <select id="motionSelect">
+                  <option value="full">Full motion</option>
+                  <option value="calm">Calm motion</option>
+                </select>
+              </label>
+
+              <label class="settings-field settings-toggle-field" for="statusBarStripToggle">
+                <span>Status bar strip</span>
+                <span class="settings-field-copy">Reserve a black strip at the top, or let the theme background show through.</span>
+                <span class="settings-switch">
+                  <input id="statusBarStripToggle" type="checkbox" />
+                  <span class="settings-switch-ui" aria-hidden="true"></span>
+                </span>
+              </label>
+            </div>
+
+            <div class="settings-actions">
+              <button
+                class="button button-secondary"
+                id="resetPlayerPositionButton"
+                type="button"
+              >
+                Reset player dock
+              </button>
+              <button
+                class="button button-secondary"
+                id="resetPreferencesButton"
+                type="button"
+              >
+                Reset preferences
+              </button>
+              <button
+                class="button button-secondary"
+                id="keyboardShortcutsButton"
+                type="button"
+                style="margin-top: 10px; width: 100%;"
+                onclick="window.showSettingsPage && window.showSettingsPage('shortcuts')"
+              >
+                Keyboard shortcuts
+              </button>
+            </div>
+          </div>
+
+          <div id="settingsShortcutsPage" style="display: none;">
+            <div class="settings-head">
+              <p class="eyebrow">Accessibility</p>
+              <h2>Keyboard shortcuts</h2>
+              <p>Use these keys to navigate Signal Share faster.</p>
+            </div>
+            
+            <div class="settings-section" style="padding-top: 0;">
+              <div id="shortcutsList" style="display: flex; flex-direction: column; gap: 10px; max-height: 50vh; overflow-y: auto; margin-bottom: 20px;">
+                <!-- Shortcuts will be injected here -->
+              </div>
+            </div>
+
+            <div class="settings-actions">
+              <button
+                class="button button-secondary"
+                type="button"
+                style="width: 100%;"
+                onclick="window.showSettingsPage && window.showSettingsPage('main')"
+              >
+                Back to preferences
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+
+      <main id="top">
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">Independent media publishing</p>
+            <h1>Share the image, video, or sound that moves the room.</h1>
+            <p class="hero-text">
+              Publish visual drops, rough cuts, and audio moments in a living
+              feed. Start locally in one browser, or connect Supabase for a
+              shared feed that follows you across devices.
+            </p>
+
+            <div class="hero-visual" aria-hidden="true">
+              <div class="hero-orb hero-orb-primary"></div>
+              <div class="hero-orb hero-orb-secondary"></div>
+              <div class="hero-dot-grid">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+
+            <div class="hero-actions">
+              <a class="button button-primary" href="#compose">Start sharing</a>
+              <a class="button button-secondary" href="#feed">Browse feed</a>
+            </div>
+
+            <dl class="hero-stats" id="statsPanel">
+              <div>
+                <dt>Posts</dt>
+                <dd data-stat="posts">0</dd>
+              </div>
+              <div>
+                <dt>Creators</dt>
+                <dd data-stat="creators">0</dd>
+              </div>
+            </dl>
+          </div>
+
+          <aside class="hero-panel" aria-label="Platform highlights">
+            <div class="panel-card panel-card-large">
+              <span>Shared publishing</span>
+              <strong>Local start, live upgrade</strong>
+              <p>
+                Test the full flow instantly, then switch to Supabase when you
+                want cross-device posts and hosted playback.
+              </p>
+            </div>
+            <div class="panel-card">
+              <span>Flexible media</span>
+              <strong>Images, video, audio</strong>
+            </div>
+            <div class="panel-card">
+              <span>Discovery</span>
+              <strong>Search, tags, sort, filter</strong>
+            </div>
+          </aside>
+        </section>
+
+        <section class="composer-grid" id="compose">
+          <div class="compose-card">
+            <div class="section-heading">
+              <p class="eyebrow">Compose</p>
+              <h2>Publish a new post</h2>
+            </div>
+
+            <form id="postForm" class="post-form">
+              <label>
+                Creator
+                <input
+                  id="creatorInput"
+                  name="creator"
+                  type="text"
+                  maxlength="40"
+                  placeholder="Your display name"
+                  required
+                />
+              </label>
+
+              <label>
+                Title
+                <input
+                  id="titleInput"
+                  name="title"
+                  type="text"
+                  maxlength="70"
+                  placeholder="Name the drop"
+                  required
+                />
+              </label>
+
+              <label>
+                Caption
+                <textarea
+                  id="captionInput"
+                  name="caption"
+                  rows="4"
+                  maxlength="280"
+                  placeholder="Say what makes this worth opening."
+                  required
+                ></textarea>
+              </label>
+
+              <label>
+                Tags
+                <input
+                  id="tagsInput"
+                  name="tags"
+                  type="text"
+                  maxlength="80"
+                  placeholder="portrait, live set, backstage"
+                />
+              </label>
+
+              <label>
+                Media Link
+                <input
+                  id="externalUrlInput"
+                  name="externalUrl"
+                  type="url"
+                  maxlength="300"
+                  placeholder="Paste a YouTube or Spotify link instead of uploading a file"
+                />
+              </label>
+
+              <p class="field-help" id="sourceHelp">
+                Use one source per post: upload a file, or paste a YouTube / Spotify link.
+              </p>
+
+              <div class="dropzone" id="dropzone" tabindex="0" role="button">
+                <input
+                  id="mediaInput"
+                  name="media"
+                  type="file"
+                  accept="image/*,video/*,audio/*"
+                  hidden
+                />
+                <div class="dropzone-graphic" aria-hidden="true">
+                  <span class="dropzone-tile dropzone-tile-primary"></span>
+                  <span class="dropzone-tile dropzone-tile-secondary"></span>
+                  <span class="dropzone-tile dropzone-tile-tertiary"></span>
+                </div>
+                <div class="dropzone-copy">
+                  <p class="dropzone-title">Drop media here</p>
+                  <p>Or click to choose an image, video, or audio file.</p>
+                  <span class="dropzone-note">Up to 50 GB per post</span>
+                </div>
+                <div class="preview-shell" id="previewShell" hidden></div>
+              </div>
+
+              <div class="form-actions">
+                <button class="button button-primary" type="submit">
+                  Publish post
+                </button>
+                <button
+                  class="button button-secondary"
+                  type="button"
+                  id="resetFormButton"
+                >
+                  Reset
+                </button>
+              </div>
+            </form>
+
+            <p
+              class="form-feedback"
+              id="formFeedback"
+              role="status"
+              aria-live="polite"
+            ></p>
+          </div>
+
+          <aside class="account-card" id="account">
+            <div class="section-heading">
+              <p class="eyebrow">Account</p>
+              <h2>Sign in and activate posting</h2>
+            </div>
+
+            <div class="auth-state">
+              <div class="auth-badge-row">
+                <span class="status-pill" id="authStatusPill">Local mode</span>
+                <span class="status-copy" id="authStatusCopy">
+                  Connect Supabase to enable login and live posting.
+                </span>
+              </div>
+              <p class="auth-hint" id="authHint">
+                Signed-in and activated accounts can publish to the shared feed.
+              </p>
+            </div>
+
+            <form id="authForm" class="auth-form">
+              <label>
+                Account name
+                <input
+                  id="authDisplayNameInput"
+                  name="authDisplayName"
+                  type="text"
+                  minlength="2"
+                  maxlength="40"
+                  placeholder="How your name appears on posts"
+                  autocomplete="nickname"
+                />
+              </label>
+
+              <label>
+                Email
+                <input
+                  id="authEmailInput"
+                  name="authEmail"
+                  type="email"
+                  maxlength="120"
+                  placeholder="you@example.com"
+                  autocomplete="email"
+                />
+              </label>
+
+              <label>
+                Password
+                <input
+                  id="authPasswordInput"
+                  name="authPassword"
+                  type="password"
+                  minlength="8"
+                  maxlength="120"
+                  placeholder="At least 8 characters"
+                  autocomplete="current-password"
+                />
+              </label>
+
+              <label class="auth-legal" for="authTermsCheckbox">
+                <span class="auth-legal-checkbox">
+                  <input id="authTermsCheckbox" name="authTermsCheckbox" type="checkbox" />
+                  <span>I agree to the <a href="./terms.html">Terms</a> and <a href="./privacy.html">Privacy Policy</a>.</span>
+                </span>
+                <span class="auth-legal-note">Existing accounts keep working as they are. This is required only for new signups.</span>
+              </label>
+
+              <div class="auth-actions">
+                <button class="button button-primary" id="signInButton" type="submit">
+                  Sign in
+                </button>
+                <button class="button button-secondary" id="signUpButton" type="button">
+                  Create account
+                </button>
+              </div>
+            </form>
+
+            <div class="auth-account" id="authAccount" hidden>
+              <div class="account-summary">
+                <strong id="accountEmail">Not signed in</strong>
+                <p id="accountMeta">Publish to the live feed after activation.</p>
+              </div>
+
+              <div class="auth-actions">
+                <button
+                  class="button button-secondary"
+                  id="openOwnProfileButton"
+                  type="button"
+                >
+                  View your profile
+                </button>
+                <button
+                  class="button button-secondary"
+                  id="signOutButton"
+                  type="button"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+
+            <div class="activation-panel" id="activationPanel" hidden>
+              <strong id="activationTitle">Check your inbox</strong>
+              <p id="activationMessage">
+                Confirm your email address to activate posting on the shared feed.
+              </p>
+              <div class="auth-actions">
+                <button
+                  class="button button-secondary"
+                  id="resendActivationButton"
+                  type="button"
+                >
+                  Resend activation email
+                </button>
+              </div>
+            </div>
+
+            <p
+              class="form-feedback auth-feedback"
+              id="authFeedback"
+              role="status"
+              aria-live="polite"
+            ></p>
+
+            <section class="admin-editor" id="adminEditor" hidden>
+              <div class="admin-editor-head">
+                <p class="eyebrow">Admin studio</p>
+                <h3>Layout and crop fit</h3>
+                <p>
+                  These controls publish a shared shell width, spacing, corner radius, and media fit
+                  mode for everyone on the live site.
+                </p>
+              </div>
+
+              <form id="adminSettingsForm" class="admin-settings-form">
+                <label class="setting-row">
+                  <span class="setting-row-head">
+                    <span>Shell width</span>
+                    <strong id="layoutWidthValue">1200px</strong>
+                  </span>
+                  <input
+                    id="layoutWidthInput"
+                    name="layoutWidth"
+                    type="range"
+                    min="960"
+                    max="1440"
+                    step="20"
+                    value="1200"
+                  />
+                </label>
+
+                <label class="setting-row">
+                  <span class="setting-row-head">
+                    <span>Section gap</span>
+                    <strong id="layoutGapValue">24px</strong>
+                  </span>
+                  <input
+                    id="layoutGapInput"
+                    name="layoutGap"
+                    type="range"
+                    min="16"
+                    max="40"
+                    step="2"
+                    value="24"
+                  />
+                </label>
+
+                <label class="setting-row">
+                  <span class="setting-row-head">
+                    <span>Surface radius</span>
+                    <strong id="layoutRadiusValue">32px</strong>
+                  </span>
+                  <input
+                    id="layoutRadiusInput"
+                    name="layoutRadius"
+                    type="range"
+                    min="22"
+                    max="44"
+                    step="1"
+                    value="32"
+                  />
+                </label>
+
+                <label class="setting-row">
+                  <span class="setting-row-head">
+                    <span>Media fit</span>
+                  </span>
+                  <select id="mediaFitSelect" name="mediaFit">
+                    <option value="cover">Crop to fill</option>
+                    <option value="contain">Contain full frame</option>
+                  </select>
+                </label>
+
+                <div class="auth-actions">
+                  <button class="button button-primary" id="saveSettingsButton" type="submit">
+                    Save live layout
+                  </button>
+                  <button
+                    class="button button-secondary"
+                    id="resetSettingsButton"
+                    type="button"
+                  >
+                    Reset preview
+                  </button>
+                </div>
+              </form>
+
+              <p
+                class="form-feedback auth-feedback"
+                id="adminSettingsFeedback"
+                role="status"
+                aria-live="polite"
+              ></p>
+            </section>
+          </aside>
+        </section>
+
+        <section class="messenger-section" id="messages" aria-label="Messenger" aria-expanded="false">
+          <div class="messenger-floating-controls" aria-hidden="false">
+            <button
+              class="button button-secondary messenger-minimize"
+              id="messengerMinimizeButton"
+              type="button"
+              aria-controls="messages"
+              aria-label="Minimize Direct Messenger"
+            >
+              <svg viewBox="0 0 24 24" role="presentation" focusable="false" aria-hidden="true">
+                <path d="M6 12.75a.75.75 0 0 1 0-1.5h12a.75.75 0 0 1 0 1.5z" fill="currentColor" />
+              </svg>
+            </button>
+
+            <button
+              class="button button-secondary messenger-expand-icon"
+              id="messengerExpandButton"
+              type="button"
+              aria-controls="messages"
+              aria-expanded="false"
+              aria-label="Expand Direct Messenger"
+            >
+              <svg viewBox="0 0 24 24" role="presentation" focusable="false" aria-hidden="true">
+                <path
+                  d="M8 4.75A.75.75 0 0 1 8.75 4h3.5a.75.75 0 0 1 0 1.5H10.56l3.22 3.22a.75.75 0 1 1-1.06 1.06L9.5 6.56v1.69a.75.75 0 0 1-1.5 0zm8 10a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-1.69l-3.22 3.22a.75.75 0 0 1-1.06-1.06l3.22-3.22H12.5a.75.75 0 0 1 0-1.5zm-8 .75a.75.75 0 0 1 .75.75v1.69l3.22-3.22a.75.75 0 1 1 1.06 1.06l-3.22 3.22h1.69a.75.75 0 0 1 0 1.5H8.75A.75.75 0 0 1 8 19zm8-10a.75.75 0 0 1-.75-.75V3.75A.75.75 0 0 1 16 3h3.25a.75.75 0 0 1 0 1.5h-1.69l3.22 3.22a.75.75 0 0 1-1.06 1.06L16.5 5.56v1.69a.75.75 0 0 1-.75.75"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+          </div>
+
+          <div class="feed-toolbar messenger-toolbar">
+            <div class="section-heading messenger-heading sr-only">
+              <p class="eyebrow">Messenger</p>
+              <h2>Direct Messenger</h2>
+            </div>
+
+            <div class="messenger-toolbar-side">
+              <div class="messenger-status">
+                <span class="status-pill" id="messengerStatusPill">Offline</span>
+                <span class="status-copy" id="messengerStatusCopy">
+                  Messenger needs Supabase, signed-in accounts, and the chat tables enabled.
+                </span>
+              </div>
+
+              <div class="messenger-dock-actions">
+                <button
+                  class="button button-secondary messenger-hide"
+                  id="messengerHideButton"
+                  type="button"
+                  aria-controls="messages"
+                >
+                  Hide
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="messenger-grid">
+            <aside class="messenger-sidebar">
+              <section class="messenger-card messenger-profile">
+                <div class="messenger-card-head">
+                  <strong>Your profile</strong>
+                  <span>Choose the display name other signed-in members will see.</span>
+                </div>
+
+                <label class="settings-field">
+                  <span>Display name</span>
+                  <input
+                    id="profileDisplayNameInput"
+                    type="text"
+                    maxlength="40"
+                    placeholder="How should people know you?"
+                  />
+                </label>
+
+                <div class="auth-actions">
+                  <button class="button button-primary" id="saveProfileButton" type="button">
+                    Save profile
+                  </button>
+                </div>
+
+                <p
+                  class="form-feedback auth-feedback"
+                  id="profileFeedback"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </section>
+
+              <section class="messenger-card messenger-people">
+                <div class="messenger-card-head">
+                  <strong>People</strong>
+                  <span>Start a direct conversation with another member.</span>
+                </div>
+
+                <label class="search-field messenger-list-search">
+                  <span class="sr-only">Search people</span>
+                  <input
+                    id="peopleSearchInput"
+                    type="search"
+                    inputmode="search"
+                    autocomplete="off"
+                    placeholder="Search people"
+                  />
+                </label>
+
+                <div class="people-list" id="peopleList"></div>
+                <p class="messenger-empty" id="peopleEmpty">Your member directory loads here.</p>
+              </section>
+
+              <section class="messenger-card messenger-conversations">
+                <div class="messenger-card-head">
+                  <strong>Conversations</strong>
+                  <span>Recent threads stay ordered by the latest activity.</span>
+                </div>
+
+                <label class="search-field messenger-list-search">
+                  <span class="sr-only">Search conversations</span>
+                  <input
+                    id="conversationSearchInput"
+                    type="search"
+                    inputmode="search"
+                    autocomplete="off"
+                    placeholder="Search conversations"
+                  />
+                </label>
+
+                <div class="conversation-list" id="conversationList"></div>
+                <p class="messenger-empty" id="conversationEmpty">
+                  Your direct conversations will appear here.
+                </p>
+              </section>
+            </aside>
+
+            <section class="messenger-thread">
+              <div class="messenger-thread-head">
+                <div class="messenger-thread-copy">
+                  <strong id="activeThreadLabel">Sign in to open inbox</strong>
+                  <span id="activeThreadMeta">Live messaging is available only for activated accounts.</span>
+                </div>
+              </div>
+
+              <div class="message-list" id="messageList"></div>
+              <p class="messenger-empty" id="messageEmpty">
+                Messaging stays disabled until you sign in and confirm your email.
+              </p>
+
+              <form class="message-form" id="messageForm">
+                <label class="sr-only" for="messageInput">Write a message</label>
+                <textarea
+                  id="messageInput"
+                  rows="1"
+                  maxlength="2000"
+                  placeholder="Write a message"
+                ></textarea>
+
+                <input id="messageAttachmentInput" type="file" hidden />
+                <div class="message-attachment-preview" id="messageAttachmentPreview" hidden></div>
+                <div class="message-emoji-panel" id="messageEmojiPanel" hidden>
+                  <button class="emoji-chip" type="button" data-emoji="😀" aria-label="Insert grinning face">😀</button>
+                  <button class="emoji-chip" type="button" data-emoji="😂" aria-label="Insert tears of joy">😂</button>
+                  <button class="emoji-chip" type="button" data-emoji="😍" aria-label="Insert heart eyes">😍</button>
+                  <button class="emoji-chip" type="button" data-emoji="🔥" aria-label="Insert fire">🔥</button>
+                  <button class="emoji-chip" type="button" data-emoji="👏" aria-label="Insert clapping hands">👏</button>
+                  <button class="emoji-chip" type="button" data-emoji="🙌" aria-label="Insert raising hands">🙌</button>
+                  <button class="emoji-chip" type="button" data-emoji="💯" aria-label="Insert one hundred">💯</button>
+                  <button class="emoji-chip" type="button" data-emoji="❤️" aria-label="Insert red heart">❤️</button>
+                  <button class="emoji-chip" type="button" data-emoji="🎉" aria-label="Insert party popper">🎉</button>
+                  <button class="emoji-chip" type="button" data-emoji="😭" aria-label="Insert loudly crying face">😭</button>
+                  <button class="emoji-chip" type="button" data-emoji="🙏" aria-label="Insert folded hands">🙏</button>
+                  <button class="emoji-chip" type="button" data-emoji="👍" aria-label="Insert thumbs up">👍</button>
+                </div>
+
+                <div class="message-form-actions">
+                  <div class="message-form-tools">
+                    <button
+                      class="button button-secondary"
+                      id="messageEmojiButton"
+                      type="button"
+                      aria-expanded="false"
+                      aria-controls="messageEmojiPanel"
+                    >
+                      Emoji
+                    </button>
+                    <button class="button button-secondary" id="messageAttachButton" type="button">
+                      Attach
+                    </button>
+                    <button
+                      class="button button-secondary"
+                      id="messageAttachmentClearButton"
+                      type="button"
+                      hidden
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <button class="button button-primary" id="sendMessageButton" type="submit">
+                    Send
+                  </button>
+                </div>
+              </form>
+
+              <p
+                class="form-feedback auth-feedback messenger-feedback"
+                id="messengerFeedback"
+                role="status"
+                aria-live="polite"
+              ></p>
+            </section>
+          </div>
+        </section>
+
+        <section class="feed-section" id="feed">
+          <div class="feed-toolbar">
+            <div class="section-heading">
+              <p class="eyebrow">Feed</p>
+              <h2>Fresh uploads and featured drops</h2>
+            </div>
+
+            <div class="toolbar-controls">
+              <label class="search-field">
+                <span class="sr-only">Search posts</span>
+                <input
+                  id="searchInput"
+                  type="search"
+                  placeholder="Search titles, captions, or tags"
+                />
+              </label>
+
+              <label class="select-field">
+                <span class="sr-only">Sort feed</span>
+                <select id="sortSelect">
+                  <option value="newest">Newest first</option>
+                  <option value="popular">Most liked</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="filter-row" id="filterRow" aria-label="Media filters">
+            <button
+              class="filter-chip is-active"
+              data-filter="all"
+              type="button"
+              aria-pressed="true"
+            >
+              All
+            </button>
+            <button
+              class="filter-chip"
+              data-filter="image"
+              type="button"
+              aria-pressed="false"
+            >
+              Images
+            </button>
+            <button
+              class="filter-chip"
+              data-filter="video"
+              type="button"
+              aria-pressed="false"
+            >
+              Video
+            </button>
+            <button
+              class="filter-chip"
+              data-filter="audio"
+              type="button"
+              aria-pressed="false"
+            >
+              Audio
+            </button>
+            <button
+              class="filter-chip"
+              data-filter="saved"
+              type="button"
+              aria-pressed="false"
+            >
+              Saved
+            </button>
+          </div>
+
+          <div class="tag-cloud" id="tagCloud" aria-label="Trending tags"></div>
+
+          <div class="feed-overview">
+            <article class="spotlight-card" id="spotlightCard"></article>
+
+            <div class="insight-stack">
+              <section class="mini-panel" aria-labelledby="creatorBoardHeading">
+                <div class="mini-panel-head">
+                  <p class="eyebrow">Creator board</p>
+                  <h3 id="creatorBoardHeading">Who is moving</h3>
+                </div>
+                <div class="mini-panel-body" id="creatorBoard"></div>
+              </section>
+            </div>
+          </div>
+
+          <div class="feed-grid" id="feedGrid" aria-live="polite"></div>
+          <nav class="feed-pagination" id="feedPagination" aria-label="Feed pages" hidden></nav>
+          <p class="empty-state" id="emptyState" hidden>
+            No posts match the current filter. Try another search or publish a
+            fresh drop.
+          </p>
+        </section>
+      </main>
+    </div>
+
+    <template id="feedCardTemplate">
+      <article class="feed-card">
+        <div class="card-media"></div>
+        <div class="card-body">
+          <div class="card-meta">
+            <p class="card-kind"></p>
+            <p class="card-signal"></p>
+          </div>
+          <h3 class="card-title"></h3>
+          <p class="card-caption"></p>
+          <div class="card-actions">
+            <button class="open-button" type="button">Open</button>
+            <button class="save-button" type="button"></button>
+            <button class="like-button" type="button"></button>
+          </div>
+          <div class="card-footer">
+            <div>
+              <button class="card-creator profile-trigger" type="button"></button>
+              <p class="card-time"></p>
+            </div>
+            <button class="delete-button" type="button" hidden>Delete</button>
+          </div>
+          <div class="card-tags"></div>
+        </div>
+      </article>
+    </template>
+
+    <section class="viewer" id="viewer" aria-hidden="true">
+      <div class="viewer-backdrop" data-close-viewer></div>
+      <div
+        class="viewer-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="viewerTitle"
+      >
+        <button class="viewer-close" id="viewerCloseButton" type="button" aria-label="Close viewer">
+          Close
+        </button>
+
+        <div class="viewer-stage" id="viewerStage"></div>
+
+        <aside class="viewer-panel">
+          <p class="viewer-kind" id="viewerKind"></p>
+          <h3 id="viewerTitle"></h3>
+          <p class="viewer-caption" id="viewerCaption"></p>
+
+          <div class="viewer-meta">
+            <button class="viewer-creator profile-trigger" id="viewerCreator" type="button"></button>
+            <p class="viewer-time" id="viewerTime"></p>
+          </div>
+
+          <div class="viewer-tags" id="viewerTags"></div>
+
+          <div class="viewer-actions">
+            <button class="button button-secondary" id="viewerCollapseButton" type="button">
+              Minimize
+            </button>
+            <button class="button button-secondary" id="viewerPrevButton" type="button">
+              Previous
+            </button>
+            <button class="button button-secondary" id="viewerNextButton" type="button">
+              Next
+            </button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="profile-view" id="profileView" aria-hidden="true">
+      <div class="profile-view-backdrop" data-close-profile></div>
+      <div
+        class="profile-view-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profileTitle"
+      >
+        <button class="viewer-close profile-view-close" id="profileCloseButton" type="button" aria-label="Close profile">
+          Close
+        </button>
+
+        <div class="profile-hero">
+          <div class="profile-identity">
+            <span class="profile-badge" id="profileBadge" aria-hidden="true">SS</span>
+            <div class="profile-copy">
+              <p class="eyebrow">Profile</p>
+              <h3 id="profileTitle">Member profile</h3>
+              <p class="profile-meta" id="profileMeta">Live member profile</p>
+            </div>
+          </div>
+
+          <div class="profile-stats" id="profileStats"></div>
+        </div>
+
+        <section class="profile-feed">
+          <div class="profile-feed-head">
+            <div>
+              <p class="eyebrow">Latest feed</p>
+              <h4>Posts from this profile</h4>
+            </div>
+          </div>
+
+          <div class="profile-feed-grid" id="profileFeedGrid" aria-live="polite"></div>
+          <nav class="feed-pagination" id="profileFeedPagination" aria-label="Profile feed pages" hidden></nav>
+          <p class="empty-state profile-empty" id="profileEmpty" hidden>
+            No posts yet.
+          </p>
+        </section>
+      </div>
+    </section>
+
+    <section class="mini-player" id="miniPlayer" aria-hidden="true">
+      <div class="mini-player-head" id="miniPlayerHead" title="Drag to move the player">
+        <div class="mini-player-copy">
+          <p class="mini-player-kind" id="miniPlayerKind"></p>
+          <strong id="miniPlayerTitle">Nothing playing</strong>
+        </div>
+
+        <div class="mini-player-actions">
+          <button class="button button-secondary" id="miniExpandButton" type="button">
+            Expand
+          </button>
+          <button class="button button-secondary" id="miniCloseButton" type="button">
+            Close
+          </button>
+        </div>
+      </div>
+
+      <div class="mini-player-stage" id="miniPlayerStage"></div>
+
+      <div class="mini-player-volume" id="miniPlayerVolume" hidden>
+        <label class="mini-player-volume-label" for="miniPlayerVolumeSlider">Volume</label>
+        <input
+          class="mini-player-volume-slider"
+          id="miniPlayerVolumeSlider"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value="100"
+        />
+        <span class="mini-player-volume-value" id="miniPlayerVolumeValue">100%</span>
+      </div>
+
+      <div class="mini-player-detail" id="miniPlayerDetail">
+        <p class="mini-player-caption" id="miniPlayerCaption"></p>
+
+        <div class="mini-player-meta">
+          <button class="mini-player-creator profile-trigger" id="miniPlayerCreator" type="button"></button>
+          <p class="mini-player-time" id="miniPlayerTime"></p>
+        </div>
+
+        <div class="mini-player-tags" id="miniPlayerTags"></div>
+
+        <div class="mini-player-nav">
+          <button class="button button-secondary" id="miniPrevButton" type="button">
+            Previous
+          </button>
+          <button class="button button-secondary" id="miniNextButton" type="button">
+            Next
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="admin-ban-panel" id="adminBanPanel" aria-hidden="true" hidden>
+      <div class="admin-ban-head">
+        <div>
+          <p class="eyebrow">Admin</p>
+          <h2>Ban Members</h2>
+        </div>
+        <button class="button button-secondary admin-ban-close" id="adminBanCloseButton" type="button">
+          Close
+        </button>
+      </div>
+
+      <p class="admin-ban-copy">
+        Banned accounts cannot post to the live feed or use Direct Messenger.
+      </p>
+
+      <label class="search-field admin-ban-search">
+        <span class="sr-only">Search members to ban</span>
+        <input
+          id="adminBanSearchInput"
+          type="search"
+          inputmode="search"
+          autocomplete="off"
+          placeholder="Search members"
+        />
+      </label>
+
+      <div class="admin-ban-list" id="adminBanList"></div>
+      <p class="messenger-empty admin-ban-empty" id="adminBanEmpty">Admin ban controls load here.</p>
+
+      <div class="admin-ban-actions">
+        <button class="button button-secondary" id="adminBanRefreshButton" type="button">
+          Refresh
+        </button>
+      </div>
+
+      <p
+        class="form-feedback auth-feedback admin-ban-feedback"
+        id="adminBanFeedback"
+        role="status"
+        aria-live="polite"
+      ></p>
+    </section>
+
+    <button
+      class="admin-ban-launcher"
+      id="adminBanLauncherButton"
+      type="button"
+      aria-controls="adminBanPanel"
+      aria-expanded="false"
+      aria-label="Open admin ban menu"
+      hidden
+    >
+      <span class="admin-ban-launcher-badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+          <path
+            d="M12 3.25 18.75 6v5.4c0 4.28-2.7 7.92-6.75 9.35-4.05-1.43-6.75-5.07-6.75-9.35V6L12 3.25Zm0 2.16L7.25 7.34v4.06c0 3.11 1.8 5.9 4.75 7.2 2.95-1.3 4.75-4.09 4.75-7.2V7.34L12 5.41Zm-2.6 5.42h5.2v1.84H9.4v-1.84Z"
+            fill="currentColor"
+          />
+        </svg>
+      </span>
+      <span class="sr-only">Open admin ban menu</span>
+    </button>
+
+    <button
+      class="messenger-launcher"
+      id="messengerLauncherButton"
+      type="button"
+      aria-controls="messages"
+      aria-expanded="false"
+      aria-label="Open messenger"
+    >
+      <span class="messenger-launcher-badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+          <path
+            d="M5 6.5C5 5.12 6.12 4 7.5 4h9C17.88 4 19 5.12 19 6.5v6c0 1.38-1.12 2.5-2.5 2.5H11l-3.62 3.02A.75.75 0 0 1 6 17.44V15H7.5C6.12 15 5 13.88 5 12.5z"
+            fill="currentColor"
+          />
+        </svg>
+      </span>
+      <span class="sr-only">Open messenger</span>
+    </button>
+
+    <script type="module" src="./config.js?v=2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4"></script>
+    <script type="module" src="./notifications.js?v=2"></script>
+    <script type="module" src="./keyboard-bindings-v3.js?v=3"></script>
+    <script type="module" src="./notification-keyboard-integration.js?v=2"></script>
+    <!-- Global Overlay Panels -->
+    <section class="settings-panel" id="notificationsPanel" aria-hidden="true" hidden style="z-index: 9000 !important;">
+      <div class="settings-backdrop" id="notificationsBackdrop"></div>
+      <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle" style="max-width: 480px;">
+        <button class="settings-close" id="notificationsCloseButton" type="button" aria-label="Close notifications">Close</button>
+        <div class="settings-head">
+          <p class="eyebrow">Activity</p>
+          <h2 id="notificationsTitle">Notifications</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <p style="margin: 0;">Recent messages and likes</p>
+            <button id="clearNotificationsButton" style="background: none; border: none; color: var(--color-primary, #3b82f6); cursor: pointer; text-decoration: underline; font-size: 0.85rem; padding: 0;">Clear All</button>
+          </div>
+        </div>
+        <div class="settings-section" style="padding-top: 0;">
+          <ul id="notificationsList" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto;">
+            <!-- Notifications will be injected here -->
+          </ul>
+          <p id="notificationsEmptyState" style="text-align: center; color: var(--text-muted, #94a3b8); padding: 20px 0;">No new notifications</p>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="app-v3.js?v=2"></script>
+
+  </body>
+</html>
