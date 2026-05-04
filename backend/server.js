@@ -28,5 +28,5 @@ app.post('/api/users/ban', (req, res) => {
 
 // Start the server
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);z
+  console.log(`Server is running on http://localhost:${port}`);
 });

@@ -8,6 +8,7 @@ $files = @(
   "styles.css",
   "api-v3.js",
   "app-v3.js",
+  "messenger-realtime.js",
   "config.js",
   "notifications.js",
   "notifications.css",
