@@ -1,3 +1,4 @@
+import { MessengerRealtime } from './messenger-realtime.js';
 import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js';
 
 // Ban Helper Functions
@@ -1840,6 +1841,7 @@ async function refreshMessengerState(options = {}) {
 }
 
 function unsubscribeMessagingChannels() {
+  if (messengerRealtime) messengerRealtime.stop();
   if (state.threadsChannel) { state.threadsChannel.unsubscribe(); state.threadsChannel = null; }
   if (state.messagesChannel) { state.messagesChannel.unsubscribe(); state.messagesChannel = null; }
   if (state.likesChannel) { state.likesChannel.unsubscribe(); state.likesChannel = null; }
@@ -1847,22 +1849,7 @@ function unsubscribeMessagingChannels() {
 }
 
 let isMessagingSubscribing = false;
-  // Safety Pulse: Check for new messages every 15 seconds as a backup to Realtime
-  if (window.__SIGNAL_SAFETY_PULSE__) clearInterval(window.__SIGNAL_SAFETY_PULSE__);
-  window.__SIGNAL_SAFETY_PULSE__ = setInterval(async () => {
-    console.log("[Messenger] Safety Pulse: Checking for new activity...");
-    if (typeof isMessagingEnabled === 'function' && isMessagingEnabled(state)) {
-      try {
-        // Force a total refresh of threads and unread state
-        await refreshMessengerState({ preserveActiveThread: true });
-        
-        // Count threads that have a newer 'updated_at' than our last view? 
-        // Actually, let's just trust refreshMessengerState to update the UI.
-      } catch (e) {
-        console.error("[Messenger] Safety Pulse failed:", e);
-      }
-    }
-  }, 15000);
+let messengerRealtime = null;
 
 async function subscribeMessagingChannels(options = {}) {
   const { force = false } = options;
@@ -1873,94 +1860,55 @@ async function subscribeMessagingChannels(options = {}) {
   try {
     isMessagingSubscribing = true;
     unsubscribeMessagingChannels();
-    const sessionHash = Date.now().toString(36) + Math.random().toString(36).substring(2);
-  state.threadsChannel = state.supabase.channel(`direct-threads-${state.currentUser.id}-${sessionHash}`);
-  state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "direct_threads" }, () => void refreshMessengerState({ preserveActiveThread: true })).on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => void refreshMessengerState({ preserveActiveThread: true }));
-  if (state.blockingAvailable) state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_blocks" }, () => void refreshMessengerState({ preserveActiveThread: true }));
-  if (state.banningAvailable) state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState().then(() => { if (canAccessAdminBanPanel(state)) void refreshAdminBanState(); if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true }); else { clearMessengerState(); render(); } }));
-  state.threadsChannel.subscribe();
-    // Simplified channel name to prevent transport issues
-    const channelName = `realtime-messages-${state.currentUser.id.slice(0, 8)}`;
-    console.log(`[Messenger] Attempting to connect to channel: ${channelName}`);
     
-    state.messagesChannel = state.supabase.channel(channelName, {
-      config: {
-        broadcast: { self: false, ack: true }
-      }
-    })
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-      handleIncomingRealtimeMessage(payload.new);
-    })
-    .on("broadcast", { event: "new-message" }, (payload) => {
-      console.log("[Messenger] Instant Broadcast received:", payload);
-      handleIncomingRealtimeMessage(payload.payload);
-    });
+    // Initialize the new dedicated Realtime system
+    if (!messengerRealtime) {
+      messengerRealtime = new MessengerRealtime(state);
+    }
+    messengerRealtime.init();
+    
+    // Keep reference for compatibility
+    state.messagesChannel = messengerRealtime.channel;
+    const sessionHash = messengerRealtime.sessionHash;
 
-    async function handleIncomingRealtimeMessage(rawData) {
-      console.log("[Messenger] Processing message data:", rawData);
-      const message = normalizeMessage(rawData); 
-      if (message.senderId && (isUserBlocked(state, message.senderId) || isUserBanned(state, message.senderId))) {
-        return;
-      }
-      const threadExists = state.directThreads.some((t) => t.id === message.threadId); 
-      const isActiveThread = message.threadId === state.activeThreadId;
-      
-      if (message.senderId && message.senderId === state.currentUser?.id) {
-        console.log("[Messenger] Self-message detected. No alert.");
-        return;
-      }
-      
-      console.log("[Messenger] Triggering INSTANT alert logic...");
-      playIncomingMessageSound(); 
-      
-      const notif = window.notifications;
-      if (notif) {
-        const senderProfile = state.availableProfiles.find(p => p.id === message.senderId);
-        let senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
-        let messageBody = message.body || "Sent an attachment";
-        
-        if (state.preferences.notificationHideSender) senderName = "Someone";
-        if (state.preferences.notificationHideBody) messageBody = "New message";
-
-        try { notif.info(messageBody, `${senderName} sent a message`); } catch (e) {}
-
-        if (!state.messengerOpen || !isActiveThread) {
-          try { notif.incrementUnreadCount(); } catch (e) {}
-        }
-      }
-
-      if (isActiveThread) {
-        mergeActiveMessage(message);
-        showMessengerFeedback("");
-        renderActiveThread(isMessagingEnabled(state));
-      }
+    state.threadsChannel = state.supabase.channel(`direct-threads-${state.currentUser.id}-${sessionHash}`);
+    state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "direct_threads" }, () => void refreshMessengerState({ preserveActiveThread: true }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => void refreshMessengerState({ preserveActiveThread: true }));
+    
+    if (state.blockingAvailable) {
+      state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_blocks" }, () => void refreshMessengerState({ preserveActiveThread: true }));
     }
     
-    state.messagesChannel.subscribe((status, err) => {
-      console.log(`[Messenger] Messages channel status:`, status);
-      if (err) console.error("[Messenger] Subscription Error:", err);
-      if (status === "SUBSCRIBED") {
-        console.log("[Messenger] Realtime is active! Waiting for messages...");
-      }
-    });
-    
+    if (state.banningAvailable) {
+      state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState().then(() => { 
+        if (canAccessAdminBanPanel(state)) void refreshAdminBanState(); 
+        if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true }); 
+        else { clearMessengerState(); render(); } 
+      }));
+    }
+    state.threadsChannel.subscribe();
+
     state.likesChannel = state.supabase.channel(`likes-${state.currentUser.id}-${sessionHash}`).on("postgres_changes", { event: "INSERT", schema: "public", table: POST_LIKES_TABLE }, (payload) => {
       const like = payload.new;
       if (like.user_id === state.currentUser.id) return;
       const likedPost = state.userPosts.find((p) => p.id === like.post_id);
-      if (likedPost && likedPost.authorId === state.currentUser.id) {
-        if (window.notifications) {
-          window.notifications.success(`Someone liked your post: ${likedPost.title || "Untitled"}`, "New Like!");
-          window.notifications.incrementUnreadCount();
-        }
+      if (likedPost && likedPost.authorId === state.currentUser.id && window.notifications) {
+        window.notifications.success(`Someone liked your post: ${likedPost.title || "Untitled"}`, "New Like!");
+        window.notifications.incrementUnreadCount();
       }
     }).subscribe();
+
   } catch (error) {
     console.error("[Messenger] Fatal Subscription Error:", error);
   } finally {
     isMessagingSubscribing = false;
   }
 }
+
+// Expose helpers for the new MessengerRealtime system
+window.playIncomingMessageSound = playIncomingMessageSound;
+window.mergeActiveMessage = mergeActiveMessage;
+window.renderActiveThread = renderActiveThread;
 
 function playIncomingMessageSound() {
   const now = Date.now(); if (now - state.lastIncomingMessageSoundAt < 700) return; state.lastIncomingMessageSoundAt = now;
