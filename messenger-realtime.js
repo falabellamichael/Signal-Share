@@ -8,10 +8,12 @@ window.MessengerRealtime = class MessengerRealtime {
     this.state = appState;
     this.channel = null;
     this.sessionHash = Math.random().toString(36).substring(2, 10);
+    this.isConnecting = false;
   }
 
   init() {
-    if (!this.state.supabase || !this.state.currentUser) return;
+    if (!this.state.supabase || !this.state.currentUser || this.isConnecting) return;
+    this.isConnecting = true;
     this.stop(); 
     
     // Tiny delay to ensure client readiness
@@ -33,6 +35,7 @@ window.MessengerRealtime = class MessengerRealtime {
           this.handleNewMessage(payload.payload);
         })
         .subscribe((status, err) => {
+          this.isConnecting = false;
           if (status === "SUBSCRIBED") {
             console.log("[Realtime] Connected.");
           }
@@ -86,7 +89,11 @@ window.MessengerRealtime = class MessengerRealtime {
 
   stop() {
     if (this.channel) {
+      console.log("[Realtime] Stopping and removing channel...");
       this.channel.unsubscribe();
+      if (this.state.supabase) {
+        this.state.supabase.removeChannel(this.channel);
+      }
       this.channel = null;
     }
   }
