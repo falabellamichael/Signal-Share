@@ -1933,9 +1933,9 @@ async function subscribeMessagingChannels(options = {}) {
         mergeActiveMessage(message);
         showMessengerFeedback("");
         renderActiveThread(isMessagingEnabled(state));
-      }
-    })
-    .subscribe((status, err) => {
+    }
+    
+    state.messagesChannel.subscribe((status, err) => {
       console.log(`[Messenger] Messages channel status:`, status);
       if (err) console.error("[Messenger] Subscription Error:", err);
       if (status === "SUBSCRIBED") {
