@@ -62,28 +62,53 @@ window.MessengerRealtime = class MessengerRealtime {
     } catch (e) {}
 
     // Show Notification
-    if (window.notifications) {
-      const senderProfile = (state.availableProfiles || []).find(p => p.id === message.senderId);
-      let senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
-      let messageBody = message.body || "Sent an attachment";
-      
-      if (state.preferences?.notificationHideSender) senderName = "Someone";
-      if (state.preferences?.notificationHideBody) messageBody = "New message";
+    const senderProfile = (state.availableProfiles || []).find(p => p.id === message.senderId);
+    let senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
+    let messageBody = message.body || "Sent an attachment";
+    
+    if (state.preferences?.notificationHideSender) senderName = "Someone";
+    if (state.preferences?.notificationHideBody) messageBody = "New message";
 
+    // 1. Try main notification system
+    if (window.notifications && typeof window.notifications.info === "function") {
       window.notifications.info(messageBody, `${senderName} sent a message`);
-      
       const isActiveThread = message.threadId === state.activeThreadId;
       if (!state.messengerOpen || !isActiveThread) {
         window.notifications.incrementUnreadCount();
       }
+    } else {
+      // 2. Fallback: Direct DOM update for mobile stability
+      const isActiveThread = message.threadId === state.activeThreadId;
+      if (!state.messengerOpen || !isActiveThread) {
+        this.fallbackIncrementBadge();
+      }
     }
 
-    // Update UI
+    // 3. Update UI
     if (message.threadId === state.activeThreadId && window.mergeActiveMessage) {
       window.mergeActiveMessage(message);
       if (window.renderActiveThread) window.renderActiveThread(true);
     } else if (window.refreshMessengerState) {
       window.refreshMessengerState({ preserveActiveThread: true });
+    }
+  }
+
+  fallbackIncrementBadge() {
+    try {
+      let count = parseInt(localStorage.getItem("signal_share_unread_count") || "0", 10);
+      count++;
+      localStorage.setItem("signal_share_unread_count", count.toString());
+      
+      const badge = document.getElementById("notificationBadge");
+      if (badge) {
+        badge.textContent = count.toString();
+        badge.style.display = "flex";
+        badge.style.opacity = "1";
+        badge.style.visibility = "visible";
+      }
+      console.log("[Realtime] Fallback badge update:", count);
+    } catch (e) {
+      console.error("[Realtime] Fallback badge failed:", e);
     }
   }
 
