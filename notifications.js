@@ -183,7 +183,9 @@ class NotificationSystem {
     if (count > 0) {
       badge.textContent = count > 99 ? '99+' : count;
       badge.style.display = 'flex';
-      console.log("[Notifications] Badge visible on phone:", count);
+      badge.style.opacity = '1';
+      badge.style.visibility = 'visible';
+      console.log("[Notifications] Force showing badge on phone:", count);
     } else {
       badge.style.display = 'none';
     }
@@ -191,7 +193,6 @@ class NotificationSystem {
 
   incrementUnreadCount() {
     let count = parseInt(localStorage.getItem('signal_share_unread_count') || '0', 10);
-    console.log("[Notifications] Incrementing unread count. New count:", count + 1);
     this.setUnreadCount(count + 1);
   }
 
@@ -248,27 +249,16 @@ const originalMethods = {
 });
 
 // Initialize notification system
-let notificationSystem = null;
+let notificationSystem = new NotificationSystem();
+window.notifications = notificationSystem;
 
-// Create notification system instance immediately if we can, or on load
-function initNotifications() {
-  if (!notificationSystem) {
-    notificationSystem = new NotificationSystem();
-    window.notifications = notificationSystem;
-    
-    // Restore badge state on load
-    const savedCount = parseInt(localStorage.getItem('signal_share_unread_count') || '0', 10);
-    if (savedCount > 0) {
-      notificationSystem.setUnreadCount(savedCount);
-    }
+// Restore badge state immediately
+(function restoreBadge() {
+  const savedCount = parseInt(localStorage.getItem('signal_share_unread_count') || '0', 10);
+  if (savedCount > 0 && window.notifications) {
+    window.notifications.setUnreadCount(savedCount);
   }
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initNotifications);
-} else {
-  initNotifications();
-}
+})();
 
 // Make the class globally available
 window.NotificationSystem = NotificationSystem;
