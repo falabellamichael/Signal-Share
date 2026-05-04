@@ -296,6 +296,13 @@ class NotificationSystem {
       console.error("[Notifications] Sync failed:", e);
     }
   }
+
+  clearHistory() {
+    this.saveHistory([]);
+    this.setUnreadCount(0);
+    console.log("[Notifications] History cleared.");
+    if (window.renderNotificationsHistory) window.renderNotificationsHistory();
+  }
 }
 
 // Wrap info/warning/error/success methods to log to history
@@ -345,16 +352,6 @@ if (document.readyState === 'loading') {
 } else {
   initNotifications();
 }
-
-// Global UI Listeners
-document.addEventListener('click', (e) => {
-  if (e.target && e.target.id === 'clearNotificationsButton') {
-    if (window.notifications) {
-      window.notifications.clearHistory();
-      if (window.renderNotificationsHistory) window.renderNotificationsHistory();
-    }
-  }
-});
 
 // Make the class globally available
 window.NotificationSystem = NotificationSystem;

@@ -1178,9 +1178,9 @@
     <script type="module" src="./config.js?v=2"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.2.3/dist/tus.min.js"></script>
-    <script type="module" src="./notifications.js?v=44"></script>
-    <script type="module" src="./keyboard-bindings-v3.js?v=44"></script>
-    <script type="module" src="./notification-keyboard-integration.js?v=44"></script>
+    <script type="module" src="./notifications.js?v=45"></script>
+    <script type="module" src="./keyboard-bindings-v3.js?v=45"></script>
+    <script type="module" src="./notification-keyboard-integration.js?v=45"></script>
     <!-- Global Overlay Panels -->
     <section class="settings-panel" id="notificationsPanel" aria-hidden="true" hidden style="z-index: 9000 !important;">
       <div class="settings-backdrop" id="notificationsBackdrop"></div>
@@ -1191,7 +1191,7 @@
           <h2 id="notificationsTitle">Notifications</h2>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
             <p style="margin: 0;">Recent messages and likes</p>
-            <button id="clearNotificationsButton" style="background: none; border: none; color: var(--color-primary, #3b82f6); cursor: pointer; text-decoration: underline; font-size: 0.85rem; padding: 0;">Clear All</button>
+            <button id="clearNotificationsButton" onclick="if(window.notifications){window.notifications.clearHistory(); if(window.renderNotificationsHistory)window.renderNotificationsHistory();}" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: var(--color-primary, #3b82f6); cursor: pointer; text-decoration: none; font-size: 0.85rem; padding: 8px 16px; border-radius: 6px; min-width: 80px; min-height: 44px;">Clear All</button>
           </div>
         </div>
         <div class="settings-section" style="padding-top: 0;">
@@ -1203,8 +1203,8 @@
       </div>
     </section>
 
-    <script src="messenger-realtime.js?v=44"></script>
-    <script type="module" src="app-v3.js?v=44"></script>
+    <script src="messenger-realtime.js?v=45"></script>
+    <script type="module" src="app-v3.js?v=45"></script>
 
   </body>
 </html>
