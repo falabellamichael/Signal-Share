@@ -18,9 +18,7 @@ window.MessengerRealtime = class MessengerRealtime {
     
     console.log("[Realtime] Connecting to:", channelName);
     
-    this.channel = this.state.supabase.channel(channelName, {
-      config: { broadcast: { self: false, ack: true } }
-    })
+    this.channel = this.state.supabase.channel(channelName)
       .on("postgres_changes", { 
         event: "INSERT", 
         schema: "public", 

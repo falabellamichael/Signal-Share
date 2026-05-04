@@ -2147,18 +2147,25 @@ async function handleMessageSubmit(event) {
       const recipientId = getThreadPartnerId(state.directThreads.find(t => t.id === state.activeThreadId));
       const targetChannelName = `messenger_live_${recipientId.slice(0, 8)}`;
       
-      console.log(`[Messenger] Sending instant broadcast to: ${targetChannelName}`);
-      state.supabase.channel(targetChannelName).send({
-        type: "broadcast",
-        event: "new-message",
-        payload: { payload: {
-          id: messageId,
-          thread_id: state.activeThreadId,
-          sender_id: state.currentUser.id,
-          body: body || null,
-          created_at: new Date().toISOString(),
-          ...attachmentPayload
-        }}
+      const tempChannel = state.supabase.channel(targetChannelName);
+      tempChannel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          tempChannel.send({
+            type: "broadcast",
+            event: "new-message",
+            payload: { payload: {
+              id: messageId,
+              thread_id: state.activeThreadId,
+              sender_id: state.currentUser.id,
+              body: body || null,
+              created_at: new Date().toISOString(),
+              ...attachmentPayload
+            }}
+          }).then(() => {
+            // Cleanup the temporary sending channel
+            setTimeout(() => tempChannel.unsubscribe(), 5000);
+          });
+        }
       });
     }
 
