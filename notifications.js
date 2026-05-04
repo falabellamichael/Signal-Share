@@ -182,12 +182,12 @@ class NotificationSystem {
     
     if (count > 0) {
       badge.textContent = count > 99 ? '99+' : count;
-      badge.style.display = 'flex';
-      badge.style.opacity = '1';
-      badge.style.visibility = 'visible';
+      badge.style.setProperty('display', 'flex', 'important');
+      badge.style.setProperty('opacity', '1', 'important');
+      badge.style.setProperty('visibility', 'visible', 'important');
       console.log("[Notifications] Force showing badge on phone:", count);
     } else {
-      badge.style.display = 'none';
+      badge.style.setProperty('display', 'none', 'important');
     }
   }
 

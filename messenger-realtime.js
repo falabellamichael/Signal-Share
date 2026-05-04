@@ -70,13 +70,18 @@ window.MessengerRealtime = class MessengerRealtime {
     if (state.preferences?.notificationHideBody) messageBody = "New message";
 
     // 1. Try main notification system
+    console.log("[Realtime] Notification System Status:", window.notifications ? "Ready" : "Missing");
+    
     if (window.notifications && typeof window.notifications.info === "function") {
+      console.log("[Realtime] Triggering info notification.");
       window.notifications.info(messageBody, `${senderName} sent a message`);
       const isActiveThread = message.threadId === state.activeThreadId;
       if (!state.messengerOpen || !isActiveThread) {
+        console.log("[Realtime] Incrementing unread count via main system.");
         window.notifications.incrementUnreadCount();
       }
     } else {
+      console.log("[Realtime] Using Fallback Badge Logic.");
       // 2. Fallback: Direct DOM update for mobile stability
       const isActiveThread = message.threadId === state.activeThreadId;
       if (!state.messengerOpen || !isActiveThread) {
@@ -86,10 +91,14 @@ window.MessengerRealtime = class MessengerRealtime {
 
     // 3. Update UI
     if (message.threadId === state.activeThreadId && window.mergeActiveMessage) {
+      console.log("[Realtime] Merging message into active thread.");
       window.mergeActiveMessage(message);
       if (window.renderActiveThread) window.renderActiveThread(true);
     } else if (window.refreshMessengerState) {
+      console.log("[Realtime] Refreshing messenger state.");
       window.refreshMessengerState({ preserveActiveThread: true });
+    } else {
+      console.warn("[Realtime] refreshMessengerState MISSING from window.");
     }
   }
 
@@ -102,9 +111,9 @@ window.MessengerRealtime = class MessengerRealtime {
       const badge = document.getElementById("notificationBadge");
       if (badge) {
         badge.textContent = count.toString();
-        badge.style.display = "flex";
-        badge.style.opacity = "1";
-        badge.style.visibility = "visible";
+        badge.style.setProperty("display", "flex", "important");
+        badge.style.setProperty("opacity", "1", "important");
+        badge.style.setProperty("visibility", "visible", "important");
       }
       console.log("[Realtime] Fallback badge update:", count);
     } catch (e) {

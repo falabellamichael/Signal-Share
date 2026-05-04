@@ -1914,6 +1914,7 @@ async function subscribeMessagingChannels(options = {}) {
 window.playIncomingMessageSound = playIncomingMessageSound;
 window.mergeActiveMessage = mergeActiveMessage;
 window.renderActiveThread = renderActiveThread;
+window.refreshMessengerState = refreshMessengerState;
 
 function playIncomingMessageSound() {
   const now = Date.now(); if (now - state.lastIncomingMessageSoundAt < 700) return; state.lastIncomingMessageSoundAt = now;
