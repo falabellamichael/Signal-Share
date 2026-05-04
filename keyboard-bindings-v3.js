@@ -170,6 +170,19 @@ class KeyboardBindings {
         window.notifications.success('Test notification', 'Success');
       }
     }, 'Show test notification');
+    
+    this.registerShortcut('Alt+Shift+l', () => {
+      // Open latest notification
+      if (window.notifications) {
+        const history = window.notifications.getHistory();
+        if (history.length > 0) {
+          const event = new CustomEvent("signal:notificationClick", {
+            detail: history[0]
+          });
+          document.dispatchEvent(event);
+        }
+      }
+    }, 'Open latest notification');
 
     this.registerShortcut('Escape', () => {
       // Close active panels

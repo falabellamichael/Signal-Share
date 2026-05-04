@@ -1935,6 +1935,7 @@ async function subscribeMessagingChannels(options = {}) {
 
 // Expose helpers globally for MessengerRealtime
 window.playIncomingMessageSound = playIncomingMessageSound;
+window.showIncomingMessageNotification = showIncomingMessageNotification;
 window.mergeActiveMessage = mergeActiveMessage;
 window.renderActiveThread = renderActiveThread;
 window.refreshMessengerState = refreshMessengerState;

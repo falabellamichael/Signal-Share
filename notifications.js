@@ -49,12 +49,13 @@ class NotificationSystem {
 
   showNotification(options) {
     const notification = {
-      id: this.generateId(),
+      id: options.id || this.generateId(),
       type: options.type || 'info',
       title: options.title || '',
       message: options.message || '',
       duration: options.duration || 5000,
-      timestamp: new Date()
+      timestamp: new Date(),
+      data: options.data || null
     };
 
     // Add to notifications array
@@ -110,6 +111,23 @@ class NotificationSystem {
       });
     }
 
+    // Add banner click listener for PC
+    const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
+    if (!isMobile) {
+      element.style.cursor = 'pointer';
+      element.addEventListener('click', (e) => {
+        if (e.target.closest('.notification-close')) return;
+        
+        const event = new CustomEvent('signal:notificationClick', {
+          detail: notification
+        });
+        document.dispatchEvent(event);
+        
+        // Auto-dismiss on click
+        this.dismissNotification(notification.id);
+      });
+    }
+
     return element;
   }
 
@@ -139,35 +157,39 @@ class NotificationSystem {
   }
 
   // Public methods for external use
-  success(message, title = 'Success') {
+  success(message, title = 'Success', options = {}) {
     return this.showNotification({
       type: 'success',
       title,
-      message
+      message,
+      ...options
     });
   }
 
-  error(message, title = 'Error') {
+  error(message, title = 'Error', options = {}) {
     return this.showNotification({
       type: 'error',
       title,
-      message
+      message,
+      ...options
     });
   }
 
-  info(message, title = 'Information') {
+  info(message, title = 'Information', options = {}) {
     return this.showNotification({
       type: 'info',
       title,
-      message
+      message,
+      ...options
     });
   }
 
-  warning(message, title = 'Warning') {
+  warning(message, title = 'Warning', options = {}) {
     return this.showNotification({
       type: 'warning',
       title,
-      message
+      message,
+      ...options
     });
   }
 
@@ -360,7 +382,7 @@ class NotificationSystem {
     const id = typeof options === 'string' ? options : options.id; 
     const data = options.data || null;
     const added = this.addToHistory({ id, type: method, title: actualTitle, message: message, data: data });
-    original.call(this, message, actualTitle);
+    original.call(this, message, actualTitle, { id, data });
     return added; 
   };
 });
@@ -418,6 +440,31 @@ window.renderNotificationsHistory = function() {
         li.style.transform = "scale(0.98)";
         setTimeout(() => li.style.transform = "scale(1)", 100);
       });
+
+      // Add keyboard accessibility for PC
+      const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
+      if (!isMobile) {
+        li.setAttribute("tabindex", "0");
+        li.setAttribute("role", "button");
+        li.style.outline = "none";
+        
+        li.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            li.click();
+          }
+        });
+        
+        li.addEventListener("focus", () => {
+          li.style.background = "var(--bg-elevated-hover, rgba(255,255,255,0.1))";
+          li.style.boxShadow = "0 0 0 2px var(--color-primary, #3b82f6)";
+        });
+        
+        li.addEventListener("blur", () => {
+          li.style.background = "var(--bg-elevated, rgba(255,255,255,0.05))";
+          li.style.boxShadow = "none";
+        });
+      }
 
       list.appendChild(li);
     });

@@ -99,6 +99,11 @@ window.MessengerRealtime = class MessengerRealtime {
         data: { type: "message", threadId: message.threadId }
       });
 
+      // Also trigger browser system notification on PC if tab is inactive
+      if (!isMobile && window.showIncomingMessageNotification) {
+        window.showIncomingMessageNotification(message);
+      }
+
       const isActiveThread = message.threadId === state.activeThreadId;
       if (added && (!state.messengerOpen || !isActiveThread)) {
         console.log("[Realtime] Incrementing unread count via main system.");
