@@ -399,11 +399,12 @@ window.renderNotificationsHistory = function() {
       li.style.borderRadius = "8px";
       li.style.position = "relative";
       li.style.overflow = "hidden";
+      li.style.cursor = "pointer";
       li.style.touchAction = "pan-y";
       li.style.transition = "transform 0.2s ease, opacity 0.2s ease";
       
       li.innerHTML = `
-        <div class="swipe-content" style="pointer-events:none;">
+        <div class="swipe-content">
           <strong style="display:block;font-size:0.95rem;margin-bottom:4px;">${item.title}</strong>
           <span style="font-size:0.85rem;color:var(--text-muted, #ccc);">${item.message}</span>
         </div>
@@ -416,9 +417,11 @@ window.renderNotificationsHistory = function() {
       let startX = 0;
       let currentX = 0;
       let isSwiping = false;
+      let startTime = 0;
 
       li.addEventListener('touchstart', (e) => {
         startX = e.touches[0].clientX;
+        startTime = Date.now();
         isSwiping = true;
         li.style.transition = 'none';
       }, { passive: true });
@@ -428,10 +431,13 @@ window.renderNotificationsHistory = function() {
         currentX = e.touches[0].clientX - startX;
         if (currentX > 0) currentX = 0;
         if (currentX < -150) currentX = -150;
-        li.style.transform = `translateX(${currentX}px)`;
+        if (Math.abs(currentX) > 10) {
+           li.style.transform = `translateX(${currentX}px)`;
+        }
       }, { passive: true });
 
-      li.addEventListener('touchend', () => {
+      li.addEventListener('touchend', (e) => {
+        const duration = Date.now() - startTime;
         isSwiping = false;
         li.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease';
         
@@ -448,8 +454,17 @@ window.renderNotificationsHistory = function() {
           }, 300);
         } else {
           li.style.transform = 'translateX(0)';
+          // If it was a quick tap with very little movement, trigger a click
+          if (duration < 300 && Math.abs(currentX) < 10) {
+            li.click();
+          }
         }
         currentX = 0;
+      });
+
+      li.addEventListener('click', () => {
+        console.log("[Notifications] Item clicked:", item);
+        // Add logic here to open threads if needed
       });
 
       list.appendChild(li);
