@@ -1800,6 +1800,16 @@ async function refreshCurrentUserBanState() {
   state.currentUserBanned = false;
   if (!state.supabase || state.backendMode !== "supabase" || !state.currentUser) { hideOverlay(); return; }
   try {
+    const profile = await loadOwnProfileFromSupabase();
+    if (profile) {
+      state.profileRecord = profile;
+      // Sync DB preferences to local state
+      updateUserPreferences({
+        ...state.preferences,
+        notificationHideSender: profile.notificationHideSender,
+        notificationHideBody: profile.notificationHideBody
+      });
+    }
     state.currentUserBanned = Boolean(await loadCurrentUserBanFromSupabase());
     if (state.currentUserBanned) { state.adminBanPanelOpen = false; state.messengerOpen = false; state.messengerExpanded = false; state.activeThreadId = null; state.activeMessages = []; showAuthFeedback("This account has been banned from posting and Direct Messenger.", true); showOverlay(); }
     else { hideOverlay(); }
