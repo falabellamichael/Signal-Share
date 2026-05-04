@@ -1934,10 +1934,8 @@ async function subscribeMessagingChannels(options = {}) {
         showMessengerFeedback("");
         renderActiveThread(isMessagingEnabled(state));
       }
-    }
-    
-    if (!threadExists || !isActiveThread) void refreshMessengerState({ preserveActiveThread: true });
-    }).subscribe((status, err) => {
+    })
+    .subscribe((status, err) => {
       console.log(`[Messenger] Messages channel status:`, status);
       if (err) console.error("[Messenger] Subscription Error:", err);
       if (status === "SUBSCRIBED") {
