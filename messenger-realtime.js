@@ -9,6 +9,7 @@ window.MessengerRealtime = class MessengerRealtime {
     this.channel = null;
     this.sessionHash = Math.random().toString(36).substring(2, 10);
     this.isConnecting = false;
+    this.processedMessageIds = new Set(); // Prevent double-counting messages in same session
   }
 
   init() {
@@ -61,6 +62,18 @@ window.MessengerRealtime = class MessengerRealtime {
     if (message.senderId === state.currentUser?.id) return;
     if (state.blockedUserIds?.includes(message.senderId)) return;
     if (state.bannedUserIds?.includes(message.senderId)) return;
+    
+    // Prevent double processing (Broadcast + Postgres changes)
+    if (this.processedMessageIds.has(message.id)) {
+      console.log("[Realtime] Skipping already processed message:", message.id);
+      return;
+    }
+    this.processedMessageIds.add(message.id);
+    if (this.processedMessageIds.size > 100) {
+      // Keep set size reasonable
+      const firstId = this.processedMessageIds.values().next().value;
+      this.processedMessageIds.delete(firstId);
+    }
 
     // Trigger sound
     try {
@@ -81,15 +94,10 @@ window.MessengerRealtime = class MessengerRealtime {
     
     if (window.notifications && typeof window.notifications.info === "function") {
       // Only show text banners on PC, hide on mobile to save screen space
-      if (!isMobile) {
-        console.log("[Realtime] Triggering info notification.");
-        window.notifications.info(messageBody, `${senderName} sent a message`, { id: message.id });
-      } else {
-        console.log("[Realtime] Skipping banner on mobile.");
-      }
+      const added = window.notifications.info(messageBody, `${senderName} sent a message`, { id: message.id });
 
       const isActiveThread = message.threadId === state.activeThreadId;
-      if (!state.messengerOpen || !isActiveThread) {
+      if (added && (!state.messengerOpen || !isActiveThread)) {
         console.log("[Realtime] Incrementing unread count via main system.");
         window.notifications.incrementUnreadCount();
       }

@@ -348,8 +348,9 @@ class NotificationSystem {
     const defaultTitles = { info: 'Information', success: 'Success', warning: 'Warning', error: 'Error' };
     const actualTitle = title || defaultTitles[method];
     const id = typeof options === 'string' ? options : options.id; // Support legacy title as 2nd param, and ID as 3rd
-    this.addToHistory({ id, type: method, title: actualTitle, message: message });
-    return original.call(this, message, actualTitle);
+    const added = this.addToHistory({ id, type: method, title: actualTitle, message: message });
+    original.call(this, message, actualTitle);
+    return added; // Return whether this was a new notification
   };
 });
 
