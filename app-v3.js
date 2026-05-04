@@ -1849,10 +1849,18 @@ function unsubscribeMessagingChannels() {
 let isMessagingSubscribing = false;
   // Safety Pulse: Check for new messages every 15 seconds as a backup to Realtime
   if (window.__SIGNAL_SAFETY_PULSE__) clearInterval(window.__SIGNAL_SAFETY_PULSE__);
-  window.__SIGNAL_SAFETY_PULSE__ = setInterval(() => {
+  window.__SIGNAL_SAFETY_PULSE__ = setInterval(async () => {
     console.log("[Messenger] Safety Pulse: Checking for new activity...");
     if (typeof isMessagingEnabled === 'function' && isMessagingEnabled(state)) {
-      void refreshMessengerState({ preserveActiveThread: true });
+      try {
+        // Force a total refresh of threads and unread state
+        await refreshMessengerState({ preserveActiveThread: true });
+        
+        // Count threads that have a newer 'updated_at' than our last view? 
+        // Actually, let's just trust refreshMessengerState to update the UI.
+      } catch (e) {
+        console.error("[Messenger] Safety Pulse failed:", e);
+      }
     }
   }, 15000);
 
@@ -1875,51 +1883,58 @@ async function subscribeMessagingChannels(options = {}) {
     const channelName = `realtime-messages-${state.currentUser.id.slice(0, 8)}`;
     console.log(`[Messenger] Attempting to connect to channel: ${channelName}`);
     
-    state.messagesChannel = state.supabase.channel(channelName).on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-      console.log("[Messenger] New message received via Realtime:", payload);
-      const message = normalizeMessage(payload.new); 
+    state.messagesChannel = state.supabase.channel(channelName, {
+      config: {
+        broadcast: { self: false, ack: true }
+      }
+    })
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+      handleIncomingRealtimeMessage(payload.new);
+    })
+    .on("broadcast", { event: "new-message" }, (payload) => {
+      console.log("[Messenger] Instant Broadcast received:", payload);
+      handleIncomingRealtimeMessage(payload.payload);
+    });
+
+    async function handleIncomingRealtimeMessage(rawData) {
+      console.log("[Messenger] Processing message data:", rawData);
+      const message = normalizeMessage(rawData); 
       if (message.senderId && (isUserBlocked(state, message.senderId) || isUserBanned(state, message.senderId))) {
-        console.log("[Messenger] Message ignored (Sender blocked/banned)");
         return;
       }
       const threadExists = state.directThreads.some((t) => t.id === message.threadId); 
       const isActiveThread = message.threadId === state.activeThreadId;
       
       if (message.senderId && message.senderId === state.currentUser?.id) {
-        console.log("[Messenger] Self-message detected via Realtime. Bell will not ring, but data arrived!");
+        console.log("[Messenger] Self-message detected. No alert.");
+        return;
       }
       
-      if (message.senderId && message.senderId !== state.currentUser?.id) { 
-        console.log("[Messenger] Triggering incoming alert logic...");
-        playIncomingMessageSound(); 
+      console.log("[Messenger] Triggering INSTANT alert logic...");
+      playIncomingMessageSound(); 
+      
+      const notif = window.notifications;
+      if (notif) {
+        const senderProfile = state.availableProfiles.find(p => p.id === message.senderId);
+        let senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
+        let messageBody = message.body || "Sent an attachment";
         
-        // Use a more robust check and independent calls
-        const notif = window.notifications;
-        if (notif) {
-          const senderProfile = state.availableProfiles.find(p => p.id === message.senderId);
-          let senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
-          let messageBody = message.body || "Sent an attachment";
-          
-          if (state.preferences.notificationHideSender) senderName = "Someone";
-          if (state.preferences.notificationHideBody) messageBody = "New message";
+        if (state.preferences.notificationHideSender) senderName = "Someone";
+        if (state.preferences.notificationHideBody) messageBody = "New message";
 
-          // 1. Show the banner (try/catch to avoid breaking the badge)
-          try {
-            notif.info(messageBody, `${senderName} sent a message`);
-          } catch (e) {
-            console.error("[Messenger] Failed to show info banner:", e);
-          }
+        try { notif.info(messageBody, `${senderName} sent a message`); } catch (e) {}
 
-          // 2. Increment the badge number
-          if (!state.messengerOpen || !isActiveThread) {
-            console.log("[Messenger] Incrementing unread count badge");
-            try {
-              notif.incrementUnreadCount();
-            } catch (e) {
-              console.error("[Messenger] Failed to increment badge:", e);
-            }
-          }
+        if (!state.messengerOpen || !isActiveThread) {
+          try { notif.incrementUnreadCount(); } catch (e) {}
         }
+      }
+
+      if (isActiveThread) {
+        mergeActiveMessage(message);
+        showMessengerFeedback("");
+        renderActiveThread(isMessagingEnabled(state));
+      }
+    }
       }
       if (isActiveThread) {
         mergeActiveMessage(message);
@@ -2176,11 +2191,38 @@ async function handleMessageSubmit(event) {
         sender_id: state.currentUser.id,
         body: body || null,
         ...attachmentPayload,
-      })
-      .select()
-      .single();
+      });
 
     if (error) throw error;
+
+    // 7. BROADCAST INSTANTLY to the other user
+    if (state.messagesChannel) {
+      const recipientId = getThreadPartnerId(state.directThreads.find(t => t.id === state.activeThreadId));
+      const targetChannelName = `realtime-messages-${recipientId.slice(0, 8)}`;
+      
+      // We send a direct broadcast to the recipient's specific channel
+      state.supabase.channel(targetChannelName).send({
+        type: 'broadcast',
+        event: 'new-message',
+        payload: {
+          id: messageId,
+          thread_id: state.activeThreadId,
+          sender_id: state.currentUser.id,
+          body: body || null,
+          ...attachmentPayload,
+          created_at: new Date().toISOString()
+        }
+      });
+      console.log(`[Messenger] Instant broadcast sent to ${targetChannelName}`);
+    }
+
+    const { data: insertedData, error: insertError } = await state.supabase
+      .from("messages")
+      .select()
+      .eq("id", messageId)
+      .single();
+
+    if (insertError) throw insertError;
 
     // Manually merge for the sender to ensure immediate UI feedback and 
     // handle potential Realtime latency/disconnects on mobile.
