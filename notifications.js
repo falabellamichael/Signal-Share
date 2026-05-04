@@ -214,7 +214,7 @@ class NotificationSystem {
   }
 
   saveClearedIds(clearedIds) {
-    const arr = Array.from(clearedIds).slice(-200); // Limit to 200 items
+    const arr = Array.from(clearedIds).slice(-1000); // Increased limit to 1000 items
     localStorage.setItem('signal_share_notifications_cleared_ids', JSON.stringify(arr));
   }
 
@@ -235,10 +235,10 @@ class NotificationSystem {
     }
 
     // 1. Blacklist Check
-    if (clearedIds.has(stableId)) return;
+    if (clearedIds.has(stableId)) return false;
 
     // 2. Duplicate Check
-    if (history.some(item => item.id === stableId)) return;
+    if (history.some(item => item.id === stableId)) return false;
 
     history.unshift({
       id: stableId,
@@ -248,6 +248,7 @@ class NotificationSystem {
       timestamp: Date.now()
     });
     this.saveHistory(history);
+    return true;
   }
 
   async syncWithSupabase(supabase, currentUserId) {
@@ -256,6 +257,8 @@ class NotificationSystem {
     
     try {
       const history = this.getHistory();
+      const lastClearedAt = parseInt(localStorage.getItem('signal_share_notifications_last_cleared_at') || '0', 10);
+      
       let lastTimestamp = 0;
       if (history.length > 0) {
         lastTimestamp = new Date(history[0].timestamp).getTime();
@@ -263,7 +266,9 @@ class NotificationSystem {
         lastTimestamp = Date.now() - (24 * 60 * 60 * 1000);
       }
 
-      const isoTimestamp = new Date(lastTimestamp).toISOString();
+      // Ensure we don't fetch anything before the last clear
+      const effectiveStartTimestamp = Math.max(lastTimestamp, lastClearedAt);
+      const isoTimestamp = new Date(effectiveStartTimestamp).toISOString();
 
       // 2. Fetch new likes
       const { data: newLikes, error: likesError } = await supabase
@@ -275,13 +280,13 @@ class NotificationSystem {
 
       if (!likesError && newLikes) {
         newLikes.forEach(like => {
-          this.addToHistory({
+          const added = this.addToHistory({
             id: `like-${like.post_id}-${like.user_id}`,
             type: "success",
             title: "New Like!",
             message: `Someone liked your post: ${like.posts.title || "Untitled"}`
           });
-          this.incrementUnreadCount();
+          if (added) this.incrementUnreadCount();
         });
       }
 
@@ -302,13 +307,13 @@ class NotificationSystem {
 
         if (!msgError && newMessages) {
           newMessages.forEach(msg => {
-            this.addToHistory({
+            const added = this.addToHistory({
               id: msg.id,
               type: "info",
               title: "New Message",
               message: msg.body || "Sent an attachment"
             });
-            this.incrementUnreadCount();
+            if (added) this.incrementUnreadCount();
           });
         }
       }
@@ -327,17 +332,23 @@ class NotificationSystem {
     this.saveClearedIds(clearedIds);
     this.saveHistory([]);
     this.setUnreadCount(0);
+    localStorage.setItem('signal_share_notifications_last_cleared_at', Date.now().toString());
     console.log("[Notifications] History cleared and IDs blacklisted.");
+  }
+
+  clearAll() {
+    this.clearHistory();
   }
 }
 
 // Wrap info/warning/error/success methods to log to history
 ['info', 'success', 'warning', 'error'].forEach(method => {
   const original = NotificationSystem.prototype[method];
-  NotificationSystem.prototype[method] = function(message, title) {
+  NotificationSystem.prototype[method] = function(message, title, options = {}) {
     const defaultTitles = { info: 'Information', success: 'Success', warning: 'Warning', error: 'Error' };
     const actualTitle = title || defaultTitles[method];
-    this.addToHistory({ type: method, title: actualTitle, message: message });
+    const id = typeof options === 'string' ? options : options.id; // Support legacy title as 2nd param, and ID as 3rd
+    this.addToHistory({ id, type: method, title: actualTitle, message: message });
     return original.call(this, message, actualTitle);
   };
 });

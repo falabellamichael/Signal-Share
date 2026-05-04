@@ -83,7 +83,7 @@ window.MessengerRealtime = class MessengerRealtime {
       // Only show text banners on PC, hide on mobile to save screen space
       if (!isMobile) {
         console.log("[Realtime] Triggering info notification.");
-        window.notifications.info(messageBody, `${senderName} sent a message`);
+        window.notifications.info(messageBody, `${senderName} sent a message`, { id: message.id });
       } else {
         console.log("[Realtime] Skipping banner on mobile.");
       }
