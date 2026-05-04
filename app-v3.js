@@ -1963,8 +1963,9 @@ async function subscribeMessagingChannels(options = {}) {
     }
     messengerRealtime.init();
     
-    // Keep reference for compatibility
+    // Explicitly set the reference so the rest of the app knows we're live
     state.messagesChannel = messengerRealtime.channel;
+    console.log("[Messenger] Realtime system initialized.");
     const sessionHash = messengerRealtime.sessionHash;
 
     state.threadsChannel = state.supabase.channel(`direct-threads-${state.currentUser.id}-${sessionHash}`);
@@ -2001,7 +2002,7 @@ async function subscribeMessagingChannels(options = {}) {
   }
 }
 
-// Expose helpers for the new MessengerRealtime system
+// Expose helpers globally at the very top
 window.playIncomingMessageSound = playIncomingMessageSound;
 window.mergeActiveMessage = mergeActiveMessage;
 window.renderActiveThread = renderActiveThread;
@@ -2017,6 +2018,13 @@ function playIncomingMessageSound() {
     gainNode.gain.setValueAtTime(0.0001, startAt); gainNode.gain.exponentialRampToValueAtTime(0.12, startAt + 0.02); gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.18);
     oscillator.connect(gainNode); gainNode.connect(ctx.destination); oscillator.start(startAt); oscillator.stop(startAt + 0.2);
   } catch (_error) {}
+}
+
+function mergeActiveMessage(message) {
+  if (!state.activeMessages) state.activeMessages = [];
+  if (state.activeMessages.some(m => m.id === message.id)) return;
+  state.activeMessages.push(message);
+  state.activeMessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
 async function handleProfileSave() {
