@@ -156,6 +156,8 @@ const DEFAULT_USER_PREFERENCES = Object.freeze({
   density: "airy",
   motion: "full",
   statusBarStrip: true,
+  notificationHideSender: false,
+  notificationHideBody: false,
 });
 const APP_CONFIG = getAppConfig();
 let messageChimeAudioContext = null;
@@ -287,6 +289,8 @@ const elements = {
   densitySelect: document.querySelector("#densitySelect"),
   motionSelect: document.querySelector("#motionSelect"),
   statusBarStripToggle: document.querySelector("#statusBarStripToggle"),
+  notificationHideSenderToggle: document.querySelector("#notificationHideSenderToggle"),
+  notificationHideBodyToggle: document.querySelector("#notificationHideBodyToggle"),
   resetPlayerPositionButton: document.querySelector("#resetPlayerPositionButton"),
   resetPreferencesButton: document.querySelector("#resetPreferencesButton"),
   messagesNavLink: document.querySelector("#messagesNavLink"),
@@ -996,6 +1000,8 @@ function attachEventListeners() {
   elements.densitySelect.addEventListener("change", handleDensityChange);
   elements.motionSelect.addEventListener("change", handleMotionChange);
   elements.statusBarStripToggle.addEventListener("change", handleStatusBarStripToggle);
+  elements.notificationHideSenderToggle.addEventListener("change", handleNotificationHideSenderToggle);
+  elements.notificationHideBodyToggle.addEventListener("change", handleNotificationHideBodyToggle);
   elements.resetPlayerPositionButton.addEventListener("click", resetPlayerDockPosition);
   elements.resetPreferencesButton.addEventListener("click", resetUserPreferences);
   elements.messagesNavLink.addEventListener("click", handleMessagesNavClick);
@@ -1741,7 +1747,17 @@ function getDefaultProfileName() {
 function formatDisplayNameFromEmail(email = "") { const localPart = String(email ?? "").trim().split("@")[0] ?? ""; const prettyName = localPart.replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "); return prettyName ? prettyName.slice(0, 40) : ""; }
 function resolveMemberDisplayName(profile, fallback = "Member") { if (!profile || typeof profile !== "object") return fallback; const displayName = String(profile.displayName ?? "").trim(); if (displayName && !normalizeEmailForMatch(displayName).includes("@")) return displayName.slice(0, 40); const prettyEmailName = formatDisplayNameFromEmail(profile.email); return prettyEmailName || (displayName ? displayName.slice(0, 40) : fallback); }
 function syncComposerCreatorWithAccount() { const shouldLockToAccount = state.backendMode === "supabase" && Boolean(state.currentUser); if (shouldLockToAccount) elements.creatorInput.value = getDefaultProfileName(); elements.creatorInput.readOnly = shouldLockToAccount; }
-function normalizeProfile(row) { return { id: row.id, email: row.email, displayName: row.display_name, createdAt: row.created_at, updatedAt: row.updated_at }; }
+function normalizeProfile(row) { 
+  return { 
+    id: row.id, 
+    email: row.email, 
+    displayName: row.display_name, 
+    notificationHideSender: Boolean(row.notification_hide_sender),
+    notificationHideBody: Boolean(row.notification_hide_body),
+    createdAt: row.created_at, 
+    updatedAt: row.updated_at 
+  }; 
+}
 function normalizeUserBlock(row) { return { blockerId: row.blocker_id, blockedId: row.blocked_id, createdAt: row.created_at }; }
 function normalizeUserBan(row) { return { bannedId: row.banned_id, bannedBy: row.banned_by, reason: row.reason ?? "", createdAt: row.created_at }; }
 function normalizeDirectThread(row) { return { id: row.id, userOneId: row.user_one_id, userTwoId: row.user_two_id, createdAt: row.created_at, updatedAt: row.updated_at }; }
@@ -1762,7 +1778,13 @@ function canonicalizeThreadPair(l, r) { return [l, r].sort((a, b) => a.localeCom
 async function syncCurrentProfileToSupabase(displayNameOverride = "") {
   const rawDisplayName = (displayNameOverride || state.profileRecord?.displayName || getDefaultProfileName()).trim().slice(0, 40);
   if (rawDisplayName.length < 2) throw new Error("Use a display name with at least 2 characters.");
-  const payload = { id: state.currentUser.id, email: getCurrentUserEmail(), display_name: rawDisplayName };
+  const payload = { 
+    id: state.currentUser.id, 
+    email: getCurrentUserEmail(), 
+    display_name: rawDisplayName,
+    notification_hide_sender: state.preferences.notificationHideSender,
+    notification_hide_body: state.preferences.notificationHideBody
+  };
   const { data, error } = await state.supabase.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
   if (error) throw error;
   const profile = normalizeProfile(data); state.profileRecord = profile; rememberCreator(profile.displayName); elements.creatorInput.value = profile.displayName; return profile;
@@ -1849,8 +1871,13 @@ async function subscribeMessagingChannels(options = {}) {
         }
         if (window.notifications) {
           const senderProfile = state.availableProfiles.find(p => p.id === message.senderId);
-          const senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
-          window.notifications.info(message.body || "Sent an attachment", `${senderName} sent a message`);
+          let senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
+          let messageBody = message.body || "Sent an attachment";
+          
+          if (state.preferences.notificationHideSender) senderName = "Someone";
+          if (state.preferences.notificationHideBody) messageBody = "New message";
+
+          window.notifications.info(messageBody, `${senderName} sent a message`);
           console.log("[Messenger] Messenger Open:", state.messengerOpen, "Active Thread:", isActiveThread);
           if (!state.messengerOpen || !isActiveThread) {
             console.log("[Messenger] Incrementing unread count badge");
@@ -2172,7 +2199,9 @@ function normalizeUserPreferences(raw = {}) {
   const density = ["airy", "compact"].includes(raw.density) ? raw.density : DEFAULT_USER_PREFERENCES.density;
   const motion = ["full", "calm"].includes(raw.motion) ? raw.motion : DEFAULT_USER_PREFERENCES.motion;
   const statusBarStrip = typeof raw.statusBarStrip === "boolean" ? raw.statusBarStrip : DEFAULT_USER_PREFERENCES.statusBarStrip;
-  return { theme, density, motion, statusBarStrip };
+  const notificationHideSender = typeof raw.notificationHideSender === "boolean" ? raw.notificationHideSender : DEFAULT_USER_PREFERENCES.notificationHideSender;
+  const notificationHideBody = typeof raw.notificationHideBody === "boolean" ? raw.notificationHideBody : DEFAULT_USER_PREFERENCES.notificationHideBody;
+  return { theme, density, motion, statusBarStrip, notificationHideSender, notificationHideBody };
 }
 
 function saveUserPreferences() { try { localStorage.setItem(USER_PREFERENCES_KEY, JSON.stringify(state.preferences)); } catch {} }
@@ -2211,6 +2240,8 @@ function renderSettingsPanel() {
       if (elements.densitySelect) elements.densitySelect.value = state.preferences.density;
       if (elements.motionSelect) elements.motionSelect.value = state.preferences.motion;
       if (elements.statusBarStripToggle) elements.statusBarStripToggle.checked = state.preferences.statusBarStrip;
+      if (elements.notificationHideSenderToggle) elements.notificationHideSenderToggle.checked = state.preferences.notificationHideSender;
+      if (elements.notificationHideBodyToggle) elements.notificationHideBodyToggle.checked = state.preferences.notificationHideBody;
       if (elements.themeGrid) {
         elements.themeGrid.querySelectorAll("[data-theme-option]").forEach((button) => {
           const isActive = button.dataset.themeOption === state.preferences.theme;
@@ -2286,6 +2317,8 @@ function handleThemeOptionClick(event) { const button = event.target.closest("[d
 function handleDensityChange(event) { updateUserPreferences({ ...state.preferences, density: event.target.value }); }
 function handleMotionChange(event) { updateUserPreferences({ ...state.preferences, motion: event.target.value }); }
 function handleStatusBarStripToggle(event) { updateUserPreferences({ ...state.preferences, statusBarStrip: event.target.checked }); }
+function handleNotificationHideSenderToggle(event) { updateUserPreferences({ ...state.preferences, notificationHideSender: event.target.checked }); }
+function handleNotificationHideBodyToggle(event) { updateUserPreferences({ ...state.preferences, notificationHideBody: event.target.checked }); }
 function resetPlayerDockPosition() { state.playerPosition = null; savePlayerPosition(null); applyMiniPlayerPosition(); }
 function resetPlayerVolume() { state.playerVolume = DEFAULT_PLAYER_VOLUME; savePlayerVolume(DEFAULT_PLAYER_VOLUME); applyPlayerVolumeToActiveElement(); renderMiniPlayerVolumeControl(); }
 function resetUserPreferences() { updateUserPreferences({ ...DEFAULT_USER_PREFERENCES }); resetPlayerDockPosition(); resetPlayerVolume(); }

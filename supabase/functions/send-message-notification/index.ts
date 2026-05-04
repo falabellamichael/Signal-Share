@@ -136,6 +136,17 @@ Deno.serve(async (request) => {
   const recipientId =
     threadRow.user_one_id === messageRow.sender_id ? threadRow.user_two_id : threadRow.user_one_id;
 
+  const { data: recipientProfile } = await adminClient
+    .from("profiles")
+    .select("notification_hide_sender, notification_hide_body")
+    .eq("id", recipientId)
+    .single();
+
+  const finalSenderName = recipientProfile?.notification_hide_sender ? "Someone" : senderName;
+  const finalMessageRow = recipientProfile?.notification_hide_body 
+    ? { ...messageRow, body: "New message", attachment_name: null, attachment_kind: null } 
+    : messageRow;
+
   const { data: subscriptions, error: subscriptionsError } = await adminClient
     .from("push_subscriptions")
     .select("id, platform, endpoint, p256dh, auth, device_token, user_agent")
@@ -150,7 +161,7 @@ Deno.serve(async (request) => {
     return jsonResponse({ sent: 0, staleRemoved: 0, skipped: true });
   }
 
-  const notificationPayload = buildNotificationPayload(messageRow, senderName);
+  const notificationPayload = buildNotificationPayload(finalMessageRow, finalSenderName);
   let sent = 0;
   let staleRemoved = 0;
 
