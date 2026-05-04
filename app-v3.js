@@ -1862,7 +1862,11 @@ async function subscribeMessagingChannels(options = {}) {
   if (state.blockingAvailable) state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_blocks" }, () => void refreshMessengerState({ preserveActiveThread: true }));
   if (state.banningAvailable) state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState().then(() => { if (canAccessAdminBanPanel(state)) void refreshAdminBanState(); if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true }); else { clearMessengerState(); render(); } }));
   state.threadsChannel.subscribe();
-    state.messagesChannel = state.supabase.channel(`messages-${state.currentUser.id}-${sessionHash}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+    // Simplified channel name to prevent transport issues
+    const channelName = `realtime-messages-${state.currentUser.id.slice(0, 8)}`;
+    console.log(`[Messenger] Attempting to connect to channel: ${channelName}`);
+    
+    state.messagesChannel = state.supabase.channel(channelName).on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
       console.log("[Messenger] New message received via Realtime:", payload);
       const message = normalizeMessage(payload.new); 
       if (message.senderId && (isUserBlocked(state, message.senderId) || isUserBanned(state, message.senderId))) {

@@ -20,7 +20,16 @@ function getMessageAttachmentKind(type = "") {
 
 export function createSupabaseClient() {
   if (window.__supabaseClient) return window.__supabaseClient;
-  const client = window.supabase.createClient(apiContext.APP_CONFIG.supabaseUrl, apiContext.APP_CONFIG.supabaseAnonKey);
+  const client = window.supabase.createClient(apiContext.APP_CONFIG.supabaseUrl, apiContext.APP_CONFIG.supabaseAnonKey, {
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
+    },
+    db: {
+      schema: 'public'
+    }
+  });
   window.__supabaseClient = client;
   return client;
 }
