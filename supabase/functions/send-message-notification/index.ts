@@ -111,6 +111,14 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: "Message not found." }, 404);
   }
 
+  const { data: senderProfile } = await adminClient
+    .from("profiles")
+    .select("display_name")
+    .eq("id", messageRow.sender_id)
+    .single();
+  
+  const senderName = senderProfile?.display_name || "Someone";
+
   if (messageRow.sender_id !== user.id) {
     return jsonResponse({ error: "You can only dispatch notifications for your own messages." }, 403);
   }
@@ -142,7 +150,7 @@ Deno.serve(async (request) => {
     return jsonResponse({ sent: 0, staleRemoved: 0, skipped: true });
   }
 
-  const notificationPayload = buildNotificationPayload(messageRow);
+  const notificationPayload = buildNotificationPayload(messageRow, senderName);
   let sent = 0;
   let staleRemoved = 0;
 
@@ -174,9 +182,9 @@ Deno.serve(async (request) => {
   return jsonResponse({ sent, staleRemoved });
 });
 
-function buildNotificationPayload(message: MessageRecord) {
+function buildNotificationPayload(message: MessageRecord, senderName: string) {
   return {
-    title: "New message",
+    title: `${senderName} sent a message`,
     body: summarizeMessageBody(message),
     threadId: message.thread_id,
     url: "#messages",

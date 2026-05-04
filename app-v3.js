@@ -1850,7 +1850,7 @@ async function subscribeMessagingChannels(options = {}) {
         if (window.notifications) {
           const senderProfile = state.availableProfiles.find(p => p.id === message.senderId);
           const senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
-          window.notifications.info(message.body || "Sent an attachment", "New message from " + senderName);
+          window.notifications.info(message.body || "Sent an attachment", `${senderName} sent a message`);
           console.log("[Messenger] Messenger Open:", state.messengerOpen, "Active Thread:", isActiveThread);
           if (!state.messengerOpen || !isActiveThread) {
             console.log("[Messenger] Incrementing unread count badge");
