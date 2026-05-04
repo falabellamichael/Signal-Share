@@ -2145,22 +2145,21 @@ async function handleMessageSubmit(event) {
     // 7. BROADCAST INSTANTLY to the other user
     if (state.messagesChannel) {
       const recipientId = getThreadPartnerId(state.directThreads.find(t => t.id === state.activeThreadId));
-      const targetChannelName = `realtime-messages-${recipientId.slice(0, 8)}`;
+      const targetChannelName = `messenger_live_${recipientId.slice(0, 8)}`;
       
-      // We send a direct broadcast to the recipient's specific channel
+      console.log(`[Messenger] Sending instant broadcast to: ${targetChannelName}`);
       state.supabase.channel(targetChannelName).send({
-        type: 'broadcast',
-        event: 'new-message',
-        payload: {
+        type: "broadcast",
+        event: "new-message",
+        payload: { payload: {
           id: messageId,
           thread_id: state.activeThreadId,
           sender_id: state.currentUser.id,
           body: body || null,
-          ...attachmentPayload,
-          created_at: new Date().toISOString()
-        }
+          created_at: new Date().toISOString(),
+          ...attachmentPayload
+        }}
       });
-      console.log(`[Messenger] Instant broadcast sent to ${targetChannelName}`);
     }
 
     const { data: insertedData, error: insertError } = await state.supabase

@@ -18,13 +18,19 @@ window.MessengerRealtime = class MessengerRealtime {
     
     console.log("[Realtime] Connecting to:", channelName);
     
-    this.channel = this.state.supabase.channel(channelName)
+    this.channel = this.state.supabase.channel(channelName, {
+      config: { broadcast: { self: false, ack: true } }
+    })
       .on("postgres_changes", { 
         event: "INSERT", 
         schema: "public", 
         table: "messages" 
       }, (payload) => {
         this.handleNewMessage(payload.new);
+      })
+      .on("broadcast", { event: "new-message" }, (payload) => {
+        console.log("[Realtime] Instant Broadcast received:", payload);
+        this.handleNewMessage(payload.payload);
       })
       .subscribe((status, err) => {
         console.log("[Realtime] Status:", status);
