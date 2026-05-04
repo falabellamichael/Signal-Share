@@ -1881,13 +1881,23 @@ class MessengerRealtime {
 
   handleNewMessage(rawData) {
     const state = this.state;
+    console.log("[Realtime] Incoming message raw data:", rawData);
     const message = this.normalize(rawData);
+    
     if (message.senderId === state.currentUser?.id) return;
     if (state.blockedUserIds?.includes(message.senderId)) return;
     if (state.bannedUserIds?.includes(message.senderId)) return;
 
-    if (window.playIncomingMessageSound) window.playIncomingMessageSound();
+    console.log("[Realtime] Triggering mobile-safe alerts for message:", message.id);
 
+    // 1. Safety Sound (don't let sound failures block the UI)
+    try {
+      if (window.playIncomingMessageSound) window.playIncomingMessageSound();
+    } catch (e) {
+      console.warn("[Realtime] Sound blocked by mobile gesture policy");
+    }
+
+    // 2. Notification UI
     if (window.notifications) {
       const senderProfile = (state.availableProfiles || []).find(p => p.id === message.senderId);
       let senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
@@ -1895,16 +1905,26 @@ class MessengerRealtime {
       if (state.preferences?.notificationHideSender) senderName = "Someone";
       if (state.preferences?.notificationHideBody) messageBody = "New message";
 
-      window.notifications.info(messageBody, `${senderName} sent a message`);
-      const isActiveThread = message.threadId === state.activeThreadId;
-      if (!state.messengerOpen || !isActiveThread) {
-        window.notifications.incrementUnreadCount();
+      try {
+        window.notifications.info(messageBody, `${senderName} sent a message`);
+        const isActiveThread = message.threadId === state.activeThreadId;
+        if (!state.messengerOpen || !isActiveThread) {
+          window.notifications.incrementUnreadCount();
+        }
+      } catch (e) {
+        console.error("[Realtime] Notification UI failed on mobile:", e);
       }
     }
 
+    // 3. Force UI Sync
     if (message.threadId === state.activeThreadId && window.mergeActiveMessage) {
       window.mergeActiveMessage(message);
       if (window.renderActiveThread) window.renderActiveThread(true);
+    } else {
+      // Force a background refresh of the conversation list
+      if (window.refreshMessengerState) {
+        window.refreshMessengerState({ preserveActiveThread: true });
+      }
     }
   }
 
