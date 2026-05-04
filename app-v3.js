@@ -1105,11 +1105,18 @@ async function handleAuthStateChange(event, session) {
     if (isMessagingEnabled(state)) {
       await refreshMessengerState({ preserveActiveThread: true });
       await flushPendingNotificationThread();
+      if (window.notifications) await window.notifications.syncWithSupabase(state.supabase, state.currentUser.id);
     } else { clearMessengerState(); }
     render();
     return;
   }
-  if (event === "SIGNED_IN") { state.pendingActivationEmail = ""; showAuthFeedback("Signed in successfully."); }
+  if (event === "SIGNED_IN") { 
+    state.pendingActivationEmail = ""; 
+    showAuthFeedback("Signed in successfully."); 
+    if (window.notifications && state.currentUser) {
+      void window.notifications.syncWithSupabase(state.supabase, state.currentUser.id);
+    }
+  }
   if (event === "SIGNED_OUT") { state.pendingActivationEmail = ""; if (previousUser) showAuthFeedback("Signed out."); }
   await refreshLikedPostsState();
   if (isMessagingEnabled(state)) {

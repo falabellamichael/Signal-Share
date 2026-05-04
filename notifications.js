@@ -225,9 +225,76 @@ class NotificationSystem {
     this.saveHistory(history);
   }
 
-  clearHistory() {
-    this.saveHistory([]);
-    this.setUnreadCount(0);
+  async syncWithSupabase(supabase, currentUserId) {
+    if (!supabase || !currentUserId) return;
+    console.log("[Notifications] Syncing missed notifications...");
+    
+    try {
+      // 1. Get the timestamp of the latest notification in history
+      const history = this.getHistory();
+      let lastTimestamp = 0;
+      if (history.length > 0) {
+        lastTimestamp = new Date(history[0].timestamp).getTime();
+      } else {
+        // If history is empty, only catch up from the last 24 hours to avoid spam
+        lastTimestamp = Date.now() - (24 * 60 * 60 * 1000);
+      }
+
+      const isoTimestamp = new Date(lastTimestamp).toISOString();
+
+      // 2. Fetch new likes
+      const { data: newLikes, error: likesError } = await supabase
+        .from("post_likes")
+        .select("*, posts!inner(author_id, title)")
+        .eq("posts.author_id", currentUserId)
+        .gt("created_at", isoTimestamp)
+        .neq("user_id", currentUserId);
+
+      if (!likesError && newLikes) {
+        newLikes.forEach(like => {
+          this.addToHistory({
+            type: "success",
+            title: "New Like!",
+            message: `Someone liked your post: ${like.posts.title || "Untitled"}`
+          });
+          this.incrementUnreadCount();
+        });
+      }
+
+      // 3. Fetch new messages (more complex query)
+      // First, get threads the user is in
+      const { data: threads, error: threadsError } = await supabase
+        .from("direct_threads")
+        .select("id")
+        .or(`user_one_id.eq.${currentUserId},user_two_id.eq.${currentUserId}`);
+
+      if (!threadsError && threads && threads.length > 0) {
+        const threadIds = threads.map(t => t.id);
+        const { data: newMessages, error: msgError } = await supabase
+          .from("messages")
+          .select("*")
+          .in("thread_id", threadIds)
+          .gt("created_at", isoTimestamp)
+          .neq("sender_id", currentUserId);
+
+        if (!msgError && newMessages) {
+          newMessages.forEach(msg => {
+            // Note: We don't have sender name here easily without more joins, 
+            // but we can at least log that a message arrived.
+            this.addToHistory({
+              type: "info",
+              title: "New Message",
+              message: msg.body || "Sent an attachment"
+            });
+            this.incrementUnreadCount();
+          });
+        }
+      }
+
+      console.log("[Notifications] Sync complete.");
+    } catch (e) {
+      console.error("[Notifications] Sync failed:", e);
+    }
   }
 }
 
