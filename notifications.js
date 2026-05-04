@@ -464,7 +464,9 @@ window.renderNotificationsHistory = function() {
 
       li.addEventListener('click', () => {
         console.log("[Notifications] Item clicked:", item);
-        // Add logic here to open threads if needed
+        // Visual feedback for click
+        li.style.background = "var(--bg-elevated-bright, rgba(255,255,255,0.15))";
+        setTimeout(() => { li.style.background = "var(--bg-elevated, rgba(255,255,255,0.05))"; }, 150);
       });
 
       list.appendChild(li);
