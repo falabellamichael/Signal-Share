@@ -1083,6 +1083,20 @@ function attachEventListeners() {
     if (event.key === "ArrowRight") stepViewer(1);
   });
   document.addEventListener("click", handleExpandedMessengerOutsideClick);
+  
+  // Notification Interactivity
+  document.addEventListener("signal:notificationClick", (event) => {
+    const notification = event.detail;
+    if (!notification || !notification.data) return;
+    
+    closeNotificationsPanel();
+    
+    if (notification.data.type === "message" && notification.data.threadId) {
+      void openMessengerThreadFromNotification(notification.data.threadId);
+    } else if (notification.data.type === "post" && notification.data.postId) {
+      void openViewer(notification.data.postId);
+    }
+  });
 }
 
 function bindAuthStateListener() {

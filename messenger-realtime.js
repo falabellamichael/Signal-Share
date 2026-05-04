@@ -94,7 +94,10 @@ window.MessengerRealtime = class MessengerRealtime {
     
     if (window.notifications && typeof window.notifications.info === "function") {
       // Only show text banners on PC, hide on mobile to save screen space
-      const added = window.notifications.info(messageBody, `${senderName} sent a message`, { id: message.id });
+      const added = window.notifications.info(messageBody, `${senderName} sent a message`, { 
+        id: message.id,
+        data: { type: "message", threadId: message.threadId }
+      });
 
       const isActiveThread = message.threadId === state.activeThreadId;
       if (added && (!state.messengerOpen || !isActiveThread)) {

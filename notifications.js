@@ -245,6 +245,7 @@ class NotificationSystem {
       type: notification.type,
       title: notification.title,
       message: notification.message,
+      data: notification.data || null, // Store metadata for click actions
       timestamp: Date.now()
     });
     this.saveHistory(history);
@@ -284,7 +285,8 @@ class NotificationSystem {
             id: `like-${like.post_id}-${like.user_id}`,
             type: "success",
             title: "New Like!",
-            message: `Someone liked your post: ${like.posts.title || "Untitled"}`
+            message: `Someone liked your post: ${like.posts.title || "Untitled"}`,
+            data: { type: "post", postId: like.post_id }
           });
           if (added) this.incrementUnreadCount();
         });
@@ -311,7 +313,8 @@ class NotificationSystem {
               id: msg.id,
               type: "info",
               title: "New Message",
-              message: msg.body || "Sent an attachment"
+              message: msg.body || "Sent an attachment",
+              data: { type: "message", threadId: msg.thread_id }
             });
             if (added) this.incrementUnreadCount();
           });
@@ -347,10 +350,11 @@ class NotificationSystem {
   NotificationSystem.prototype[method] = function(message, title, options = {}) {
     const defaultTitles = { info: 'Information', success: 'Success', warning: 'Warning', error: 'Error' };
     const actualTitle = title || defaultTitles[method];
-    const id = typeof options === 'string' ? options : options.id; // Support legacy title as 2nd param, and ID as 3rd
-    const added = this.addToHistory({ id, type: method, title: actualTitle, message: message });
+    const id = typeof options === 'string' ? options : options.id; 
+    const data = options.data || null;
+    const added = this.addToHistory({ id, type: method, title: actualTitle, message: message, data: data });
     original.call(this, message, actualTitle);
-    return added; // Return whether this was a new notification
+    return added; 
   };
 });
 
@@ -380,11 +384,34 @@ window.renderNotificationsHistory = function() {
     if (clearButton) clearButton.style.display = "block";
     history.forEach(item => {
       const li = document.createElement("li");
+      li.className = "notification-history-item";
       li.style.padding = "12px";
       li.style.background = "var(--bg-elevated, rgba(255,255,255,0.05))";
       li.style.borderRadius = "8px";
       li.style.cursor = "pointer";
-      li.innerHTML = `<strong style="display:block;font-size:0.95rem;margin-bottom:4px;">${item.title}</strong><span style="font-size:0.85rem;color:var(--text-muted, #ccc);">${item.message}</span>`;
+      li.style.transition = "transform 0.1s ease, background 0.2s ease";
+      li.style.borderLeft = `4px solid var(--${item.type}, #777)`;
+      
+      li.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <strong style="display:block;font-size:0.95rem;">${item.title}</strong>
+          <span style="font-size:0.85rem;color:var(--text-muted, #ccc);">${item.message}</span>
+          <small style="font-size:0.7rem;opacity:0.5;margin-top:4px;">${new Date(item.timestamp).toLocaleTimeString()}</small>
+        </div>
+      `;
+
+      li.addEventListener("click", () => {
+        // Dispatch custom event for the main app to handle
+        const event = new CustomEvent("signal:notificationClick", {
+          detail: item
+        });
+        document.dispatchEvent(event);
+        
+        // Visual feedback
+        li.style.transform = "scale(0.98)";
+        setTimeout(() => li.style.transform = "scale(1)", 100);
+      });
+
       list.appendChild(li);
     });
   }
