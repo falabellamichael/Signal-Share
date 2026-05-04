@@ -2312,7 +2312,15 @@ function renderKeyboardShortcuts() {
   });
 }
 
-function updateUserPreferences(nextPreferences) { state.preferences = normalizeUserPreferences(nextPreferences); applyUserPreferences(state.preferences); saveUserPreferences(); renderSettingsPanel(); }
+function updateUserPreferences(nextPreferences) { 
+  state.preferences = normalizeUserPreferences(nextPreferences); 
+  applyUserPreferences(state.preferences); 
+  saveUserPreferences(); 
+  if (state.supabase && state.currentUser) {
+    void syncCurrentProfileToSupabase().catch(err => console.error("[Preferences] Sync failed:", err));
+  }
+  renderSettingsPanel(); 
+}
 function handleThemeOptionClick(event) { const button = event.target.closest("[data-theme-option]"); if (!button) return; updateUserPreferences({ ...state.preferences, theme: button.dataset.themeOption }); }
 function handleDensityChange(event) { updateUserPreferences({ ...state.preferences, density: event.target.value }); }
 function handleMotionChange(event) { updateUserPreferences({ ...state.preferences, motion: event.target.value }); }
