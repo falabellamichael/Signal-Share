@@ -224,7 +224,14 @@ class NotificationSystem {
   }
 
   saveHistory(history) {
+    // 1. Time-based cleanup: Keep only last 24 hours
+    const now = Date.now();
+    const threshold = now - (24 * 60 * 60 * 1000);
+    history = history.filter(item => item.timestamp > threshold);
+
+    // 2. Size-based cleanup: Keep only last 50 items
     if (history.length > 50) history = history.slice(0, 50);
+
     localStorage.setItem('signal_share_notifications_history', JSON.stringify(history));
     if (window.renderNotificationsHistory) window.renderNotificationsHistory();
   }
@@ -257,20 +264,35 @@ class NotificationSystem {
        stableId = 'gen-' + Math.abs(hash).toString(36);
     }
 
-    // 1. Blacklist Check
+    // 1. Blacklist/Duplicate Check
     if (clearedIds.has(stableId)) return false;
-
-    // 2. Duplicate Check
     if (history.some(item => item.id === stableId)) return false;
 
+    // 2. Add to array
     history.unshift({
       id: stableId,
       type: notification.type,
       title: notification.title,
       message: notification.message,
-      data: notification.data || null, // Store metadata for click actions
+      data: notification.data || null,
       timestamp: Date.now()
     });
+
+    // 3. Automated Badge Increment
+    // Only increment if we're not currently viewing the source of the notification
+    if (window.state) {
+      const isMessage = notification.data?.type === "message";
+      const isCurrentThread = isMessage && notification.data?.threadId === window.state.activeThreadId;
+      const isMessengerOpen = window.state.messengerOpen;
+      
+      if (!(isMessengerOpen && isCurrentThread)) {
+        this.incrementUnreadCount();
+      }
+    } else {
+      // Fallback if state isn't ready
+      this.incrementUnreadCount();
+    }
+
     this.saveHistory(history);
     return true;
   }
@@ -306,14 +328,13 @@ class NotificationSystem {
 
       if (!likesError && newLikes) {
         newLikes.forEach(like => {
-          const added = this.addToHistory({
+          this.addToHistory({
             id: `like-${like.post_id}-${like.user_id}`,
             type: "success",
             title: "New Like!",
             message: `Someone liked your post: ${like.posts.title || "Untitled"}`,
             data: { type: "post", postId: like.post_id }
           });
-          if (added) this.incrementUnreadCount();
         });
       }
 
@@ -334,14 +355,13 @@ class NotificationSystem {
 
         if (!msgError && newMessages) {
           newMessages.forEach(msg => {
-            const added = this.addToHistory({
+            this.addToHistory({
               id: msg.id,
               type: "info",
               title: "New Message",
               message: msg.body || "Sent an attachment",
               data: { type: "message", threadId: msg.thread_id }
             });
-            if (added) this.incrementUnreadCount();
           });
         }
       }

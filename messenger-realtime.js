@@ -94,7 +94,7 @@ window.MessengerRealtime = class MessengerRealtime {
     
     if (window.notifications && typeof window.notifications.info === "function") {
       // Only show text banners on PC, hide on mobile to save screen space
-      const added = window.notifications.info(messageBody, `${senderName} sent a message`, { 
+      window.notifications.info(messageBody, `${senderName} sent a message`, { 
         id: message.id,
         data: { type: "message", threadId: message.threadId }
       });
@@ -102,19 +102,6 @@ window.MessengerRealtime = class MessengerRealtime {
       // Also trigger browser system notification on PC if tab is inactive
       if (!isMobile && window.showIncomingMessageNotification) {
         window.showIncomingMessageNotification(message);
-      }
-
-      const isActiveThread = message.threadId === state.activeThreadId;
-      if (added && (!state.messengerOpen || !isActiveThread)) {
-        console.log("[Realtime] Incrementing unread count via main system.");
-        window.notifications.incrementUnreadCount();
-      }
-    } else {
-      console.log("[Realtime] Using Fallback Badge Logic.");
-      // 2. Fallback: Direct DOM update for mobile stability
-      const isActiveThread = message.threadId === state.activeThreadId;
-      if (!state.messengerOpen || !isActiveThread) {
-        this.fallbackIncrementBadge();
       }
     }
 
@@ -128,25 +115,6 @@ window.MessengerRealtime = class MessengerRealtime {
       window.refreshMessengerState({ preserveActiveThread: true });
     } else {
       console.warn("[Realtime] refreshMessengerState MISSING from window.");
-    }
-  }
-
-  fallbackIncrementBadge() {
-    try {
-      let count = parseInt(localStorage.getItem("signal_share_unread_count") || "0", 10);
-      count++;
-      localStorage.setItem("signal_share_unread_count", count.toString());
-      
-      const badge = document.getElementById("notificationBadge");
-      if (badge) {
-        badge.textContent = count.toString();
-        badge.style.setProperty("display", "flex", "important");
-        badge.style.setProperty("opacity", "1", "important");
-        badge.style.setProperty("visibility", "visible", "important");
-      }
-      console.log("[Realtime] Fallback badge update:", count);
-    } catch (e) {
-      console.error("[Realtime] Fallback badge failed:", e);
     }
   }
 
