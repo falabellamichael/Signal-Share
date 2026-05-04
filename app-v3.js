@@ -2595,12 +2595,17 @@ async function getExternalPreviewMetadata(source) { if (source.provider === "spo
 
 async function getSpotifyPreviewMetadata(source) {
   const sourceUrl = resolveSpotifyPreviewSourceUrl(source); if (!sourceUrl) return null;
-  const cacheKey = `spotify:preview:v5:${sourceUrl}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
+  const cacheKey = `spotify:preview:v9:${sourceUrl}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
   const request = Promise.all([fetchSpotifyPreviewCatalogMetadata(source, sourceUrl), fetchSpotifyPreviewOEmbedMetadata(sourceUrl)]).then(([cat, oem]) => { 
-    if (cat?.error) return { error: cat.error };
-    const metadata = { title: cat?.title || oem?.title || "", creator: cat?.creator || oem?.creator || "", thumbnailUrl: cat?.thumbnailUrl || oem?.thumbnailUrl || "" }; 
+    // Even if cat has an error, we try to use oem as a fallback
+    const metadata = { 
+      title: cat?.title || oem?.title || "", 
+      creator: cat?.creator || oem?.creator || "", 
+      thumbnailUrl: cat?.thumbnailUrl || oem?.thumbnailUrl || "",
+      error: cat?.error && !oem?.title ? cat.error : null // Only show error if BOTH failed
+    }; 
     const hasMetadata = Boolean(metadata.title || metadata.creator || metadata.thumbnailUrl); 
-    return hasMetadata ? metadata : null; 
+    return hasMetadata ? metadata : (metadata.error ? metadata : null); 
   }).then(result => {
     externalPreviewCache.set(cacheKey, result);
     return result;
