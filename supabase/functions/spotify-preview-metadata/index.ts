@@ -56,7 +56,7 @@ Deno.serve(async (request) => {
     SPOTIFY_DEFAULT_MARKET;
   const accessToken = await getSpotifyAccessToken();
   if (!accessToken) {
-    return jsonResponse({ error: "Spotify access token could not be created." }, 500);
+    return jsonResponse({ error: "Spotify authentication failed. Check your Client ID and Secret in Supabase secrets." }, 401);
   }
 
   const metadata = await fetchSpotifyPreviewMetadata(resource, accessToken, market);
@@ -86,6 +86,8 @@ async function getSpotifyAccessToken() {
   if (!response?.ok) {
     cachedAccessToken = "";
     cachedAccessTokenExpiresAt = 0;
+    const errBody = await response?.json().catch(() => ({}));
+    console.error("[Spotify Auth Error]:", response?.status, errBody);
     return "";
   }
 

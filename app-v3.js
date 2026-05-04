@@ -2595,8 +2595,19 @@ async function getExternalPreviewMetadata(source) { if (source.provider === "spo
 
 async function getSpotifyPreviewMetadata(source) {
   const sourceUrl = resolveSpotifyPreviewSourceUrl(source); if (!sourceUrl) return null;
-  const cacheKey = `spotify:preview:${sourceUrl}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
-  const request = Promise.all([fetchSpotifyPreviewCatalogMetadata(source, sourceUrl), fetchSpotifyPreviewOEmbedMetadata(sourceUrl)]).then(([cat, oem]) => { const metadata = { title: cat?.title || oem?.title || "", creator: cat?.creator || oem?.creator || "", thumbnailUrl: cat?.thumbnailUrl || oem?.thumbnailUrl || "" }; const hasMetadata = Boolean(metadata.title || metadata.creator || metadata.thumbnailUrl); externalPreviewCache.set(cacheKey, hasMetadata ? metadata : null); return hasMetadata ? metadata : null; }).catch(() => { externalPreviewCache.set(cacheKey, null); return null; });
+  const cacheKey = `spotify:preview:v5:${sourceUrl}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
+  const request = Promise.all([fetchSpotifyPreviewCatalogMetadata(source, sourceUrl), fetchSpotifyPreviewOEmbedMetadata(sourceUrl)]).then(([cat, oem]) => { 
+    if (cat?.error) return { error: cat.error };
+    const metadata = { title: cat?.title || oem?.title || "", creator: cat?.creator || oem?.creator || "", thumbnailUrl: cat?.thumbnailUrl || oem?.thumbnailUrl || "" }; 
+    const hasMetadata = Boolean(metadata.title || metadata.creator || metadata.thumbnailUrl); 
+    return hasMetadata ? metadata : null; 
+  }).then(result => {
+    externalPreviewCache.set(cacheKey, result);
+    return result;
+  }).catch(() => { 
+    externalPreviewCache.set(cacheKey, null); 
+    return null; 
+  });
   externalPreviewCache.set(cacheKey, request); return request;
 }
 
@@ -2606,7 +2617,13 @@ async function fetchSpotifyPreviewCatalogMetadata(source, sourceUrl) {
   if (!functionName) return { error: "Config Missing" }; 
   try { 
     const { data, error } = await state.supabase.functions.invoke(functionName, { body: { url: sourceUrl, market: getSpotifyPreviewMarket() } }); 
-    if (error) return { error: "API Error" };
+    if (error) {
+      console.error("[Spotify] Edge Function Error:", error);
+      let msg = "API Error";
+      if (error instanceof Error) msg = error.message;
+      else if (typeof error === "object" && error.message) msg = error.message;
+      return { error: msg };
+    }
     if (!data || data.error) return { error: data?.error || "Empty Response" }; 
     return { title: typeof data.title === "string" ? data.title.trim() : "", creator: typeof data.creator === "string" ? data.creator.trim() : "", thumbnailUrl: typeof data.thumbnailUrl === "string" ? data.thumbnailUrl.trim() : "" }; 
   } catch (err) { return { error: "Network Error" }; } 
