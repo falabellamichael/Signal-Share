@@ -273,9 +273,9 @@ function firstImageUrl(value: unknown) {
   return "";
 }
 
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
+function jsonResponse(payload: Record<string, unknown>, _status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status: 200, // Always 200 to avoid generic Supabase "non-2xx" errors in frontend
     headers: {
       ...corsHeaders,
       "Content-Type": "application/json",
