@@ -346,6 +346,16 @@ if (document.readyState === 'loading') {
   initNotifications();
 }
 
+// Global UI Listeners
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'clearNotificationsButton') {
+    if (window.notifications) {
+      window.notifications.clearHistory();
+      if (window.renderNotificationsHistory) window.renderNotificationsHistory();
+    }
+  }
+});
+
 // Make the class globally available
 window.NotificationSystem = NotificationSystem;
 
