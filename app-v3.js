@@ -1847,6 +1847,15 @@ function unsubscribeMessagingChannels() {
 }
 
 let isMessagingSubscribing = false;
+  // Safety Pulse: Check for new messages every 15 seconds as a backup to Realtime
+  if (window.__SIGNAL_SAFETY_PULSE__) clearInterval(window.__SIGNAL_SAFETY_PULSE__);
+  window.__SIGNAL_SAFETY_PULSE__ = setInterval(() => {
+    console.log("[Messenger] Safety Pulse: Checking for new activity...");
+    if (typeof isMessagingEnabled === 'function' && isMessagingEnabled(state)) {
+      void refreshMessengerState({ preserveActiveThread: true });
+    }
+  }, 15000);
+
 async function subscribeMessagingChannels(options = {}) {
   const { force = false } = options;
   if (isMessagingSubscribing || (!force && state.threadsChannel && state.messagesChannel) || !isMessagingEnabled(state)) {

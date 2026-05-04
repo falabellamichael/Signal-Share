@@ -24,7 +24,8 @@ export function createSupabaseClient() {
     realtime: {
       params: {
         eventsPerSecond: 10
-      }
+      },
+      transport: 'websocket' // Force websocket to bypass some transport failures
     },
     db: {
       schema: 'public'
