@@ -61,7 +61,8 @@ Deno.serve(async (request) => {
 
   const metadata = await fetchSpotifyPreviewMetadata(resource, accessToken, market);
   if (!metadata) {
-    return jsonResponse({ error: "Spotify preview metadata could not be loaded." }, 404);
+    // If the Catalog API fails, we could try a fallback or just be more descriptive
+    return jsonResponse({ error: `Spotify API refused the request for this ${resource.type}. It might be region-locked or private.` }, 404);
   }
 
   return jsonResponse(metadata);
@@ -122,6 +123,8 @@ async function fetchSpotifyPreviewMetadata(
   }).catch(() => null);
 
   if (!response?.ok) {
+    const errBody = await response?.json().catch(() => ({}));
+    console.error(`[Spotify API Error] ${resource.type}:`, response?.status, errBody);
     return null;
   }
 
