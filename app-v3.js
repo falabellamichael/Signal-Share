@@ -1872,6 +1872,10 @@ async function subscribeMessagingChannels(options = {}) {
       const threadExists = state.directThreads.some((t) => t.id === message.threadId); 
       const isActiveThread = message.threadId === state.activeThreadId;
       
+      if (message.senderId && message.senderId === state.currentUser?.id) {
+        console.log("[Messenger] Self-message detected via Realtime. Bell will not ring, but data arrived!");
+      }
+      
       if (message.senderId && message.senderId !== state.currentUser?.id) { 
         console.log("[Messenger] Triggering incoming alert logic...");
         playIncomingMessageSound(); 

@@ -182,9 +182,9 @@ class NotificationSystem {
     
     if (count > 0) {
       badge.textContent = count > 99 ? '99+' : count;
-      badge.style.display = 'flex';
+      badge.style.setProperty('display', 'flex', 'important');
     } else {
-      badge.style.display = 'none';
+      badge.style.setProperty('display', 'none', 'important');
     }
   }
 
