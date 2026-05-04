@@ -1,25 +1,19 @@
 /**
- * Messenger Realtime System (v1)
- * Handles live message notifications and badge updates.
+ * Messenger Realtime System (v2)
+ * Dedicated file for live notifications and badge updates.
  */
 
-export class MessengerRealtime {
+window.MessengerRealtime = class MessengerRealtime {
   constructor(appState) {
     this.state = appState;
     this.channel = null;
     this.sessionHash = Math.random().toString(36).substring(2, 10);
   }
 
-  /**
-   * Starts listening for new messages
-   */
   init() {
     if (!this.state.supabase || !this.state.currentUser) return;
-    
-    this.stop(); // Clean up any old connections
-    
+    this.stop(); 
     const userId = this.state.currentUser.id;
-    // Simplified, rock-solid naming convention
     const channelName = `messenger_live_${userId.slice(0, 8)}`;
     
     console.log("[Realtime] Connecting to:", channelName);
@@ -35,58 +29,49 @@ export class MessengerRealtime {
       .subscribe((status, err) => {
         console.log("[Realtime] Status:", status);
         if (err || status === "CHANNEL_ERROR") {
-          console.error("[Realtime] Error encountered. Retrying in 3s...", err);
+          console.error("[Realtime] Connection issue. Retrying in 3s...", err);
           setTimeout(() => this.init(), 3000);
         }
       });
   }
 
-  /**
-   * Processes an incoming message and triggers alerts
-   */
   handleNewMessage(rawData) {
     const state = this.state;
-    // 1. Normalize the data
+    console.log("[Realtime] New message data arrived.");
     const message = this.normalize(rawData);
     
-    // 2. Ignore if it's from us or from someone we blocked
     if (message.senderId === state.currentUser?.id) return;
     if (state.blockedUserIds?.includes(message.senderId)) return;
     if (state.bannedUserIds?.includes(message.senderId)) return;
 
-    console.log("[Realtime] New message detected from:", message.senderId);
+    // Trigger sound
+    try {
+      if (window.playIncomingMessageSound) window.playIncomingMessageSound();
+    } catch (e) {}
 
-    // 3. Play sound (always)
-    if (window.playIncomingMessageSound) {
-      window.playIncomingMessageSound();
-    }
-
-    // 4. Update Notification System
+    // Show Notification
     if (window.notifications) {
       const senderProfile = (state.availableProfiles || []).find(p => p.id === message.senderId);
       let senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
       let messageBody = message.body || "Sent an attachment";
       
-      // Respect privacy settings
       if (state.preferences?.notificationHideSender) senderName = "Someone";
       if (state.preferences?.notificationHideBody) messageBody = "New message";
 
-      // Show banner
       window.notifications.info(messageBody, `${senderName} sent a message`);
       
-      // Increment badge if messenger is closed or we aren't in that thread
       const isActiveThread = message.threadId === state.activeThreadId;
       if (!state.messengerOpen || !isActiveThread) {
         window.notifications.incrementUnreadCount();
       }
     }
 
-    // 5. Update UI if messenger is open
+    // Update UI
     if (message.threadId === state.activeThreadId && window.mergeActiveMessage) {
       window.mergeActiveMessage(message);
-      if (window.renderActiveThread) {
-        window.renderActiveThread(true);
-      }
+      if (window.renderActiveThread) window.renderActiveThread(true);
+    } else if (window.refreshMessengerState) {
+      window.refreshMessengerState({ preserveActiveThread: true });
     }
   }
 
@@ -109,4 +94,4 @@ export class MessengerRealtime {
       attachmentUrl: row.attachment_file_path
     };
   }
-}
+};
