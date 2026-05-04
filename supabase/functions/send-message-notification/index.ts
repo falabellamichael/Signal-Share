@@ -177,7 +177,7 @@ Deno.serve(async (request) => {
 function buildNotificationPayload(message: MessageRecord) {
   return {
     title: "New message",
-    body: "",
+    body: summarizeMessageBody(message),
     threadId: message.thread_id,
     url: "#messages",
     tag: `direct-message-${message.id}`,

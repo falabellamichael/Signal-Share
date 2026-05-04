@@ -1,0 +1,5 @@
+Banned Foul Language List:
+
+- [Insert banned words or phrases here, one per line]
+
+Note: This list should be updated regularly to ensure compliance with website policies and community guidelines.

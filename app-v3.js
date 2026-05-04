@@ -1831,18 +1831,33 @@ async function subscribeMessagingChannels(options = {}) {
   if (state.banningAvailable) state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState().then(() => { if (canAccessAdminBanPanel(state)) void refreshAdminBanState(); if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true }); else { clearMessengerState(); render(); } }));
   state.threadsChannel.subscribe();
     state.messagesChannel = state.supabase.channel(`messages-${state.currentUser.id}-${sessionHash}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-      const message = normalizeMessage(payload.new); if (message.senderId && (isUserBlocked(state, message.senderId) || isUserBanned(state, message.senderId))) return;
-      const threadExists = state.directThreads.some((t) => t.id === message.threadId); const isActiveThread = message.threadId === state.activeThreadId;
+      console.log("[Messenger] New message received via Realtime:", payload);
+      const message = normalizeMessage(payload.new); 
+      if (message.senderId && (isUserBlocked(state, message.senderId) || isUserBanned(state, message.senderId))) {
+        console.log("[Messenger] Message ignored (Sender blocked/banned)");
+        return;
+      }
+      const threadExists = state.directThreads.some((t) => t.id === message.threadId); 
+      const isActiveThread = message.threadId === state.activeThreadId;
+      
       if (message.senderId && message.senderId !== state.currentUser?.id) { 
+        console.log("[Messenger] Triggering incoming alert logic...");
         playIncomingMessageSound(); 
-        if (shouldShowIncomingMessageNotification() && !supportsWebPushNotifications() && !supportsNativePushNotifications()) void showIncomingMessageNotification(message); 
+        if (shouldShowIncomingMessageNotification() && !supportsWebPushNotifications() && !supportsNativePushNotifications()) {
+          console.log("[Messenger] Showing browser notification...");
+          void showIncomingMessageNotification(message); 
+        }
         if (window.notifications) {
           const senderProfile = state.availableProfiles.find(p => p.id === message.senderId);
           const senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
           window.notifications.info(message.body || "Sent an attachment", "New message from " + senderName);
+          console.log("[Messenger] Messenger Open:", state.messengerOpen, "Active Thread:", isActiveThread);
           if (!state.messengerOpen || !isActiveThread) {
+            console.log("[Messenger] Incrementing unread count badge");
             window.notifications.incrementUnreadCount();
           }
+        } else {
+          console.warn("[Messenger] window.notifications is NOT defined!");
         }
       }
       if (isActiveThread) {
@@ -1853,7 +1868,9 @@ async function subscribeMessagingChannels(options = {}) {
         renderConversationList(isReady);
       }
       if (!threadExists || !isActiveThread) void refreshMessengerState({ preserveActiveThread: true });
-    }).subscribe();
+    }).subscribe((status) => {
+      console.log(`[Messenger] Messages channel status for ${state.currentUser.id}:`, status);
+    });
     
     state.likesChannel = state.supabase.channel(`likes-${state.currentUser.id}-${sessionHash}`).on("postgres_changes", { event: "INSERT", schema: "public", table: POST_LIKES_TABLE }, (payload) => {
       const like = payload.new;
