@@ -1909,7 +1909,8 @@ async function subscribeMessagingChannels(options = {}) {
   }
 }
 
-// Expose helpers globally at the very top
+
+// Expose helpers globally for MessengerRealtime
 window.playIncomingMessageSound = playIncomingMessageSound;
 window.mergeActiveMessage = mergeActiveMessage;
 window.renderActiveThread = renderActiveThread;
@@ -1925,13 +1926,6 @@ function playIncomingMessageSound() {
     gainNode.gain.setValueAtTime(0.0001, startAt); gainNode.gain.exponentialRampToValueAtTime(0.12, startAt + 0.02); gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.18);
     oscillator.connect(gainNode); gainNode.connect(ctx.destination); oscillator.start(startAt); oscillator.stop(startAt + 0.2);
   } catch (_error) {}
-}
-
-function mergeActiveMessage(message) {
-  if (!state.activeMessages) state.activeMessages = [];
-  if (state.activeMessages.some(m => m.id === message.id)) return;
-  state.activeMessages.push(message);
-  state.activeMessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
 async function handleProfileSave() {
