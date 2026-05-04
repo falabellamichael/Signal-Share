@@ -27,7 +27,9 @@ class NotificationSystem {
     container.setAttribute('aria-atomic', 'true');
     
     // Add to body
-    document.body.appendChild(container);
+    if (document.body) {
+      document.body.appendChild(container);
+    }
     
     return container;
   }
@@ -61,7 +63,9 @@ class NotificationSystem {
     const notificationElement = this.createNotificationElement(notification);
     
     // Add to container
-    this.notificationContainer.appendChild(notificationElement);
+    if (this.notificationContainer) {
+      this.notificationContainer.appendChild(notificationElement);
+    }
 
     // Auto-dismiss if duration is set
     if (notification.duration > 0) {
@@ -98,10 +102,12 @@ class NotificationSystem {
 
     // Add close button event listener
     const closeButton = element.querySelector('.notification-close');
-    closeButton.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.dismissNotification(notification.id);
-    });
+    if (closeButton) {
+      closeButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.dismissNotification(notification.id);
+      });
+    }
 
     return element;
   }
@@ -164,20 +170,11 @@ class NotificationSystem {
     });
   }
 
-  // Clear all notifications
-  clearAll() {
-    this.notifications.forEach(notification => {
-      this.dismissNotification(notification.id);
-    });
-    this.notifications = [];
-  }
-
-  // Manage unread notification badge on the profile avatar
+  // Manage unread notification badge
   setUnreadCount(count) {
     const badge = document.getElementById('notificationBadge');
     if (!badge) return;
     
-    // Save to localStorage so it persists across reloads
     localStorage.setItem('signal_share_unread_count', count.toString());
     
     if (count > 0) {
@@ -185,7 +182,6 @@ class NotificationSystem {
       badge.style.setProperty('display', 'flex', 'important');
       badge.style.setProperty('opacity', '1', 'important');
       badge.style.setProperty('visibility', 'visible', 'important');
-      console.log("[Notifications] Force showing badge on phone:", count);
     } else {
       badge.style.setProperty('display', 'none', 'important');
     }
@@ -207,7 +203,6 @@ class NotificationSystem {
   }
 
   saveHistory(history) {
-    // Keep last 50 notifications max
     if (history.length > 50) history = history.slice(0, 50);
     localStorage.setItem('signal_share_notifications_history', JSON.stringify(history));
     if (window.renderNotificationsHistory) window.renderNotificationsHistory();
@@ -230,13 +225,11 @@ class NotificationSystem {
     console.log("[Notifications] Syncing missed notifications...");
     
     try {
-      // 1. Get the timestamp of the latest notification in history
       const history = this.getHistory();
       let lastTimestamp = 0;
       if (history.length > 0) {
         lastTimestamp = new Date(history[0].timestamp).getTime();
       } else {
-        // If history is empty, only catch up from the last 24 hours to avoid spam
         lastTimestamp = Date.now() - (24 * 60 * 60 * 1000);
       }
 
@@ -261,8 +254,7 @@ class NotificationSystem {
         });
       }
 
-      // 3. Fetch new messages (more complex query)
-      // First, get threads the user is in
+      // 3. Fetch new messages
       const { data: threads, error: threadsError } = await supabase
         .from("direct_threads")
         .select("id")
@@ -279,8 +271,6 @@ class NotificationSystem {
 
         if (!msgError && newMessages) {
           newMessages.forEach(msg => {
-            // Note: We don't have sender name here easily without more joins, 
-            // but we can at least log that a message arrived.
             this.addToHistory({
               type: "info",
               title: "New Message",
@@ -290,7 +280,6 @@ class NotificationSystem {
           });
         }
       }
-
       console.log("[Notifications] Sync complete.");
     } catch (e) {
       console.error("[Notifications] Sync failed:", e);
@@ -301,78 +290,27 @@ class NotificationSystem {
     this.saveHistory([]);
     this.setUnreadCount(0);
     console.log("[Notifications] History cleared.");
-    if (window.renderNotificationsHistory) window.renderNotificationsHistory();
   }
 }
 
 // Wrap info/warning/error/success methods to log to history
-const originalMethods = {
-  info: NotificationSystem.prototype.info,
-  success: NotificationSystem.prototype.success,
-  warning: NotificationSystem.prototype.warning,
-  error: NotificationSystem.prototype.error
-};
-
 ['info', 'success', 'warning', 'error'].forEach(method => {
+  const original = NotificationSystem.prototype[method];
   NotificationSystem.prototype[method] = function(message, title) {
     const defaultTitles = { info: 'Information', success: 'Success', warning: 'Warning', error: 'Error' };
     const actualTitle = title || defaultTitles[method];
     this.addToHistory({ type: method, title: actualTitle, message: message });
-    return originalMethods[method].call(this, message, actualTitle);
+    return original.call(this, message, actualTitle);
   };
 });
 
-function initNotifications() {
-  if (notificationSystem) return;
-  
-  // Ensure the container exists in the DOM or create it immediately
-  let container = document.getElementById('notification-container');
-  if (!container && document.body) {
-    container = document.createElement('div');
-    container.id = 'notification-container';
-    container.className = 'notification-container';
-    document.body.appendChild(container);
-  }
-
-  notificationSystem = new NotificationSystem();
-  window.notifications = notificationSystem;
-
-  // Restore badge state immediately
-  try {
-    const savedCount = parseInt(localStorage.getItem('signal_share_unread_count') || '0', 10);
-    if (savedCount > 0) {
-      notificationSystem.setUnreadCount(savedCount);
-    }
-  } catch (e) {}
-  
-  console.log("[Notifications] System Aggressively Initialized.");
-}
-
-// Start IMMEDIATELY
-initNotifications();
-// And also try again on DOM ready just in case body wasn't ready
-document.addEventListener('DOMContentLoaded', initNotifications);
-window.addEventListener('load', initNotifications);
-
-// Make the class globally available
-window.NotificationSystem = NotificationSystem;
-
-// Export for module usage
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = NotificationSystem;
-}
-
-// UI Integration for Notifications
+// UI Integration
 window.renderNotificationsPanel = function() {
   const panel = document.getElementById('notificationsPanel');
-  const launcher = document.getElementById('notificationsLauncherButton');
   if (!panel || !window.state) return;
-  
   const isOpen = window.state.notificationsPanelOpen;
   panel.hidden = !isOpen;
   panel.classList.toggle("is-open", isOpen);
-  panel.setAttribute("aria-hidden", isOpen ? "false" : "true");
-  if (launcher) launcher.setAttribute("aria-expanded", isOpen ? "true" : "false");
 };
 
 window.renderNotificationsHistory = function() {
@@ -390,86 +328,35 @@ window.renderNotificationsHistory = function() {
   } else {
     if (emptyState) emptyState.style.display = "none";
     if (clearButton) clearButton.style.display = "block";
-    
-    history.forEach((item, index) => {
+    history.forEach(item => {
       const li = document.createElement("li");
-      li.className = "notification-history-item";
       li.style.padding = "12px";
       li.style.background = "var(--bg-elevated, rgba(255,255,255,0.05))";
       li.style.borderRadius = "8px";
-      li.style.position = "relative";
-      li.style.overflow = "hidden";
       li.style.cursor = "pointer";
-      li.style.touchAction = "pan-y";
-      li.style.transition = "transform 0.2s ease, opacity 0.2s ease";
-      
-      li.innerHTML = `
-        <div class="swipe-content">
-          <strong style="display:block;font-size:0.95rem;margin-bottom:4px;">${item.title}</strong>
-          <span style="font-size:0.85rem;color:var(--text-muted, #ccc);">${item.message}</span>
-        </div>
-        <div class="swipe-bg" style="position:absolute;top:0;right:-100%;width:100%;height:100%;background:rgba(239, 68, 68, 0.2);display:flex;align-items:center;padding-left:20px;pointer-events:none;">
-           <span style="color: #ef4444; font-size: 0.8rem; font-weight: bold;">Clear</span>
-        </div>
-      `;
-
-      // Swipe logic
-      let startX = 0;
-      let currentX = 0;
-      let isSwiping = false;
-      let startTime = 0;
-
-      li.addEventListener('touchstart', (e) => {
-        startX = e.touches[0].clientX;
-        startTime = Date.now();
-        isSwiping = true;
-        li.style.transition = 'none';
-      }, { passive: true });
-
-      li.addEventListener('touchmove', (e) => {
-        if (!isSwiping) return;
-        currentX = e.touches[0].clientX - startX;
-        if (currentX > 0) currentX = 0;
-        if (currentX < -150) currentX = -150;
-        if (Math.abs(currentX) > 10) {
-           li.style.transform = `translateX(${currentX}px)`;
-        }
-      }, { passive: true });
-
-      li.addEventListener('touchend', (e) => {
-        const duration = Date.now() - startTime;
-        isSwiping = false;
-        li.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease';
-        
-        if (currentX < -80) {
-          li.style.transform = 'translateX(-120%)';
-          li.style.opacity = '0';
-          setTimeout(() => {
-            if (window.notifications) {
-              const currentHistory = window.notifications.getHistory();
-              currentHistory.splice(index, 1);
-              window.notifications.saveHistory(currentHistory);
-              window.renderNotificationsHistory();
-            }
-          }, 300);
-        } else {
-          li.style.transform = 'translateX(0)';
-          // If it was a quick tap with very little movement, trigger a click
-          if (duration < 300 && Math.abs(currentX) < 10) {
-            li.click();
-          }
-        }
-        currentX = 0;
-      });
-
-      li.addEventListener('click', () => {
-        console.log("[Notifications] Item clicked:", item);
-        // Visual feedback for click
-        li.style.background = "var(--bg-elevated-bright, rgba(255,255,255,0.15))";
-        setTimeout(() => { li.style.background = "var(--bg-elevated, rgba(255,255,255,0.05))"; }, 150);
-      });
-
+      li.innerHTML = `<strong style="display:block;font-size:0.95rem;margin-bottom:4px;">${item.title}</strong><span style="font-size:0.85rem;color:var(--text-muted, #ccc);">${item.message}</span>`;
       list.appendChild(li);
     });
   }
 };
+
+// Initialize
+let notificationSystem = null;
+function initNotifications() {
+  if (notificationSystem) return;
+  notificationSystem = new NotificationSystem();
+  window.notifications = notificationSystem;
+  
+  const savedCount = parseInt(localStorage.getItem('signal_share_unread_count') || '0', 10);
+  if (savedCount > 0) notificationSystem.setUnreadCount(savedCount);
+  console.log("[Notifications] System Initialized (Reverted).");
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initNotifications);
+} else {
+  initNotifications();
+}
+window.addEventListener('load', initNotifications);
+
+window.NotificationSystem = NotificationSystem;
