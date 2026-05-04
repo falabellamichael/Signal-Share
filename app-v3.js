@@ -1933,6 +1933,7 @@ async function subscribeMessagingChannels(options = {}) {
         mergeActiveMessage(message);
         showMessengerFeedback("");
         renderActiveThread(isMessagingEnabled(state));
+      }
     }
     
     state.messagesChannel.subscribe((status, err) => {
@@ -1954,6 +1955,8 @@ async function subscribeMessagingChannels(options = {}) {
         }
       }
     }).subscribe();
+  } catch (error) {
+    console.error("[Messenger] Fatal Subscription Error:", error);
   } finally {
     isMessagingSubscribing = false;
   }
