@@ -1883,11 +1883,10 @@ async function subscribeMessagingChannels(options = {}) {
       if (message.senderId && message.senderId !== state.currentUser?.id) { 
         console.log("[Messenger] Triggering incoming alert logic...");
         playIncomingMessageSound(); 
-        if (shouldShowIncomingMessageNotification() && !supportsWebPushNotifications() && !supportsNativePushNotifications()) {
-          console.log("[Messenger] Showing browser notification...");
-          void showIncomingMessageNotification(message); 
-        }
-        if (window.notifications) {
+        
+        // Use a more robust check and independent calls
+        const notif = window.notifications;
+        if (notif) {
           const senderProfile = state.availableProfiles.find(p => p.id === message.senderId);
           let senderName = senderProfile ? (senderProfile.displayName || "Member") : "Member";
           let messageBody = message.body || "Sent an attachment";
@@ -1895,14 +1894,22 @@ async function subscribeMessagingChannels(options = {}) {
           if (state.preferences.notificationHideSender) senderName = "Someone";
           if (state.preferences.notificationHideBody) messageBody = "New message";
 
-          window.notifications.info(messageBody, `${senderName} sent a message`);
-          console.log("[Messenger] Messenger Open:", state.messengerOpen, "Active Thread:", isActiveThread);
+          // 1. Show the banner (try/catch to avoid breaking the badge)
+          try {
+            notif.info(messageBody, `${senderName} sent a message`);
+          } catch (e) {
+            console.error("[Messenger] Failed to show info banner:", e);
+          }
+
+          // 2. Increment the badge number
           if (!state.messengerOpen || !isActiveThread) {
             console.log("[Messenger] Incrementing unread count badge");
-            window.notifications.incrementUnreadCount();
+            try {
+              notif.incrementUnreadCount();
+            } catch (e) {
+              console.error("[Messenger] Failed to increment badge:", e);
+            }
           }
-        } else {
-          console.warn("[Messenger] window.notifications is NOT defined!");
         }
       }
       if (isActiveThread) {
