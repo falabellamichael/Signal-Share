@@ -142,6 +142,8 @@ Deno.serve(async (request) => {
     .eq("id", recipientId)
     .single();
 
+  console.log(`[Notification Debug] Recipient ${recipientId} preferences:`, recipientProfile);
+
   const finalSenderName = recipientProfile?.notification_hide_sender ? "Someone" : senderName;
   const finalMessageRow = recipientProfile?.notification_hide_body 
     ? { ...messageRow, body: "New message", attachment_name: null, attachment_kind: null } 
