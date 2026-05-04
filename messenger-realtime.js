@@ -19,10 +19,10 @@ export class MessengerRealtime {
     this.stop(); // Clean up any old connections
     
     const userId = this.state.currentUser.id;
-    // Using the exact naming convention that is most stable for Supabase
-    const channelName = `messages-${userId}-${this.sessionHash}`;
+    // Simplified, rock-solid naming convention
+    const channelName = `messenger_live_${userId.slice(0, 8)}`;
     
-    console.log("[Realtime] Connecting to messenger channel:", channelName);
+    console.log("[Realtime] Connecting to:", channelName);
     
     this.channel = this.state.supabase.channel(channelName)
       .on("postgres_changes", { 
@@ -34,7 +34,10 @@ export class MessengerRealtime {
       })
       .subscribe((status, err) => {
         console.log("[Realtime] Status:", status);
-        if (err) console.error("[Realtime] Error:", err);
+        if (err || status === "CHANNEL_ERROR") {
+          console.error("[Realtime] Error encountered. Retrying in 3s...", err);
+          setTimeout(() => this.init(), 3000);
+        }
       });
   }
 
