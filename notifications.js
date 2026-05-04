@@ -5,6 +5,7 @@ class NotificationSystem {
   constructor() {
     this.notifications = [];
     this.notificationContainer = null;
+    this.syncPromise = null; // Prevent concurrent syncs
     this.init();
   }
 
@@ -254,9 +255,11 @@ class NotificationSystem {
 
   async syncWithSupabase(supabase, currentUserId) {
     if (!supabase || !currentUserId) return;
-    console.log("[Notifications] Syncing missed notifications...");
+    if (this.syncPromise) return this.syncPromise;
     
-    try {
+    this.syncPromise = (async () => {
+      console.log("[Notifications] Syncing missed notifications...");
+      try {
       const history = this.getHistory();
       const lastClearedAt = parseInt(localStorage.getItem('signal_share_notifications_last_cleared_at') || '0', 10);
       
@@ -323,7 +326,11 @@ class NotificationSystem {
       console.log("[Notifications] Sync complete.");
     } catch (e) {
       console.error("[Notifications] Sync failed:", e);
+    } finally {
+      this.syncPromise = null;
     }
+    })();
+    return this.syncPromise;
   }
 
   clearHistory() {

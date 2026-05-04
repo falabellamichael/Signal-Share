@@ -1425,7 +1425,6 @@ function focusMessengerPrimaryControl() {
 }
 
 function openMessengerDock({ expanded = false, focusPrimaryControl = false } = {}) {
-  if (window.notifications) window.notifications.setUnreadCount(0);
   const nextExpanded = resolveMessengerExpandedState(expanded);
   if (!state.messengerOpen || state.messengerExpanded !== nextExpanded) { state.messengerOpen = true; state.messengerExpanded = nextExpanded; renderMessenger(); }
   if (focusPrimaryControl) focusMessengerPrimaryControl();
@@ -2314,7 +2313,6 @@ function renderSettingsPanel() {
 function openNotificationsPanel() { 
   state.notificationsPanelOpen = true; 
   setMobileHeaderHidden(false); 
-  if (window.notifications) window.notifications.setUnreadCount(0);
   render();
   if (window.renderNotificationsHistory) window.renderNotificationsHistory();
   requestAnimationFrame(() => elements.notificationsCloseButton?.focus?.()); 
