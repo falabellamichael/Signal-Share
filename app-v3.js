@@ -1905,8 +1905,12 @@ async function subscribeMessagingChannels(options = {}) {
         renderConversationList(isReady);
       }
       if (!threadExists || !isActiveThread) void refreshMessengerState({ preserveActiveThread: true });
-    }).subscribe((status) => {
-      console.log(`[Messenger] Messages channel status for ${state.currentUser.id}:`, status);
+    }).subscribe((status, err) => {
+      console.log(`[Messenger] Messages channel status:`, status);
+      if (err) console.error("[Messenger] Subscription Error:", err);
+      if (status === "SUBSCRIBED") {
+        console.log("[Messenger] Realtime is active! Waiting for messages...");
+      }
     });
     
     state.likesChannel = state.supabase.channel(`likes-${state.currentUser.id}-${sessionHash}`).on("postgres_changes", { event: "INSERT", schema: "public", table: POST_LIKES_TABLE }, (payload) => {

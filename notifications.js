@@ -190,6 +190,7 @@ class NotificationSystem {
 
   incrementUnreadCount() {
     let count = parseInt(localStorage.getItem('signal_share_unread_count') || '0', 10);
+    console.log("[Notifications] Incrementing unread count. New count:", count + 1);
     this.setUnreadCount(count + 1);
   }
 
