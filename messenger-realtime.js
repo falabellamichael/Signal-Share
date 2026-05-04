@@ -45,6 +45,12 @@ window.MessengerRealtime = class MessengerRealtime {
           }
         });
     }, 1000);
+
+    // Heartbeat to monitor health
+    if (this.heartbeat) clearInterval(this.heartbeat);
+    this.heartbeat = setInterval(() => {
+      console.log("[Realtime] Heartbeat. Status:", this.channel ? "Connected" : "Disconnected");
+    }, 30000);
   }
 
   handleNewMessage(rawData) {
@@ -122,6 +128,7 @@ window.MessengerRealtime = class MessengerRealtime {
   }
 
   stop() {
+    if (this.heartbeat) clearInterval(this.heartbeat);
     if (this.channel) {
       console.log("[Realtime] Stopping and removing channel...");
       this.channel.unsubscribe();
