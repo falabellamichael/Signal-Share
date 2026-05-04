@@ -76,11 +76,18 @@ window.MessengerRealtime = class MessengerRealtime {
     if (state.preferences?.notificationHideBody) messageBody = "New message";
 
     // 1. Try main notification system
-    console.log("[Realtime] Notification System Status:", window.notifications ? "Ready" : "Missing");
+    const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
+    console.log("[Realtime] Notification System Status:", window.notifications ? "Ready" : "Missing", "Mobile:", isMobile);
     
     if (window.notifications && typeof window.notifications.info === "function") {
-      console.log("[Realtime] Triggering info notification.");
-      window.notifications.info(messageBody, `${senderName} sent a message`);
+      // Only show text banners on PC, hide on mobile to save screen space
+      if (!isMobile) {
+        console.log("[Realtime] Triggering info notification.");
+        window.notifications.info(messageBody, `${senderName} sent a message`);
+      } else {
+        console.log("[Realtime] Skipping banner on mobile.");
+      }
+
       const isActiveThread = message.threadId === state.activeThreadId;
       if (!state.messengerOpen || !isActiveThread) {
         console.log("[Realtime] Incrementing unread count via main system.");

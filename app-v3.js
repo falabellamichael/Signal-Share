@@ -1896,8 +1896,11 @@ async function subscribeMessagingChannels(options = {}) {
       const like = payload.new;
       if (like.user_id === state.currentUser.id) return;
       const likedPost = state.userPosts.find((p) => p.id === like.post_id);
+      const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
       if (likedPost && likedPost.authorId === state.currentUser.id && window.notifications) {
-        window.notifications.success(`Someone liked your post: ${likedPost.title || "Untitled"}`, "New Like!");
+        if (!isMobile) {
+          window.notifications.success(`Someone liked your post: ${likedPost.title || "Untitled"}`, "New Like!");
+        }
         window.notifications.incrementUnreadCount();
       }
     }).subscribe();
