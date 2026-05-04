@@ -197,9 +197,7 @@ class NotificationSystem {
     try {
       const history = JSON.parse(localStorage.getItem('signal_share_notifications_history') || '[]');
       return Array.isArray(history) ? history : [];
-    } catch {
-      return [];
-    }
+    } catch { return []; }
   }
 
   saveHistory(history) {
@@ -208,10 +206,42 @@ class NotificationSystem {
     if (window.renderNotificationsHistory) window.renderNotificationsHistory();
   }
 
+  getClearedIds() {
+    try {
+      const cleared = JSON.parse(localStorage.getItem('signal_share_notifications_cleared_ids') || '[]');
+      return new Set(Array.isArray(cleared) ? cleared : []);
+    } catch { return new Set(); }
+  }
+
+  saveClearedIds(clearedIds) {
+    const arr = Array.from(clearedIds).slice(-200); // Limit to 200 items
+    localStorage.setItem('signal_share_notifications_cleared_ids', JSON.stringify(arr));
+  }
+
   addToHistory(notification) {
     const history = this.getHistory();
+    const clearedIds = this.getClearedIds();
+    
+    // Stable ID generation for blacklisting
+    let stableId = notification.id;
+    if (!stableId) {
+       const content = (notification.title || '') + (notification.message || '');
+       let hash = 0;
+       for (let i = 0; i < content.length; i++) {
+         hash = ((hash << 5) - hash) + content.charCodeAt(i);
+         hash |= 0;
+       }
+       stableId = 'gen-' + Math.abs(hash).toString(36);
+    }
+
+    // 1. Blacklist Check
+    if (clearedIds.has(stableId)) return;
+
+    // 2. Duplicate Check
+    if (history.some(item => item.id === stableId)) return;
+
     history.unshift({
-      id: notification.id || Date.now().toString(),
+      id: stableId,
       type: notification.type,
       title: notification.title,
       message: notification.message,
@@ -246,6 +276,7 @@ class NotificationSystem {
       if (!likesError && newLikes) {
         newLikes.forEach(like => {
           this.addToHistory({
+            id: `like-${like.post_id}-${like.user_id}`,
             type: "success",
             title: "New Like!",
             message: `Someone liked your post: ${like.posts.title || "Untitled"}`
@@ -272,6 +303,7 @@ class NotificationSystem {
         if (!msgError && newMessages) {
           newMessages.forEach(msg => {
             this.addToHistory({
+              id: msg.id,
               type: "info",
               title: "New Message",
               message: msg.body || "Sent an attachment"
@@ -287,9 +319,15 @@ class NotificationSystem {
   }
 
   clearHistory() {
+    const history = this.getHistory();
+    const clearedIds = this.getClearedIds();
+    history.forEach(item => {
+      if (item.id) clearedIds.add(item.id);
+    });
+    this.saveClearedIds(clearedIds);
     this.saveHistory([]);
     this.setUnreadCount(0);
-    console.log("[Notifications] History cleared.");
+    console.log("[Notifications] History cleared and IDs blacklisted.");
   }
 }
 
