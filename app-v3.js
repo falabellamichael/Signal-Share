@@ -1935,15 +1935,8 @@ async function subscribeMessagingChannels(options = {}) {
         renderActiveThread(isMessagingEnabled(state));
       }
     }
-      }
-      if (isActiveThread) {
-        mergeActiveMessage(message);
-        showMessengerFeedback("");
-        const isReady = isMessagingEnabled(state);
-        renderActiveThread(isReady);
-        renderConversationList(isReady);
-      }
-      if (!threadExists || !isActiveThread) void refreshMessengerState({ preserveActiveThread: true });
+    
+    if (!threadExists || !isActiveThread) void refreshMessengerState({ preserveActiveThread: true });
     }).subscribe((status, err) => {
       console.log(`[Messenger] Messages channel status:`, status);
       if (err) console.error("[Messenger] Subscription Error:", err);
