@@ -13,65 +13,35 @@ import {
   loadPostsFromDatabase, 
   savePostToDatabase, 
   deletePostFromDatabase, 
-  setApiContext,
-  DB_NAME,
-  DB_VERSION,
-  STORE_NAME,
-  MAX_IMAGE_FILE_SIZE,
-  MAX_VIDEO_FILE_SIZE,
-  FEED_POSTS_PER_PAGE,
-  LIKED_POSTS_KEY,
-  POST_LIKES_TABLE,
-  SAVED_POSTS_KEY,
-  PLAYER_POSITION_KEY,
-  PLAYER_VOLUME_KEY,
-  USER_PREFERENCES_KEY,
-  DEFAULT_PLAYER_VOLUME,
-  DEFAULT_USER_PREFERENCES,
-  DEFAULT_SITE_SETTINGS,
-  THEME_OPTIONS,
-  THEME_VALUES,
-  loadUserPreferences,
-  loadSavedPosts,
-  loadPlayerPosition,
-  loadPlayerVolume,
-  normalizeUserPreferences
-} from './api-v3.js?v=92';
+  setApiContext 
+} from './api-v3.js';
 
 // Messenger & Admin Features
 // Extracted from app-v3.js for modularity
 
-// --- Global State Bridge ---
-const state = new Proxy({}, {
-  get(target, prop) {
-    return window.__SIGNAL_SHARE_STATE__?.[prop];
-  },
-  set(target, prop, value) {
-    if (window.__SIGNAL_SHARE_STATE__) {
-      window.__SIGNAL_SHARE_STATE__[prop] = value;
-      return true;
-    }
-    return false;
-  }
-});
-
-const elements = new Proxy({}, {
-  get(target, prop) {
-    return window.__SIGNAL_SHARE_ELEMENTS__?.[prop];
-  },
-  set(target, prop, value) {
-    if (window.__SIGNAL_SHARE_ELEMENTS__) {
-      window.__SIGNAL_SHARE_ELEMENTS__[prop] = value;
-      return true;
-    }
-    return false;
-  }
-});
+const state = window.__SIGNAL_SHARE_STATE__;
+const elements = window.__SIGNAL_SHARE_ELEMENTS__;
 
 // Helper to ensure we can access core functions from app-v3.js
 const getCore = () => window;
 
 // --- Settings & Preferences ---
+
+function loadUserPreferences() {
+  try { return normalizeUserPreferences(JSON.parse(localStorage.getItem(window.USER_PREFERENCES_KEY) ?? "{}")); } catch { return { ...window.DEFAULT_USER_PREFERENCES }; }
+}
+
+function normalizeUserPreferences(raw = {}) {
+  const theme = window.THEME_VALUES.has(raw.theme) ? raw.theme : window.DEFAULT_USER_PREFERENCES.theme;
+  const density = ["airy", "compact"].includes(raw.density) ? raw.density : window.DEFAULT_USER_PREFERENCES.density;
+  const motion = ["full", "calm"].includes(raw.motion) ? raw.motion : window.DEFAULT_USER_PREFERENCES.motion;
+  const statusBarStrip = typeof raw.statusBarStrip === "boolean" ? raw.statusBarStrip : window.DEFAULT_USER_PREFERENCES.statusBarStrip;
+  const notificationHideSender = typeof raw.notificationHideSender === "boolean" ? raw.notificationHideSender : window.DEFAULT_USER_PREFERENCES.notificationHideSender;
+  const notificationHideBody = typeof raw.notificationHideBody === "boolean" ? raw.notificationHideBody : window.DEFAULT_USER_PREFERENCES.notificationHideBody;
+  return { theme, density, motion, statusBarStrip, notificationHideSender, notificationHideBody };
+}
+
+function saveUserPreferences() { try { localStorage.setItem(window.USER_PREFERENCES_KEY, JSON.stringify(state.preferences)); } catch {} }
 
 function applyUserPreferences(preferences) {
   document.body.dataset.theme = preferences.theme; 
@@ -147,21 +117,7 @@ function renderKeyboardShortcuts() {
   });
 }
 
-function updateUserPreferences(nextPreferences) {
-  state.preferences = normalizeUserPreferences(nextPreferences); 
-  applyUserPreferences(state.preferences); 
-  saveUserPreferences(); 
-  if (state.supabase && state.currentUser) {
-    void window.syncCurrentProfileToSupabase().catch(err => console.error("[Preferences] Sync failed:", err));
-  }
-  renderSettingsPanel(); 
-}
 
-function resetUserPreferences() {
-  updateUserPreferences({ ...window.DEFAULT_USER_PREFERENCES }); 
-  if (window.resetPlayerDockPosition) window.resetPlayerDockPosition(); 
-  if (window.resetPlayerVolume) window.resetPlayerVolume(); 
-}
 
 // --- Notifications Panel ---
 
@@ -195,36 +151,10 @@ function toggleNotificationsPanel(event) {
 
 function syncOverlayBodyState() { document.body.classList.toggle("viewer-open", Boolean(state.viewerPostId || state.viewerAttachment || state.activeProfileKey)); }
 
-function syncMobileHeaderVisibility() { 
-  if (!(window.isMobileHeaderViewport && window.isMobileHeaderViewport())) { setMobileHeaderHidden(false); state.lastScrollY = window.scrollY; return; } 
-  if (state.settingsPanelOpen || window.scrollY <= 24) setMobileHeaderHidden(false); 
-  state.lastScrollY = window.scrollY; 
-}
 
-function handleWindowScroll() { 
-  if (!(window.isMobileHeaderViewport && window.isMobileHeaderViewport())) return; 
-  const currentScrollY = window.scrollY; 
-  if (state.settingsPanelOpen || currentScrollY <= 24) { setMobileHeaderHidden(false); state.lastScrollY = currentScrollY; return; } 
-  const delta = currentScrollY - state.lastScrollY; 
-  if (Math.abs(delta) < 8) { state.lastScrollY = currentScrollY; return; } 
-  if (delta > 0) setMobileHeaderHidden(true); else setMobileHeaderHidden(false); 
-  state.lastScrollY = currentScrollY; 
-}
 
-  const root = document.documentElement; const viewport = window.visualViewport; 
-  const offsetTop = viewport ? Math.max(0, Math.round(viewport.offsetTop)) : 0; 
-  const visibleHeight = viewport ? Math.round(viewport.height) : window.innerHeight; 
-  const offsetBottom = viewport ? Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop)) : 0;
-  root.style.setProperty("--viewport-offset-top", `${offsetTop}px`); 
-  root.style.setProperty("--viewport-offset-bottom", `${offsetBottom}px`); 
-  root.style.setProperty("--viewport-visible-height", `${visibleHeight}px`);
-}
 
-  updateViewportMetrics(); 
-  syncMobileHeaderVisibility(); 
-  if (window.syncMobileMessengerMode) window.syncMobileMessengerMode(); 
-  if (state.playerPostId && state.playerPosition && window.applyMiniPlayerPosition) window.applyMiniPlayerPosition(); 
-}
+
 
 function showFeedback(message, isError = false) { elements.formFeedback.textContent = message; elements.formFeedback.classList.toggle("is-error", isError); }
 function showAuthFeedback(message, isError = false) { elements.authFeedback.textContent = message; elements.authFeedback.classList.toggle("is-error", isError); }
@@ -1087,25 +1017,15 @@ function getSiteSettingsPayload() { return { id: "global", shell_width: state.si
 function normalizeSiteSettings(row = {}) { return { shellWidth: clampNumber(row.shell_width, 960, 1440, 1200), sectionGap: clampNumber(row.section_gap, 16, 40, 24), surfaceRadius: clampNumber(row.surface_radius, 22, 44, 32), mediaFit: row.media_fit === "contain" ? "contain" : "cover" }; }
 function clampNumber(value, min, max, fallback) { const numeric = Number(value); if (!Number.isFinite(numeric)) return fallback; return Math.min(max, Math.max(min, Math.round(numeric))); }
 
+function loadPlayerPosition() { try { const raw = localStorage.getItem(window.PLAYER_POSITION_KEY); if (!raw) return null; const parsed = JSON.parse(raw); return { x: Math.round(parsed.x), y: Math.round(parsed.y) }; } catch { return null; } }
 function normalizePlayerVolume(value, fallback = 1) { const numeric = Number(value); if (!Number.isFinite(numeric)) return fallback; return Math.min(1, Math.max(0, numeric)); }
+function loadPlayerVolume() { try { const raw = localStorage.getItem(window.PLAYER_VOLUME_KEY); if (!raw) return 1; return normalizePlayerVolume(raw); } catch { return 1; } }
 function savePlayerVolume(volume) { try { localStorage.setItem(window.PLAYER_VOLUME_KEY, `${normalizePlayerVolume(volume)}`); } catch {} }
 function savePlayerPosition(position) { try { if (!position) { localStorage.removeItem(window.PLAYER_POSITION_KEY); return; } localStorage.setItem(window.PLAYER_POSITION_KEY, JSON.stringify({ x: Math.round(position.x), y: Math.round(position.y) })); } catch {} }
 
 function getPlayerViewportPadding() { return window.innerWidth <= 760 ? 12 : 20; }
 
-  if (!state.playerPosition) { elements.miniPlayer.style.left = ""; elements.miniPlayer.style.top = ""; elements.miniPlayer.style.right = ""; elements.miniPlayer.style.bottom = ""; return; }
-  const nextPosition = clampPlayerPosition(state.playerPosition); state.playerPosition = nextPosition; savePlayerPosition(nextPosition);
-  elements.miniPlayer.style.left = `${nextPosition.x}px`; elements.miniPlayer.style.top = `${nextPosition.y}px`; elements.miniPlayer.style.right = "auto"; elements.miniPlayer.style.bottom = "auto";
-}
 
-  const target = event.target instanceof Element ? event.target : null; if (!state.playerPostId || target?.closest("button")) return;
-  const rect = elements.miniPlayer.getBoundingClientRect();
-  state.playerPosition = clampPlayerPosition(state.playerPosition ?? { x: rect.left, y: rect.top });
-  state.playerDrag = { pointerId: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
-  elements.miniPlayer.classList.add("is-dragging");
-  try { elements.miniPlayerHead.setPointerCapture(event.pointerId); } catch {}
-  event.preventDefault();
-}
 
 
 function handleViewportResize() { updateViewportMetrics(); syncMobileHeaderVisibility(); syncMobileMessengerMode(); if (state.playerPostId && state.playerPosition) applyMiniPlayerPosition(); }
@@ -1352,59 +1272,8 @@ function updateAdminSettingsValues() { elements.layoutWidthValue.textContent = `
 
 function renderAdminEditor() { const showAdminEditor = state.backendMode === "supabase" && isCurrentUserActivated() && isCurrentUserAdmin(); elements.adminEditor.hidden = !showAdminEditor; if (!showAdminEditor) return; elements.layoutWidthInput.value = String(state.siteSettings.shellWidth); elements.layoutGapInput.value = String(state.siteSettings.sectionGap); elements.layoutRadiusInput.value = String(state.siteSettings.surfaceRadius); elements.mediaFitSelect.value = state.siteSettings.mediaFit; updateAdminSettingsValues(); }
 
-  const posts = getVisiblePosts(); const tagCounts = new Map(); posts.forEach((post) => { (post.tags || []).forEach((tag) => tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1)); });
-  const tags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8); elements.tagCloud.innerHTML = "";
-  tags.forEach(([tag, count]) => { const button = document.createElement("button"); button.className = "tag-chip"; button.textContent = `#${tag} ${count}`; if (state.search === tag.toLowerCase()) button.classList.add("is-active"); button.addEventListener("click", () => { state.search = tag.toLowerCase(); elements.searchInput.value = tag; getCore().render(); }); elements.tagCloud.appendChild(button); });
-}
 
 
-  const fragment = elements.feedCardTemplate.content.cloneNode(true);
-  const mediaContainer = fragment.querySelector(".card-media");
-  const kind = fragment.querySelector(".card-kind");
-  const signal = fragment.querySelector(".card-signal");
-  const title = fragment.querySelector(".card-title");
-  const caption = fragment.querySelector(".card-caption");
-  const creator = fragment.querySelector(".card-creator");
-  const time = fragment.querySelector(".card-time");
-  const tags = fragment.querySelector(".card-tags");
-  const openButton = fragment.querySelector(".open-button");
-  const saveButton = fragment.querySelector(".save-button");
-  const likeButton = fragment.querySelector(".like-button");
-  const deleteButton = fragment.querySelector(".delete-button") || document.createElement("button");
-  
-  kind.textContent = formatKind(post.mediaKind);
-  signal.textContent = getSignalLabel(post);
-  title.textContent = post.title;
-  caption.textContent = post.caption;
-  const creatorSummary = getProfileSummaryForPost(post);
-  creator.textContent = creatorSummary?.displayName ?? post.creator;
-  time.textContent = formatTimestamp(post.createdAt);
-  
-  const isLiked = state.likedPosts.includes(post.id);
-  likeButton.textContent = `${getLikeCount(post)} likes`;
-  likeButton.setAttribute("aria-pressed", String(isLiked));
-  if (isLiked) likeButton.classList.add("is-liked");
-  
-  const isSaved = isPostSaved(post.id);
-  saveButton.textContent = isSaved ? "Saved" : "Save";
-  saveButton.classList.toggle("is-saved", isSaved);
-  
-  openButton.textContent = isPlayablePost(post) ? "Play" : "Open";
-  
-  creator.addEventListener("click", (e) => openProfileByKey(creatorSummary?.key, e.currentTarget));
-  openButton.addEventListener("click", (e) => isPlayablePost(post) ? openMiniPlayer(post.id, e.currentTarget) : openViewer(post.id, e.currentTarget));
-  saveButton.addEventListener("click", () => toggleSave(post.id));
-  likeButton.addEventListener("click", () => void toggleLike(post.id));
-  
-  if (canDeletePost(post)) {
-    deleteButton.hidden = false;
-    deleteButton.addEventListener("click", () => deletePost(post.id));
-  }
-  
-  (post.tags || []).forEach(t => { const p = document.createElement("span"); p.className = "tag-pill"; p.textContent = `#${t}`; tags.appendChild(p); });
-  renderCardMedia(mediaContainer, post);
-  return fragment;
-}
 
 function getAllPosts() { if (state.backendMode === "local" && state.userPosts.length === 0) return [...window.DEMO_POSTS]; return [...state.userPosts]; }
 function renderFeed() {
@@ -2177,13 +2046,6 @@ function closeProfile(options = {}) {
   state.profileReturnFocusElement = null; 
 }
 
-  const post = getPostById(state.playerPostId);
-  elements.miniPlayer.classList.toggle("is-open", !!post);
-  if (!post) return;
-  elements.miniPlayerTitle.textContent = post.title;
-  renderMiniPlayerMedia(elements.miniPlayerStage, post);
-  applyMiniPlayerPosition();
-}
 
 function renderViewer() {
   if (!state.viewerPostId && !state.viewerAttachment) { 
@@ -2590,24 +2452,21 @@ Object.assign(window, {
   isCurrentUserActivated,
   canRevealMemberEmails,
   playIncomingMessageSound,
-  renderAccountState,
-  renderOverview,
-  renderFeed,
-  renderAdminEditor,
-  renderStats,
-  renderTagCloud,
-  renderNotificationsPanel,
-  syncSourceHelp,
-  updateActiveFilterChip,
-  setStatusPill,
-  showFeedback,
-  isCurrentUserActivated,
-  isCurrentUserAdmin,
-  getCurrentUserEmail,
-  getOwnProfileKey,
-  openProfileByKey,
-  syncProfileNavAvatar,
-  syncOverlayBodyState,
+  syncCurrentProfileToSupabase,
+  handleMessageSubmit,
+  handleMessageAttachmentInputChange,
+  handleMessageEmojiPanelClick,
+  toggleMessageEmojiPicker,
+  closeMessageEmojiPicker,
+  clearMessageAttachmentSelection,
+  openOwnProfile,
+  stepViewer,
+  expandMiniPlayer,
+  collapseViewerToPlayer,
+  stepMiniPlayer,
+  applyMiniPlayerPosition,
+  clampPlayerPosition,
+  destroyActivePlayer,
   renderCardMedia,
   renderSpotlightMedia,
   renderViewerMedia,
@@ -2654,20 +2513,54 @@ Object.assign(window, {
   clearSelectedMedia,
   clearPreviewOnly,
   renderPreview,
-  renderExternalPreview,
+  renderExternalPreview
+});
+
+// Expose UI functions to global window object so app-v3.js can call them
+Object.assign(window, {
+  renderStats,
+  renderAccountState,
+  renderMessenger,
+  renderSettingsPanel,
+  renderNotificationsPanel,
+  renderAdminEditor,
+  renderAdminBanPanel,
+  renderTagCloud,
+  renderOverview,
+  renderFeed,
+  renderMiniPlayer,
+  renderViewer,
+  renderProfileView,
+  syncSourceHelp,
+  updateComposerAccess,
+  handleViewportResize,
+  handleWindowScroll,
+  handleWindowClick,
+  updateUserPreferences,
+  resetUserPreferences,
+  openSettingsPanel,
+  closeSettingsPanel,
+  toggleSettingsPanel,
+  openNotificationsPanel,
+  closeNotificationsPanel,
+  toggleNotificationsPanel,
+  openMessengerThreadFromNotification,
+  refreshMessengerState,
   syncCurrentProfileToSupabase,
-  handleMessageSubmit,
-  handleMessageAttachmentInputChange,
-  handleMessageEmojiPanelClick,
-  toggleMessageEmojiPicker,
-  closeMessageEmojiPicker,
-  clearMessageAttachmentSelection,
-  openOwnProfile,
-  stepViewer,
-  expandMiniPlayer,
-  collapseViewerToPlayer,
-  stepMiniPlayer,
+  syncMobileHeaderVisibility,
+  setMobileHeaderHidden,
+  isMobileHeaderViewport,
+  isMobileMessengerViewport,
   applyMiniPlayerPosition,
-  clampPlayerPosition,
-  destroyActivePlayer
+  renderFeedCard,
+  renderMiniPlayerVolumeControl,
+  applyPlayerVolumeToActiveElement,
+  resetPlayerDockPosition,
+  resetPlayerVolume,
+  closeThemePicker,
+  closeMessageEmojiPicker,
+  closeAdminBanPanel,
+  showFeedback,
+  showAuthFeedback,
+  setStatusPill
 });
