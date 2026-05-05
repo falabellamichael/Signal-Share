@@ -53,8 +53,8 @@
     n.read = true;
     save();
     
-    // Close the panel first (optional, but usually desired if navigating)
-    // if (window.toggleNotificationsPanel) window.toggleNotificationsPanel();
+    // Close the panel first
+    if (window.toggleNotificationsPanel) window.toggleNotificationsPanel();
     
     // Determine where to go
     const msg = (n.message + n.title).toLowerCase();
