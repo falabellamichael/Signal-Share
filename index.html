@@ -27,7 +27,7 @@
   </head>
   <body>
     <div class="page-shell">
-      <header class="site-header" style="z-index: 999999 !important; pointer-events: auto !important;">
+      <header class="site-header">
         <a class="brand" href="#top" aria-label="Signal Share home">
           <span class="brand-mark" aria-hidden="true">
             <span class="brand-glyph brand-glyph-back">S</span>
@@ -39,8 +39,8 @@
           </span>
         </a>
 
-        <div class="header-tools" style="z-index: 1000000 !important; pointer-events: auto !important;">
-          <nav class="site-nav" aria-label="Primary" style="z-index: 1000001 !important; pointer-events: auto !important;">
+        <div class="header-tools">
+          <nav class="site-nav" aria-label="Primary">
             <a href="#compose">Upload</a>
             <a href="#messages" id="messagesNavLink" aria-controls="messages" aria-expanded="false">
               Messages
@@ -1178,11 +1178,11 @@
     <script type="module" src="./config.js?v=2"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.2.3/dist/tus.min.js"></script>
-    <script type="module" src="./notifications.js?v=62"></script>
-    <script type="module" src="./keyboard-bindings-v3.js?v=62"></script>
-    <script type="module" src="./notification-keyboard-integration.js?v=62"></script>
+    <script type="module" src="./notifications.js?v=63"></script>
+    <script type="module" src="./keyboard-bindings-v3.js?v=63"></script>
+    <script type="module" src="./notification-keyboard-integration.js?v=63"></script>
     <!-- Global Overlay Panels -->
-    <section class="settings-panel" id="notificationsPanel" aria-hidden="true" hidden style="z-index: 9000 !important;">
+    <section class="settings-panel" id="notificationsPanel" aria-hidden="true" hidden style="z-index: 10000 !important;">
       <div class="settings-backdrop" id="notificationsBackdrop"></div>
       <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle" style="max-width: 480px;">
         <button class="settings-close" id="notificationsCloseButton" type="button" aria-label="Close notifications">Close</button>
@@ -1203,8 +1203,8 @@
       </div>
     </section>
 
-    <script src="messenger-realtime.js?v=62"></script>
-    <script type="module" src="app-v3.js?v=62"></script>
+    <script src="messenger-realtime.js?v=63"></script>
+    <script type="module" src="app-v3.js?v=63"></script>
 
   </body>
 </html>
