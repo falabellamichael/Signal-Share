@@ -147,6 +147,7 @@ function renderKeyboardShortcuts() {
   });
 }
 
+function updateUserPreferences(nextPreferences) {
   state.preferences = normalizeUserPreferences(nextPreferences); 
   applyUserPreferences(state.preferences); 
   saveUserPreferences(); 
@@ -156,6 +157,7 @@ function renderKeyboardShortcuts() {
   renderSettingsPanel(); 
 }
 
+function resetUserPreferences() {
   updateUserPreferences({ ...window.DEFAULT_USER_PREFERENCES }); 
   if (window.resetPlayerDockPosition) window.resetPlayerDockPosition(); 
   if (window.resetPlayerVolume) window.resetPlayerVolume(); 
@@ -193,12 +195,13 @@ function toggleNotificationsPanel(event) {
 
 function syncOverlayBodyState() { document.body.classList.toggle("viewer-open", Boolean(state.viewerPostId || state.viewerAttachment || state.activeProfileKey)); }
 
-
+function syncMobileHeaderVisibility() { 
   if (!(window.isMobileHeaderViewport && window.isMobileHeaderViewport())) { setMobileHeaderHidden(false); state.lastScrollY = window.scrollY; return; } 
   if (state.settingsPanelOpen || window.scrollY <= 24) setMobileHeaderHidden(false); 
   state.lastScrollY = window.scrollY; 
 }
 
+function handleWindowScroll() { 
   if (!(window.isMobileHeaderViewport && window.isMobileHeaderViewport())) return; 
   const currentScrollY = window.scrollY; 
   if (state.settingsPanelOpen || currentScrollY <= 24) { setMobileHeaderHidden(false); state.lastScrollY = currentScrollY; return; } 
