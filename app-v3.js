@@ -1764,16 +1764,45 @@ function canonicalizeThreadPair(l, r) { return [l, r].sort((a, b) => a.localeCom
 async function syncCurrentProfileToSupabase(displayNameOverride = "") {
   const rawDisplayName = (displayNameOverride || state.profileRecord?.displayName || getDefaultProfileName()).trim().slice(0, 40);
   if (rawDisplayName.length < 2) throw new Error("Use a display name with at least 2 characters.");
+  
+  // Prepare payload
   const payload = { 
     id: state.currentUser.id, 
     email: getCurrentUserEmail(), 
-    display_name: rawDisplayName,
-    notification_hide_sender: state.preferences.notificationHideSender,
-    notification_hide_body: state.preferences.notificationHideBody
+    display_name: rawDisplayName
   };
-  const { data, error } = await state.supabase.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
-  if (error) throw error;
-  const profile = normalizeProfile(data); state.profileRecord = profile; rememberCreator(profile.displayName); elements.creatorInput.value = profile.displayName; return profile;
+  
+  // Only add privacy columns if they are likely to exist or we want to try
+  // We'll use a try-catch for the specific columns if they fail
+  try {
+    const fullPayload = {
+      ...payload,
+      notification_hide_sender: state.preferences.notificationHideSender,
+      notification_hide_body: state.preferences.notificationHideBody
+    };
+    const { data, error } = await state.supabase.from("profiles").upsert(fullPayload, { onConflict: "id" }).select().single();
+    if (error) {
+      // If error suggests missing columns, fallback to basic payload
+      if (error.message?.includes("column") || error.code === "PGRST204" || error.code === "42703") {
+         console.warn("[Profiles] Privacy columns missing, falling back to basic sync");
+         const { data: fallbackData, error: fallbackError } = await state.supabase.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
+         if (fallbackError) throw fallbackError;
+         return finalizeProfileSync(fallbackData);
+      }
+      throw error;
+    }
+    return finalizeProfileSync(data);
+  } catch (error) {
+    throw error;
+  }
+}
+
+function finalizeProfileSync(data) {
+  const profile = normalizeProfile(data); 
+  state.profileRecord = profile; 
+  rememberCreator(profile.displayName); 
+  if (elements.creatorInput) elements.creatorInput.value = profile.displayName; 
+  return profile;
 }
 
 async function loadOwnProfileFromSupabase() { const { data, error } = await state.supabase.from("profiles").select("*").eq("id", state.currentUser.id).maybeSingle(); if (error) throw error; return data ? normalizeProfile(data) : null; }
@@ -2986,18 +3015,25 @@ function parseExternalMediaUrl(raw) {
 function healPosts(posts) {
   if (!Array.isArray(posts)) return posts;
   return posts.map(post => {
+    if (!post) return post;
     // Aggressive YouTube detection: check ALL fields for a hint of YouTube
     const fields = [post.externalUrl, post.mediaUrl, post.src, post.caption, post.title].join(" ");
-    const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("yout");
+    const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("youtu");
     
-    if (isYouTubeHint && (!post.externalId || !post.embedUrl)) {
-      const repaired = parseYouTubeUrl(post.externalUrl || post.src || post.mediaUrl || post.caption || "");
+    // Check if embedUrl is actually valid for YouTube
+    const hasValidEmbed = typeof post.embedUrl === "string" && post.embedUrl.includes("youtube.com/embed/");
+    
+    if (isYouTubeHint && (!post.externalId || !hasValidEmbed)) {
+      const repaired = parseYouTubeUrl(post.externalUrl || post.src || post.mediaUrl || post.caption || post.title || "");
       if (repaired) {
-        post.externalId = repaired.externalId;
-        post.embedUrl = repaired.embedUrl;
-        post.sourceKind = "youtube";
-        post.mediaKind = "video";
-        post.provider = "youtube";
+        return {
+          ...post,
+          externalId: repaired.externalId,
+          embedUrl: repaired.embedUrl,
+          sourceKind: "youtube",
+          mediaKind: "video",
+          provider: "youtube"
+        };
       }
     }
     return post;
