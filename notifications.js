@@ -172,8 +172,75 @@ class NotificationSystem {
     document.dispatchEvent(event);
   }
 
+  async syncWithSupabase(supabase, userId) {
+    if (!supabase || !userId) return;
+    try {
+      console.log("[Notifications] Syncing with Supabase...");
+      
+      // 1. Sync missed likes
+      const { data: newLikes } = await supabase
+        .from('post_likes')
+        .select('*, posts(title, author_id)')
+        .eq('posts.author_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (newLikes) {
+        newLikes.forEach(like => {
+          this.add({
+            id: `like-${like.post_id}-${like.user_id}`,
+            type: "success",
+            title: "New Like!",
+            message: `Someone liked your post: ${like.posts?.title || "Untitled"}`,
+            data: { type: "post", postId: like.post_id },
+            silent: true // Don't show banners for old synced items
+          });
+        });
+      }
+
+      // 2. Sync missed messages
+      const { data: newMessages } = await supabase
+        .from("messages")
+        .select("*")
+        .neq("sender_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (newMessages) {
+        newMessages.forEach(msg => {
+          this.add({
+            id: msg.id,
+            type: "info",
+            title: "New Message",
+            message: msg.body || "Sent an attachment",
+            data: { type: "message", threadId: msg.thread_id },
+            silent: true
+          });
+        });
+      }
+    } catch (e) {
+      console.error("[Notifications] Sync failed:", e);
+    }
+  }
+
+  // Backward compatibility for app-v3
+  setUnreadCount(count) {
+    // In our new history-based system, the badge is derived from history length.
+    // We ignore manual count sets to keep history as the source of truth.
+    if (count === 0) this.markAllRead();
+  }
+
+  markAllRead() {
+    // Simply clear the current "session" of notifications or mark them in history
+    // For now, we'll just clear the visual badge by clearing history if needed, 
+    // or we could add a 'read' flag. Let's add a 'read' flag for better UX.
+    this.history.forEach(n => n.read = true);
+    this.save();
+  }
+
   updateBadge() {
-    const count = this.history.length;
+    // Only count unread items
+    const count = this.history.filter(n => !n.read).length;
     const badge = document.getElementById('notificationBadge');
     if (badge) {
       if (count > 0) {
