@@ -880,6 +880,7 @@ async function initialize() {
       state.backendError = "";
       state.authRestoring = true;
       state.userPosts = await loadPostsFromSupabase();
+      state.userPosts = healPosts(state.userPosts);
       try {
         state.siteSettings = await loadSiteSettingsFromSupabase();
         applySiteSettings(state.siteSettings);
@@ -2971,12 +2972,27 @@ function parseExternalMediaUrl(raw) {
   return null;
 }
 
+function healPosts(posts) {
+  if (!Array.isArray(posts)) return posts;
+  return posts.map(post => {
+    // If it's a YouTube post but missing its ID or embed URL, try to repair it using the new regex
+    if (post.sourceKind === "youtube" && (!post.externalId || !post.embedUrl) && (post.externalUrl || post.src)) {
+      const repaired = parseYouTubeUrl(post.externalUrl || post.src);
+      if (repaired) {
+        post.externalId = repaired.externalId;
+        post.embedUrl = repaired.embedUrl;
+        post.mediaKind = "video";
+      }
+    }
+    return post;
+  });
+}
+
 function parseYouTubeUrl(raw) {
-  let url; try { url = new URL(raw); } catch { return null; }
-  const host = url.hostname.replace(/^www\./, ""); let videoId = "";
-  if (host === "youtu.be") videoId = url.pathname.slice(1).split("/")[0];
-  else if (host === "youtube.com" || host === "m.youtube.com") { if (url.pathname === "/watch") videoId = url.searchParams.get("v") ?? ""; else if (url.pathname.startsWith("/shorts/") || url.pathname.startsWith("/embed/") || url.pathname.startsWith("/live/") || url.pathname.startsWith("/v/")) videoId = url.pathname.split("/")[2] ?? ""; }
-  if (!videoId) return null;
+  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|live|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
+  const match = raw.match(regex);
+  if (!match) return null;
+  const videoId = match[1];
   return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
 }
 
