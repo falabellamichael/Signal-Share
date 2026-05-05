@@ -1,6 +1,7 @@
 /* Notification System Styles */
 * {
   -webkit-tap-highlight-color: transparent !important;
+  outline: none !important;
 }
 
 .notification-container {
