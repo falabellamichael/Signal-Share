@@ -92,17 +92,12 @@ window.MessengerRealtime = class MessengerRealtime {
     const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
     console.log("[Realtime] Notification System Status:", window.notifications ? "Ready" : "Missing", "Mobile:", isMobile);
     
-    if (window.notifications && typeof window.notifications.info === "function") {
-      // Only show text banners on PC, hide on mobile to save screen space
+    if (window.notifications) {
+      // Show notification (Centralized system handles banners, history, and browser alerts)
       window.notifications.info(messageBody, `${senderName} sent a message`, { 
         id: message.id,
         data: { type: "message", threadId: message.threadId }
       });
-
-      // Also trigger browser system notification on PC if tab is inactive
-      if (!isMobile && window.showIncomingMessageNotification) {
-        window.showIncomingMessageNotification(message);
-      }
     }
 
     // 3. Update UI

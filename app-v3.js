@@ -512,53 +512,6 @@ function base64UrlToUint8Array(value) {
   return buffer;
 }
 
-async function getSiteServiceWorkerRegistration() {
-  if (!("serviceWorker" in navigator) || !window.isSecureContext) return null;
-  if (serviceWorkerRegistrationPromise) return serviceWorkerRegistrationPromise;
-  try {
-    return await navigator.serviceWorker.ready;
-  } catch (error) {
-    console.error("Service worker is not ready", error);
-    return null;
-  }
-}
-
-function getIncomingMessageNotificationTitle() {
-  return DEFAULT_MESSAGE_NOTIFICATION_TITLE;
-}
-
-function shouldShowIncomingMessageNotification() {
-  return document.hidden || !document.hasFocus();
-}
-
-async function showIncomingMessageNotification(message) {
-  if (!canUseBrowserNotifications() || Notification.permission !== "granted") return;
-  const notificationTitle = getIncomingMessageNotificationTitle();
-  const notificationUrl = `${window.location.origin}${window.location.pathname}#messages`;
-  const options = {
-    icon: "./icons/icon-192.png?v=2",
-    badge: "./icons/icon-192.png?v=2",
-    tag: `message-${message.id}`,
-    renotify: true,
-    vibrate: [120, 50, 120],
-    data: { url: notificationUrl, threadId: message.threadId },
-  };
-  try {
-    const registration = await getSiteServiceWorkerRegistration();
-    if (registration?.showNotification) {
-      await registration.showNotification(notificationTitle, options);
-      return;
-    }
-  } catch (error) {
-    console.error("Service worker notification failed", error);
-  }
-  try {
-    new Notification(notificationTitle, options);
-  } catch (error) {
-    console.error("Browser notification failed", error);
-  }
-}
-
 async function openMessengerThreadFromNotification(threadId = "") {
   openMessengerDock({ expanded: !isMobileMessengerViewport(), focusPrimaryControl: false });
   if (!threadId) return;
@@ -1935,7 +1888,6 @@ async function subscribeMessagingChannels(options = {}) {
 
 // Expose helpers globally for MessengerRealtime
 window.playIncomingMessageSound = playIncomingMessageSound;
-window.showIncomingMessageNotification = showIncomingMessageNotification;
 window.mergeActiveMessage = mergeActiveMessage;
 window.renderActiveThread = renderActiveThread;
 window.refreshMessengerState = refreshMessengerState;
