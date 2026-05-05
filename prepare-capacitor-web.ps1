@@ -6,8 +6,15 @@ $dist = Join-Path $root "dist"
 $files = @(
   "index.html",
   "styles.css",
-  "app.js",
+  "api-v3.js",
+  "app-ui-v3.js",
+  "app-v3.js",
+  "messenger-realtime.js",
   "config.js",
+  "notifications.js",
+  "notifications.css",
+  "keyboard-bindings-v3.js",
+  "notification-keyboard-integration.js",
   "site.webmanifest",
   "service-worker.js"
 )
