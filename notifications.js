@@ -100,11 +100,11 @@
         history.forEach(n => {
           const li = document.createElement('li');
           const isUnread = n.read === false;
-          const bg = isUnread ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.05)";
-          const opacity = isUnread ? "1" : "0.75";
-          const border = isUnread ? "4px solid #3b82f6" : "4px solid rgba(255,255,255,0.2)";
+          const bg = isUnread ? "rgba(0,0,0,0.06)" : "rgba(0,0,0,0.02)";
+          const opacity = isUnread ? "1" : "0.55";
+          const border = isUnread ? "4px solid #3b82f6" : "4px solid rgba(0,0,0,0.1)";
           
-          li.style.cssText = `padding:12px; margin-bottom:8px; border-radius:8px; background:${bg}; border-left:${border}; cursor:pointer; color:inherit; list-style:none; transition: all 0.2s; opacity:${opacity};`;
+          li.style.cssText = `padding:12px; margin-bottom:8px; border-radius:12px; background:${bg}; border-left:${border}; cursor:pointer; color:inherit; list-style:none; transition: all 0.2s; opacity:${opacity};`;
           li.innerHTML = `<strong style="color:inherit;">${n.title}</strong><p style="margin:4px 0; font-size:0.9rem; opacity:0.8; color:inherit;">${n.message}</p>`;
           
           li.onclick = (e) => {
@@ -113,7 +113,7 @@
           };
           
           li.onmouseover = () => { 
-            li.style.background = isUnread ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)";
+            li.style.background = isUnread ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.04)";
             li.style.opacity = "1";
           };
           li.onmouseout = () => { 
