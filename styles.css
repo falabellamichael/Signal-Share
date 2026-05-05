@@ -5084,3 +5084,8 @@ body[data-theme='contrast'] .message-bubble { background: #000000 !important; bo
 body[data-theme='contrast'] .message-row.is-self .message-bubble { background: linear-gradient(135deg, #FFD166 0%, #06D6A0 100%) !important; border: none !important; color: #000000 !important; }
 body[data-theme='contrast'] .message-row.is-self .message-bubble p, body[data-theme='contrast'] .message-row.is-self .message-bubble span { color: #000000 !important; }
 body[data-theme='contrast'] .message-bubble span { color: rgba(255, 255, 255, 0.7) !important; }
+/* Ember Red Messenger Refinement */
+body[data-theme='ember'] .message-bubble { background: transparent !important; border: 1.5px solid rgba(255, 68, 56, 0.8) !important; color: #ffffff !important; }
+body[data-theme='ember'] .message-row.is-self .message-bubble { background: linear-gradient(135deg, #ff4438 0%, #ff8a3d 100%) !important; border: none !important; color: #ffffff !important; }
+body[data-theme='ember'] .message-row.is-self .message-bubble p, body[data-theme='ember'] .message-row.is-self .message-bubble span { color: #ffffff !important; }
+body[data-theme='ember'] .message-bubble span { color: rgba(255, 255, 255, 0.8) !important; }
