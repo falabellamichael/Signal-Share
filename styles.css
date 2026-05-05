@@ -182,6 +182,30 @@ body.viewer-open {
   overflow: hidden;
 }
 
+html.overlay-scroll-active,
+body.overlay-scroll-active {
+  overscroll-behavior-y: contain;
+}
+
+.settings-panel,
+.viewer,
+.profile-view {
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.settings-dialog,
+.viewer-dialog,
+.profile-view-dialog,
+.messenger-section,
+.admin-ban-panel,
+.mini-player,
+.message-list,
+#notificationsList {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 body[data-theme="midnight"] {
   --surface: rgba(11, 18, 26, 0.78);
   --surface-strong: rgba(12, 20, 28, 0.94);
@@ -3154,6 +3178,7 @@ body[data-theme="midnight"] .feed-page-button:hover:not(:disabled) {
   background: rgba(255, 250, 242, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.45);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
+  overflow: auto;
 }
 
 .viewer-close {

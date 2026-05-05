@@ -46,16 +46,10 @@ public class MainActivity extends BridgeActivity {
             }, "NativeBridge");
 
             ViewGroup parent = (ViewGroup) webView.getParent();
-            if (parent != null && !(parent instanceof SwipeRefreshLayout)) {
-                swipeRefreshLayout = new SwipeRefreshLayout(MainActivity.this) {
-                    @Override
-                    public boolean canChildScrollUp() {
-                        // If refresh is disabled by JS, tell the layout the child "can scroll up"
-                        // so it won't intercept the pull gesture.
-                        if (!isRefreshEnabled) return true;
-                        return super.canChildScrollUp();
-                    }
-                };
+            if (parent instanceof SwipeRefreshLayout) {
+                swipeRefreshLayout = (SwipeRefreshLayout) parent;
+            } else if (parent != null) {
+                swipeRefreshLayout = new SwipeRefreshLayout(MainActivity.this);
                 swipeRefreshLayout.setLayoutParams(new ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
@@ -70,9 +64,17 @@ public class MainActivity extends BridgeActivity {
                 ));
                 
                 parent.addView(swipeRefreshLayout, index);
+            }
 
+            if (swipeRefreshLayout != null) {
                 // Initial state should respect what JS might have already requested
                 swipeRefreshLayout.setEnabled(isRefreshEnabled);
+                swipeRefreshLayout.setOnChildScrollUpCallback((refreshLayout, child) -> {
+                    // When JS marks an overlay as active, keep SwipeRefreshLayout from
+                    // intercepting overlay scroll gestures as page-level pull-to-refresh.
+                    if (!isRefreshEnabled) return true;
+                    return webView.canScrollVertically(-1);
+                });
 
                 swipeRefreshLayout.setOnRefreshListener(() -> {
                     // Safety check: if JS has requested disabled, don't refresh
@@ -84,6 +86,11 @@ public class MainActivity extends BridgeActivity {
                     swipeRefreshLayout.postDelayed(() -> swipeRefreshLayout.setRefreshing(false), 1200);
                 });
             }
+
+            webView.evaluateJavascript(
+                    "window.dispatchEvent(new Event('signal:nativeBridgeReady'));",
+                    null
+            );
         }, 100);
 
         PhoneNowPlayingHelper.pushSnapshotToConnectedNodes(this);

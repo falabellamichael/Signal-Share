@@ -211,6 +211,19 @@ export function createAppUi(context) {
     miniNextButton: document.querySelector("#miniNextButton"),
   };
 
+  const OVERLAY_SCROLL_CONTAINER_SELECTOR = [
+    ".settings-dialog",
+    ".viewer-dialog",
+    ".profile-view-dialog",
+    ".messenger-section",
+    ".admin-ban-panel",
+    ".mini-player",
+    ".message-list",
+    "#notificationsList",
+  ].join(",");
+  let activeOverlayScrollContainer = null;
+  let activeOverlayTouchY = 0;
+
   function attachEventListeners() {
     if (state.listenersAttached) return;
     state.listenersAttached = true;
@@ -301,6 +314,11 @@ export function createAppUi(context) {
     window.addEventListener("scroll", handleWindowScroll, { passive: true });
     window.visualViewport?.addEventListener("resize", handleViewportResize);
     window.visualViewport?.addEventListener("scroll", handleViewportResize);
+    window.addEventListener("signal:nativeBridgeReady", syncOverlayBodyState);
+    document.addEventListener("touchstart", handleOverlayTouchStart, { passive: true, capture: true });
+    document.addEventListener("touchmove", handleOverlayTouchMove, { passive: false, capture: true });
+    document.addEventListener("touchend", clearOverlayTouchState, { passive: true, capture: true });
+    document.addEventListener("touchcancel", clearOverlayTouchState, { passive: true, capture: true });
     document.addEventListener("keydown", (event) => {
       if (state.settingsPanelOpen && event.key === "Escape") { closeSettingsPanel(); return; }
       if (state.notificationsPanelOpen && event.key === "Escape") { closeNotificationsPanel(); return; }
@@ -441,6 +459,7 @@ export function createAppUi(context) {
     elements.messengerExpandButton.setAttribute("aria-label", state.messengerExpanded ? "Collapse Direct Messenger" : "Expand Direct Messenger");
     elements.messengerExpandButton.classList.toggle("is-collapsing", state.messengerExpanded);
     elements.messagesNavLink.setAttribute("aria-expanded", state.messengerOpen ? "true" : "false");
+    syncOverlayBodyState();
   }
 
   function syncMessengerDockScrollState() {
@@ -1026,6 +1045,51 @@ export function createAppUi(context) {
 
   function handleWindowScroll() { if (!isMobileHeaderViewport()) return; const currentScrollY = window.scrollY; if (state.settingsPanelOpen || currentScrollY <= 24) { setMobileHeaderHidden(false); state.lastScrollY = currentScrollY; return; } const delta = currentScrollY - state.lastScrollY; if (Math.abs(delta) < 8) { state.lastScrollY = currentScrollY; return; } if (delta > 0) setMobileHeaderHidden(true); else setMobileHeaderHidden(false); state.lastScrollY = currentScrollY; }
 
+  function getOpenOverlayRoots() {
+    return [
+      state.settingsPanelOpen ? elements.settingsPanel : null,
+      state.notificationsPanelOpen ? elements.notificationsPanel : null,
+      state.viewerPostId || state.viewerAttachment ? elements.viewer : null,
+      state.activeProfileKey ? elements.profileView : null,
+      state.adminBanPanelOpen ? elements.adminBanPanel : null,
+      state.messengerOpen ? elements.messengerSection : null,
+      state.playerPostId ? elements.miniPlayer : null,
+    ].filter(Boolean);
+  }
+
+  function getOverlayScrollContainer(target) {
+    if (!(target instanceof Element)) return null;
+    const overlayRoot = getOpenOverlayRoots().find((root) => root.contains(target));
+    if (!overlayRoot) return null;
+    const scrollContainer = target.closest(OVERLAY_SCROLL_CONTAINER_SELECTOR);
+    if (scrollContainer && overlayRoot.contains(scrollContainer)) return scrollContainer;
+    return overlayRoot;
+  }
+
+  function handleOverlayTouchStart(event) {
+    const touch = event.touches?.[0];
+    activeOverlayScrollContainer = getOverlayScrollContainer(event.target);
+    if (!touch || !activeOverlayScrollContainer) return;
+    activeOverlayTouchY = touch.clientY;
+  }
+
+  function handleOverlayTouchMove(event) {
+    if (!activeOverlayScrollContainer) return;
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    const deltaY = touch.clientY - activeOverlayTouchY;
+    activeOverlayTouchY = touch.clientY;
+    const maxScrollTop = Math.max(0, activeOverlayScrollContainer.scrollHeight - activeOverlayScrollContainer.clientHeight);
+    const atTop = activeOverlayScrollContainer.scrollTop <= 0;
+    const atBottom = activeOverlayScrollContainer.scrollTop >= maxScrollTop - 1;
+    if (maxScrollTop <= 0 || (deltaY > 0 && atTop) || (deltaY < 0 && atBottom)) event.preventDefault();
+  }
+
+  function clearOverlayTouchState() {
+    activeOverlayScrollContainer = null;
+    activeOverlayTouchY = 0;
+  }
+
   function applySiteSettings(settings) { const root = document.documentElement; root.style.setProperty("--shell-max-width", `${settings.shellWidth}px`); root.style.setProperty("--section-gap", `${settings.sectionGap}px`); root.style.setProperty("--radius-xl", `${settings.surfaceRadius}px`); root.style.setProperty("--radius-lg", `${Math.max(18, settings.surfaceRadius - 8)}px`); root.style.setProperty("--radius-md", `${Math.max(14, settings.surfaceRadius - 14)}px`); root.style.setProperty("--feed-media-fit", settings.mediaFit); }
 
   function handleAdminSettingsInput() { state.siteSettings = { shellWidth: clampNumber(elements.layoutWidthInput.value, 960, 1440, DEFAULT_SITE_SETTINGS.shellWidth), sectionGap: clampNumber(elements.layoutGapInput.value, 16, 40, DEFAULT_SITE_SETTINGS.sectionGap), surfaceRadius: clampNumber(elements.layoutRadiusInput.value, 22, 44, DEFAULT_SITE_SETTINGS.surfaceRadius), mediaFit: elements.mediaFitSelect.value === "contain" ? "contain" : "cover" }; applySiteSettings(state.siteSettings); updateAdminSettingsValues(); }
@@ -1078,12 +1142,16 @@ export function createAppUi(context) {
   }
 
   function syncOverlayBodyState() {
-    const overlayOpen = Boolean(state.viewerPostId || state.viewerAttachment || state.activeProfileKey || state.settingsPanelOpen || state.notificationsPanelOpen || state.adminBanPanelOpen);
-    document.body.classList.toggle("viewer-open", overlayOpen);
+    const modalOverlayOpen = Boolean(state.viewerPostId || state.viewerAttachment || state.activeProfileKey || state.settingsPanelOpen || state.notificationsPanelOpen || state.adminBanPanelOpen);
+    const scrollOverlayOpen = Boolean(modalOverlayOpen || state.messengerOpen || state.playerPostId);
+    document.documentElement.classList.toggle("overlay-scroll-active", scrollOverlayOpen);
+    document.body.classList.toggle("viewer-open", modalOverlayOpen);
+    document.body.classList.toggle("overlay-scroll-active", scrollOverlayOpen);
+    window.__signalShareOverlayOpen = scrollOverlayOpen;
 
     // Native bridge: Disable pull-to-refresh when any overlay is open
     if (window.NativeBridge && typeof window.NativeBridge.setPullToRefreshEnabled === "function") {
-      window.NativeBridge.setPullToRefreshEnabled(!overlayOpen);
+      window.NativeBridge.setPullToRefreshEnabled(!scrollOverlayOpen);
     }
   }
 
@@ -1394,10 +1462,11 @@ export function createAppUi(context) {
   }
 
   function renderMiniPlayer() {
-    if (!state.playerPostId) { state.playerDrag = null; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); return; }
+    if (!state.playerPostId) { state.playerDrag = null; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); syncOverlayBodyState(); return; }
     const post = getPostById(state.playerPostId); if (!post || !isPlayablePost(post)) { closeMiniPlayer(); return; }
     const creatorSummary = getProfileSummaryForPost(post);
     elements.miniPlayer.classList.add("is-open"); elements.miniPlayer.classList.toggle("is-expanded", state.miniPlayerExpanded); elements.miniPlayer.setAttribute("aria-hidden", "false");
+    syncOverlayBodyState();
     elements.miniPlayerKind.textContent = `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`; elements.miniPlayerTitle.textContent = post.title; elements.miniPlayerCaption.textContent = post.caption; elements.miniPlayerCreator.textContent = creatorSummary?.displayName ?? post.creator; elements.miniPlayerCreator.onclick = creatorSummary ? (event) => openProfileByKey(creatorSummary.key, event.currentTarget) : null; elements.miniPlayerTime.textContent = formatTimestamp(post.createdAt); elements.miniExpandButton.textContent = state.miniPlayerExpanded ? "Collapse" : "Expand";
     elements.miniPlayerTags.innerHTML = ""; post.tags.forEach((tag) => { const pill = document.createElement("span"); pill.className = "tag-pill"; pill.textContent = `#${tag}`; elements.miniPlayerTags.appendChild(pill); });
     const playableIds = getPlayableVisiblePostIds(); const canStep = playableIds.length > 1; elements.miniPrevButton.disabled = !canStep; elements.miniNextButton.disabled = !canStep;
@@ -1485,7 +1554,7 @@ export function createAppUi(context) {
 
   function collapseViewerToPlayer() { if (!state.viewerPostId) return; state.playerPostId = state.viewerPostId; state.miniPlayerExpanded = false; state.viewerPostId = null; elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); syncOverlayBodyState(); renderMiniPlayer(); }
 
-  function closeMiniPlayer() { state.playerPostId = null; state.miniPlayerExpanded = false; state.playerDrag = null; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); destroyActivePlayer(); }
+  function closeMiniPlayer() { state.playerPostId = null; state.miniPlayerExpanded = false; state.playerDrag = null; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); destroyActivePlayer(); syncOverlayBodyState(); }
 
   function handleMiniPlayerStageClick(event) { if (!event.target.closest("iframe, video, audio") && !state.miniPlayerExpanded) expandMiniPlayer(); }
 
