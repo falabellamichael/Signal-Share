@@ -2290,6 +2290,7 @@ function closeNotificationsPanel(options = {}) {
 }
 let lastToggleTime = 0;
 window.toggleNotificationsPanel = function(event) { 
+  console.log("[App] Toggling notifications panel...");
   const now = Date.now();
   if (now - lastToggleTime < 300) return; // Prevent double-toggle
   lastToggleTime = now;
