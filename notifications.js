@@ -1,5 +1,5 @@
-// Signal Share Notification System (v6 - Final Restoration)
-// This version strictly follows the user's requested minimalist logic.
+// Signal Share Notification System (v7 - Anti-Skyrocket)
+// Optimized for strict de-duplication and 24h retention.
 
 class NotificationSystem {
   constructor() {
@@ -11,19 +11,35 @@ class NotificationSystem {
   init() {
     this.load();
     this.setupUI();
-    console.log("[Notifications] System Initialized.");
+    console.log("[Notifications] System Initialized (v7).");
   }
 
-  // Use the exact key and logic suggested by the user
   load() {
     try {
       let saved = JSON.parse(localStorage.getItem('notifications')) || [];
-      const now = new Date().getTime();
-      const threshold = now - (24 * 60 * 60 * 1000); // 24 hours
+      if (!Array.isArray(saved)) saved = [];
       
-      this.history = saved.filter(n => n.timestamp > threshold);
+      const now = Date.now();
+      const threshold = now - (24 * 60 * 60 * 1000);
+      
+      // Strict filtering: 24h + Deduplication by ID and Content
+      const seenIds = new Set();
+      const seenContent = new Set();
+      
+      this.history = saved.filter(n => {
+        if (!n || typeof n !== 'object' || !n.timestamp || n.timestamp < threshold) return false;
+        
+        const contentKey = (n.title || '') + '|' + (n.message || '');
+        if (seenIds.has(n.id) || seenContent.has(contentKey)) return false;
+        
+        seenIds.add(n.id);
+        seenContent.add(contentKey);
+        return true;
+      });
+
       this.save();
     } catch (e) {
+      console.error("[Notifications] Load error:", e);
       this.history = [];
     }
   }
@@ -47,15 +63,21 @@ class NotificationSystem {
   add(options) {
     if (!options || !options.message) return;
     
-    // De-duplication
-    const id = options.id || ('n-' + Date.now() + Math.random().toString(36).substr(2, 5));
-    if (this.history.some(n => n.id === id)) return;
+    const title = options.title || 'Signal Share';
+    const message = options.message;
+    const contentKey = title + '|' + message;
+    
+    // Strict De-duplication Check
+    if (this.history.some(n => n.id === options.id || (n.title + '|' + n.message) === contentKey)) {
+      console.log("[Notifications] Duplicate suppressed:", title);
+      return;
+    }
 
     const notification = {
-      id,
+      id: options.id || ('notif-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5)),
       type: options.type || 'info',
-      title: options.title || 'Signal Share',
-      message: options.message,
+      title,
+      message,
       data: options.data || null,
       timestamp: Date.now(),
       read: false
@@ -64,7 +86,7 @@ class NotificationSystem {
     this.history.unshift(notification);
     this.save();
 
-    // Trigger visual alerts
+    // Visual Alerts
     const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
     if (!options.silent) {
       if (!isMobile) this.showBanner(notification);
@@ -78,17 +100,22 @@ class NotificationSystem {
     el.innerHTML = `
       <div class="notification-header">
         <strong>${notification.title}</strong>
-        <button class="notification-close" style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:inherit;">&times;</button>
+        <button class="notification-close">&times;</button>
       </div>
       <div class="notification-message">${notification.message}</div>
     `;
 
     el.onclick = (e) => {
-      if (e.target.closest('.notification-close')) {
+      if (e.target.classList.contains('notification-close')) {
         el.remove();
         return;
       }
       this.handleNotificationClick(notification);
+      el.remove();
+    };
+
+    el.querySelector('.notification-close').onclick = (e) => {
+      e.stopPropagation();
       el.remove();
     };
 
@@ -98,46 +125,36 @@ class NotificationSystem {
 
   showSystemNotification(notification) {
     const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
-    if (isMobile) return; // Mobile uses native push
+    if (isMobile) return;
 
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     if (!document.hidden && document.hasFocus()) return;
 
-    const n = new Notification(notification.title, {
-      body: notification.message,
-      icon: "./icons/icon-192.png",
-      data: notification.data
-    });
-
-    n.onclick = () => {
-      window.focus();
-      this.handleNotificationClick(notification);
-      n.close();
-    };
+    try {
+      const n = new Notification(notification.title, {
+        body: notification.message,
+        icon: "./icons/icon-192.png",
+        tag: notification.id // Tag prevents multiple system alerts for same notification
+      });
+      n.onclick = () => { window.focus(); this.handleNotificationClick(notification); n.close(); };
+    } catch (e) {}
   }
 
   handleNotificationClick(notification) {
-    // Notify app-v3 coordinator
     document.dispatchEvent(new CustomEvent('signal:notificationClick', { detail: notification }));
   }
 
   updateBadge() {
     const unreadCount = this.history.filter(n => !n.read).length;
-    
-    // 1. Update the UI badge
     const badge = document.getElementById('notificationBadge');
     if (badge) {
       badge.textContent = unreadCount;
       badge.style.display = unreadCount > 0 ? 'flex' : 'none';
     }
 
-    // 2. Update the Capacitor app icon badge
     if (window.Capacitor?.Plugins?.Badge) {
       window.Capacitor.Plugins.Badge.set({ count: unreadCount }).catch(() => {});
     }
-    
-    // 3. Sync to legacy storage if needed
-    localStorage.setItem('signal_share_unread_count', unreadCount.toString());
   }
 
   markAllRead() {
@@ -150,21 +167,20 @@ class NotificationSystem {
     this.save();
   }
 
-  // Standard wrappers for external calls
+  // Backward compatibility stubs
   success(msg, title, opts) { this.add({ ...opts, type: 'success', message: msg, title: title || 'Success' }); }
   error(msg, title, opts) { this.add({ ...opts, type: 'error', message: msg, title: title || 'Error' }); }
   info(msg, title, opts) { this.add({ ...opts, type: 'info', message: msg, title: title || 'New Message' }); }
   warning(msg, title, opts) { this.add({ ...opts, type: 'warning', message: msg, title: title || 'Warning' }); }
-  
-  // Stubs for app-v3
   setUnreadCount(count) { if (count === 0) this.markAllRead(); }
-  syncWithSupabase() { /* Communication is handled by app-v3 or realtime */ }
+  syncWithSupabase() { /* No-op, managed by realtime */ }
+  incrementUnreadCount() { /* No-op, badge is history-derived */ }
 }
 
-// Global exposure
+// Global initialization
 window.notifications = new NotificationSystem();
 
-// Legacy UI hook for rendering the history list
+// UI Hook
 window.renderNotificationsHistory = function() {
   const list = document.getElementById('notificationsList');
   if (!list) return;
@@ -181,13 +197,7 @@ window.renderNotificationsHistory = function() {
     const li = document.createElement('li');
     li.className = `notification-history-item ${n.read ? 'read' : 'unread'}`;
     li.style.cssText = "padding: 12px; margin-bottom: 8px; border-radius: 8px; background: rgba(255,255,255,0.05); cursor: pointer; border-left: 4px solid " + (n.type === 'success' ? '#10b981' : '#3b82f6');
-    
-    li.innerHTML = `
-      <strong style="display:block;">${n.title}</strong>
-      <p style="margin: 4px 0; font-size: 0.9rem; opacity: 0.8;">${n.message}</p>
-      <small style="opacity: 0.5;">${new Date(n.timestamp).toLocaleTimeString()}</small>
-    `;
-    
+    li.innerHTML = `<strong>${n.title}</strong><p style="margin:4px 0;opacity:0.8;">${n.message}</p><small style="opacity:0.5;">${new Date(n.timestamp).toLocaleTimeString()}</small>`;
     li.onclick = () => window.notifications.handleNotificationClick(n);
     list.appendChild(li);
   });
