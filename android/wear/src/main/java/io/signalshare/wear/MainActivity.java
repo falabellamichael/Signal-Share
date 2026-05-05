@@ -162,6 +162,8 @@ public class MainActivity extends AppCompatActivity {
     private ImageView feedPreviewImage;
     private ImageView feedPageImage;
     private ImageView feedOpenImage;
+    private ImageView mediaPreviewImage;
+    private ImageView mediaPageImage;
     private EditText watchEmailInput;
     private EditText watchPasswordInput;
     private EditText watchMessageInput;
@@ -405,6 +407,8 @@ public class MainActivity extends AppCompatActivity {
         feedPreviewImage = findViewById(R.id.feedPreviewImage);
         feedPageImage = findViewById(R.id.feedPageImage);
         feedOpenImage = findViewById(R.id.feedOpenImage);
+        mediaPreviewImage = findViewById(R.id.mediaPreviewImage);
+        mediaPageImage = findViewById(R.id.mediaPageImage);
         watchEmailInput = findViewById(R.id.watchEmailInput);
         watchPasswordInput = findViewById(R.id.watchPasswordInput);
         watchMessageInput = findViewById(R.id.watchMessageInput);
@@ -576,6 +580,8 @@ public class MainActivity extends AppCompatActivity {
         feedPreviewImage.setBackground(createInputDrawable(theme.inputFill, theme.inputStroke, 16f));
         feedPageImage.setBackground(createInputDrawable(theme.inputFill, theme.inputStroke, 18f));
         feedOpenImage.setBackground(createInputDrawable(theme.inputFill, theme.inputStroke, 18f));
+        mediaPreviewImage.setBackground(createInputDrawable(theme.inputFill, theme.inputStroke, 16f));
+        mediaPageImage.setBackground(createInputDrawable(theme.inputFill, theme.inputStroke, 18f));
 
         Button[] secondaryButtons = new Button[]{
                 backHomeButton,
@@ -1853,6 +1859,8 @@ public class MainActivity extends AppCompatActivity {
             );
             mediaPanelTitle.setText(R.string.media_access_title);
             mediaPanelMeta.setText(R.string.media_access_summary);
+            mediaPreviewImage.setImageResource(android.R.color.transparent);
+            mediaPageImage.setImageResource(android.R.color.transparent);
             if (activeSection == Section.MEDIA) {
                 pageBody.setText(R.string.media_access_summary);
                 openPhoneButton.setText(R.string.media_access_button);
@@ -1867,6 +1875,8 @@ public class MainActivity extends AppCompatActivity {
             );
             mediaPanelTitle.setText(R.string.media_panel_title);
             mediaPanelMeta.setText(R.string.media_panel_phone_unavailable);
+            mediaPreviewImage.setImageResource(android.R.color.transparent);
+            mediaPageImage.setImageResource(android.R.color.transparent);
             if (activeSection == Section.MEDIA) {
                 pageBody.setText(R.string.media_panel_phone_unavailable);
                 openPhoneButton.setText(R.string.open_phone);
@@ -1878,6 +1888,7 @@ public class MainActivity extends AppCompatActivity {
             updateMediaCardState(snapshot.title, snapshot.meta);
             mediaPanelTitle.setText(snapshot.title);
             mediaPanelMeta.setText(snapshot.meta);
+            loadNowPlayingImage(snapshot.artworkUri);
             if (activeSection == Section.MEDIA) {
                 pageBody.setText(R.string.media_detail);
                 openPhoneButton.setText(R.string.open_phone);
@@ -1891,10 +1902,33 @@ public class MainActivity extends AppCompatActivity {
         );
         mediaPanelTitle.setText(R.string.media_panel_title);
         mediaPanelMeta.setText(R.string.media_panel_idle);
+        mediaPreviewImage.setImageResource(android.R.color.transparent);
+        mediaPageImage.setImageResource(android.R.color.transparent);
         if (activeSection == Section.MEDIA) {
             pageBody.setText(R.string.media_panel_idle);
             openPhoneButton.setText(R.string.open_phone);
         }
+    }
+
+    private void loadNowPlayingImage(String artworkUri) {
+        if (TextUtils.isEmpty(artworkUri)) {
+            mediaPreviewImage.setImageResource(android.R.color.transparent);
+            mediaPageImage.setImageResource(android.R.color.transparent);
+            return;
+        }
+
+        executor.execute(() -> {
+            Bitmap bitmap = downloadBitmap(artworkUri);
+            mainHandler.post(() -> {
+                if (bitmap != null) {
+                    mediaPreviewImage.setImageBitmap(bitmap);
+                    mediaPageImage.setImageBitmap(bitmap);
+                } else {
+                    mediaPreviewImage.setImageResource(android.R.color.transparent);
+                    mediaPageImage.setImageResource(android.R.color.transparent);
+                }
+            });
+        });
     }
 
     private void renderPhoneNowPlayingLoadingState() {
@@ -2066,6 +2100,7 @@ public class MainActivity extends AppCompatActivity {
             boolean active = json.optBoolean("active", false);
             String appPackage = json.optString("appPackage", "");
             String openUri = json.optString("openUri", "");
+            String artworkUri = json.optString("artworkUri", "");
             if (permissionRequired) {
                 return NowPlayingSnapshot.permissionRequired(true);
             }
@@ -2075,7 +2110,8 @@ public class MainActivity extends AppCompatActivity {
                         json.optString("meta", getString(R.string.media_phone_meta)),
                         true,
                         appPackage,
-                        openUri
+                        openUri,
+                        artworkUri
                 );
             }
             return NowPlayingSnapshot.idle(true, appPackage, openUri);
@@ -2120,7 +2156,8 @@ public class MainActivity extends AppCompatActivity {
         String appLabel = resolveMediaAppLabel(packageName);
         String stateLabel = resolvePlaybackStateLabel(controller.getPlaybackState());
         String openUri = resolveLocalPlayableOpenUri(controller);
-        return NowPlayingSnapshot.active(title, buildMediaMeta(appLabel, creator, stateLabel), false, packageName, openUri);
+        String artworkUri = extractNowPlayingArtworkUri(controller.getMetadata(), openUri);
+        return NowPlayingSnapshot.active(title, buildMediaMeta(appLabel, creator, stateLabel), false, packageName, openUri, artworkUri);
     }
 
     private String resolveLocalPlayableOpenUri(MediaController controller) {
@@ -2346,6 +2383,32 @@ public class MainActivity extends AppCompatActivity {
         return "";
     }
 
+    private String extractNowPlayingArtworkUri(MediaMetadata metadata, String openUri) {
+        if (metadata != null) {
+            String[] keys = new String[]{
+                    MediaMetadata.METADATA_KEY_ART_URI,
+                    MediaMetadata.METADATA_KEY_ALBUM_ART_URI,
+                    MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI
+            };
+
+            for (String key : keys) {
+                String value = metadata.getString(key);
+                if (!TextUtils.isEmpty(value)) {
+                    return value;
+                }
+            }
+        }
+
+        if (!TextUtils.isEmpty(openUri)) {
+            String videoId = extractYoutubeVideoId(openUri);
+            if (!TextUtils.isEmpty(videoId)) {
+                return "https://i.ytimg.com/vi/" + videoId + "/mqdefault.jpg";
+            }
+        }
+
+        return "";
+    }
+
     private String resolveMediaAppLabel(String packageName) {
         if (TextUtils.isEmpty(packageName)) {
             return "";
@@ -2478,6 +2541,10 @@ public class MainActivity extends AppCompatActivity {
         String value = rawValue.trim();
         if (value.matches("^[A-Za-z0-9_-]{11}$")) {
             return value;
+        }
+
+        if (value.startsWith("vnd.youtube:")) {
+            return trimYoutubeVideoId(value.substring("vnd.youtube:".length()));
         }
 
         try {
@@ -3724,6 +3791,10 @@ public class MainActivity extends AppCompatActivity {
                 return "";
             }
 
+            if (rawUrl.startsWith("vnd.youtube:")) {
+                return trimYoutubeVideoId(rawUrl.substring("vnd.youtube:".length()));
+            }
+
             try {
                 Uri uri = Uri.parse(rawUrl);
                 String host = uri.getHost();
@@ -3824,36 +3895,38 @@ public class MainActivity extends AppCompatActivity {
         final String meta;
         final String appPackage;
         final String openUri;
+        final String artworkUri;
         final boolean active;
         final boolean permissionRequired;
         final boolean remoteSource;
         final boolean phoneUnavailable;
 
-        private NowPlayingSnapshot(String title, String meta, String appPackage, String openUri, boolean active, boolean permissionRequired, boolean remoteSource, boolean phoneUnavailable) {
+        private NowPlayingSnapshot(String title, String meta, String appPackage, String openUri, String artworkUri, boolean active, boolean permissionRequired, boolean remoteSource, boolean phoneUnavailable) {
             this.title = title;
             this.meta = meta;
             this.appPackage = appPackage;
             this.openUri = openUri;
+            this.artworkUri = artworkUri;
             this.active = active;
             this.permissionRequired = permissionRequired;
             this.remoteSource = remoteSource;
             this.phoneUnavailable = phoneUnavailable;
         }
 
-        static NowPlayingSnapshot active(String title, String meta, boolean remoteSource, String appPackage, String openUri) {
-            return new NowPlayingSnapshot(title, meta, appPackage, openUri, true, false, remoteSource, false);
+        static NowPlayingSnapshot active(String title, String meta, boolean remoteSource, String appPackage, String openUri, String artworkUri) {
+            return new NowPlayingSnapshot(title, meta, appPackage, openUri, artworkUri, true, false, remoteSource, false);
         }
 
         static NowPlayingSnapshot idle(boolean remoteSource, String appPackage, String openUri) {
-            return new NowPlayingSnapshot("", "", appPackage, openUri, false, false, remoteSource, false);
+            return new NowPlayingSnapshot("", "", appPackage, openUri, "", false, false, remoteSource, false);
         }
 
         static NowPlayingSnapshot permissionRequired(boolean remoteSource) {
-            return new NowPlayingSnapshot("", "", "", "", false, true, remoteSource, false);
+            return new NowPlayingSnapshot("", "", "", "", "", false, true, remoteSource, false);
         }
 
         static NowPlayingSnapshot phoneUnavailable() {
-            return new NowPlayingSnapshot("", "", "", "", false, false, true, true);
+            return new NowPlayingSnapshot("", "", "", "", "", false, false, true, true);
         }
     }
 }

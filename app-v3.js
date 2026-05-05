@@ -1,4 +1,4 @@
-import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js';
+import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js';
 
 
 
@@ -907,6 +907,7 @@ async function initialize() {
     try {
       state.db = await openDatabase();
       state.userPosts = await loadPostsFromDatabase();
+      state.userPosts = healPosts(state.userPosts);
     } catch (error) {
       console.error("IndexedDB is unavailable", error);
       state.db = null;
@@ -3016,9 +3017,9 @@ function healPosts(posts) {
   if (!Array.isArray(posts)) return posts;
   return posts.map(post => {
     if (!post) return post;
-    // Aggressive YouTube detection: check ALL fields for a hint of YouTube
+    // Aggressive YouTube detection: check ALL fields for a hint of YouTube (Syncing logic from MainActivity)
     const fields = [post.externalUrl, post.mediaUrl, post.src, post.caption, post.title].join(" ");
-    const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("youtu");
+    const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("youtu") || fields.toLowerCase().includes("vnd.youtube");
     
     // Check if embedUrl is actually valid for YouTube
     const hasValidEmbed = typeof post.embedUrl === "string" && post.embedUrl.includes("youtube.com/embed/");
@@ -3040,23 +3041,7 @@ function healPosts(posts) {
   });
 }
 
-function parseYouTubeUrl(raw) {
-  if (!raw || typeof raw !== "string") return null;
-  // Comprehensive Regex covering all major formats
-  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
-  const match = raw.match(regex);
-  if (match && match[1]) {
-    const videoId = match[1];
-    return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
-  }
-  // Last resort: scan for anything that looks like an 11-char ID after a common trigger
-  const lastResort = /(?:v=|v\/|vi\/|embed\/|shorts\/|live\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/.exec(raw);
-  if (lastResort && lastResort[1]) {
-     const videoId = lastResort[1];
-     return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
-  }
-  return null;
-}
+// parseYouTubeUrl is now imported from api-v3.js to ensure consistency across the app
 
 function parseSpotifyUrl(raw) {
   let url; try { url = new URL(raw); } catch { return null; }

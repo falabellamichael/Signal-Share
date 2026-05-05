@@ -186,7 +186,46 @@ export async function deleteHostedPost(post) {
   const { error } = await apiContext.state.supabase.from(apiContext.APP_CONFIG.postsTable).delete().eq("id", post.id); if (error) throw error;
 }
 
-export function normalizeSupabasePost(row) { return { id: row.id, authorId: row.author_id ?? null, creator: row.creator, title: row.title, caption: row.caption, tags: Array.isArray(row.tags) ? row.tags : [], createdAt: row.created_at, mediaKind: row.media_kind, sourceKind: row.source_kind ?? "upload", provider: row.provider ?? null, src: row.media_url ?? "", mediaUrl: row.media_url ?? "", externalUrl: row.external_url ?? null, embedUrl: row.embed_url ?? null, externalId: row.external_id ?? null, label: row.label ?? null, filePath: row.file_path ?? null, fileType: row.file_type ?? null, fileSize: row.file_size ?? null, likes: row.likes ?? 0, isLocal: false }; }
+export function normalizeSupabasePost(row) { 
+  const post = { id: row.id, authorId: row.author_id ?? null, creator: row.creator, title: row.title, caption: row.caption, tags: Array.isArray(row.tags) ? row.tags : [], createdAt: row.created_at, mediaKind: row.media_kind, sourceKind: row.source_kind ?? "upload", provider: row.provider ?? null, src: row.media_url ?? "", mediaUrl: row.media_url ?? "", externalUrl: row.external_url ?? null, embedUrl: row.embed_url ?? null, externalId: row.external_id ?? null, label: row.label ?? null, filePath: row.file_path ?? null, fileType: row.file_type ?? null, fileSize: row.file_size ?? null, likes: row.likes ?? 0, isLocal: false }; 
+  
+  // On-the-fly healing for YouTube posts (Syncing logic from MainActivity)
+  const fields = [post.externalUrl, post.mediaUrl, post.src, post.caption, post.title].join(" ");
+  const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("youtu") || fields.toLowerCase().includes("vnd.youtube");
+  
+  const hasValidEmbed = typeof post.embedUrl === "string" && post.embedUrl.includes("youtube.com/embed/");
+  
+  if (isYouTubeHint && (!post.externalId || !hasValidEmbed)) {
+    const repaired = parseYouTubeUrl(post.externalUrl || post.mediaUrl || post.src || post.caption || post.title || "");
+    if (repaired) {
+      post.externalId = repaired.externalId;
+      post.embedUrl = repaired.embedUrl;
+      post.sourceKind = "youtube";
+      post.mediaKind = "video";
+      post.provider = "youtube";
+    }
+  }
+  
+  return post;
+}
+
+export function parseYouTubeUrl(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  // Comprehensive Regex matching MainActivity logic including vnd.youtube:
+  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/i;
+  const match = raw.match(regex);
+  if (match && match[1]) {
+    const videoId = match[1];
+    return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
+  }
+  // Last resort: scan for anything that looks like an 11-char ID after a common trigger
+  const lastResort = /(?:v=|v\/|vi\/|embed\/|shorts\/|live\/|youtu\.be\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/.exec(raw);
+  if (lastResort && lastResort[1]) {
+     const videoId = lastResort[1];
+     return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
+  }
+  return null;
+}
 
 export function openDatabase() { 
   return new Promise((res, rej) => { 

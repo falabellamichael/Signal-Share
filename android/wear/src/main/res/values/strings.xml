@@ -57,6 +57,7 @@
     <string name="media_panel_idle">Nothing is playing right now. Start media on your phone or watch, then refresh here.</string>
     <string name="media_panel_syncing_phone">Checking what is playing on your phone...</string>
     <string name="media_panel_phone_unavailable">Phone playback data is not available yet. Open or update the phone app, then refresh.</string>
+    <string name="media_preview">Media session artwork preview</string>
     <string name="media_prev">Prev</string>
     <string name="media_play_pause">Play/Pause</string>
     <string name="media_next">Next</string>

@@ -62,7 +62,8 @@ final class PhoneNowPlayingHelper {
         String creator = extractNowPlayingCreator(controller.getMetadata(), title);
         String appLabel = resolveMediaAppLabel(context, packageName);
         String stateLabel = resolvePlaybackStateLabel(controller.getPlaybackState());
-        return Snapshot.active(title, buildMediaMeta(appLabel, creator, stateLabel), packageName, openUri);
+        String artworkUri = extractNowPlayingArtworkUri(controller.getMetadata(), openUri);
+        return Snapshot.active(title, buildMediaMeta(appLabel, creator, stateLabel), packageName, openUri, artworkUri);
     }
 
     static boolean performAction(Context context, String action) {
@@ -375,6 +376,32 @@ final class PhoneNowPlayingHelper {
         return "";
     }
 
+    private static String extractNowPlayingArtworkUri(MediaMetadata metadata, String openUri) {
+        if (metadata != null) {
+            String[] keys = new String[]{
+                    MediaMetadata.METADATA_KEY_ART_URI,
+                    MediaMetadata.METADATA_KEY_ALBUM_ART_URI,
+                    MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI
+            };
+
+            for (String key : keys) {
+                String value = metadata.getString(key);
+                if (!TextUtils.isEmpty(value)) {
+                    return value;
+                }
+            }
+        }
+
+        if (!TextUtils.isEmpty(openUri)) {
+            String videoId = extractYoutubeVideoId(openUri);
+            if (!TextUtils.isEmpty(videoId)) {
+                return "https://i.ytimg.com/vi/" + videoId + "/mqdefault.jpg";
+            }
+        }
+
+        return "";
+    }
+
     private static String resolveMediaAppLabel(Context context, String packageName) {
         if (TextUtils.isEmpty(packageName)) {
             return "";
@@ -578,6 +605,10 @@ final class PhoneNowPlayingHelper {
             return value;
         }
 
+        if (value.startsWith("vnd.youtube:")) {
+            return trimYoutubeVideoId(value.substring("vnd.youtube:".length()));
+        }
+
         try {
             Uri uri = Uri.parse(value);
             String host = uri.getHost();
@@ -759,28 +790,30 @@ final class PhoneNowPlayingHelper {
         final String meta;
         final String appPackage;
         final String openUri;
+        final String artworkUri;
         final boolean active;
         final boolean permissionRequired;
 
-        private Snapshot(String title, String meta, String appPackage, String openUri, boolean active, boolean permissionRequired) {
+        private Snapshot(String title, String meta, String appPackage, String openUri, String artworkUri, boolean active, boolean permissionRequired) {
             this.title = title;
             this.meta = meta;
             this.appPackage = appPackage;
             this.openUri = openUri;
+            this.artworkUri = artworkUri;
             this.active = active;
             this.permissionRequired = permissionRequired;
         }
 
-        static Snapshot active(String title, String meta, String appPackage, String openUri) {
-            return new Snapshot(title, meta, appPackage, openUri, true, false);
+        static Snapshot active(String title, String meta, String appPackage, String openUri, String artworkUri) {
+            return new Snapshot(title, meta, appPackage, openUri, artworkUri, true, false);
         }
 
         static Snapshot idle(String appPackage, String openUri) {
-            return new Snapshot("", "", appPackage, openUri, false, false);
+            return new Snapshot("", "", appPackage, openUri, "", false, false);
         }
 
         static Snapshot permissionRequired() {
-            return new Snapshot("", "", "", "", false, true);
+            return new Snapshot("", "", "", "", "", false, true);
         }
 
         byte[] toBytes() {
@@ -790,6 +823,7 @@ final class PhoneNowPlayingHelper {
                 json.put("meta", meta);
                 json.put("appPackage", appPackage);
                 json.put("openUri", openUri);
+                json.put("artworkUri", artworkUri);
                 json.put("active", active);
                 json.put("permissionRequired", permissionRequired);
                 return json.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
