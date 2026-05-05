@@ -1,8 +1,8 @@
-const CACHE_NAME = "signal-share-shell-v93";
+const CACHE_NAME = "signal-share-shell-v94";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=85",
+  "./styles.css?v=88",
   "./config.js",
   "./api-v3.js?v=92",
   "./app-v3.js?v=93",
