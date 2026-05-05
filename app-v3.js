@@ -2279,6 +2279,7 @@ function openNotificationsPanel() {
   state.notificationsPanelOpen = true; 
   setMobileHeaderHidden(false); 
   render();
+  if (window.notifications?.resetBadge) window.notifications.resetBadge();
   if (window.renderNotificationsHistory) window.renderNotificationsHistory();
   requestAnimationFrame(() => elements.notificationsCloseButton?.focus?.()); 
 }
