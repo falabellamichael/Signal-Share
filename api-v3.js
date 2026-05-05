@@ -217,20 +217,76 @@ export function normalizeSupabasePost(row) {
 
 export function parseYouTubeUrl(raw) {
   if (!raw || typeof raw !== "string") return null;
-  // Comprehensive Regex matching MainActivity logic including vnd.youtube:
-  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/i;
-  const match = raw.match(regex);
-  if (match && match[1]) {
-    const videoId = match[1];
-    return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
+  const value = raw.trim();
+  
+  // 1. Check if it's just an 11-char ID (Android logic: value.matches("^[A-Za-z0-9_-]{11}$"))
+  if (/^[A-Za-z0-9_-]{11}$/.test(value)) {
+    return buildYouTubeObject(value, raw);
   }
-  // Last resort: scan for anything that looks like an 11-char ID after a common trigger
-  const lastResort = /(?:v=|v\/|vi\/|embed\/|shorts\/|live\/|youtu\.be\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/.exec(raw);
-  if (lastResort && lastResort[1]) {
-     const videoId = lastResort[1];
-     return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
+
+  // 2. Check for vnd.youtube: prefix (Android logic: rawUrl.startsWith("vnd.youtube:"))
+  if (value.toLowerCase().startsWith("vnd.youtube:")) {
+    const id = trimYoutubeVideoId(value.slice(12)); // "vnd.youtube:".length is 12
+    if (id) return buildYouTubeObject(id, raw);
   }
+
+  // 3. Try parsing as a URL (Android logic: Uri.parse(rawUrl))
+  try {
+    const url = new URL(value.includes("://") ? value : `https://${value}`);
+    const host = (url.hostname || "").toLowerCase();
+    
+    // youtu.be/ID (Android logic: host.contains("youtu.be"))
+    if (host.includes("youtu.be")) {
+      const id = trimYoutubeVideoId(url.pathname.replace("/", ""));
+      if (id) return buildYouTubeObject(id, raw);
+    }
+    
+    // youtube.com/watch?v=ID (Android logic: uri.getQueryParameter("v"))
+    const v = url.searchParams.get("v") || url.searchParams.get("vi");
+    if (v) {
+      const id = trimYoutubeVideoId(v);
+      if (id) return buildYouTubeObject(id, raw);
+    }
+    
+    // segments like /embed/ID, /shorts/ID, /live/ID, /v/ID (Android logic: segments loop)
+    const segments = url.pathname.split("/").filter(Boolean);
+    for (let i = 0; i < segments.length; i++) {
+      const s = segments[i].toLowerCase();
+      if (["embed", "shorts", "live", "v"].includes(s)) {
+        if (segments[i + 1]) {
+          const id = trimYoutubeVideoId(segments[i + 1]);
+          if (id) return buildYouTubeObject(id, raw);
+        }
+      }
+    }
+  } catch (e) {
+    // URL parsing failed, fall back to regex scan
+  }
+
+  // 4. Final Regex Fallback (Matches the robust scan pattern in Android and previous JS version)
+  const regex = /(?:v=|v\/|vi\/|embed\/|shorts\/|live\/|youtu\.be\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/i;
+  const match = value.match(regex);
+  if (match && match[1]) return buildYouTubeObject(match[1], raw);
+  
   return null;
+}
+
+function trimYoutubeVideoId(id) {
+  if (!id) return "";
+  const trimmed = id.trim();
+  return trimmed.length > 11 ? trimmed.slice(0, 11) : trimmed;
+}
+
+function buildYouTubeObject(videoId, originalUrl) {
+  if (!videoId || videoId.length !== 11) return null;
+  return { 
+    provider: "youtube", 
+    mediaKind: "video", 
+    externalId: videoId, 
+    embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, 
+    originalUrl, 
+    label: `YouTube video ${videoId}` 
+  };
 }
 
 export function openDatabase() { 
