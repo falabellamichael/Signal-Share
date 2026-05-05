@@ -5053,3 +5053,11 @@ body[data-theme='contrast'] .profile-view-dialog h2, body[data-theme='contrast']
 body[data-theme='ember'] .profile-view-dialog h2, body[data-theme='ember'] .profile-view-dialog h3, body[data-theme='ember'] .profile-view-dialog h4, body[data-theme='ember'] .profile-view-dialog p, body[data-theme='ember'] .profile-view-dialog .eyebrow, body[data-theme='ember'] .profile-view-dialog .profile-meta { color: var(--text) !important; }
 /* PC Theme Picker Refinement */
 @media (min-width: 761px) { .theme-option-tile { grid-template-columns: 1fr !important; justify-items: center !important; padding: 12px !important; min-height: 0 !important; } .theme-option-copy { display: none !important; } .theme-picker-menu { grid-template-columns: repeat(3, 1fr) !important; gap: 12px !important; } .theme-preview { width: 100% !important; max-width: 80px !important; height: 80px !important; } }
+/* Settings Spacing Improvements */
+.settings-dialog { padding: 32px !important; gap: 32px !important; }
+.settings-head { margin-bottom: 12px !important; gap: 16px !important; }
+.settings-fields { gap: 32px !important; }
+.settings-field { gap: 14px !important; }
+.settings-field-copy { margin-bottom: 4px !important; }
+.settings-actions { gap: 16px !important; margin-top: 12px !important; }
+.settings-toggle-field { gap: 18px !important; }
