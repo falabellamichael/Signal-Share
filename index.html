@@ -1175,7 +1175,7 @@
       <span class="sr-only">Open messenger</span>
     </button>
 
-    <script src="./config.js"></script>
+    <script type="module" src="./config.js?v=2"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.2.3/dist/tus.min.js"></script>
     <script type="module" src="./notifications.js?v=80"></script>
@@ -1203,65 +1203,8 @@
       </div>
     </section>
 
-    <script src="messenger-realtime.js"></script>
-    <script type="module" src="app-ui-v3.js"></script>
-    <script type="module" src="app-v3.js"></script>
-
-    <!-- Emergency Diagnostic Overlay (Hidden unless error occurs) -->
-    <div id="diagnostic-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:9999999; color:#ff4444; padding:20px; font-family:monospace; font-size:14px; overflow:auto;">
-      <h2 style="color:white; margin-top:0;">Runtime Error Detected</h2>
-      <pre id="diagnostic-content" style="white-space:pre-wrap;"></pre>
-      <button onclick="location.reload()" style="background:#444; color:white; border:none; padding:10px 20px; margin-top:20px; border-radius:5px;">Reload App</button>
-    </div>
-
-    <script>
-      window.onerror = function(msg, url, lineNo, columnNo, error) {
-        const overlay = document.getElementById('diagnostic-overlay');
-        const content = document.getElementById('diagnostic-content');
-        if (overlay && content) {
-          overlay.style.display = 'block';
-          content.textContent += "\nError: " + msg + "\nFile: " + url + "\nLine: " + lineNo + ":" + columnNo + "\n";
-          if (error && error.stack) content.textContent += "\nStack: " + error.stack + "\n";
-        }
-        return false;
-      };
-      window.addEventListener('unhandledrejection', function(event) {
-        const overlay = document.getElementById('diagnostic-overlay');
-        const content = document.getElementById('diagnostic-content');
-        if (overlay && content) {
-          overlay.style.display = 'block';
-          content.textContent += "\nPromise Rejected: " + event.reason + "\n";
-        }
-      });
-    </script>
-
-    <!-- Emergency Diagnostic Overlay (Hidden unless error occurs) -->
-    <div id="diagnostic-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:9999999; color:#ff4444; padding:20px; font-family:monospace; font-size:14px; overflow:auto;">
-      <h2 style="color:white; margin-top:0;">Runtime Error Detected</h2>
-      <pre id="diagnostic-content" style="white-space:pre-wrap;"></pre>
-      <button onclick="location.reload()" style="background:#444; color:white; border:none; padding:10px 20px; margin-top:20px; border-radius:5px;">Reload App</button>
-    </div>
-
-    <script>
-      window.onerror = function(msg, url, lineNo, columnNo, error) {
-        const overlay = document.getElementById('diagnostic-overlay');
-        const content = document.getElementById('diagnostic-content');
-        if (overlay && content) {
-          overlay.style.display = 'block';
-          content.textContent += `\nError: ${msg}\nFile: ${url}\nLine: ${lineNo}:${columnNo}\n`;
-          if (error && error.stack) content.textContent += `\nStack: ${error.stack}\n`;
-        }
-        return false;
-      };
-      window.addEventListener('unhandledrejection', function(event) {
-        const overlay = document.getElementById('diagnostic-overlay');
-        const content = document.getElementById('diagnostic-content');
-        if (overlay && content) {
-          overlay.style.display = 'block';
-          content.textContent += `\nPromise Rejected: ${event.reason}\n`;
-        }
-      });
-    </script>
+    <script src="messenger-realtime.js?v=80"></script>
+    <script type="module" src="app-v3.js?v=93"></script>
 
   </body>
 </html>

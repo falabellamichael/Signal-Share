@@ -6,15 +6,8 @@ $dist = Join-Path $root "dist"
 $files = @(
   "index.html",
   "styles.css",
-  "api-v3.js",
-  "app-ui-v3.js",
-  "app-v3.js",
-  "messenger-realtime.js",
+  "app.js",
   "config.js",
-  "notifications.js",
-  "notifications.css",
-  "keyboard-bindings-v3.js",
-  "notification-keyboard-integration.js",
   "site.webmanifest",
   "service-worker.js"
 )
@@ -30,10 +23,7 @@ if (Test-Path -LiteralPath $dist) {
 New-Item -ItemType Directory -Path $dist | Out-Null
 
 foreach ($file in $files) {
-  $src = Join-Path $root $file
-  # Force OneDrive hydration by reading content
-  [void](Get-Content -LiteralPath $src -Raw -ErrorAction SilentlyContinue)
-  Copy-Item -LiteralPath $src -Destination (Join-Path $dist $file) -Force
+  Copy-Item -LiteralPath (Join-Path $root $file) -Destination (Join-Path $dist $file) -Force
 }
 
 foreach ($directory in $directories) {
