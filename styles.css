@@ -71,6 +71,18 @@ html {
   scroll-behavior: smooth;
 }
 
+html[data-status-bar-strip="off"]:root {
+  --status-bar-safe-space: 0px;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 html[data-status-bar-strip="off"] {
   --status-bar-strip-height: 0px;
 }
