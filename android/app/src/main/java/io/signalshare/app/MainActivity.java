@@ -16,8 +16,24 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 1001;
+    private static final String NATIVE_BRIDGE_OBJECT = "NativeBridge";
+    private static final String NATIVE_BRIDGE_READY_EVENT_JS =
+            "window.dispatchEvent(new Event('signal:nativeBridgeReady'));";
     private SwipeRefreshLayout swipeRefreshLayout;
     private boolean isRefreshEnabled = true;
+    private boolean nativeBridgeInjected = false;
+
+    private final Object nativeBridgeInterface = new Object() {
+        @android.webkit.JavascriptInterface
+        public void setPullToRefreshEnabled(boolean enabled) {
+            mainHandler.post(() -> {
+                isRefreshEnabled = enabled;
+                if (swipeRefreshLayout != null) {
+                    swipeRefreshLayout.setEnabled(enabled);
+                }
+            });
+        }
+    };
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -26,76 +42,94 @@ public class MainActivity extends BridgeActivity {
 
         createNotificationChannel();
 
-        // Set up pull-to-refresh by wrapping the Capacitor WebView
-        mainHandler.postDelayed(() -> {
-            if (getBridge() == null) return;
-            WebView webView = getBridge().getWebView();
-            if (webView == null) return;
-
-            // Add Javascript interface to control native refresh
-            webView.addJavascriptInterface(new Object() {
-                @android.webkit.JavascriptInterface
-                public void setPullToRefreshEnabled(boolean enabled) {
-                    mainHandler.post(() -> {
-                        isRefreshEnabled = enabled;
-                        if (swipeRefreshLayout != null) {
-                            swipeRefreshLayout.setEnabled(enabled);
-                        }
-                    });
-                }
-            }, "NativeBridge");
-
-            ViewGroup parent = (ViewGroup) webView.getParent();
-            if (parent instanceof SwipeRefreshLayout) {
-                swipeRefreshLayout = (SwipeRefreshLayout) parent;
-            } else if (parent != null) {
-                swipeRefreshLayout = new SwipeRefreshLayout(MainActivity.this);
-                swipeRefreshLayout.setLayoutParams(new ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                ));
-
-                int index = parent.indexOfChild(webView);
-                parent.removeView(webView);
-                
-                swipeRefreshLayout.addView(webView, new ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                ));
-                
-                parent.addView(swipeRefreshLayout, index);
-            }
-
-            if (swipeRefreshLayout != null) {
-                // Initial state should respect what JS might have already requested
-                swipeRefreshLayout.setEnabled(isRefreshEnabled);
-                swipeRefreshLayout.setOnChildScrollUpCallback((refreshLayout, child) -> {
-                    // When JS marks an overlay as active, keep SwipeRefreshLayout from
-                    // intercepting overlay scroll gestures as page-level pull-to-refresh.
-                    if (!isRefreshEnabled) return true;
-                    return webView.canScrollVertically(-1);
-                });
-
-                swipeRefreshLayout.setOnRefreshListener(() -> {
-                    // Safety check: if JS has requested disabled, don't refresh
-                    if (!isRefreshEnabled) {
-                        swipeRefreshLayout.setRefreshing(false);
-                        return;
-                    }
-                    webView.reload();
-                    swipeRefreshLayout.postDelayed(() -> swipeRefreshLayout.setRefreshing(false), 1200);
-                });
-            }
-
-            webView.evaluateJavascript(
-                    "window.dispatchEvent(new Event('signal:nativeBridgeReady'));",
-                    null
-            );
-        }, 100);
-
         PhoneNowPlayingHelper.pushSnapshotToConnectedNodes(this);
         requestNotificationPermission();
         handleIntent(getIntent());
+    }
+
+    @Override
+    protected void load() {
+        injectNativeBridgeInterface();
+        super.load();
+        configurePullToRefresh();
+        dispatchNativeBridgeReadyEvent();
+    }
+
+    private void injectNativeBridgeInterface() {
+        if (nativeBridgeInjected) {
+            return;
+        }
+
+        WebView webView = findViewById(com.getcapacitor.android.R.id.webview);
+        if (webView == null) {
+            return;
+        }
+
+        webView.addJavascriptInterface(nativeBridgeInterface, NATIVE_BRIDGE_OBJECT);
+        nativeBridgeInjected = true;
+    }
+
+    private void configurePullToRefresh() {
+        if (getBridge() == null) {
+            return;
+        }
+        WebView webView = getBridge().getWebView();
+        if (webView == null) {
+            return;
+        }
+
+        ViewGroup parent = (ViewGroup) webView.getParent();
+        if (parent instanceof SwipeRefreshLayout) {
+            swipeRefreshLayout = (SwipeRefreshLayout) parent;
+        } else if (parent != null) {
+            swipeRefreshLayout = new SwipeRefreshLayout(MainActivity.this);
+            swipeRefreshLayout.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+            ));
+
+            int index = parent.indexOfChild(webView);
+            parent.removeView(webView);
+
+            swipeRefreshLayout.addView(webView, new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+            ));
+
+            parent.addView(swipeRefreshLayout, index);
+        }
+
+        if (swipeRefreshLayout == null) {
+            return;
+        }
+
+        // Initial state should respect what JS might have already requested.
+        swipeRefreshLayout.setEnabled(isRefreshEnabled);
+        swipeRefreshLayout.setOnChildScrollUpCallback((refreshLayout, child) -> {
+            // When JS marks an overlay as active, keep SwipeRefreshLayout from
+            // intercepting overlay scroll gestures as page-level pull-to-refresh.
+            if (!isRefreshEnabled) return true;
+            return webView.canScrollVertically(-1);
+        });
+
+        swipeRefreshLayout.setOnRefreshListener(() -> {
+            // Safety check: if JS has requested disabled, don't refresh.
+            if (!isRefreshEnabled) {
+                swipeRefreshLayout.setRefreshing(false);
+                return;
+            }
+            webView.reload();
+            swipeRefreshLayout.postDelayed(() -> swipeRefreshLayout.setRefreshing(false), 1200);
+        });
+    }
+
+    private void dispatchNativeBridgeReadyEvent() {
+        if (getBridge() == null || getBridge().getWebView() == null) {
+            return;
+        }
+        WebView webView = getBridge().getWebView();
+        webView.post(() -> webView.evaluateJavascript(NATIVE_BRIDGE_READY_EVENT_JS, null));
+        webView.postDelayed(() -> webView.evaluateJavascript(NATIVE_BRIDGE_READY_EVENT_JS, null), 600);
     }
 
     private void createNotificationChannel() {

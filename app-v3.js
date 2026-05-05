@@ -633,6 +633,21 @@ async function initializeNativePushNotifications() {
     await push.addListener("registrationError", (error) => console.error("Native push registration failed", error));
     await push.addListener("pushNotificationReceived", (notification) => {
       if (notification?.data?.type === "direct-message") {
+        if (window.notifications && typeof window.notifications.add === "function") {
+          const threadId = notification?.data?.threadId ?? "";
+          const messageId = String(notification?.data?.messageId ?? "").trim();
+          const title = trimNotificationText(notification?.title || notification?.data?.title || "New message", 80) || "New message";
+          const body = trimNotificationText(notification?.body || notification?.data?.body || "New direct message", 160) || "New direct message";
+          window.notifications.add({
+            id: messageId || `native-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            type: "info",
+            title,
+            message: body,
+            threadId,
+            data: { type: "message", threadId },
+            silent: true,
+          });
+        }
         playIncomingMessageSound();
         if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true });
       }
@@ -665,6 +680,9 @@ async function catchUpMessengerState({ force = false } = {}) {
   messengerCatchUpPromise = (async () => {
     await refreshMessengerState({ preserveActiveThread: true, force: true });
     await flushPendingNotificationThread();
+    if (window.notifications && state.supabase && state.currentUser?.id) {
+      await window.notifications.syncWithSupabase(state.supabase, state.currentUser.id);
+    }
   })();
   try { await messengerCatchUpPromise; } finally { messengerCatchUpPromise = null; }
 }
@@ -827,6 +845,9 @@ async function initialize() {
       if (isMessagingEnabled(state)) {
         await refreshMessengerState();
         await flushPendingNotificationThread();
+        if (window.notifications) {
+          await window.notifications.syncWithSupabase(state.supabase, state.currentUser.id);
+        }
       }
       bindAuthStateListener();
     } catch (error) {
