@@ -5199,6 +5199,12 @@ button:disabled {
 /* FORCE BLACK PROFILE BACKGROUND AT END OF FILE */
 body[data-theme='contrast'] .profile-view-dialog { background: #000000 !important; border-color: rgba(255, 255, 255, 0.5) !important; }
 body[data-theme='contrast'] .profile-view { background: #000000 !important; }
+/* Theme Picker Refinement - Hide Writing */
+.theme-option-copy { display: none !important; }
+.theme-option-tile { grid-template-columns: 1fr !important; justify-items: center !important; padding: 12px !important; min-height: 0 !important; }
+.theme-preview { width: 100% !important; max-width: 120px !important; height: 80px !important; }
+.theme-picker-menu { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+@media (min-width: 761px) { .theme-picker-menu { grid-template-columns: repeat(3, 1fr) !important; } }
 /* Ember Red Profile Background */
 body[data-theme='ember'] .profile-view-dialog { 
   background: radial-gradient(circle at top left, rgba(255, 68, 56, 0.22), transparent 30%), 
