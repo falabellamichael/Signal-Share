@@ -1,8 +1,8 @@
-// Signal Share Notification System (V20 - STABLE REVERT)
-// Reverted the experimental overrides and data merging to restore the last known stable state.
+// Signal Share Notification System (V25 - INTERACTIVE)
+// Added: Click handlers for notifications to navigate to messenger or other areas.
 
 (function() {
-  console.log("[Notifications] Loading V20...");
+  console.log("[Notifications] Loading V25...");
 
   let history = [];
   let count = 0;
@@ -33,7 +33,8 @@
       title: opts.title || 'Signal Share',
       message: opts.message,
       timestamp: Date.now(),
-      type: opts.type || 'info'
+      type: opts.type || 'info',
+      threadId: opts.threadId || ""
     };
 
     history.unshift(item);
@@ -42,6 +43,25 @@
       showBanner(item);
     }
     save();
+  }
+
+  function handleNotificationClick(n) {
+    console.log("[Notifications] Item clicked:", n);
+    
+    // Close the panel first
+    if (window.toggleNotificationsPanel) window.toggleNotificationsPanel();
+    
+    // Determine where to go
+    const msg = (n.message + n.title).toLowerCase();
+    if (msg.includes('message') || msg.includes('text') || n.threadId) {
+      if (window.openMessengerFromNotification) {
+        window.openMessengerFromNotification(n.threadId || "");
+      }
+    } else if (msg.includes('account') || msg.includes('profile')) {
+      window.location.hash = "account";
+    } else if (msg.includes('feed') || msg.includes('like')) {
+      window.location.hash = "feed";
+    }
   }
 
   function renderUI() {
@@ -55,14 +75,23 @@
     }
 
     const list = document.getElementById('notificationsList');
+    const emptyState = document.getElementById('notificationsEmptyState');
     if (list) {
       list.innerHTML = '';
-      history.forEach(n => {
-        const li = document.createElement('li');
-        li.style.cssText = "padding:12px; margin-bottom:8px; border-radius:8px; background:rgba(255,255,255,0.05); border-left:4px solid #3b82f6; cursor:pointer; color:inherit; list-style:none;";
-        li.innerHTML = `<strong style="color:inherit;">${n.title}</strong><p style="margin:4px 0; font-size:0.9rem; opacity:0.8; color:inherit;">${n.message}</p>`;
-        list.appendChild(li);
-      });
+      if (history.length === 0) {
+        if (emptyState) emptyState.style.display = 'block';
+      } else {
+        if (emptyState) emptyState.style.display = 'none';
+        history.forEach(n => {
+          const li = document.createElement('li');
+          li.style.cssText = "padding:12px; margin-bottom:8px; border-radius:8px; background:rgba(255,255,255,0.05); border-left:4px solid #3b82f6; cursor:pointer; color:inherit; list-style:none; transition: background 0.2s;";
+          li.innerHTML = `<strong style="color:inherit;">${n.title}</strong><p style="margin:4px 0; font-size:0.9rem; opacity:0.8; color:inherit;">${n.message}</p>`;
+          li.onclick = () => handleNotificationClick(n);
+          li.onmouseover = () => { li.style.background = "rgba(255,255,255,0.1)"; };
+          li.onmouseout = () => { li.style.background = "rgba(255,255,255,0.05)"; };
+          list.appendChild(li);
+        });
+      }
     }
   }
 
@@ -76,8 +105,6 @@
     const isMidnight = currentTheme.toLowerCase().includes('midnight');
     badge.style.setProperty('background-color', isMidnight ? '#3b82f6' : '#000000', 'important');
     badge.style.setProperty('color', '#ffffff', 'important');
-    badge.style.setProperty('opacity', '1', 'important');
-    badge.style.setProperty('visibility', 'visible', 'important');
   }
 
   function showBanner(item) {
@@ -90,9 +117,9 @@
     }
     const el = document.createElement('div');
     el.className = `notification notification-${item.type}`;
-    el.style.cssText = "background:rgba(0,0,0,0.95); color:white; padding:15px; margin-bottom:10px; border-radius:10px; border-left:5px solid #3b82f6; box-shadow:0 5px 20px rgba(0,0,0,0.5); z-index:10001; position:relative; pointer-events:auto;";
+    el.style.cssText = "background:rgba(0,0,0,0.95); color:white; padding:15px; margin-bottom:10px; border-radius:10px; border-left:5px solid #3b82f6; box-shadow:0 5px 20px rgba(0,0,0,0.5); z-index:10001; position:relative; pointer-events:auto; cursor:pointer;";
     el.innerHTML = `<strong>${item.title}</strong><div style="font-size:0.9rem;">${item.message}</div>`;
-    el.onclick = () => el.remove();
+    el.onclick = () => { handleNotificationClick(item); el.remove(); };
     container.appendChild(el);
     setTimeout(() => { if (el.parentNode) el.remove(); }, 5000);
   }

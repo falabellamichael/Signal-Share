@@ -57,6 +57,9 @@
             <a href="#profileView" id="profileNavLink" aria-controls="profileView" aria-expanded="false" title="Profile" style="display: flex; align-items: center; position: relative; margin-left: 8px;">
               <span class="profile-badge profile-nav-avatar" id="profileNavAvatar" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 50%; margin: 0; padding: 0;">--</span>
             </a>
+            <button id="settingsToggleButton" class="button button-secondary settings-toggle" type="button" aria-expanded="false" aria-controls="settingsPanel" style="background: transparent !important; border-color: rgba(255,255,255,0.1); color: inherit; margin-left: 12px;">
+              Settings
+            </button>
           </nav>
 
           <button
@@ -65,6 +68,7 @@
             type="button"
             aria-expanded="false"
             aria-controls="settingsPanel"
+            style="display: none;"
           >
             Settings
           </button>
@@ -1178,9 +1182,9 @@
     <script type="module" src="./config.js?v=2"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.2.3/dist/tus.min.js"></script>
-    <script type="module" src="./notifications.js?v=63"></script>
-    <script type="module" src="./keyboard-bindings-v3.js?v=63"></script>
-    <script type="module" src="./notification-keyboard-integration.js?v=63"></script>
+    <script type="module" src="./notifications.js?v=64"></script>
+    <script type="module" src="./keyboard-bindings-v3.js?v=64"></script>
+    <script type="module" src="./notification-keyboard-integration.js?v=64"></script>
     <!-- Global Overlay Panels -->
     <section class="settings-panel" id="notificationsPanel" aria-hidden="true" hidden style="z-index: 10000 !important;">
       <div class="settings-backdrop" id="notificationsBackdrop"></div>
@@ -1203,8 +1207,8 @@
       </div>
     </section>
 
-    <script src="messenger-realtime.js?v=63"></script>
-    <script type="module" src="app-v3.js?v=63"></script>
+    <script src="messenger-realtime.js?v=64"></script>
+    <script type="module" src="app-v3.js?v=64"></script>
 
   </body>
 </html>

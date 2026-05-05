@@ -2305,6 +2305,7 @@ window.NotificationSystem = {
   toggle: () => window.toggleNotificationsPanel()
 };
 window.toggleNotifications = () => window.toggleNotificationsPanel();
+window.openMessengerFromNotification = openMessengerThreadFromNotification;
 
 function renderKeyboardShortcuts() {
   if (!elements.shortcutsList) return;
