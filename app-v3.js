@@ -1163,7 +1163,7 @@ async function syncCurrentProfileToSupabase(displayNameOverride = "") {
   try {
     const fullPayload = {
       ...payload,
-      notification_hide_sender: state.preferences.notificationHideSender,
+      theme: state.preferences.theme, density: state.preferences.density, motion: state.preferences.motion, status_bar_strip: state.preferences.statusBarStrip, notification_hide_sender: state.preferences.notificationHideSender,
       notification_hide_body: state.preferences.notificationHideBody
     };
     const { data, error } = await state.supabase.from("profiles").upsert(fullPayload, { onConflict: "id" }).select().single();
