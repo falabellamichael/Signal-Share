@@ -2684,7 +2684,7 @@ async function applyExternalPreviewMetadata(stage, image, titleElement, badgeEle
   const metadata = await getExternalPreviewMetadata(source); if (!stage.isConnected) return;
   const providerName = formatProviderName(source.provider);
   if (!metadata || metadata.error) {
-    badgeElement.textContent = `${metadata?.error || "Error"} • ${providerName}`;
+    badgeElement.textContent = providerName;
     return;
   }
   if (typeof metadata.title === "string" && metadata.title.trim()) { const previewTitle = metadata.title.trim(); titleElement.textContent = previewTitle; image.alt = `${previewTitle} preview`; }
@@ -2975,7 +2975,7 @@ function parseYouTubeUrl(raw) {
   let url; try { url = new URL(raw); } catch { return null; }
   const host = url.hostname.replace(/^www\./, ""); let videoId = "";
   if (host === "youtu.be") videoId = url.pathname.slice(1).split("/")[0];
-  else if (host === "youtube.com" || host === "m.youtube.com") { if (url.pathname === "/watch") videoId = url.searchParams.get("v") ?? ""; else if (url.pathname.startsWith("/shorts/") || url.pathname.startsWith("/embed/")) videoId = url.pathname.split("/")[2] ?? ""; }
+  else if (host === "youtube.com" || host === "m.youtube.com") { if (url.pathname === "/watch") videoId = url.searchParams.get("v") ?? ""; else if (url.pathname.startsWith("/shorts/") || url.pathname.startsWith("/embed/") || url.pathname.startsWith("/live/") || url.pathname.startsWith("/v/")) videoId = url.pathname.split("/")[2] ?? ""; }
   if (!videoId) return null;
   return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
 }
