@@ -1,8 +1,8 @@
-// Signal Share Notification System (V25 - INTERACTIVE)
-// Added: Click handlers for notifications to navigate to messenger or other areas.
+// Signal Share Notification System (V26 - UNREAD STATES)
+// Added: Tracking of 'read' vs 'unread' notifications with visual opacity differences.
 
 (function() {
-  console.log("[Notifications] Loading V25...");
+  console.log("[Notifications] Loading V26...");
 
   let history = [];
   let count = 0;
@@ -34,7 +34,8 @@
       message: opts.message,
       timestamp: Date.now(),
       type: opts.type || 'info',
-      threadId: opts.threadId || ""
+      threadId: opts.threadId || "",
+      read: false // New items are always unread
     };
 
     history.unshift(item);
@@ -48,8 +49,12 @@
   function handleNotificationClick(n) {
     console.log("[Notifications] Item clicked:", n);
     
-    // Close the panel first
-    if (window.toggleNotificationsPanel) window.toggleNotificationsPanel();
+    // Mark as read
+    n.read = true;
+    save();
+    
+    // Close the panel first (optional, but usually desired if navigating)
+    // if (window.toggleNotificationsPanel) window.toggleNotificationsPanel();
     
     // Determine where to go
     const msg = (n.message + n.title).toLowerCase();
@@ -84,11 +89,31 @@
         if (emptyState) emptyState.style.display = 'none';
         history.forEach(n => {
           const li = document.createElement('li');
-          li.style.cssText = "padding:12px; margin-bottom:8px; border-radius:8px; background:rgba(255,255,255,0.05); border-left:4px solid #3b82f6; cursor:pointer; color:inherit; list-style:none; transition: background 0.2s;";
+          
+          // Style based on READ state
+          const isUnread = n.read === false;
+          const bg = isUnread ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)";
+          const opacity = isUnread ? "1" : "0.55";
+          const border = isUnread ? "4px solid #3b82f6" : "4px solid rgba(255,255,255,0.1)";
+          
+          li.style.cssText = `padding:12px; margin-bottom:8px; border-radius:8px; background:${bg}; border-left:${border}; cursor:pointer; color:inherit; list-style:none; transition: all 0.2s; opacity:${opacity};`;
+          
           li.innerHTML = `<strong style="color:inherit;">${n.title}</strong><p style="margin:4px 0; font-size:0.9rem; opacity:0.8; color:inherit;">${n.message}</p>`;
-          li.onclick = () => handleNotificationClick(n);
-          li.onmouseover = () => { li.style.background = "rgba(255,255,255,0.1)"; };
-          li.onmouseout = () => { li.style.background = "rgba(255,255,255,0.05)"; };
+          
+          li.onclick = (e) => {
+            e.stopPropagation();
+            handleNotificationClick(n);
+          };
+          
+          li.onmouseover = () => { 
+            li.style.background = isUnread ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.05)";
+            li.style.opacity = "1";
+          };
+          li.onmouseout = () => { 
+            li.style.background = bg;
+            li.style.opacity = opacity;
+          };
+          
           list.appendChild(li);
         });
       }
@@ -142,6 +167,7 @@
     warning: (m, t, o) => add({...o, type:'warning', message:m, title:t}),
     clearHistory: () => { history = []; count = 0; save(); },
     resetBadge: () => { count = 0; save(); },
+    markAllAsRead: () => { history.forEach(n => n.read = true); save(); },
     incrementUnreadCount: () => { count++; save(); },
     syncWithSupabase: () => {},
     setUnreadCount: (c) => { if(c===0) { count = 0; save(); } }
