@@ -1544,6 +1544,26 @@ function renderSpotlightMedia(container, post) { appendMedia(container, post, { 
 function renderViewerMedia(container, post) { if (isPlayablePost(post)) mountPersistentPlayer(container, post, "viewer"); else appendMedia(container, post, { variant: "viewer" }); }
 function renderMiniPlayerMedia(container, post) { mountPersistentPlayer(container, post, "mini"); }
 
+function renderViewerAttachmentMedia(container, attachment) {
+  if (!attachment?.url || !attachment?.kind) return;
+  if (attachment.kind === "image") {
+    const image = document.createElement("img");
+    image.className = "viewer-media";
+    image.loading = "eager";
+    image.alt = attachment.title || "Shared image";
+    image.src = attachment.url;
+    container.appendChild(image);
+    return;
+  }
+  const video = document.createElement("video");
+  video.className = "viewer-media";
+  video.controls = true;
+  video.preload = "metadata";
+  video.playsInline = true;
+  video.src = attachment.url;
+  container.appendChild(video);
+}
+
 function isPlayablePost(post) { return post?.mediaKind === "video" || post?.mediaKind === "audio" || post?.sourceKind === "youtube" || post?.sourceKind === "spotify"; }
 function getActivePlayerMediaElement() { return state.activePlayerElement?.querySelector("video, audio") || (state.activePlayerElement instanceof HTMLMediaElement ? state.activePlayerElement : null); }
 function getControllablePlayerPost() { return state.playerPostId ? getPostById(state.playerPostId) : null; }

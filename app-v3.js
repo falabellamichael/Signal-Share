@@ -15,6 +15,7 @@ import {
   deletePostFromDatabase, 
   setApiContext,
   loadUserPreferences,
+  normalizeUserPreferences,
   loadSavedPosts,
   loadPlayerPosition,
   loadPlayerVolume
