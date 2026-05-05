@@ -5037,3 +5037,6 @@ button:disabled {
     min-width: 92px;
   }
 }
+/* FORCE BLACK PROFILE BACKGROUND AT END OF FILE */
+body[data-theme='contrast'] .profile-view-dialog { background: #000000 !important; border-color: rgba(255, 255, 255, 0.5) !important; }
+body[data-theme='contrast'] .profile-view { background: #000000 !important; }
