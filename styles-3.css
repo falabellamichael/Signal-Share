@@ -973,15 +973,40 @@ button:disabled {
     padding-right: 2px;
   }
 
+  .messenger-list-search {
+    margin-top: 12px;
+    margin-bottom: 12px;
+  }
+
+  .messenger-list-search input {
+    padding: 12px 14px;
+    line-height: 1.25;
+  }
+
+  .person-row,
+  .conversation-row {
+    grid-template-columns: minmax(0, 1fr) 48px;
+    gap: 10px;
+  }
+
   .person-button,
   .conversation-button {
+    gap: 7px;
     padding: 12px 14px;
   }
 
   .person-block-button,
   .conversation-delete-button {
-    min-width: 38px;
-    padding: 0 10px;
+    width: 48px;
+    min-width: 48px;
+    padding: 0;
+  }
+
+  .person-button strong,
+  .conversation-button strong {
+    line-height: 1.22;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .message-list {
@@ -1014,7 +1039,7 @@ button:disabled {
     white-space: normal;
     overflow-wrap: anywhere;
     word-break: break-word;
-    line-height: 1.35;
+    line-height: 1.33;
   }
 
   .message-form textarea {
@@ -1554,21 +1579,36 @@ button:disabled {
     margin-bottom: 10px;
   }
 
+  .messenger-list-search input {
+    padding: 10px 12px;
+    line-height: 1.25;
+  }
+
+  .person-row,
+  .conversation-row {
+    grid-template-columns: minmax(0, 1fr) 38px;
+    gap: 8px;
+  }
+
   .person-button,
   .conversation-button {
-    gap: 4px;
+    gap: 6px;
     padding: 10px 12px;
   }
 
   .person-block-button,
   .conversation-delete-button {
-    min-width: 34px;
-    padding: 0 8px;
+    width: 38px;
+    min-width: 38px;
+    padding: 0;
   }
 
   .person-button strong,
   .conversation-button strong {
     font-size: 0.92rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .person-button span,
