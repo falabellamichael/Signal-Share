@@ -2238,7 +2238,7 @@ h1 {
   }
 
   .messenger-card {
-    padding: 20px 20px 24px;
+    padding: 16px 18px;
   }
 
   .messenger-list-search {
@@ -2346,7 +2346,7 @@ h1 {
   align-content: start;
   height: 100%;
   overflow-y: auto;
-  padding-bottom: 40px;
+  padding-bottom: 12px;
 }
 
 .messenger-section.is-expanded .messenger-sidebar,
@@ -2366,7 +2366,7 @@ h1 {
 
 .messenger-card,
 .messenger-thread {
-  padding: 20px 20px 48px;
+  padding: 16px 16px 14px;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(19, 33, 43, 0.1);
   background: rgba(255, 255, 255, 0.68);
