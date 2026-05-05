@@ -1,4 +1,41 @@
-import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js?v=92';
+import { 
+  createSupabaseClient, 
+  loadPostsFromSupabase, 
+  loadLikedPostsFromSupabase, 
+  publishPostToSupabase, 
+  compressImageFile, 
+  uploadFileToSupabase, 
+  uploadMessageAttachment, 
+  deleteHostedPost, 
+  normalizeSupabasePost, 
+  parseYouTubeUrl, 
+  openDatabase, 
+  loadPostsFromDatabase, 
+  savePostToDatabase, 
+  deletePostFromDatabase, 
+  setApiContext,
+  DB_NAME,
+  DB_VERSION,
+  STORE_NAME,
+  MAX_IMAGE_FILE_SIZE,
+  MAX_VIDEO_FILE_SIZE,
+  FEED_POSTS_PER_PAGE,
+  LIKED_POSTS_KEY,
+  POST_LIKES_TABLE,
+  SAVED_POSTS_KEY,
+  PLAYER_POSITION_KEY,
+  PLAYER_VOLUME_KEY,
+  USER_PREFERENCES_KEY,
+  DEFAULT_PLAYER_VOLUME,
+  DEFAULT_USER_PREFERENCES,
+  DEFAULT_SITE_SETTINGS,
+  THEME_OPTIONS,
+  THEME_VALUES,
+  loadUserPreferences,
+  loadSavedPosts,
+  loadPlayerVolume,
+  DEMO_POSTS
+} from './api-v3.js?v=92';
 
 
 
@@ -72,117 +109,6 @@ function isUserBlocked(state, userId) {
 function canAccessAdminBanPanel(state) {
     return Boolean(state.currentUser) && isCurrentUserAdmin();
 }
-
-const DEMO_POSTS = [
-  {
-    id: "demo-studio-light",
-    creator: "Mara Vale",
-    title: "Studio Light Test",
-    caption:
-      "Blocking color and reflection before the final portrait session. Clean gradients always read better on skin.",
-    tags: ["portrait", "lighting", "studio"],
-    createdAt: "2026-04-16T14:22:00.000Z",
-    mediaKind: "image",
-    src: createDemoGraphic({
-      title: "Studio Light Test",
-      subtitle: "portrait study",
-      palette: ["#f4a261", "#ee6c4d", "#13212b"],
-    }),
-    likes: 18,
-    isLocal: false,
-  },
-  {
-    id: "demo-quiet-launch",
-    creator: "Ivo Chen",
-    title: "Quiet Launch Poster",
-    caption:
-      "Campaign art with a softer edge. Testing a calmer type treatment against high-contrast shapes.",
-    tags: ["poster", "branding", "campaign"],
-    createdAt: "2026-04-19T19:35:00.000Z",
-    mediaKind: "image",
-    src: createDemoGraphic({
-      title: "Quiet Launch",
-      subtitle: "campaign poster",
-      palette: ["#2a9d8f", "#264653", "#f6efe3"],
-    }),
-    likes: 27,
-    isLocal: false,
-  },
-  {
-    id: "demo-night-drive",
-    creator: "Rae Sol",
-    title: "Night Drive Mix",
-    caption:
-      "A late edit of the opening cue. Upload your own audio to turn this prototype into a working listening feed.",
-    tags: ["audio", "mix", "score"],
-    createdAt: "2026-04-22T08:05:00.000Z",
-    mediaKind: "audio",
-    src: "",
-    likes: 11,
-    isLocal: false,
-  },
-];
-
-const DB_NAME = "signal-share-db";
-const DB_VERSION = 1;
-const STORE_NAME = "posts";
-const MAX_IMAGE_FILE_SIZE = 50 * 1024 * 1024 * 1024;
-const MAX_VIDEO_FILE_SIZE = 50 * 1024 * 1024 * 1024;
-const MAX_MESSAGE_LENGTH = 2000;
-const DEFAULT_MESSAGE_NOTIFICATION_TITLE = "New message";
-const FEED_POSTS_PER_PAGE = 9;
-const POST_MODERATION_ERROR = "This post contains blocked language and cannot be published.";
-const LIKED_POSTS_KEY = "signal-share-liked";
-const POST_LIKES_TABLE = "post_likes";
-const SAVED_POSTS_KEY = "signal-share-saved";
-const CREATOR_NAME_KEY = "signal-share-creator";
-const PLAYER_POSITION_KEY = "signal-share-player-position";
-const PLAYER_VOLUME_KEY = "signal-share-player-volume";
-const USER_PREFERENCES_KEY = "signal-share-preferences";
-const CURRENT_TERMS_VERSION = "2026-04-28";
-const CURRENT_PRIVACY_VERSION = "2026-04-28";
-const EXTERNAL_PROVIDERS = ["youtube", "spotify"];
-const DEFAULT_PLAYER_VOLUME = 1;
-const DEFAULT_AUTH_REDIRECT_URL = "https://falabellamichael.github.io/Signal-Share/";
-const DEFAULT_BLOCKED_TERMS = Object.freeze([
-  "asshole", "beaner", "bitch", "chink", "cunt", "fag", "faggot", "fuck", "gook", "kike", "motherfucker", "nigga", "nigger", "paki", "raghead", "retard", "shit", "slut", "spic", "tranny", "wetback", "whore",
-]);
-const DEFAULT_SITE_SETTINGS = Object.freeze({
-  shellWidth: 1200,
-  sectionGap: 24,
-  surfaceRadius: 32,
-  mediaFit: "cover",
-});
-const DEFAULT_USER_PREFERENCES = Object.freeze({
-  theme: "sunset",
-  density: "airy",
-  statusBarStrip: true,
-  notificationHideSender: false,
-  notificationHideBody: false,
-});
-const THEME_OPTIONS = Object.freeze([
-  { value: "sunset", label: "Sunset", description: "Warm default" },
-  { value: "midnight", label: "Midnight", description: "Dark mode" },
-  { value: "gallery", label: "Gallery", description: "Neutral light" },
-  { value: "aurora", label: "Aurora", description: "Cool studio" },
-  { value: "contrast", label: "High Contrast", description: "Blackout with sharp signal colors" },
-  { value: "ember", label: "Ember Red", description: "Deep red companion glow" },
-]);
-const THEME_VALUES = new Set(THEME_OPTIONS.map((option) => option.value));
-
-// Bridge to app-ui-v3.js
-window.DEFAULT_USER_PREFERENCES = DEFAULT_USER_PREFERENCES;
-window.THEME_VALUES = THEME_VALUES;
-window.USER_PREFERENCES_KEY = USER_PREFERENCES_KEY;
-window.SAVED_POSTS_KEY = SAVED_POSTS_KEY;
-window.DEMO_POSTS = DEMO_POSTS;
-window.MAX_IMAGE_FILE_SIZE = MAX_IMAGE_FILE_SIZE;
-window.MAX_VIDEO_FILE_SIZE = MAX_VIDEO_FILE_SIZE;
-window.LIKED_POSTS_KEY = LIKED_POSTS_KEY;
-window.DEFAULT_PLAYER_VOLUME = DEFAULT_PLAYER_VOLUME;
-window.PLAYER_POSITION_KEY = PLAYER_POSITION_KEY;
-window.PLAYER_VOLUME_KEY = PLAYER_VOLUME_KEY;
-window.THEME_OPTIONS = THEME_OPTIONS;
 
 const APP_CONFIG = getAppConfig();
 let messageChimeAudioContext = null;
@@ -282,172 +208,192 @@ if (!window[globalStateKey]) {
 const state = window[globalStateKey];
 window.state = state; // Also expose as window.state for backward compatibility and cross-module access
 
-const elements = {
-  siteHeader: document.querySelector(".site-header"),
-  postForm: document.querySelector("#postForm"),
-  creatorInput: document.querySelector("#creatorInput"),
-  titleInput: document.querySelector("#titleInput"),
-  captionInput: document.querySelector("#captionInput"),
-  tagsInput: document.querySelector("#tagsInput"),
-  externalUrlInput: document.querySelector("#externalUrlInput"),
-  mediaInput: document.querySelector("#mediaInput"),
-  dropzone: document.querySelector("#dropzone"),
-  previewShell: document.querySelector("#previewShell"),
-  formFeedback: document.querySelector("#formFeedback"),
-  resetFormButton: document.querySelector("#resetFormButton"),
-  sourceHelp: document.querySelector("#sourceHelp"),
-  settingsToggleButton: document.querySelector("#settingsToggleButton"),
-  settingsPanel: document.querySelector("#settingsPanel"),
-  settingsBackdrop: document.querySelector("#settingsBackdrop"),
-  settingsCloseButton: document.querySelector("#settingsCloseButton"),
-  notificationsLauncherButton: document.querySelector("#notificationBell"),
-  notificationsPanel: document.querySelector("#notificationsPanel"),
-  notificationsBackdrop: document.querySelector("#notificationsBackdrop"),
-  notificationsCloseButton: document.querySelector("#notificationsCloseButton"),
-  clearNotificationsButton: document.querySelector("#clearNotificationsButton"),
-  notificationsList: document.querySelector("#notificationsList"),
-  notificationsEmptyState: document.querySelector("#notificationsEmptyState"),
-  keyboardShortcutsButton: document.querySelector("#keyboardShortcutsButton"),
-  settingsMainPage: document.querySelector("#settingsMainPage"),
-  settingsShortcutsPage: document.querySelector("#settingsShortcutsPage"),
-  shortcutsList: document.querySelector("#shortcutsList"),
-  themePicker: document.querySelector("#themePicker"),
-  themePickerButton: document.querySelector("#themePickerButton"),
-  themePickerMenu: document.querySelector("#themePickerMenu"),
-  themePickerPreview: document.querySelector("#themePickerPreview"),
-  themePickerLabel: document.querySelector("#themePickerLabel"),
-  themePickerDescription: document.querySelector("#themePickerDescription"),
-  densitySelect: document.querySelector("#densitySelect"),
-  motionSelect: document.querySelector("#motionSelect"),
-  statusBarStripToggle: document.querySelector("#statusBarStripToggle"),
-  notificationHideSenderToggle: document.querySelector("#notificationHideSenderToggle"),
-  notificationHideBodyToggle: document.querySelector("#notificationHideBodyToggle"),
-  resetPlayerPositionButton: document.querySelector("#resetPlayerPositionButton"),
-  resetPreferencesButton: document.querySelector("#resetPreferencesButton"),
-  messagesNavLink: document.querySelector("#messagesNavLink"),
-  profileNavLink: document.querySelector("#profileNavLink"),
-  profileNavAvatar: document.querySelector("#profileNavAvatar"),
+const ELEMENT_SELECTORS = {
+  siteHeader: ".site-header",
+  postForm: "#postForm",
+  creatorInput: "#creatorInput",
+  titleInput: "#titleInput",
+  captionInput: "#captionInput",
+  tagsInput: "#tagsInput",
+  externalUrlInput: "#externalUrlInput",
+  mediaInput: "#mediaInput",
+  dropzone: "#dropzone",
+  previewShell: "#previewShell",
+  formFeedback: "#formFeedback",
+  resetFormButton: "#resetFormButton",
+  sourceHelp: "#sourceHelp",
+  settingsToggleButton: "#settingsToggleButton",
+  settingsPanel: "#settingsPanel",
+  settingsBackdrop: "#settingsBackdrop",
+  settingsCloseButton: "#settingsCloseButton",
+  notificationsLauncherButton: "#notificationBell",
+  notificationsPanel: "#notificationsPanel",
+  notificationsBackdrop: "#notificationsBackdrop",
+  notificationsCloseButton: "#notificationsCloseButton",
+  clearNotificationsButton: "#clearNotificationsButton",
+  notificationsList: "#notificationsList",
+  notificationsEmptyState: "#notificationsEmptyState",
+  keyboardShortcutsButton: "#keyboardShortcutsButton",
+  settingsMainPage: "#settingsMainPage",
+  settingsShortcutsPage: "#settingsShortcutsPage",
+  shortcutsList: "#shortcutsList",
+  themePicker: "#themePicker",
+  themePickerButton: "#themePickerButton",
+  themePickerMenu: "#themePickerMenu",
+  themePickerPreview: "#themePickerPreview",
+  themePickerLabel: "#themePickerLabel",
+  themePickerDescription: "#themePickerDescription",
+  densitySelect: "#densitySelect",
+  motionSelect: "#motionSelect",
+  statusBarStripToggle: "#statusBarStripToggle",
+  notificationHideSenderToggle: "#notificationHideSenderToggle",
+  notificationHideBodyToggle: "#notificationHideBodyToggle",
+  resetPlayerPositionButton: "#resetPlayerPositionButton",
+  resetPreferencesButton: "#resetPreferencesButton",
+  messagesNavLink: "#messagesNavLink",
+  profileNavLink: "#profileNavLink",
+  profileNavAvatar: "#profileNavAvatar",
 
-  adminBanLauncherButton: document.querySelector("#adminBanLauncherButton"),
-  adminBanPanel: document.querySelector("#adminBanPanel"),
-  adminBanCloseButton: document.querySelector("#adminBanCloseButton"),
-  adminBanRefreshButton: document.querySelector("#adminBanRefreshButton"),
-  adminBanSearchInput: document.querySelector("#adminBanSearchInput"),
-  adminBanList: document.querySelector("#adminBanList"),
-  adminBanEmpty: document.querySelector("#adminBanEmpty"),
-  adminBanFeedback: document.querySelector("#adminBanFeedback"),
-  messengerLauncherButton: document.querySelector("#messengerLauncherButton"),
-  messengerSection: document.querySelector("#messages"),
-  messengerMinimizeButton: document.querySelector("#messengerMinimizeButton"),
-  messengerExpandButton: document.querySelector("#messengerExpandButton"),
-  messengerHideButton: document.querySelector("#messengerHideButton"),
-  messengerStatusPill: document.querySelector("#messengerStatusPill"),
-  messengerStatusCopy: document.querySelector("#messengerStatusCopy"),
-  profileDisplayNameInput: document.querySelector("#profileDisplayNameInput"),
-  saveProfileButton: document.querySelector("#saveProfileButton"),
-  profileFeedback: document.querySelector("#profileFeedback"),
-  peopleSearchInput: document.querySelector("#peopleSearchInput"),
-  peopleList: document.querySelector("#peopleList"),
-  peopleEmpty: document.querySelector("#peopleEmpty"),
-  conversationSearchInput: document.querySelector("#conversationSearchInput"),
-  conversationList: document.querySelector("#conversationList"),
-  conversationEmpty: document.querySelector("#conversationEmpty"),
-  activeThreadLabel: document.querySelector("#activeThreadLabel"),
-  activeThreadMeta: document.querySelector("#activeThreadMeta"),
-  messageList: document.querySelector("#messageList"),
-  messageEmpty: document.querySelector("#messageEmpty"),
-  messageForm: document.querySelector("#messageForm"),
-  messageInput: document.querySelector("#messageInput"),
-  messageAttachmentInput: document.querySelector("#messageAttachmentInput"),
-  messageAttachmentPreview: document.querySelector("#messageAttachmentPreview"),
-  messageEmojiPanel: document.querySelector("#messageEmojiPanel"),
-  messageEmojiButton: document.querySelector("#messageEmojiButton"),
-  messageAttachButton: document.querySelector("#messageAttachButton"),
-  messageAttachmentClearButton: document.querySelector("#messageAttachmentClearButton"),
-  sendMessageButton: document.querySelector("#sendMessageButton"),
-  messengerFeedback: document.querySelector("#messengerFeedback"),
-  authForm: document.querySelector("#authForm"),
-  authDisplayNameInput: document.querySelector("#authDisplayNameInput"),
-  authEmailInput: document.querySelector("#authEmailInput"),
-  authPasswordInput: document.querySelector("#authPasswordInput"),
-  authTermsCheckbox: document.querySelector("#authTermsCheckbox"),
-  signInButton: document.querySelector("#signInButton"),
-  signUpButton: document.querySelector("#signUpButton"),
-  signOutButton: document.querySelector("#signOutButton"),
-  openOwnProfileButton: document.querySelector("#openOwnProfileButton"),
-  resendActivationButton: document.querySelector("#resendActivationButton"),
-  authAccount: document.querySelector("#authAccount"),
-  accountEmail: document.querySelector("#accountEmail"),
-  accountMeta: document.querySelector("#accountMeta"),
-  authFeedback: document.querySelector("#authFeedback"),
-  adminEditor: document.querySelector("#adminEditor"),
-  adminSettingsForm: document.querySelector("#adminSettingsForm"),
-  layoutWidthInput: document.querySelector("#layoutWidthInput"),
-  layoutWidthValue: document.querySelector("#layoutWidthValue"),
-  layoutGapInput: document.querySelector("#layoutGapInput"),
-  layoutGapValue: document.querySelector("#layoutGapValue"),
-  layoutRadiusInput: document.querySelector("#layoutRadiusInput"),
-  layoutRadiusValue: document.querySelector("#layoutRadiusValue"),
-  mediaFitSelect: document.querySelector("#mediaFitSelect"),
-  saveSettingsButton: document.querySelector("#saveSettingsButton"),
-  resetSettingsButton: document.querySelector("#resetSettingsButton"),
-  adminSettingsFeedback: document.querySelector("#adminSettingsFeedback"),
-  authStatusPill: document.querySelector("#authStatusPill"),
-  authStatusCopy: document.querySelector("#authStatusCopy"),
-  authHint: document.querySelector("#authHint"),
-  activationPanel: document.querySelector("#activationPanel"),
-  activationTitle: document.querySelector("#activationTitle"),
-  activationMessage: document.querySelector("#activationMessage"),
-  feedGrid: document.querySelector("#feedGrid"),
-  feedCardTemplate: document.querySelector("#feedCardTemplate"),
-  filterRow: document.querySelector("#filterRow"),
-  tagCloud: document.querySelector("#tagCloud"),
-  emptyState: document.querySelector("#emptyState"),
-  sortSelect: document.querySelector("#sortSelect"),
-  searchInput: document.querySelector("#searchInput"),
-  statsPanel: document.querySelector("#statsPanel"),
-  spotlightCard: document.querySelector("#spotlightCard"),
-  creatorBoard: document.querySelector("#creatorBoard"),
-  viewer: document.querySelector("#viewer"),
-  profileView: document.querySelector("#profileView"),
-  feedPagination: document.querySelector("#feedPagination"),
-  viewerStage: document.querySelector("#viewerStage"),
-  viewerCloseButton: document.querySelector("#viewerCloseButton"),
-  viewerCollapseButton: document.querySelector("#viewerCollapseButton"),
-  viewerKind: document.querySelector("#viewerKind"),
-  viewerTitle: document.querySelector("#viewerTitle"),
-  viewerCaption: document.querySelector("#viewerCaption"),
-  viewerCreator: document.querySelector("#viewerCreator"),
-  viewerTime: document.querySelector("#viewerTime"),
-  viewerTags: document.querySelector("#viewerTags"),
-  viewerPrevButton: document.querySelector("#viewerPrevButton"),
-  viewerNextButton: document.querySelector("#viewerNextButton"),
-  profileCloseButton: document.querySelector("#profileCloseButton"),
-  profileBadge: document.querySelector("#profileBadge"),
-  profileTitle: document.querySelector("#profileTitle"),
-  profileMeta: document.querySelector("#profileMeta"),
-  profileStats: document.querySelector("#profileStats"),
-  profileFeedGrid: document.querySelector("#profileFeedGrid"),
-  profileFeedPagination: document.querySelector("#profileFeedPagination"),
-  profileEmpty: document.querySelector("#profileEmpty"),
-  miniPlayer: document.querySelector("#miniPlayer"),
-  miniPlayerHead: document.querySelector("#miniPlayerHead"),
-  miniPlayerStage: document.querySelector("#miniPlayerStage"),
-  miniPlayerVolume: document.querySelector("#miniPlayerVolume"),
-  miniPlayerVolumeSlider: document.querySelector("#miniPlayerVolumeSlider"),
-  miniPlayerVolumeValue: document.querySelector("#miniPlayerVolumeValue"),
-  miniPlayerKind: document.querySelector("#miniPlayerKind"),
-  miniPlayerTitle: document.querySelector("#miniPlayerTitle"),
-  miniPlayerDetail: document.querySelector("#miniPlayerDetail"),
-  miniPlayerCaption: document.querySelector("#miniPlayerCaption"),
-  miniPlayerCreator: document.querySelector("#miniPlayerCreator"),
-  miniPlayerTime: document.querySelector("#miniPlayerTime"),
-  miniPlayerTags: document.querySelector("#miniPlayerTags"),
-  miniExpandButton: document.querySelector("#miniExpandButton"),
-  miniCloseButton: document.querySelector("#miniCloseButton"),
-  miniPrevButton: document.querySelector("#miniPrevButton"),
-  miniNextButton: document.querySelector("#miniNextButton"),
+  adminBanLauncherButton: "#adminBanLauncherButton",
+  adminBanPanel: "#adminBanPanel",
+  adminBanCloseButton: "#adminBanCloseButton",
+  adminBanRefreshButton: "#adminBanRefreshButton",
+  adminBanSearchInput: "#adminBanSearchInput",
+  adminBanList: "#adminBanList",
+  adminBanEmpty: "#adminBanEmpty",
+  adminBanFeedback: "#adminBanFeedback",
+  messengerLauncherButton: "#messengerLauncherButton",
+  messengerSection: "#messages",
+  messengerMinimizeButton: "#messengerMinimizeButton",
+  messengerExpandButton: "#messengerExpandButton",
+  messengerHideButton: "#messengerHideButton",
+  messengerStatusPill: "#messengerStatusPill",
+  messengerStatusCopy: "#messengerStatusCopy",
+  profileDisplayNameInput: "#profileDisplayNameInput",
+  saveProfileButton: "#saveProfileButton",
+  profileFeedback: "#profileFeedback",
+  peopleSearchInput: "#peopleSearchInput",
+  peopleList: "#peopleList",
+  peopleEmpty: "#peopleEmpty",
+  conversationSearchInput: "#conversationSearchInput",
+  conversationList: "#conversationList",
+  conversationEmpty: "#conversationEmpty",
+  activeThreadLabel: "#activeThreadLabel",
+  activeThreadMeta: "#activeThreadMeta",
+  messageList: "#messageList",
+  messageEmpty: "#messageEmpty",
+  messageForm: "#messageForm",
+  messageInput: "#messageInput",
+  messageAttachmentInput: "#messageAttachmentInput",
+  messageAttachmentPreview: "#messageAttachmentPreview",
+  messageEmojiPanel: "#messageEmojiPanel",
+  messageEmojiButton: "#messageEmojiButton",
+  messageAttachButton: "#messageAttachButton",
+  messageAttachmentClearButton: "#messageAttachmentClearButton",
+  sendMessageButton: "#sendMessageButton",
+  messengerFeedback: "#messengerFeedback",
+  authForm: "#authForm",
+  authDisplayNameInput: "#authDisplayNameInput",
+  authEmailInput: "#authEmailInput",
+  authPasswordInput: "#authPasswordInput",
+  authTermsCheckbox: "#authTermsCheckbox",
+  signInButton: "#signInButton",
+  signUpButton: "#signUpButton",
+  signOutButton: "#signOutButton",
+  openOwnProfileButton: "#openOwnProfileButton",
+  resendActivationButton: "#resendActivationButton",
+  authAccount: "#authAccount",
+  accountEmail: "#accountEmail",
+  accountMeta: "#accountMeta",
+  authFeedback: "#authFeedback",
+  adminEditor: "#adminEditor",
+  adminSettingsForm: "#adminSettingsForm",
+  layoutWidthInput: "#layoutWidthInput",
+  layoutWidthValue: "#layoutWidthValue",
+  layoutGapInput: "#layoutGapInput",
+  layoutGapValue: "#layoutGapValue",
+  layoutRadiusInput: "#layoutRadiusInput",
+  layoutRadiusValue: "#layoutRadiusValue",
+  mediaFitSelect: "#mediaFitSelect",
+  saveSettingsButton: "#saveSettingsButton",
+  resetSettingsButton: "#resetSettingsButton",
+  adminSettingsFeedback: "#adminSettingsFeedback",
+  authStatusPill: "#authStatusPill",
+  authStatusCopy: "#authStatusCopy",
+  authHint: "#authHint",
+  activationPanel: "#activationPanel",
+  activationTitle: "#activationTitle",
+  activationMessage: "#activationMessage",
+  feedGrid: "#feedGrid",
+  feedCardTemplate: "#feedCardTemplate",
+  filterRow: "#filterRow",
+  tagCloud: "#tagCloud",
+  emptyState: "#emptyState",
+  sortSelect: "#sortSelect",
+  searchInput: "#searchInput",
+  statsPanel: "#statsPanel",
+  spotlightCard: "#spotlightCard",
+  creatorBoard: "#creatorBoard",
+  viewer: "#viewer",
+  profileView: "#profileView",
+  feedPagination: "#feedPagination",
+  viewerStage: "#viewerStage",
+  viewerCloseButton: "#viewerCloseButton",
+  viewerCollapseButton: "#viewerCollapseButton",
+  viewerKind: "#viewerKind",
+  viewerTitle: "#viewerTitle",
+  viewerCaption: "#viewerCaption",
+  viewerCreator: "#viewerCreator",
+  viewerTime: "#viewerTime",
+  viewerTags: "#viewerTags",
+  viewerPrevButton: "#viewerPrevButton",
+  viewerNextButton: "#viewerNextButton",
+  profileCloseButton: "#profileCloseButton",
+  profileBadge: "#profileBadge",
+  profileTitle: "#profileTitle",
+  profileMeta: "#profileMeta",
+  profileStats: "#profileStats",
+  profileFeedGrid: "#profileFeedGrid",
+  profileFeedPagination: "#profileFeedPagination",
+  profileEmpty: "#profileEmpty",
+  miniPlayer: "#miniPlayer",
+  miniPlayerHead: "#miniPlayerHead",
+  miniPlayerStage: "#miniPlayerStage",
+  miniPlayerVolume: "#miniPlayerVolume",
+  miniPlayerVolumeSlider: "#miniPlayerVolumeSlider",
+  miniPlayerVolumeValue: "#miniPlayerVolumeValue",
+  miniPlayerKind: "#miniPlayerKind",
+  miniPlayerTitle: "#miniPlayerTitle",
+  miniPlayerDetail: "#miniPlayerDetail",
+  miniPlayerCaption: "#miniPlayerCaption",
+  miniPlayerCreator: "#miniPlayerCreator",
+  miniPlayerTime: "#miniPlayerTime",
+  miniPlayerTags: "#miniPlayerTags",
+  miniExpandButton: "#miniExpandButton",
+  miniCloseButton: "#miniCloseButton",
+  miniPrevButton: "#miniPrevButton",
+  miniNextButton: "#miniNextButton",
+  profileNavAvatar: "#profileNavAvatar",
+  notificationsPanel: "#notificationsPanel",
+  notificationsBackdrop: "#notificationsBackdrop",
+  notificationsCloseButton: "#notificationsCloseButton",
+  clearNotificationsButton: "#clearNotificationsButton",
+  notificationsList: "#notificationsList",
+  profileFeedback: "#profileFeedback",
+  keyboardShortcutsButton: "#keyboardShortcutsButton",
 };
+
+const elementsCache = {};
+const elements = new Proxy({}, {
+  get: (target, prop) => {
+    if (elementsCache[prop]) return elementsCache[prop];
+    const selector = ELEMENT_SELECTORS[prop];
+    if (!selector) return null;
+    const el = document.querySelector(selector);
+    if (el) elementsCache[prop] = el;
+    return el;
+  }
+});
 
 window.__SIGNAL_SHARE_ELEMENTS__ = elements;
 
@@ -465,12 +411,7 @@ if (!window.__SIGNAL_SHARE_INITIALIZED__) {
   window.canAccessAdminBanPanel = canAccessAdminBanPanel;
   window.formatBackendError = formatBackendError;
   window.getMediaKind = getMediaKind;
-  window.showFeedback = showFeedback;
   window.render = render;
-  window.normalizeUserPreferences = normalizeUserPreferences;
-  window.applyUserPreferences = applyUserPreferences;
-  window.saveUserPreferences = saveUserPreferences;
-  window.renderSettingsPanel = renderSettingsPanel;
   window.showOverlay = showOverlay;
   window.hideOverlay = hideOverlay;
 
@@ -484,10 +425,18 @@ if (!window.__SIGNAL_SHARE_INITIALIZED__) {
     STORE_NAME
   });
 
-  initialize().catch((error) => {
-    console.error("App initialization failed:", error);
-    showFeedback("The site could not start correctly. Reload and try again.", true);
-  });
+  const onReady = () => {
+    initialize().catch((error) => {
+      console.error("App initialization failed:", error);
+      showFeedback("The site could not start correctly. Reload and try again.", true);
+    });
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", onReady);
+  } else {
+    onReady();
+  }
 }
 
 function registerSiteServiceWorker() {
@@ -1087,8 +1036,6 @@ function attachEventListeners() {
     if (event.key === "ArrowLeft") stepViewer(-1);
     if (event.key === "ArrowRight") stepViewer(1);
   });
-    if (event.key === "ArrowRight") stepViewer(1);
-  });
   // Notification Interactivity
   document.addEventListener("signal:notificationClick", (event) => {
     const notification = event.detail;
@@ -1273,34 +1220,8 @@ function render() {
   syncSourceHelp();
   updateComposerAccess();
 }
-    else { setStatusPill("Local mode", ""); elements.authStatusCopy.textContent = "Connect Supabase to enable login and live posting."; elements.authHint.textContent = "You can still test the site locally without an account."; }
-    elements.authForm.querySelectorAll("input, button").forEach((element) => { element.disabled = true; });
-    elements.activationPanel.hidden = true;
-    elements.authAccount.hidden = true;
-    syncComposerCreatorWithAccount();
-    return;
-  }
-  if (state.authRestoring) {
-    setStatusPill("Restoring session", "warning"); elements.authStatusCopy.textContent = "Restoring your login session..."; elements.authHint.textContent = "This can take a moment on mobile after refresh.";
-    elements.authForm.hidden = true; elements.authAccount.hidden = true; elements.activationPanel.hidden = true;
-    syncComposerCreatorWithAccount();
-    return;
-  }
-  elements.authForm.querySelectorAll("input, button").forEach((element) => { element.disabled = false; });
-  if (!isSignedIn) {
-    setStatusPill(pendingEmail ? "Activation pending" : "Signed out", pendingEmail ? "warning" : "");
-    elements.authStatusCopy.textContent = pendingEmail ? `Activation email sent to ${pendingEmail}.` : "Sign in to publish to the shared feed.";
-    elements.authHint.textContent = "Create an account once, confirm your email, then come back here to post live.";
-    if (pendingEmail) { elements.activationTitle.textContent = "Check your inbox"; elements.activationMessage.textContent = `Open the activation email sent to ${pendingEmail}, then sign in here after confirming.`; }
-    syncComposerCreatorWithAccount();
-    return;
-  }
-  elements.accountEmail.textContent = state.currentUser.email ?? "Signed in";
-  elements.accountMeta.textContent = isActivated ? (isCurrentUserAdmin() ? "Your account is active with admin privileges, including visual uploads and feed deletion." : "Your account is active and can publish YouTube and Spotify links.") : "Your account is signed in but still needs email activation.";
-  elements.openOwnProfileButton.disabled = !getOwnProfileKey();
-  if (isCurrentUserBanned(state)) {
 
-// renderAccountState leftovers and window click/outside click logic moved to app-ui-v3.js
+// --- Admin Features & Account Management ---
 
 // Admin Ban UI rendering moved to app-ui-v3.js
 
@@ -1764,10 +1685,7 @@ function updatePostLikeCount(id, delta) { state.userPosts = state.userPosts.map(
 
 
 
-function createDemoGraphic({ title, subtitle, palette }) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${palette[0]}" /><stop offset="52%" stop-color="${palette[1]}" /><stop offset="100%" stop-color="${palette[2]}" /></linearGradient></defs><rect width="1200" height="900" rx="50" fill="url(#bg)" /><circle cx="920" cy="180" r="140" fill="rgba(255,255,255,0.22)" /><circle cx="340" cy="660" r="210" fill="rgba(255,255,255,0.14)" /><rect x="92" y="92" width="1016" height="716" rx="34" fill="rgba(15,23,32,0.12)" stroke="rgba(255,255,255,0.35)" /><text x="124" y="300" fill="white" font-size="132" font-family="Georgia, serif">${title}</text><text x="126" y="386" fill="rgba(255,255,255,0.82)" font-size="40" font-family="Arial, sans-serif">${subtitle}</text><text x="126" y="734" fill="rgba(255,255,255,0.7)" font-size="32" font-family="Arial, sans-serif">Signal Share demo post</text></svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
+
 
 
 
