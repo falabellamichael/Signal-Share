@@ -1,4 +1,8 @@
 /* Notification System Styles */
+* {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
 .notification-container {
   position: fixed;
   top: 20px;
