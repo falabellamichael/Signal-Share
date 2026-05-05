@@ -1,24 +1,37 @@
-// Signal Share Notification System (V28 - BACKGROUND SYNC CATCH-UP)
-// Added: Supabase catch-up sync so notification badge recovers missed messages after app/web reopen.
+// Signal Share Notification System (V29 - PROFILE-BASED NOTIFICATION STATE)
+// Added: Profile-backed seen IDs + sync cursor so dismiss state survives cache clears.
 
 (function () {
-  console.log("[Notifications] Loading V28...");
+  console.log("[Notifications] Loading V29...");
 
   const HISTORY_KEY = "notif_v17_hist";
   const COUNT_KEY = "notif_v17_count";
   const SEEN_KEY = "notif_v17_seen_ids";
   const SYNC_CURSOR_PREFIX = "notif_v17_sync_cursor";
+  const PROFILE_CURSOR_COLUMN = "notification_sync_cursor";
+  const PROFILE_SEEN_IDS_COLUMN = "notification_seen_ids";
   const MAX_HISTORY_ITEMS = 60;
   const MAX_SEEN_ITEMS = 1200;
   const MAX_SYNC_MESSAGES = 200;
   const INITIAL_SYNC_LOOKBACK_MS = 24 * 60 * 60 * 1000;
   const SYNC_MIN_INTERVAL_MS = 12000;
+  const REMOTE_SAVE_DEBOUNCE_MS = 1200;
+  const REMOTE_SAVE_MIN_INTERVAL_MS = 4000;
 
   let history = [];
   let count = 0;
   let seenIds = new Map();
   let syncInFlightPromise = null;
   let lastSyncStartedAt = 0;
+  let activeSupabaseClient = null;
+  let activeSupabaseUserId = "";
+  let remoteStateSupported = null;
+  let remoteStateLoadedForUser = "";
+  let remoteStateLoadPromise = null;
+  let remoteStateSavePromise = null;
+  let remoteStateSaveTimer = null;
+  let remoteStateLastSavedAt = 0;
+  let remoteStatePendingCursor = "";
 
   function toFiniteNumber(value, fallback = 0) {
     const parsed = Number(value);
@@ -123,6 +136,7 @@
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
     localStorage.setItem(COUNT_KEY, String(normalizeCount(count)));
     saveSeenIds();
+    queueRemoteStatePersist();
     if (render) renderUI();
   }
 
@@ -143,6 +157,169 @@
     const timestamp = Date.parse(isoValue);
     if (Number.isNaN(timestamp)) return;
     localStorage.setItem(getSyncCursorKey(userId), new Date(timestamp).toISOString());
+  }
+
+  function isMissingProfileNotificationColumns(error) {
+    const code = String(error?.code ?? "");
+    const message = String(error?.message ?? "").toLowerCase();
+    return (
+      code === "PGRST204" ||
+      code === "42703" ||
+      message.includes(PROFILE_CURSOR_COLUMN) ||
+      message.includes(PROFILE_SEEN_IDS_COLUMN)
+    );
+  }
+
+  function sanitizeIsoTimestamp(value) {
+    const parsed = Date.parse(String(value ?? ""));
+    return Number.isNaN(parsed) ? "" : new Date(parsed).toISOString();
+  }
+
+  function parseRemoteSeenIds(value) {
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+    }
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => String(item ?? "").trim()).filter(Boolean);
+        }
+      } catch (_error) {}
+    }
+    return [];
+  }
+
+  function getSeenIdsForRemote() {
+    trimSeenIds();
+    return Array.from(seenIds.entries())
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, MAX_SEEN_ITEMS)
+      .map(([id]) => id);
+  }
+
+  function setRemoteContext(supabase, userId) {
+    if (!supabase || typeof supabase.from !== "function" || !userId) return;
+    const normalizedUserId = String(userId);
+    if (normalizedUserId !== activeSupabaseUserId) {
+      remoteStateSupported = null;
+      remoteStateLoadedForUser = "";
+      remoteStateLoadPromise = null;
+      remoteStateSavePromise = null;
+      remoteStateLastSavedAt = 0;
+      remoteStatePendingCursor = "";
+      if (remoteStateSaveTimer) {
+        clearTimeout(remoteStateSaveTimer);
+        remoteStateSaveTimer = null;
+      }
+    }
+    activeSupabaseClient = supabase;
+    activeSupabaseUserId = normalizedUserId;
+  }
+
+  async function loadRemoteStateFromProfile(supabase, userId, options = {}) {
+    const { force = false } = options;
+    if (!supabase || typeof supabase.from !== "function" || !userId) return false;
+    if (!force && remoteStateLoadedForUser === userId && remoteStateSupported !== false) return remoteStateSupported !== false;
+    if (!force && remoteStateLoadPromise) return remoteStateLoadPromise;
+
+    remoteStateLoadPromise = (async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(`${PROFILE_CURSOR_COLUMN},${PROFILE_SEEN_IDS_COLUMN}`)
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (error) {
+        if (isMissingProfileNotificationColumns(error)) {
+          remoteStateSupported = false;
+          return false;
+        }
+        console.error("[Notifications] Remote state could not be loaded", error);
+        return false;
+      }
+
+      remoteStateSupported = true;
+      remoteStateLoadedForUser = userId;
+
+      const remoteCursor = sanitizeIsoTimestamp(data?.[PROFILE_CURSOR_COLUMN]);
+      if (remoteCursor) setSyncCursor(userId, remoteCursor);
+
+      const remoteSeenIds = parseRemoteSeenIds(data?.[PROFILE_SEEN_IDS_COLUMN]);
+      if (remoteSeenIds.length) {
+        const stamp = remoteCursor ? Date.parse(remoteCursor) : Date.now();
+        remoteSeenIds.forEach((id) => rememberSeenId(id, stamp));
+        save({ render: false });
+      }
+
+      return true;
+    })().finally(() => {
+      remoteStateLoadPromise = null;
+    });
+
+    return remoteStateLoadPromise;
+  }
+
+  async function persistRemoteStateNow(options = {}) {
+    const { cursorIso = "", force = false } = options;
+    if (!activeSupabaseClient || !activeSupabaseUserId || remoteStateSupported === false) return false;
+    if (!force && remoteStateSavePromise) return remoteStateSavePromise;
+
+    const now = Date.now();
+    if (!force && now - remoteStateLastSavedAt < REMOTE_SAVE_MIN_INTERVAL_MS) return false;
+
+    const candidateCursor = sanitizeIsoTimestamp(cursorIso || remoteStatePendingCursor || getSyncCursor(activeSupabaseUserId));
+    const payload = {
+      [PROFILE_SEEN_IDS_COLUMN]: getSeenIdsForRemote(),
+    };
+    if (candidateCursor) payload[PROFILE_CURSOR_COLUMN] = candidateCursor;
+
+    remoteStateSavePromise = (async () => {
+      const { error } = await activeSupabaseClient
+        .from("profiles")
+        .update(payload)
+        .eq("id", activeSupabaseUserId);
+
+      if (error) {
+        if (isMissingProfileNotificationColumns(error)) {
+          remoteStateSupported = false;
+          return false;
+        }
+        console.error("[Notifications] Remote state could not be saved", error);
+        return false;
+      }
+
+      remoteStateSupported = true;
+      remoteStateLastSavedAt = Date.now();
+      remoteStatePendingCursor = "";
+      return true;
+    })().finally(() => {
+      remoteStateSavePromise = null;
+    });
+
+    return remoteStateSavePromise;
+  }
+
+  function queueRemoteStatePersist(options = {}) {
+    const { cursorIso = "", immediate = false } = options;
+    if (!activeSupabaseClient || !activeSupabaseUserId || remoteStateSupported === false) return;
+    const normalizedCursor = sanitizeIsoTimestamp(cursorIso);
+    if (normalizedCursor) remoteStatePendingCursor = normalizedCursor;
+
+    if (remoteStateSaveTimer) {
+      clearTimeout(remoteStateSaveTimer);
+      remoteStateSaveTimer = null;
+    }
+
+    if (immediate) {
+      void persistRemoteStateNow({ force: true });
+      return;
+    }
+
+    remoteStateSaveTimer = setTimeout(() => {
+      remoteStateSaveTimer = null;
+      void persistRemoteStateNow();
+    }, REMOTE_SAVE_DEBOUNCE_MS);
   }
 
   function getInitialSyncCursorIso() {
@@ -216,6 +393,7 @@
     history = [];
     count = 0;
     save();
+    queueRemoteStatePersist({ immediate: true });
   }
 
   function resetBadge() {
@@ -228,6 +406,7 @@
       item.read = true;
     });
     save();
+    queueRemoteStatePersist({ immediate: true });
   }
 
   function handleNotificationClick(notification) {
@@ -262,6 +441,7 @@
     }
 
     save();
+    queueRemoteStatePersist({ immediate: true });
     dispatchCustomEvent("notification:dismiss", notification);
   }
 
@@ -346,6 +526,8 @@
   async function syncWithSupabase(supabase, userId, options = {}) {
     const { force = false } = options || {};
     if (!supabase || typeof supabase.from !== "function" || !userId) return { added: 0, skipped: true };
+    setRemoteContext(supabase, userId);
+    await loadRemoteStateFromProfile(supabase, userId, { force });
 
     const now = Date.now();
     if (syncInFlightPromise) return syncInFlightPromise;
@@ -365,7 +547,9 @@
 
       const threadIds = (threadRows || []).map((row) => row.id).filter(Boolean);
       if (!threadIds.length) {
-        setSyncCursor(userId, new Date().toISOString());
+        const nextCursor = new Date().toISOString();
+        setSyncCursor(userId, nextCursor);
+        queueRemoteStatePersist({ cursorIso: nextCursor, immediate: true });
         return { added: 0, skipped: false };
       }
 
@@ -384,7 +568,9 @@
       const { data: messageRows, error: messageError } = await messageQuery;
       if (messageError) throw messageError;
       if (!Array.isArray(messageRows) || !messageRows.length) {
-        setSyncCursor(userId, new Date().toISOString());
+        const nextCursor = new Date().toISOString();
+        setSyncCursor(userId, nextCursor);
+        queueRemoteStatePersist({ cursorIso: nextCursor, immediate: true });
         return { added: 0, skipped: false };
       }
 
@@ -425,7 +611,9 @@
         }
       }
 
-      setSyncCursor(userId, latestSeenIso || new Date().toISOString());
+      const nextCursor = latestSeenIso || new Date().toISOString();
+      setSyncCursor(userId, nextCursor);
+      queueRemoteStatePersist({ cursorIso: nextCursor, immediate: true });
       return { added, skipped: false };
     })().catch((error) => {
       console.error("[Notifications] Supabase sync failed", error);

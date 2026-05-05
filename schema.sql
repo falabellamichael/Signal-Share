@@ -75,6 +75,19 @@ create table if not exists public.profiles (
   check (char_length(trim(display_name)) between 2 and 40)
 );
 
+alter table public.profiles
+add column if not exists notification_hide_sender boolean not null default false,
+add column if not exists notification_hide_body boolean not null default false,
+add column if not exists notification_sync_cursor timestamptz,
+add column if not exists notification_seen_ids jsonb not null default '[]'::jsonb;
+
+alter table public.profiles
+drop constraint if exists profiles_notification_seen_ids_is_array;
+
+alter table public.profiles
+add constraint profiles_notification_seen_ids_is_array
+check (jsonb_typeof(notification_seen_ids) = 'array');
+
 create table if not exists public.direct_threads (
   id uuid primary key default gen_random_uuid(),
   user_one_id uuid not null references auth.users (id) on delete cascade,
