@@ -1881,12 +1881,14 @@ async function subscribeMessagingChannels(options = {}) {
       const likedPost = state.userPosts.find((p) => p.id === like.post_id);
       const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
       if (likedPost && likedPost.authorId === state.currentUser.id && window.notifications) {
-        if (!isMobile) {
-          window.notifications.success(`Someone liked your post: ${likedPost.title || "Untitled"}`, "New Like!");
-        } else {
-          // On mobile, just increment the badge if we don't show the banner
-          window.notifications.incrementUnreadCount();
-        }
+        // Prevent spam by using a stable composite ID (one notification per person per post)
+        const notificationId = `like-${like.post_id}-${like.user_id}`;
+        const message = `Someone liked your post: ${likedPost.title || "Untitled"}`;
+        
+        window.notifications.success(message, "New Like!", { 
+          id: notificationId,
+          silent: isMobile // On mobile, add to history silently (no banner)
+        });
       }
     }).subscribe();
 

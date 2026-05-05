@@ -40,8 +40,8 @@
     };
 
     history.unshift(item);
+    count++; // Always increment count for new notifications
     if (!opts.silent) {
-      count++;
       showBanner(item);
     }
     save();
