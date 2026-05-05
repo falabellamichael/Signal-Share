@@ -195,9 +195,19 @@ window.renderNotificationsHistory = function() {
   document.getElementById('notificationsEmptyState').style.display = 'none';
   history.forEach(n => {
     const li = document.createElement('li');
-    li.className = `notification-history-item ${n.read ? 'read' : 'unread'}`;
-    li.style.cssText = "padding: 12px; margin-bottom: 8px; border-radius: 8px; background: rgba(255,255,255,0.05); cursor: pointer; border-left: 4px solid " + (n.type === 'success' ? '#10b981' : '#3b82f6');
-    li.innerHTML = `<strong>${n.title}</strong><p style="margin:4px 0;opacity:0.8;">${n.message}</p><small style="opacity:0.5;">${new Date(n.timestamp).toLocaleTimeString()}</small>`;
+    const isUnread = !n.read;
+    li.className = `notification-history-item ${isUnread ? 'unread' : 'read'}`;
+    
+    // Set border color based on type
+    const borderColor = n.type === 'success' ? '#10b981' : (n.type === 'error' ? '#ef4444' : '#3b82f6');
+    li.style.borderLeftColor = borderColor;
+    
+    li.innerHTML = `
+      <strong style="display:block;">${n.title}</strong>
+      <p style="margin:4px 0;opacity:0.8;font-size:0.9rem;">${n.message}</p>
+      <small style="opacity:0.5;">${new Date(n.timestamp).toLocaleTimeString()}</small>
+    `;
+    
     li.onclick = () => window.notifications.handleNotificationClick(n);
     list.appendChild(li);
   });
