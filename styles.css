@@ -5174,51 +5174,43 @@ button:disabled {
 body[data-theme='contrast'] .profile-view-dialog { background: #000000 !important; border-color: rgba(255, 255, 255, 0.5) !important; }
 body[data-theme='contrast'] .profile-view { background: #000000 !important; }
 /* Ember Red Profile Background */
-body[data-theme='ember'] .profile-view-dialog { background: radial-gradient(circle at top left, rgba(255, 68, 56, 0.3), transparent 28%), radial-gradient(circle at top right, rgba(255, 138, 61, 0.22), transparent 25%), linear-gradient(180deg, #140302 0%, #260705 48%, #100101 100%) !important; border-color: rgba(255, 120, 82, 0.3) !important; }
+body[data-theme='ember'] .profile-view-dialog { 
+  background: radial-gradient(circle at top left, rgba(255, 68, 56, 0.22), transparent 30%), 
+              linear-gradient(180deg, #1c0403 0%, #260705 50%, #140302 100%) !important; 
+  border-color: rgba(255, 120, 82, 0.24) !important; 
+}
 /* Theme Color Coding Refinements */
 body[data-theme='contrast'] .profile-stat, body[data-theme='contrast'] .feed-page-button { background: #000000 !important; border-color: rgba(255, 255, 255, 0.4) !important; color: #ffffff !important; }
 body[data-theme='contrast'] .feed-page-button.is-active { background: var(--accent) !important; color: #000000 !important; }
-body[data-theme='ember'] .profile-stat, body[data-theme='ember'] .feed-page-button { background: var(--surface-strong) !important; border-color: var(--line) !important; color: var(--text) !important; }
+body[data-theme='ember'] .profile-stat, body[data-theme='ember'] .feed-page-button { 
+  background: rgba(42, 12, 10, 0.82) !important; 
+  border-color: rgba(255, 120, 82, 0.18) !important; 
+  color: #fff !important; 
+}
 body[data-theme='ember'] .feed-page-button.is-active { background: var(--accent) !important; color: #ffffff !important; border-color: transparent !important; }
-body[data-theme='ember'] .profile-stat-label, body[data-theme='ember'] .feed-pagination-summary { color: var(--muted) !important; }
+body[data-theme='ember'] .profile-stat-label, body[data-theme='ember'] .feed-pagination-summary { color: #ff8a3d !important; }
 /* Profile Text Color Correction */
 body[data-theme='contrast'] .profile-view-dialog h2, body[data-theme='contrast'] .profile-view-dialog h3, body[data-theme='contrast'] .profile-view-dialog h4, body[data-theme='contrast'] .profile-view-dialog p, body[data-theme='contrast'] .profile-view-dialog .eyebrow, body[data-theme='contrast'] .profile-view-dialog .profile-meta { color: #ffffff !important; }
-body[data-theme='ember'] .profile-view-dialog h2, body[data-theme='ember'] .profile-view-dialog h3, body[data-theme='ember'] .profile-view-dialog h4, body[data-theme='ember'] .profile-view-dialog p, body[data-theme='ember'] .profile-view-dialog .eyebrow, body[data-theme='ember'] .profile-view-dialog .profile-meta { color: var(--text) !important; }
-/* PC Theme Picker Refinement */
-@media (min-width: 761px) { .theme-option-tile { grid-template-columns: 1fr !important; justify-items: center !important; padding: 12px !important; min-height: 0 !important; } .theme-option-copy { display: none !important; } .theme-picker-menu { grid-template-columns: repeat(3, 1fr) !important; gap: 12px !important; } .theme-preview { width: 100% !important; max-width: 80px !important; height: 80px !important; } }
-/* Settings Spacing Improvements */
-.settings-dialog { padding: 32px !important; gap: 32px !important; }
-.settings-head { margin-bottom: 12px !important; gap: 16px !important; }
-.settings-fields { gap: 32px !important; }
-.settings-field { gap: 14px !important; }
-.settings-field-copy { margin-bottom: 4px !important; }
-.settings-actions { gap: 16px !important; margin-top: 12px !important; }
-.settings-toggle-field { gap: 18px !important; }
-/* Compact Settings Spacing Refinement */
-.settings-dialog { padding: 32px !important; gap: 24px !important; }
-.settings-head { margin-bottom: 0 !important; gap: 12px !important; }
-.settings-fields { gap: 24px !important; }
-.settings-field { gap: 10px !important; }
-.settings-field-copy { margin-bottom: 0 !important; }
-.settings-actions { gap: 12px !important; margin-top: 10px !important; }
-.settings-toggle-field { gap: 12px !important; }
-/* Unified Equalized Settings Spacing */
-.settings-dialog { padding: 32px 32px 24px !important; gap: 14px !important; }
-.settings-head { margin: 0 !important; gap: 14px !important; }
-.settings-fields { gap: 14px !important; }
-.settings-field { gap: 14px !important; }
-.settings-actions { gap: 14px !important; margin-top: 14px !important; }
-.settings-toggle-field { gap: 14px !important; }
-.settings-field-copy { margin: 0 !important; }
-/* Final Settings Spacing Tweak */
-.settings-fields { margin-top: 10px !important; }
+body[data-theme='ember'] .profile-view-dialog h2, body[data-theme='ember'] .profile-view-dialog h3, body[data-theme='ember'] .profile-view-dialog h4, body[data-theme='ember'] .profile-view-dialog p, body[data-theme='ember'] .profile-view-dialog .eyebrow, body[data-theme='ember'] .profile-view-dialog .profile-meta { color: #fff !important; }
 /* High Contrast Messenger Refinement */
 body[data-theme='contrast'] .message-bubble { background: #000000 !important; border: 1.5px solid #ffffff !important; color: #ffffff !important; }
 body[data-theme='contrast'] .message-row.is-self .message-bubble { background: linear-gradient(135deg, #FFD166 0%, #06D6A0 100%) !important; border: none !important; color: #000000 !important; }
 body[data-theme='contrast'] .message-row.is-self .message-bubble p, body[data-theme='contrast'] .message-row.is-self .message-bubble span { color: #000000 !important; }
 body[data-theme='contrast'] .message-bubble span { color: rgba(255, 255, 255, 0.7) !important; }
 /* Ember Red Messenger Refinement */
-body[data-theme='ember'] .message-bubble { background: transparent !important; border: 1.5px solid rgba(255, 68, 56, 0.8) !important; color: #ffffff !important; }
-body[data-theme='ember'] .message-row.is-self .message-bubble { background: linear-gradient(135deg, #ff4438 0%, #ff8a3d 100%) !important; border: none !important; color: #ffffff !important; }
-body[data-theme='ember'] .message-row.is-self .message-bubble p, body[data-theme='ember'] .message-row.is-self .message-bubble span { color: #ffffff !important; }
-body[data-theme='ember'] .message-bubble span { color: rgba(255, 255, 255, 0.8) !important; }
+body[data-theme='ember'] .message-bubble { 
+  background: rgba(36, 12, 10, 0.92) !important; 
+  border: 1px solid rgba(255, 120, 82, 0.2) !important; 
+  color: #fff !important; 
+}
+body[data-theme='ember'] .message-row.is-self .message-bubble { 
+  background: linear-gradient(135deg, #ff4438 0%, #ff8a3d 100%) !important; 
+  border: none !important; 
+  color: #fff !important; 
+  box-shadow: 0 10px 24px rgba(255, 68, 56, 0.2) !important;
+}
+body[data-theme='ember'] .message-row.is-self .message-bubble p, 
+body[data-theme='ember'] .message-row.is-self .message-bubble span { 
+  color: #fff !important; 
+}
+body[data-theme='ember'] .message-bubble span { color: rgba(255, 255, 255, 0.75) !important; }
