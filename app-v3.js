@@ -1873,8 +1873,10 @@ async function subscribeMessagingChannels(options = {}) {
       if (likedPost && likedPost.authorId === state.currentUser.id && window.notifications) {
         if (!isMobile) {
           window.notifications.success(`Someone liked your post: ${likedPost.title || "Untitled"}`, "New Like!");
+        } else {
+          // On mobile, just increment the badge if we don't show the banner
+          window.notifications.incrementUnreadCount();
         }
-        window.notifications.incrementUnreadCount();
       }
     }).subscribe();
 

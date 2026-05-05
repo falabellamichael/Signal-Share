@@ -53,9 +53,12 @@ class NotificationSystem {
   add(options) {
     if (!options || !options.message) return;
 
-    // 1. Add to history (simple unshift)
+    // Simple ID-based de-duplication
+    const id = options.id || (Date.now() + '-' + Math.random().toString(36).substr(2, 5));
+    if (this.history.some(n => n.id === id)) return;
+
     const item = {
-      id: options.id || Date.now(),
+      id,
       title: options.title || 'Notification',
       message: options.message,
       timestamp: Date.now(),
@@ -83,7 +86,7 @@ class NotificationSystem {
     el.style.cursor = 'pointer';
     el.onclick = () => el.remove();
     this.container.appendChild(el);
-    setTimeout(() => el.remove(), 5000);
+    setTimeout(() => { if (el.parentNode) el.remove(); }, 5000);
   }
 
   updateBadgeUI() {
@@ -117,7 +120,11 @@ class NotificationSystem {
   showNotification(o) { this.add(o); }
   addToHistory(o) { this.add(o); }
   setUnreadCount(c) { if (c === 0) this.resetBadge(); }
-  incrementUnreadCount() { this.add({ message: 'New activity', silent: false }); }
+  incrementUnreadCount() { 
+    // Just bump the number if called from old code, don't add a message
+    this.badgeCount++;
+    this.updateBadgeUI();
+  }
   syncWithSupabase() {} 
 }
 
