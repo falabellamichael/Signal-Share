@@ -5077,3 +5077,5 @@ body[data-theme='ember'] .profile-view-dialog h2, body[data-theme='ember'] .prof
 .settings-actions { gap: 14px !important; margin-top: 14px !important; }
 .settings-toggle-field { gap: 14px !important; }
 .settings-field-copy { margin: 0 !important; }
+/* Final Settings Spacing Tweak */
+.settings-fields { margin-top: 10px !important; }
