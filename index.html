@@ -47,7 +47,7 @@
             </a>
             <a href="#feed">Feed</a>
             <a href="#account">Account</a>
-            <button id="notificationBell" class="notification-bell bell-icon" aria-controls="notificationsPanel" aria-expanded="false" title="Notifications" ontouchstart="event.stopPropagation(); if(window.toggleNotificationsPanel) { window.toggleNotificationsPanel(event); }" onclick="if(window.toggleNotificationsPanel) { window.toggleNotificationsPanel(event); } else { console.warn('Panel controller not loaded yet'); }" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; color: inherit; padding: 0 8px; z-index: 1000002 !important; pointer-events: auto !important; -webkit-tap-highlight-color: rgba(0,0,0,0); flex-shrink: 0; min-height: 44px; min-width: 44px;">
+            <button id="notificationBell" class="notification-bell bell-icon" aria-controls="notificationsPanel" aria-expanded="false" title="Notifications">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                 <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
@@ -1182,9 +1182,9 @@
     <script type="module" src="./config.js?v=2"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.2.3/dist/tus.min.js"></script>
-    <script type="module" src="./notifications.js?v=64"></script>
-    <script type="module" src="./keyboard-bindings-v3.js?v=64"></script>
-    <script type="module" src="./notification-keyboard-integration.js?v=64"></script>
+    <script type="module" src="./notifications.js?v=65"></script>
+    <script type="module" src="./keyboard-bindings-v3.js?v=65"></script>
+    <script type="module" src="./notification-keyboard-integration.js?v=65"></script>
     <!-- Global Overlay Panels -->
     <section class="settings-panel" id="notificationsPanel" aria-hidden="true" hidden style="z-index: 10000 !important;">
       <div class="settings-backdrop" id="notificationsBackdrop"></div>
@@ -1207,8 +1207,8 @@
       </div>
     </section>
 
-    <script src="messenger-realtime.js?v=64"></script>
-    <script type="module" src="app-v3.js?v=64"></script>
+    <script src="messenger-realtime.js?v=65"></script>
+    <script type="module" src="app-v3.js?v=65"></script>
 
   </body>
 </html>

@@ -2300,7 +2300,19 @@ window.toggleNotificationsPanel = function(event) {
   if (state.notificationsPanelOpen) closeNotificationsPanel(); else openNotificationsPanel(); 
 }
 
-// Compatibility with user snippet
+// Initial setup for the notification bell
+if (elements.notificationsLauncherButton) {
+  const bell = elements.notificationsLauncherButton;
+  bell.style.cssText = "background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; color: inherit; padding: 0 8px; z-index: 10000; pointer-events: auto !important; -webkit-tap-highlight-color: rgba(0,0,0,0); flex-shrink: 0; min-height: 44px; min-width: 44px;";
+  
+  // Use pointerdown for the fastest, cleanest response on both PC and Mobile
+  bell.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    window.toggleNotificationsPanel(e);
+  });
+}
+
 window.NotificationSystem = {
   toggle: () => window.toggleNotificationsPanel()
 };
