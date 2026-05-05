@@ -3004,7 +3004,7 @@ function hydrateRememberedCreator() { const remembered = localStorage.getItem(CR
 function rememberCreatorInput() { rememberCreator(elements.creatorInput.value.trim()); }
 function rememberCreator(name) { if (!name) localStorage.removeItem(CREATOR_NAME_KEY); else localStorage.setItem(CREATOR_NAME_KEY, name); }
 function buildUploadPost(base, file) { return { ...base, mediaKind: getMediaKind(file.type), sourceKind: "upload", isLocal: true, fileName: file.name, fileType: file.type, fileSize: file.size, blob: file }; }
-function buildExternalPost(base, parsed) { return { ...base, mediaKind: parsed.mediaKind, sourceKind: parsed.provider, provider: parsed.provider, externalUrl: parsed.originalUrl, embedUrl: parsed.embedUrl, externalId: parsed.externalId, label: parsed.label, isLocal: state.backendMode !== "supabase" }; }
+function buildExternalPost(base, parsed) { return { ...base, mediaKind: parsed.mediaKind, sourceKind: parsed.provider, provider: parsed.provider, src: parsed.embedUrl, externalUrl: parsed.originalUrl, embedUrl: parsed.embedUrl, externalId: parsed.externalId, label: parsed.label, isLocal: state.backendMode !== "supabase" }; }
 
 function parseExternalMediaUrl(raw) {
   if (!raw) return null;
@@ -3031,6 +3031,7 @@ function healPosts(posts) {
           ...post,
           externalId: repaired.externalId,
           embedUrl: repaired.embedUrl,
+          src: repaired.embedUrl, // Sync src for player compatibility
           sourceKind: "youtube",
           mediaKind: "video",
           provider: "youtube"

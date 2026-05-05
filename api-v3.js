@@ -189,6 +189,11 @@ export async function deleteHostedPost(post) {
 export function normalizeSupabasePost(row) { 
   const post = { id: row.id, authorId: row.author_id ?? null, creator: row.creator, title: row.title, caption: row.caption, tags: Array.isArray(row.tags) ? row.tags : [], createdAt: row.created_at, mediaKind: row.media_kind, sourceKind: row.source_kind ?? "upload", provider: row.provider ?? null, src: row.media_url ?? "", mediaUrl: row.media_url ?? "", externalUrl: row.external_url ?? null, embedUrl: row.embed_url ?? null, externalId: row.external_id ?? null, label: row.label ?? null, filePath: row.file_path ?? null, fileType: row.file_type ?? null, fileSize: row.file_size ?? null, likes: row.likes ?? 0, isLocal: false }; 
   
+  // Sync src with embedUrl for external providers if media_url is missing
+  if ((post.sourceKind === "youtube" || post.sourceKind === "spotify") && !post.src && post.embedUrl) {
+    post.src = post.embedUrl;
+  }
+  
   // On-the-fly healing for YouTube posts (Syncing logic from MainActivity)
   const fields = [post.externalUrl, post.mediaUrl, post.src, post.caption, post.title].join(" ");
   const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("youtu") || fields.toLowerCase().includes("vnd.youtube");
@@ -200,6 +205,7 @@ export function normalizeSupabasePost(row) {
     if (repaired) {
       post.externalId = repaired.externalId;
       post.embedUrl = repaired.embedUrl;
+      post.src = repaired.embedUrl; // Sync src for player compatibility
       post.sourceKind = "youtube";
       post.mediaKind = "video";
       post.provider = "youtube";
