@@ -44,7 +44,7 @@ export async function loadLikedPostsFromSupabase() {
 export async function publishPostToSupabase(post, onProgress) {
   let mediaUrl = post.mediaUrl ?? null, filePath = post.filePath ?? null, fileType = post.fileType ?? null, fileSize = post.fileSize ?? null;
   if (post.sourceKind === "upload" && post.blob) { const uploaded = await uploadFileToSupabase(post.id, post.blob, onProgress); mediaUrl = uploaded.mediaUrl; filePath = uploaded.filePath; fileType = post.fileType; fileSize = post.fileSize; }
-  const payload = { id: post.id, author_id: apiContext.state.currentUser?.id ?? null, creator: post.creator, title: post.title, caption: post.caption, tags: post.tags, media_kind: post.mediaKind, source_kind: post.sourceKind, provider: post.provider ?? null, media_url: mediaUrl, external_url: post.external_url ?? null, embed_url: post.embed_url ?? null, external_id: post.external_id ?? null, label: post.label ?? null, file_path: filePath, file_type: fileType, file_size: fileSize, likes: post.likes ?? 0 };
+  const payload = { id: post.id, author_id: apiContext.state.currentUser?.id ?? null, creator: post.creator, title: post.title, caption: post.caption, tags: post.tags, media_kind: post.mediaKind, source_kind: post.sourceKind, provider: post.provider ?? null, media_url: mediaUrl, external_url: post.externalUrl ?? null, embed_url: post.embedUrl ?? null, external_id: post.externalId ?? null, label: post.label ?? null, file_path: filePath, file_type: fileType, file_size: fileSize, likes: post.likes ?? 0 };
   const { data, error } = await apiContext.state.supabase.from(apiContext.APP_CONFIG.postsTable).insert(payload).select().single();
   if (error) throw error; return normalizeSupabasePost(data);
 }
