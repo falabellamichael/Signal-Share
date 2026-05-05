@@ -195,13 +195,13 @@ export function normalizeSupabasePost(row) {
   }
   
   // On-the-fly healing for YouTube posts (Syncing logic from MainActivity)
-  const fields = [post.externalUrl, post.mediaUrl, post.src, post.caption, post.title].join(" ");
+  const fields = [post.externalUrl, post.embedUrl, post.externalId, post.mediaUrl, post.src, post.label, post.caption, post.title].join(" ");
   const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("youtu") || fields.toLowerCase().includes("vnd.youtube");
   
   const hasValidEmbed = typeof post.embedUrl === "string" && post.embedUrl.includes("youtube.com/embed/");
   
   if (isYouTubeHint && (!post.externalId || !hasValidEmbed)) {
-    const repaired = parseYouTubeUrl(post.externalUrl || post.mediaUrl || post.src || post.caption || post.title || "");
+    const repaired = parseYouTubeUrl(post.externalUrl || post.embedUrl || post.externalId || post.mediaUrl || post.src || post.label || post.caption || post.title || "");
     if (repaired) {
       post.externalId = repaired.externalId;
       post.embedUrl = repaired.embedUrl;
@@ -267,6 +267,9 @@ export function parseYouTubeUrl(raw) {
   const regex = /(?:v=|v\/|vi\/|embed\/|shorts\/|live\/|youtu\.be\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/i;
   const match = value.match(regex);
   if (match && match[1]) return buildYouTubeObject(match[1], raw);
+
+  const labelMatch = value.match(/\byoutube\s+video\s+([a-zA-Z0-9_-]{11})\b/i);
+  if (labelMatch && labelMatch[1]) return buildYouTubeObject(labelMatch[1], raw);
   
   return null;
 }

@@ -1,4 +1,4 @@
-import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js';
+import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js?v=92';
 
 
 
@@ -2656,19 +2656,34 @@ function isPlayablePost(post) { if (!post) return false; return post.mediaKind =
 function getActivePlayerMediaElement() { if (!(state.activePlayerElement instanceof HTMLElement)) return null; if (state.activePlayerElement instanceof HTMLMediaElement) return state.activePlayerElement; const mediaElement = state.activePlayerElement.querySelector("video, audio"); return mediaElement instanceof HTMLMediaElement ? mediaElement : null; }
 function getControllablePlayerPost() { return getPostById(state.activePlayerPostId || state.playerPostId); }
 
+function resolveExternalEmbedSource(post) {
+  if (!post) return "";
+  if (post.sourceKind === "youtube") {
+    const parsed = parseYouTubeUrl(post.embedUrl || post.externalUrl || post.externalId || post.mediaUrl || post.src || post.label || "");
+    return parsed?.embedUrl || (typeof post.embedUrl === "string" ? post.embedUrl : "");
+  }
+  return post.embedUrl || post.src || post.mediaUrl || "";
+}
+
 function buildPersistentPlayerSource(post) {
-  const source = typeof post?.embedUrl === "string" ? post.embedUrl : ""; if (post?.sourceKind !== "youtube" || !source) return source;
+  let source = resolveExternalEmbedSource(post);
+  if (post?.sourceKind !== "youtube" || !source) return source;
+
+  if (source.startsWith("//")) source = "https:" + source;
+
   try {
-    const url = new URL(source, window.location.origin);
+    const url = new URL(source);
     url.searchParams.set("enablejsapi", "1");
     url.searchParams.set("playsinline", "1");
     url.searchParams.set("autoplay", "1");
     url.searchParams.set("mute", "1");
-    if (window.location.origin && window.location.origin !== "null") {
+
+    if (window.location.protocol.startsWith("http") && window.location.origin && window.location.origin !== "null") {
       url.searchParams.set("origin", window.location.origin);
     } else {
-      url.searchParams.set("origin", window.location.href.split('#')[0].split('?')[0]);
+      url.searchParams.set("origin", window.location.href.split("#")[0].split("?")[0]);
     }
+
     return url.toString();
   }
   catch {
@@ -2719,9 +2734,9 @@ function appendMedia(container, post, options = {}) {
 }
 
 function renderExternalMedia(container, post, variant) {
-  if (variant === "viewer") { const frame = document.createElement("iframe"); frame.className = post.sourceKind === "youtube" ? "viewer-embed viewer-youtube" : "viewer-embed viewer-spotify"; frame.src = post.embedUrl; frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.height = post.sourceKind === "youtube" ? "100%" : "440"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; frame.setAttribute("allowfullscreen", ""); container.appendChild(frame); return; }
-  if (variant === "mini") { const frame = document.createElement("iframe"); frame.className = post.sourceKind === "youtube" ? "mini-player-embed mini-youtube" : "mini-player-embed mini-spotify"; frame.src = post.embedUrl; frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.height = post.sourceKind === "youtube" ? "192" : "152"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; frame.setAttribute("allowfullscreen", ""); container.appendChild(frame); return; }
-  container.appendChild(createExternalPreviewStage({ provider: post.sourceKind, title: post.title, creator: post.creator, externalId: post.externalId ?? "", externalUrl: post.externalUrl ?? "", embedUrl: post.embedUrl ?? "" }, { variant, note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player." }));
+  if (variant === "viewer") { const frame = document.createElement("iframe"); frame.className = post.sourceKind === "youtube" ? "viewer-embed viewer-youtube" : "viewer-embed viewer-spotify"; frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.height = post.sourceKind === "youtube" ? "100%" : "440"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; frame.setAttribute("allowfullscreen", ""); container.appendChild(frame); return; }
+  if (variant === "mini") { const frame = document.createElement("iframe"); frame.className = post.sourceKind === "youtube" ? "mini-player-embed mini-youtube" : "mini-player-embed mini-spotify"; frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.height = post.sourceKind === "youtube" ? "192" : "152"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; frame.setAttribute("allowfullscreen", ""); container.appendChild(frame); return; }
+  container.appendChild(createExternalPreviewStage({ provider: post.sourceKind, title: post.title, creator: post.creator, externalId: post.externalId ?? "", externalUrl: post.externalUrl ?? "", embedUrl: post.embedUrl ?? "", label: post.label ?? "" }, { variant, note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player." }));
 }
 
 function createExternalPreviewStage(source, options = {}) {
@@ -2738,17 +2753,17 @@ function createExternalPreviewStage(source, options = {}) {
 }
 
 async function applyExternalPreviewMetadata(stage, image, titleElement, badgeElement, source) {
-  const metadata = await getExternalPreviewMetadata(source); if (!stage.isConnected) return;
+  const metadata = await getExternalPreviewMetadata(source);
+  if (!stage.isConnected || !metadata) return;
+
   const providerName = formatProviderName(source.provider);
-  if (!metadata || metadata.error) {
-    badgeElement.textContent = providerName;
-    return;
+  if (typeof metadata.title === "string" && metadata.title.trim()) {
+    const previewTitle = metadata.title.trim();
+    titleElement.textContent = previewTitle;
+    image.alt = `${previewTitle} preview`;
   }
-  if (typeof metadata.title === "string" && metadata.title.trim()) { const previewTitle = metadata.title.trim(); titleElement.textContent = previewTitle; image.alt = `${previewTitle} preview`; }
   if (typeof metadata.creator === "string" && metadata.creator.trim()) {
     badgeElement.textContent = `${metadata.creator.trim()} • ${providerName}`;
-  } else {
-    badgeElement.textContent = providerName;
   }
   if (typeof metadata.thumbnailUrl === "string" && metadata.thumbnailUrl.trim()) {
     loadPreviewImageCandidates(stage, image, [metadata.thumbnailUrl.trim()]);
@@ -2823,16 +2838,27 @@ async function fetchSpotifyPreviewOEmbedMetadata(sourceUrl) {
 }
 async function getSpotifyPreviewImageUrl(source) { const metadata = await getSpotifyPreviewMetadata(source); return typeof metadata?.thumbnailUrl === "string" ? metadata.thumbnailUrl : ""; }
 function getSpotifyPreviewMarket() { const locale = (Array.isArray(navigator.languages) && navigator.languages[0]) || navigator.language || navigator.userLanguage || ""; const match = `${locale}`.trim().match(/[-_]([A-Za-z]{2})$/); return match ? match[1].toUpperCase() : "US"; }
-function resolveYouTubePreviewCandidates(source) { const externalId = source.externalId || parseYouTubeUrl(source.externalUrl || source.embedUrl || source.originalUrl || "")?.externalId || ""; if (!externalId) return []; return [`https://i.ytimg.com/vi/${externalId}/maxresdefault.jpg`, `https://i.ytimg.com/vi/${externalId}/sddefault.jpg`, `https://i.ytimg.com/vi/${externalId}/hqdefault.jpg`, `https://i.ytimg.com/vi/${externalId}/mqdefault.jpg`]; }
+function resolveYouTubePreviewCandidates(source) {
+  const externalId = source.externalId || parseYouTubeUrl(source.externalUrl || source.embedUrl || source.originalUrl || source.label || "")?.externalId || "";
+  if (!externalId) return [];
+  return [
+    `https://i.ytimg.com/vi/${externalId}/maxresdefault.jpg`,
+    `https://i.ytimg.com/vi/${externalId}/sddefault.jpg`,
+    `https://i.ytimg.com/vi/${externalId}/hqdefault.jpg`,
+    `https://i.ytimg.com/vi/${externalId}/mqdefault.jpg`,
+    `https://img.youtube.com/vi/${externalId}/0.jpg`
+  ];
+}
 
 async function getYouTubePreviewMetadata(source) {
   const sourceUrl = resolveYouTubePreviewSourceUrl(source); if (!sourceUrl) return null;
   const cacheKey = `youtube:oembed:${sourceUrl}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
   const request = fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(sourceUrl)}&format=json`).then((res) => (res.ok ? res.json() : null)).then((payload) => {
+    if (!payload || (!payload.title && !payload.thumbnail_url)) return null;
     const metadata = {
-      title: typeof payload?.title === "string" ? payload.title.trim() : "",
-      creator: typeof payload?.author_name === "string" ? payload.author_name.trim() : "",
-      thumbnailUrl: typeof payload?.thumbnail_url === "string" ? payload.thumbnail_url.trim() : ""
+      title: typeof payload.title === "string" ? payload.title.trim() : "",
+      creator: typeof payload.author_name === "string" ? payload.author_name.trim() : "",
+      thumbnailUrl: typeof payload.thumbnail_url === "string" ? payload.thumbnail_url.trim() : ""
     };
     externalPreviewCache.set(cacheKey, metadata);
     return metadata;
@@ -2843,7 +2869,13 @@ async function getYouTubePreviewMetadata(source) {
   externalPreviewCache.set(cacheKey, request); return request;
 }
 
-function resolveYouTubePreviewSourceUrl(source) { if (source.externalUrl) return source.externalUrl; if (source.originalUrl) return source.originalUrl; const externalId = source.externalId || parseYouTubeUrl(source.embedUrl || source.originalUrl || "")?.externalId || ""; return externalId ? `https://www.youtube.com/watch?v=${externalId}` : ""; }
+function resolveYouTubePreviewSourceUrl(source) {
+  const externalId = source.externalId || parseYouTubeUrl(source.externalUrl || source.embedUrl || source.originalUrl || source.label || "")?.externalId || "";
+  if (externalId) return `https://www.youtube.com/watch?v=${externalId}`;
+  if (source.externalUrl) return source.externalUrl;
+  if (source.originalUrl) return source.originalUrl;
+  return "";
+}
 function resolveSpotifyPreviewSourceUrl(source) { if (source.externalUrl) return source.externalUrl; if (source.originalUrl) return source.originalUrl; if (source.embedUrl) { try { const embedUrl = new URL(source.embedUrl); const segments = embedUrl.pathname.split("/").filter(Boolean); const typeIndex = segments[0] === "embed" ? 1 : 0; const type = segments[typeIndex]; const externalId = segments[typeIndex + 1] || source.externalId || ""; if (type && externalId) return `https://open.spotify.com/${type}/${externalId}`; } catch { return ""; } } return ""; }
 
 function renderMiniPlayerVolumeControl() {
@@ -3032,7 +3064,7 @@ function hydrateRememberedCreator() { const remembered = localStorage.getItem(CR
 function rememberCreatorInput() { rememberCreator(elements.creatorInput.value.trim()); }
 function rememberCreator(name) { if (!name) localStorage.removeItem(CREATOR_NAME_KEY); else localStorage.setItem(CREATOR_NAME_KEY, name); }
 function buildUploadPost(base, file) { return { ...base, mediaKind: getMediaKind(file.type), sourceKind: "upload", isLocal: true, fileName: file.name, fileType: file.type, fileSize: file.size, blob: file }; }
-function buildExternalPost(base, parsed) { return { ...base, mediaKind: parsed.mediaKind, sourceKind: parsed.provider, provider: parsed.provider, src: parsed.embedUrl, externalUrl: parsed.originalUrl, embedUrl: parsed.embedUrl, externalId: parsed.externalId, label: parsed.label, isLocal: state.backendMode !== "supabase" }; }
+function buildExternalPost(base, parsed) { return { ...base, mediaKind: parsed.mediaKind, sourceKind: parsed.provider, provider: parsed.provider, src: parsed.embedUrl, mediaUrl: parsed.embedUrl, externalUrl: parsed.originalUrl, embedUrl: parsed.embedUrl, externalId: parsed.externalId, label: parsed.label, isLocal: state.backendMode !== "supabase" }; }
 
 function parseExternalMediaUrl(raw) {
   if (!raw) return null;
@@ -3046,14 +3078,14 @@ function healPosts(posts) {
   return posts.map(post => {
     if (!post) return post;
     // Aggressive YouTube detection: check ALL fields for a hint of YouTube (Syncing logic from MainActivity)
-    const fields = [post.externalUrl, post.mediaUrl, post.src, post.caption, post.title].join(" ");
+    const fields = [post.externalUrl, post.embedUrl, post.externalId, post.mediaUrl, post.src, post.label, post.caption, post.title].join(" ");
     const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("youtu") || fields.toLowerCase().includes("vnd.youtube");
     
     // Check if embedUrl is actually valid for YouTube
     const hasValidEmbed = typeof post.embedUrl === "string" && post.embedUrl.includes("youtube.com/embed/");
     
     if (isYouTubeHint && (!post.externalId || !hasValidEmbed)) {
-      const repaired = parseYouTubeUrl(post.externalUrl || post.src || post.mediaUrl || post.caption || post.title || "");
+      const repaired = parseYouTubeUrl(post.externalUrl || post.embedUrl || post.externalId || post.src || post.mediaUrl || post.label || post.caption || post.title || "");
       if (repaired) {
         return {
           ...post,
