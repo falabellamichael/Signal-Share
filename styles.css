@@ -5061,3 +5061,11 @@ body[data-theme='ember'] .profile-view-dialog h2, body[data-theme='ember'] .prof
 .settings-field-copy { margin-bottom: 4px !important; }
 .settings-actions { gap: 16px !important; margin-top: 12px !important; }
 .settings-toggle-field { gap: 18px !important; }
+/* Compact Settings Spacing Refinement */
+.settings-dialog { padding: 32px !important; gap: 24px !important; }
+.settings-head { margin-bottom: 0 !important; gap: 12px !important; }
+.settings-fields { gap: 24px !important; }
+.settings-field { gap: 10px !important; }
+.settings-field-copy { margin-bottom: 0 !important; }
+.settings-actions { gap: 12px !important; margin-top: 10px !important; }
+.settings-toggle-field { gap: 12px !important; }
