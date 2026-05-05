@@ -5042,3 +5042,9 @@ body[data-theme='contrast'] .profile-view-dialog { background: #000000 !importan
 body[data-theme='contrast'] .profile-view { background: #000000 !important; }
 /* Ember Red Profile Background */
 body[data-theme='ember'] .profile-view-dialog { background: radial-gradient(circle at top left, rgba(255, 68, 56, 0.3), transparent 28%), radial-gradient(circle at top right, rgba(255, 138, 61, 0.22), transparent 25%), linear-gradient(180deg, #140302 0%, #260705 48%, #100101 100%) !important; border-color: rgba(255, 120, 82, 0.3) !important; }
+/* Theme Color Coding Refinements */
+body[data-theme='contrast'] .profile-stat, body[data-theme='contrast'] .feed-page-button { background: #000000 !important; border-color: rgba(255, 255, 255, 0.4) !important; color: #ffffff !important; }
+body[data-theme='contrast'] .feed-page-button.is-active { background: var(--accent) !important; color: #000000 !important; }
+body[data-theme='ember'] .profile-stat, body[data-theme='ember'] .feed-page-button { background: var(--surface-strong) !important; border-color: var(--line) !important; color: var(--text) !important; }
+body[data-theme='ember'] .feed-page-button.is-active { background: var(--accent) !important; color: #ffffff !important; border-color: transparent !important; }
+body[data-theme='ember'] .profile-stat-label, body[data-theme='ember'] .feed-pagination-summary { color: var(--muted) !important; }
