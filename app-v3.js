@@ -1246,6 +1246,7 @@ window.renderNotificationsPanel = function() {
   const isOpen = state.notificationsPanelOpen;
   if (elements.notificationsPanel) {
     elements.notificationsPanel.hidden = !isOpen;
+    elements.notificationsPanel.classList.toggle("is-open", isOpen);
     elements.notificationsPanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
   }
   syncOverlayBodyState();
