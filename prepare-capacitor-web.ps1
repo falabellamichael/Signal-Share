@@ -6,6 +6,9 @@ $dist = Join-Path $root "dist"
 $files = @(
   "index.html",
   "styles.css",
+  "styles-1.css",
+  "styles-2.css",
+  "styles-3.css",
   "app.js",
   "config.js",
   "site.webmanifest",
