@@ -6,14 +6,17 @@
 
   const HISTORY_KEY = "notif_v17_hist";
   const COUNT_KEY = "notif_v17_count";
+  const SEEN_KEY = "notif_v17_seen_ids";
   const SYNC_CURSOR_PREFIX = "notif_v17_sync_cursor";
   const MAX_HISTORY_ITEMS = 60;
+  const MAX_SEEN_ITEMS = 1200;
   const MAX_SYNC_MESSAGES = 200;
   const INITIAL_SYNC_LOOKBACK_MS = 24 * 60 * 60 * 1000;
   const SYNC_MIN_INTERVAL_MS = 12000;
 
   let history = [];
   let count = 0;
+  let seenIds = new Map();
   let syncInFlightPromise = null;
   let lastSyncStartedAt = 0;
 
@@ -48,6 +51,57 @@
     }
   }
 
+  function parseSeenIds(raw) {
+    if (!raw) return new Map();
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const next = new Map();
+        const now = Date.now();
+        parsed.forEach((id) => {
+          const normalizedId = String(id ?? "");
+          if (normalizedId) next.set(normalizedId, now);
+        });
+        return next;
+      }
+      if (parsed && typeof parsed === "object") {
+        const next = new Map();
+        Object.entries(parsed).forEach(([id, timestamp]) => {
+          const normalizedId = String(id ?? "");
+          if (!normalizedId) return;
+          const numericTimestamp = toFiniteNumber(timestamp, Date.now());
+          next.set(normalizedId, numericTimestamp);
+        });
+        return next;
+      }
+    } catch (_error) {}
+    return new Map();
+  }
+
+  function trimSeenIds() {
+    if (seenIds.size <= MAX_SEEN_ITEMS) return;
+    const sorted = Array.from(seenIds.entries()).sort((left, right) => right[1] - left[1]);
+    seenIds = new Map(sorted.slice(0, MAX_SEEN_ITEMS));
+  }
+
+  function saveSeenIds() {
+    trimSeenIds();
+    const serialized = Object.fromEntries(seenIds.entries());
+    localStorage.setItem(SEEN_KEY, JSON.stringify(serialized));
+  }
+
+  function rememberSeenId(id, timestamp = Date.now()) {
+    const normalizedId = String(id ?? "");
+    if (!normalizedId) return;
+    seenIds.set(normalizedId, toFiniteNumber(timestamp, Date.now()));
+    trimSeenIds();
+  }
+
+  function hasSeenId(id) {
+    const normalizedId = String(id ?? "");
+    return normalizedId ? seenIds.has(normalizedId) : false;
+  }
+
   function trimHistory() {
     if (history.length > MAX_HISTORY_ITEMS) {
       history = history.slice(0, MAX_HISTORY_ITEMS);
@@ -55,9 +109,12 @@
   }
 
   function load() {
+    seenIds = parseSeenIds(localStorage.getItem(SEEN_KEY));
     history = parseHistory(localStorage.getItem(HISTORY_KEY));
+    history.forEach((item) => rememberSeenId(item.id, item.timestamp));
     trimHistory();
     count = normalizeCount(localStorage.getItem(COUNT_KEY));
+    saveSeenIds();
   }
 
   function save(options = {}) {
@@ -65,6 +122,7 @@
     trimHistory();
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
     localStorage.setItem(COUNT_KEY, String(normalizeCount(count)));
+    saveSeenIds();
     if (render) renderUI();
   }
 
@@ -126,7 +184,7 @@
     if (!message) return false;
 
     const id = getNotificationId(opts);
-    if (hasNotification(id)) return false;
+    if (hasNotification(id) || hasSeenId(id)) return false;
 
     const timestampFromInput = Number(opts.timestamp);
     const createdAtFromInput = Date.parse(String(opts.createdAt ?? ""));
@@ -146,6 +204,7 @@
     };
 
     history.unshift(item);
+    rememberSeenId(item.id, item.timestamp);
     if (opts.incrementCount !== false && !item.read) count = normalizeCount(count + 1);
     if (!opts.silent) showBanner(item);
     save();
@@ -385,7 +444,7 @@
   themeObserver.observe(document.body, { attributes: true, attributeFilter: ["data-theme", "class"] });
 
   window.addEventListener("storage", (event) => {
-    if (event.key === HISTORY_KEY || event.key === COUNT_KEY) {
+    if (event.key === HISTORY_KEY || event.key === COUNT_KEY || event.key === SEEN_KEY) {
       load();
       renderUI();
     }
