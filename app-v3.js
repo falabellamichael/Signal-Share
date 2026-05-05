@@ -2986,15 +2986,18 @@ function parseExternalMediaUrl(raw) {
 function healPosts(posts) {
   if (!Array.isArray(posts)) return posts;
   return posts.map(post => {
-    // If it's a YouTube post but missing its ID or embed URL, try to repair it
-    const isYouTube = post.sourceKind === "youtube" || (post.externalUrl && post.externalUrl.includes("yout"));
-    if (isYouTube && (!post.externalId || !post.embedUrl)) {
-      const repaired = parseYouTubeUrl(post.externalUrl || post.src || post.mediaUrl || "");
+    // Aggressive YouTube detection: check ALL fields for a hint of YouTube
+    const fields = [post.externalUrl, post.mediaUrl, post.src, post.caption, post.title].join(" ");
+    const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("yout");
+    
+    if (isYouTubeHint && (!post.externalId || !post.embedUrl)) {
+      const repaired = parseYouTubeUrl(post.externalUrl || post.src || post.mediaUrl || post.caption || "");
       if (repaired) {
         post.externalId = repaired.externalId;
         post.embedUrl = repaired.embedUrl;
         post.sourceKind = "youtube";
         post.mediaKind = "video";
+        post.provider = "youtube";
       }
     }
     return post;
@@ -3003,11 +3006,18 @@ function healPosts(posts) {
 
 function parseYouTubeUrl(raw) {
   if (!raw || typeof raw !== "string") return null;
-  const regex = /^.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/|shorts\/|live\/)|(?:(?:watch)?\?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*/;
+  // Comprehensive Regex covering all major formats
+  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
   const match = raw.match(regex);
-  if (match && match[1].length === 11) {
+  if (match && match[1]) {
     const videoId = match[1];
     return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
+  }
+  // Last resort: scan for anything that looks like an 11-char ID after a common trigger
+  const lastResort = /(?:v=|v\/|vi\/|embed\/|shorts\/|live\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/.exec(raw);
+  if (lastResort && lastResort[1]) {
+     const videoId = lastResort[1];
+     return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
   }
   return null;
 }
