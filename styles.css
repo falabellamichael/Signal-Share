@@ -5040,3 +5040,5 @@ button:disabled {
 /* FORCE BLACK PROFILE BACKGROUND AT END OF FILE */
 body[data-theme='contrast'] .profile-view-dialog { background: #000000 !important; border-color: rgba(255, 255, 255, 0.5) !important; }
 body[data-theme='contrast'] .profile-view { background: #000000 !important; }
+/* Ember Red Profile Background */
+body[data-theme='ember'] .profile-view-dialog { background: radial-gradient(circle at top left, rgba(255, 68, 56, 0.3), transparent 28%), radial-gradient(circle at top right, rgba(255, 138, 61, 0.22), transparent 25%), linear-gradient(180deg, #140302 0%, #260705 48%, #100101 100%) !important; border-color: rgba(255, 120, 82, 0.3) !important; }
