@@ -2658,8 +2658,23 @@ function getControllablePlayerPost() { return getPostById(state.activePlayerPost
 
 function buildPersistentPlayerSource(post) {
   const source = typeof post?.embedUrl === "string" ? post.embedUrl : ""; if (post?.sourceKind !== "youtube" || !source) return source;
-  try { const url = new URL(source, window.location.origin); url.searchParams.set("enablejsapi", "1"); url.searchParams.set("playsinline", "1"); if (window.location.origin && window.location.origin !== "null") url.searchParams.set("origin", window.location.origin); return url.toString(); }
-  catch { const separator = source.includes("?") ? "&" : "?"; return `${source}${separator}enablejsapi=1&playsinline=1`; }
+  try {
+    const url = new URL(source, window.location.origin);
+    url.searchParams.set("enablejsapi", "1");
+    url.searchParams.set("playsinline", "1");
+    url.searchParams.set("autoplay", "1");
+    url.searchParams.set("mute", "1");
+    if (window.location.origin && window.location.origin !== "null") {
+      url.searchParams.set("origin", window.location.origin);
+    } else {
+      url.searchParams.set("origin", window.location.href.split('#')[0].split('?')[0]);
+    }
+    return url.toString();
+  }
+  catch {
+    const separator = source.includes("?") ? "&" : "?";
+    return `${source}${separator}enablejsapi=1&playsinline=1&autoplay=1&mute=1`;
+  }
 }
 
 function postMessageToYouTubePlayer(frame, func, args = []) { if (!(frame instanceof HTMLIFrameElement) || !frame.contentWindow) return; frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args }), "*"); }
@@ -2735,7 +2750,9 @@ async function applyExternalPreviewMetadata(stage, image, titleElement, badgeEle
   } else {
     badgeElement.textContent = providerName;
   }
-  if (source.provider === "spotify" && typeof metadata.thumbnailUrl === "string" && metadata.thumbnailUrl.trim()) loadPreviewImageCandidates(stage, image, [metadata.thumbnailUrl.trim()]);
+  if (typeof metadata.thumbnailUrl === "string" && metadata.thumbnailUrl.trim()) {
+    loadPreviewImageCandidates(stage, image, [metadata.thumbnailUrl.trim()]);
+  }
 }
 
 function loadPreviewImageCandidates(stage, image, candidates) {
@@ -2811,7 +2828,18 @@ function resolveYouTubePreviewCandidates(source) { const externalId = source.ext
 async function getYouTubePreviewMetadata(source) {
   const sourceUrl = resolveYouTubePreviewSourceUrl(source); if (!sourceUrl) return null;
   const cacheKey = `youtube:oembed:${sourceUrl}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
-  const request = fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(sourceUrl)}&format=json`).then((res) => (res.ok ? res.json() : null)).then((payload) => { const metadata = { title: typeof payload?.title === "string" ? payload.title.trim() : "", creator: typeof payload?.author_name === "string" ? payload.author_name.trim() : "" }; externalPreviewCache.set(cacheKey, metadata); return metadata; }).catch(() => { externalPreviewCache.set(cacheKey, null); return null; });
+  const request = fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(sourceUrl)}&format=json`).then((res) => (res.ok ? res.json() : null)).then((payload) => {
+    const metadata = {
+      title: typeof payload?.title === "string" ? payload.title.trim() : "",
+      creator: typeof payload?.author_name === "string" ? payload.author_name.trim() : "",
+      thumbnailUrl: typeof payload?.thumbnail_url === "string" ? payload.thumbnail_url.trim() : ""
+    };
+    externalPreviewCache.set(cacheKey, metadata);
+    return metadata;
+  }).catch(() => {
+    externalPreviewCache.set(cacheKey, null);
+    return null;
+  });
   externalPreviewCache.set(cacheKey, request); return request;
 }
 
