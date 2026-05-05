@@ -5205,6 +5205,15 @@ body[data-theme='contrast'] .profile-view { background: #000000 !important; }
 .theme-preview { width: 100% !important; max-width: 120px !important; height: 80px !important; }
 .theme-picker-menu { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
 @media (min-width: 761px) { .theme-picker-menu { grid-template-columns: repeat(3, 1fr) !important; } }
+/* Unified Equalized Settings Spacing */
+.settings-dialog { padding: 32px 32px 24px !important; gap: 14px !important; }
+.settings-head { margin: 0 !important; gap: 14px !important; }
+.settings-fields { gap: 14px !important; margin-top: 10px !important; }
+.settings-field { gap: 14px !important; }
+.settings-actions { gap: 14px !important; margin-top: 14px !important; }
+.settings-toggle-field { gap: 14px !important; }
+.settings-field-copy { margin: 0 !important; }
+.auth-actions { margin-top: 20px !important; }
 /* Ember Red Profile Background */
 body[data-theme='ember'] .profile-view-dialog { 
   background: radial-gradient(circle at top left, rgba(255, 68, 56, 0.22), transparent 30%), 
