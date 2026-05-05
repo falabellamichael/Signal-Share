@@ -1,46 +1,41 @@
-// Signal Share Notification System (v8 - Ultra Hardened)
-// This version uses stable IDs, content de-duplication, and rate limiting.
+// Signal Share Notification System (NUCLEAR RESTART)
+// This version is stripped of all complex logic. 
+// The badge starts at 0 every refresh and only increases during your current session.
 
 class NotificationSystem {
   constructor() {
     this.history = [];
+    this.badgeCount = 0;
     this.container = null;
+    
+    // ONE-TIME CLEANUP of old buggy storage
+    if (!localStorage.getItem('notif_v9_reset')) {
+      localStorage.removeItem('notifications');
+      localStorage.setItem('notif_v9_reset', 'true');
+    }
+    
     this.init();
   }
 
   init() {
-    this.load();
+    this.loadHistory();
     this.setupUI();
-    console.log("[Notifications] System Initialized (v8).");
+    this.resetBadge();
+    console.log("[Notifications] Nuclear Restart Complete. Badge is 0.");
   }
 
-  load() {
+  loadHistory() {
     try {
-      let saved = JSON.parse(localStorage.getItem('notifications')) || [];
-      const now = Date.now();
-      const threshold = now - (24 * 60 * 60 * 1000);
-      
-      const seenIds = new Set();
-      const seenContent = new Set();
-      
-      this.history = saved.filter(n => {
-        if (!n || !n.timestamp || n.timestamp < threshold) return false;
-        const key = (n.title + '|' + n.message).toLowerCase();
-        if (seenIds.has(n.id) || seenContent.has(key)) return false;
-        seenIds.add(n.id);
-        seenContent.add(key);
-        return true;
-      });
-
-      this.save();
+      const saved = localStorage.getItem('notifications_history_v9');
+      this.history = JSON.parse(saved || '[]');
     } catch (e) {
       this.history = [];
     }
   }
 
-  save() {
-    localStorage.setItem('notifications', JSON.stringify(this.history.slice(0, 50)));
-    this.updateBadge();
+  saveHistory() {
+    // Keep only last 50 items for the history panel
+    localStorage.setItem('notifications_history_v9', JSON.stringify(this.history.slice(0, 50)));
     if (window.renderNotificationsHistory) window.renderNotificationsHistory();
   }
 
@@ -54,145 +49,90 @@ class NotificationSystem {
     }
   }
 
+  // THE ONLY WAY to add a notification
   add(options) {
-    if (!options || !options.message) return null;
-    
-    const title = (options.title || 'Signal Share').trim();
-    const message = options.message.trim();
-    const contentKey = (title + '|' + message).toLowerCase();
-    
-    // Stable ID: Use provided ID or hash of content
-    const id = options.id || ('n-' + btoa(contentKey).substring(0, 16));
-    
-    const existingIndex = this.history.findIndex(n => n.id === id || (n.title + '|' + n.message).toLowerCase() === contentKey);
-    
-    if (existingIndex !== -1) {
-      const existing = this.history[existingIndex];
-      // Suppress spam (exact same notification within 30s)
-      if (Date.now() - existing.timestamp < 30000) return existing.id;
-      // Re-trigger old notification: move to top and mark unread
-      this.history.splice(existingIndex, 1);
-    }
+    if (!options || !options.message) return;
 
-    const notification = {
-      id,
-      type: options.type || 'info',
-      title,
-      message,
-      data: options.data || null,
+    // 1. Add to history (simple unshift)
+    const item = {
+      id: options.id || Date.now(),
+      title: options.title || 'Notification',
+      message: options.message,
       timestamp: Date.now(),
-      read: false
+      type: options.type || 'info'
     };
-
-    this.history.unshift(notification);
-    this.save();
-
-    const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
-    if (!options.silent) {
-      if (!isMobile) this.showBanner(notification);
-      this.showSystemNotification(notification);
-    }
     
-    return id;
+    this.history.unshift(item);
+    this.saveHistory();
+
+    // 2. Increment badge ONLY if not silent
+    if (!options.silent) {
+      this.badgeCount++;
+      this.updateBadgeUI();
+      this.showBanner(item);
+    }
   }
 
-  showBanner(notification) {
+  showBanner(item) {
     const el = document.createElement('div');
-    el.className = `notification notification-${notification.type}`;
+    el.className = `notification notification-${item.type}`;
     el.innerHTML = `
-      <div class="notification-header">
-        <strong>${notification.title}</strong>
-        <button class="notification-close" style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:inherit;">&times;</button>
-      </div>
-      <div class="notification-message">${notification.message}</div>
+      <div style="font-weight:bold;">${item.title}</div>
+      <div>${item.message}</div>
     `;
-
-    el.onclick = (e) => {
-      if (e.target.closest('.notification-close')) {
-        el.remove();
-        return;
-      }
-      this.handleNotificationClick(notification);
-      el.remove();
-    };
-
+    el.style.cursor = 'pointer';
+    el.onclick = () => el.remove();
     this.container.appendChild(el);
-    setTimeout(() => { if (el.parentNode) el.remove(); }, 6000);
+    setTimeout(() => el.remove(), 5000);
   }
 
-  showSystemNotification(notification) {
-    const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
-    if (isMobile || !("Notification" in window) || Notification.permission !== "granted") return;
-    if (!document.hidden && document.hasFocus()) return;
-
-    try {
-      const n = new Notification(notification.title, {
-        body: notification.message,
-        icon: "./icons/icon-192.png",
-        tag: notification.id
-      });
-      n.onclick = () => { window.focus(); this.handleNotificationClick(notification); n.close(); };
-    } catch (e) {}
-  }
-
-  handleNotificationClick(notification) {
-    document.dispatchEvent(new CustomEvent('signal:notificationClick', { detail: notification }));
-  }
-
-  updateBadge() {
-    const unreadCount = this.history.filter(n => !n.read).length;
+  updateBadgeUI() {
     const badge = document.getElementById('notificationBadge');
     if (badge) {
-      badge.textContent = unreadCount;
-      badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+      badge.textContent = this.badgeCount;
+      badge.style.display = this.badgeCount > 0 ? 'flex' : 'none';
     }
     if (window.Capacitor?.Plugins?.Badge) {
-      window.Capacitor.Plugins.Badge.set({ count: unreadCount }).catch(() => {});
+      window.Capacitor.Plugins.Badge.set({ count: this.badgeCount }).catch(() => {});
     }
   }
 
-  markAllRead() {
-    this.history.forEach(n => n.read = true);
-    this.save();
+  resetBadge() {
+    this.badgeCount = 0;
+    this.updateBadgeUI();
   }
 
   clearHistory() {
     this.history = [];
-    this.save();
+    this.saveHistory();
+    this.resetBadge();
   }
 
-  // Aliases and legacy stubs
-  success(msg, title, opts) { return this.add({ ...opts, type: 'success', message: msg, title: title || 'Success' }); }
-  error(msg, title, opts) { return this.add({ ...opts, type: 'error', message: msg, title: title || 'Error' }); }
-  info(msg, title, opts) { return this.add({ ...opts, type: 'info', message: msg, title: title || 'New Message' }); }
-  warning(msg, title, opts) { return this.add({ ...opts, type: 'warning', message: msg, title: title || 'Warning' }); }
-  showNotification(opts) { return this.add(opts); }
-  addToHistory(opts) { return this.add(opts); }
-  setUnreadCount(count) { if (count === 0) this.markAllRead(); }
-  syncWithSupabase() {}
-  incrementUnreadCount() {}
+  // Legacy support stubs - all mapped to the new simple 'add'
+  success(m, t, o) { this.add({ ...o, type: 'success', message: m, title: t }); }
+  error(m, t, o) { this.add({ ...o, type: 'error', message: m, title: t }); }
+  info(m, t, o) { this.add({ ...o, type: 'info', message: m, title: t }); }
+  warning(m, t, o) { this.add({ ...o, type: 'warning', message: m, title: t }); }
+  
+  showNotification(o) { this.add(o); }
+  addToHistory(o) { this.add(o); }
+  setUnreadCount(c) { if (c === 0) this.resetBadge(); }
+  incrementUnreadCount() { this.add({ message: 'New activity', silent: false }); }
+  syncWithSupabase() {} 
 }
 
+// Instantiate
 window.notifications = new NotificationSystem();
 
+// Simple history renderer
 window.renderNotificationsHistory = function() {
   const list = document.getElementById('notificationsList');
   if (!list) return;
   list.innerHTML = '';
-  const history = window.notifications.history;
-  if (history.length === 0) {
-    document.getElementById('notificationsEmptyState').style.display = 'block';
-    return;
-  }
-  document.getElementById('notificationsEmptyState').style.display = 'none';
-  history.forEach(n => {
+  window.notifications.history.forEach(n => {
     const li = document.createElement('li');
-    const isUnread = !n.read;
-    li.className = `notification-history-item ${isUnread ? 'unread' : 'read'}`;
-    const borderColor = n.type === 'success' ? '#10b981' : (n.type === 'error' ? '#ef4444' : '#3b82f6');
-    li.style.borderLeftColor = borderColor;
-    li.innerHTML = `<strong style="display:block;">${n.title}</strong><p style="margin:4px 0;opacity:0.8;font-size:0.9rem;">${n.message}</p><small style="opacity:0.5;">${new Date(n.timestamp).toLocaleTimeString()}</small>`;
-    li.onclick = () => window.notifications.handleNotificationClick(n);
+    li.style.cssText = "padding:10px; margin-bottom:5px; border-radius:5px; background:rgba(255,255,255,0.05); border-left:4px solid #3b82f6;";
+    li.innerHTML = `<strong>${n.title}</strong><p>${n.message}</p>`;
     list.appendChild(li);
   });
 };
