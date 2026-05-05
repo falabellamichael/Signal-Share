@@ -2745,9 +2745,9 @@ function createExternalPreviewStage(source, options = {}) {
   const overlay = document.createElement("div"); overlay.className = "external-preview-overlay"; const badge = document.createElement("span"); badge.className = "external-preview-badge"; badge.textContent = formatProviderName(source.provider); const title = document.createElement("strong"); title.className = "external-preview-title"; title.textContent = source.title; const description = document.createElement("p"); description.className = "external-preview-copy"; description.textContent = note || source.creator || "External media preview";
   overlay.append(badge, title, description); stage.append(image, overlay);
   if (source.provider === "youtube") { void applyExternalPreviewMetadata(stage, image, title, badge, source); loadPreviewImageCandidates(stage, image, resolveYouTubePreviewCandidates(source)); }
-  else if (source.provider === "spotify") { 
-    badge.textContent = "Loading Artist...";
-    void applyExternalPreviewMetadata(stage, image, title, badge, source); 
+  else if (source.provider === "spotify") {
+    badge.textContent = formatExternalPreviewBadge(source.provider, deriveSpotifyCreatorFromSourceTitle(source));
+    void applyExternalPreviewMetadata(stage, image, title, badge, source);
   }
   return stage;
 }
@@ -2755,19 +2755,39 @@ function createExternalPreviewStage(source, options = {}) {
 async function applyExternalPreviewMetadata(stage, image, titleElement, badgeElement, source) {
   const metadata = await getExternalPreviewMetadata(source);
   if (!stage.isConnected || !metadata) return;
-
-  const providerName = formatProviderName(source.provider);
   if (typeof metadata.title === "string" && metadata.title.trim()) {
     const previewTitle = metadata.title.trim();
     titleElement.textContent = previewTitle;
     image.alt = `${previewTitle} preview`;
   }
-  if (typeof metadata.creator === "string" && metadata.creator.trim()) {
-    badgeElement.textContent = `${metadata.creator.trim()} • ${providerName}`;
-  }
+  const fallbackCreator = source.provider === "spotify" ? deriveSpotifyCreatorFromSourceTitle(source, metadata.title) : "";
+  const previewCreator = typeof metadata.creator === "string" && metadata.creator.trim() ? metadata.creator.trim() : fallbackCreator;
+  badgeElement.textContent = formatExternalPreviewBadge(source.provider, previewCreator);
   if (typeof metadata.thumbnailUrl === "string" && metadata.thumbnailUrl.trim()) {
     loadPreviewImageCandidates(stage, image, [metadata.thumbnailUrl.trim()]);
   }
+}
+
+function formatExternalPreviewBadge(provider, creator = "") {
+  const providerName = formatProviderName(provider);
+  const cleanCreator = typeof creator === "string" ? creator.trim() : "";
+  return cleanCreator && cleanCreator !== providerName ? `${cleanCreator} / ${providerName}` : providerName;
+}
+
+function deriveSpotifyCreatorFromSourceTitle(source) {
+  if (source?.provider !== "spotify") return "";
+  const sourceTitle = typeof source.title === "string" ? source.title.trim() : "";
+  if (!sourceTitle) return "";
+  const match = sourceTitle.match(/^(.{1,80}?)\s+-\s+(.+)$/);
+  if (!match) return "";
+  const candidate = match[1].trim();
+  const remainder = match[2].trim();
+  if (!candidate || !remainder || isGenericSpotifyCreatorFallback(candidate)) return "";
+  return candidate;
+}
+
+function isGenericSpotifyCreatorFallback(value) {
+  return /^(audio|music|post|song|spotify|track|untitled)$/i.test(String(value ?? "").trim());
 }
 
 function loadPreviewImageCandidates(stage, image, candidates) {
@@ -2781,12 +2801,13 @@ async function getExternalPreviewMetadata(source) { if (source.provider === "spo
 
 async function getSpotifyPreviewMetadata(source) {
   const sourceUrl = resolveSpotifyPreviewSourceUrl(source); if (!sourceUrl) return null;
-  const cacheKey = `spotify:preview:v9:${sourceUrl}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
+  const cacheKey = `spotify:preview:v10:${sourceUrl}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
   const request = Promise.all([fetchSpotifyPreviewCatalogMetadata(source, sourceUrl), fetchSpotifyPreviewOEmbedMetadata(sourceUrl)]).then(([cat, oem]) => { 
     // Even if cat has an error, we try to use oem as a fallback
-    const metadata = { 
-      title: cat?.title || oem?.title || "", 
-      creator: cat?.creator || oem?.creator || "", 
+    const fallbackCreator = deriveSpotifyCreatorFromSourceTitle(source, cat?.title || oem?.title || "");
+    const metadata = {
+      title: cat?.title || oem?.title || "",
+      creator: cat?.creator || oem?.creator || fallbackCreator || "",
       thumbnailUrl: cat?.thumbnailUrl || oem?.thumbnailUrl || "",
       error: cat?.error && !oem?.title ? cat.error : null // Only show error if BOTH failed
     }; 
