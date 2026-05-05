@@ -1,5 +1,5 @@
-// Signal Share Notification System (v7 - Anti-Skyrocket)
-// Optimized for strict de-duplication and 24h retention.
+// Signal Share Notification System (v8 - Ultra Hardened)
+// This version uses stable IDs, content de-duplication, and rate limiting.
 
 class NotificationSystem {
   constructor() {
@@ -11,35 +11,29 @@ class NotificationSystem {
   init() {
     this.load();
     this.setupUI();
-    console.log("[Notifications] System Initialized (v7).");
+    console.log("[Notifications] System Initialized (v8).");
   }
 
   load() {
     try {
       let saved = JSON.parse(localStorage.getItem('notifications')) || [];
-      if (!Array.isArray(saved)) saved = [];
-      
       const now = Date.now();
       const threshold = now - (24 * 60 * 60 * 1000);
       
-      // Strict filtering: 24h + Deduplication by ID and Content
       const seenIds = new Set();
       const seenContent = new Set();
       
       this.history = saved.filter(n => {
-        if (!n || typeof n !== 'object' || !n.timestamp || n.timestamp < threshold) return false;
-        
-        const contentKey = (n.title || '') + '|' + (n.message || '');
-        if (seenIds.has(n.id) || seenContent.has(contentKey)) return false;
-        
+        if (!n || !n.timestamp || n.timestamp < threshold) return false;
+        const key = (n.title + '|' + n.message).toLowerCase();
+        if (seenIds.has(n.id) || seenContent.has(key)) return false;
         seenIds.add(n.id);
-        seenContent.add(contentKey);
+        seenContent.add(key);
         return true;
       });
 
       this.save();
     } catch (e) {
-      console.error("[Notifications] Load error:", e);
       this.history = [];
     }
   }
@@ -61,20 +55,27 @@ class NotificationSystem {
   }
 
   add(options) {
-    if (!options || !options.message) return;
+    if (!options || !options.message) return null;
     
-    const title = options.title || 'Signal Share';
-    const message = options.message;
-    const contentKey = title + '|' + message;
+    const title = (options.title || 'Signal Share').trim();
+    const message = options.message.trim();
+    const contentKey = (title + '|' + message).toLowerCase();
     
-    // Strict De-duplication Check
-    if (this.history.some(n => n.id === options.id || (n.title + '|' + n.message) === contentKey)) {
-      console.log("[Notifications] Duplicate suppressed:", title);
-      return;
+    // Stable ID: Use provided ID or hash of content
+    const id = options.id || ('n-' + btoa(contentKey).substring(0, 16));
+    
+    const existingIndex = this.history.findIndex(n => n.id === id || (n.title + '|' + n.message).toLowerCase() === contentKey);
+    
+    if (existingIndex !== -1) {
+      const existing = this.history[existingIndex];
+      // Suppress spam (exact same notification within 30s)
+      if (Date.now() - existing.timestamp < 30000) return existing.id;
+      // Re-trigger old notification: move to top and mark unread
+      this.history.splice(existingIndex, 1);
     }
 
     const notification = {
-      id: options.id || ('notif-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5)),
+      id,
       type: options.type || 'info',
       title,
       message,
@@ -86,12 +87,13 @@ class NotificationSystem {
     this.history.unshift(notification);
     this.save();
 
-    // Visual Alerts
     const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
     if (!options.silent) {
       if (!isMobile) this.showBanner(notification);
       this.showSystemNotification(notification);
     }
+    
+    return id;
   }
 
   showBanner(notification) {
@@ -100,22 +102,17 @@ class NotificationSystem {
     el.innerHTML = `
       <div class="notification-header">
         <strong>${notification.title}</strong>
-        <button class="notification-close">&times;</button>
+        <button class="notification-close" style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:inherit;">&times;</button>
       </div>
       <div class="notification-message">${notification.message}</div>
     `;
 
     el.onclick = (e) => {
-      if (e.target.classList.contains('notification-close')) {
+      if (e.target.closest('.notification-close')) {
         el.remove();
         return;
       }
       this.handleNotificationClick(notification);
-      el.remove();
-    };
-
-    el.querySelector('.notification-close').onclick = (e) => {
-      e.stopPropagation();
       el.remove();
     };
 
@@ -125,16 +122,14 @@ class NotificationSystem {
 
   showSystemNotification(notification) {
     const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
-    if (isMobile) return;
-
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    if (isMobile || !("Notification" in window) || Notification.permission !== "granted") return;
     if (!document.hidden && document.hasFocus()) return;
 
     try {
       const n = new Notification(notification.title, {
         body: notification.message,
         icon: "./icons/icon-192.png",
-        tag: notification.id // Tag prevents multiple system alerts for same notification
+        tag: notification.id
       });
       n.onclick = () => { window.focus(); this.handleNotificationClick(notification); n.close(); };
     } catch (e) {}
@@ -151,7 +146,6 @@ class NotificationSystem {
       badge.textContent = unreadCount;
       badge.style.display = unreadCount > 0 ? 'flex' : 'none';
     }
-
     if (window.Capacitor?.Plugins?.Badge) {
       window.Capacitor.Plugins.Badge.set({ count: unreadCount }).catch(() => {});
     }
@@ -167,47 +161,37 @@ class NotificationSystem {
     this.save();
   }
 
-  // Backward compatibility stubs
-  success(msg, title, opts) { this.add({ ...opts, type: 'success', message: msg, title: title || 'Success' }); }
-  error(msg, title, opts) { this.add({ ...opts, type: 'error', message: msg, title: title || 'Error' }); }
-  info(msg, title, opts) { this.add({ ...opts, type: 'info', message: msg, title: title || 'New Message' }); }
-  warning(msg, title, opts) { this.add({ ...opts, type: 'warning', message: msg, title: title || 'Warning' }); }
+  // Aliases and legacy stubs
+  success(msg, title, opts) { return this.add({ ...opts, type: 'success', message: msg, title: title || 'Success' }); }
+  error(msg, title, opts) { return this.add({ ...opts, type: 'error', message: msg, title: title || 'Error' }); }
+  info(msg, title, opts) { return this.add({ ...opts, type: 'info', message: msg, title: title || 'New Message' }); }
+  warning(msg, title, opts) { return this.add({ ...opts, type: 'warning', message: msg, title: title || 'Warning' }); }
+  showNotification(opts) { return this.add(opts); }
+  addToHistory(opts) { return this.add(opts); }
   setUnreadCount(count) { if (count === 0) this.markAllRead(); }
-  syncWithSupabase() { /* No-op, managed by realtime */ }
-  incrementUnreadCount() { /* No-op, badge is history-derived */ }
+  syncWithSupabase() {}
+  incrementUnreadCount() {}
 }
 
-// Global initialization
 window.notifications = new NotificationSystem();
 
-// UI Hook
 window.renderNotificationsHistory = function() {
   const list = document.getElementById('notificationsList');
   if (!list) return;
   list.innerHTML = '';
-  
   const history = window.notifications.history;
   if (history.length === 0) {
     document.getElementById('notificationsEmptyState').style.display = 'block';
     return;
   }
-  
   document.getElementById('notificationsEmptyState').style.display = 'none';
   history.forEach(n => {
     const li = document.createElement('li');
     const isUnread = !n.read;
     li.className = `notification-history-item ${isUnread ? 'unread' : 'read'}`;
-    
-    // Set border color based on type
     const borderColor = n.type === 'success' ? '#10b981' : (n.type === 'error' ? '#ef4444' : '#3b82f6');
     li.style.borderLeftColor = borderColor;
-    
-    li.innerHTML = `
-      <strong style="display:block;">${n.title}</strong>
-      <p style="margin:4px 0;opacity:0.8;font-size:0.9rem;">${n.message}</p>
-      <small style="opacity:0.5;">${new Date(n.timestamp).toLocaleTimeString()}</small>
-    `;
-    
+    li.innerHTML = `<strong style="display:block;">${n.title}</strong><p style="margin:4px 0;opacity:0.8;font-size:0.9rem;">${n.message}</p><small style="opacity:0.5;">${new Date(n.timestamp).toLocaleTimeString()}</small>`;
     li.onclick = () => window.notifications.handleNotificationClick(n);
     list.appendChild(li);
   });
