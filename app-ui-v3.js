@@ -2510,45 +2510,6 @@ Object.assign(window, {
   clearSelectedMedia,
   clearPreviewOnly,
   renderPreview,
-  renderExternalPreview
-});
-
-// Expose UI functions to global window object so app-v3.js can call them
-Object.assign(window, {
-  renderStats,
-  renderAccountState,
-  renderMessenger,
-  renderSettingsPanel,
-  renderNotificationsPanel,
-  renderAdminEditor,
-  renderAdminBanPanel,
-  renderTagCloud,
-  renderOverview,
-  renderFeed,
-  renderMiniPlayer,
-  renderViewer,
-  renderProfileView,
-  syncSourceHelp,
-  updateComposerAccess,
-  handleViewportResize,
-  handleWindowScroll,
-  handleWindowClick,
-  updateUserPreferences,
-  resetUserPreferences,
-  openSettingsPanel,
-  closeSettingsPanel,
-  toggleSettingsPanel,
-  openNotificationsPanel,
-  closeNotificationsPanel,
-  toggleNotificationsPanel,
-  openMessengerThreadFromNotification,
-  refreshMessengerState,
-  syncCurrentProfileToSupabase,
-  syncMobileHeaderVisibility,
-  setMobileHeaderHidden,
-  isMobileHeaderViewport,
-  isMobileMessengerViewport,
-  applyMiniPlayerPosition,
   renderFeedCard,
   renderMiniPlayerVolumeControl,
   applyPlayerVolumeToActiveElement,
@@ -2561,3 +2522,5 @@ Object.assign(window, {
   showAuthFeedback,
   setStatusPill
 });
+
+
