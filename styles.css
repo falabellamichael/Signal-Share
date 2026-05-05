@@ -5069,3 +5069,11 @@ body[data-theme='ember'] .profile-view-dialog h2, body[data-theme='ember'] .prof
 .settings-field-copy { margin-bottom: 0 !important; }
 .settings-actions { gap: 12px !important; margin-top: 10px !important; }
 .settings-toggle-field { gap: 12px !important; }
+/* Unified Equalized Settings Spacing */
+.settings-dialog { padding: 32px 32px 24px !important; gap: 14px !important; }
+.settings-head { margin: 0 !important; gap: 14px !important; }
+.settings-fields { gap: 14px !important; }
+.settings-field { gap: 14px !important; }
+.settings-actions { gap: 14px !important; margin-top: 14px !important; }
+.settings-toggle-field { gap: 14px !important; }
+.settings-field-copy { margin: 0 !important; }
