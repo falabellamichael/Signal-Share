@@ -450,7 +450,12 @@ body[data-theme="contrast"] .conversation-delete-prompt,
 body[data-theme="contrast"] .emoji-chip,
 body[data-theme="contrast"] .theme-picker-trigger,
 body[data-theme="contrast"] .theme-picker-menu,
-body[data-theme="contrast"] .theme-option-tile,
+body[data-theme="contrast"] .theme-option-tile {
+  background: rgba(8, 10, 12, 0.86);
+  border-color: var(--line);
+  color: var(--text);
+}
+
 body[data-theme="ember"] .button-secondary,
 body[data-theme="ember"] .filter-chip,
 body[data-theme="ember"] .tag-chip,
@@ -466,8 +471,8 @@ body[data-theme="ember"] .emoji-chip,
 body[data-theme="ember"] .theme-picker-trigger,
 body[data-theme="ember"] .theme-picker-menu,
 body[data-theme="ember"] .theme-option-tile {
-  background: rgba(8, 10, 12, 0.86);
-  border-color: var(--line);
+  background: rgba(36, 12, 10, 0.86);
+  border-color: rgba(255, 120, 82, 0.18);
   color: var(--text);
 }
 
@@ -594,6 +599,134 @@ body[data-theme="ember"] .dropzone {
     linear-gradient(145deg, rgba(255, 68, 56, 0.18), rgba(255, 138, 61, 0.14)),
     rgba(28, 4, 3, 0.74);
   border-color: var(--line);
+}
+
+/* Ember Profile Overrides */
+body[data-theme="ember"] .profile-view-dialog {
+  background:
+    radial-gradient(circle at top left, rgba(255, 138, 61, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(42, 12, 10, 0.96), rgba(22, 6, 5, 0.96));
+  border-color: rgba(255, 120, 82, 0.22);
+}
+
+body[data-theme="ember"] .profile-stat {
+  background: linear-gradient(180deg, rgba(58, 18, 15, 0.78), rgba(31, 7, 5, 0.82));
+  border-color: rgba(255, 120, 82, 0.18);
+}
+
+body[data-theme="ember"] .profile-meta,
+body[data-theme="ember"] .profile-stat-label {
+  color: #ff8a3d;
+}
+
+body[data-theme="ember"] .profile-feed-head h4,
+body[data-theme="ember"] .profile-copy h3,
+body[data-theme="ember"] .profile-stat-value {
+  color: #fff;
+}
+
+body[data-theme="ember"] .profile-badge {
+  background: linear-gradient(135deg, #ff4438, #ff8a3d);
+  color: #fff;
+}
+
+/* Ember Primary Button Overrides */
+body[data-theme="ember"] .button-primary {
+  background: linear-gradient(135deg, #ff4438, #ff8a3d);
+  color: #fff;
+  box-shadow: 0 14px 30px rgba(255, 68, 56, 0.22);
+}
+
+body[data-theme="ember"] .button-primary:hover,
+body[data-theme="ember"] .button-primary:focus-visible {
+  box-shadow: 0 18px 40px rgba(255, 68, 56, 0.32);
+}
+
+/* Ember Admin Ban Panel Overrides */
+body[data-theme="ember"] .admin-ban-item {
+  background: rgba(36, 12, 10, 0.6);
+  border-color: rgba(255, 120, 82, 0.18);
+}
+
+body[data-theme="ember"] .admin-ban-item.is-banned {
+  background: rgba(255, 68, 56, 0.12);
+  border-color: rgba(255, 68, 56, 0.4);
+}
+
+body[data-theme="ember"] .admin-ban-launcher {
+  background: rgba(31, 7, 5, 0.96);
+  border-color: rgba(255, 120, 82, 0.18);
+  box-shadow: 0 22px 54px rgba(255, 68, 56, 0.24);
+}
+
+body[data-theme="ember"] .messenger-launcher {
+  background: rgba(31, 7, 5, 0.96);
+  border-color: rgba(255, 120, 82, 0.18);
+  box-shadow: 0 22px 54px rgba(255, 68, 56, 0.24);
+}
+
+/* Ember Dropzone Tile Overrides */
+body[data-theme="ember"] .dropzone-tile-primary {
+  background: linear-gradient(135deg, #ff4438, #ff8a3d);
+}
+
+body[data-theme="ember"] .dropzone-tile-secondary {
+  background: linear-gradient(135deg, #ff8a3d, #ffc107);
+}
+
+body[data-theme="ember"] .dropzone-tile-tertiary {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04)),
+    linear-gradient(180deg, rgba(42, 12, 10, 0.88), rgba(64, 18, 15, 0.66));
+}
+
+/* Ember Media & Stage Overrides */
+body[data-theme="ember"] .spotlight-media {
+  background:
+    linear-gradient(135deg, rgba(255, 68, 56, 0.18), rgba(255, 138, 61, 0.24)),
+    #1c0403;
+}
+
+body[data-theme="ember"] .viewer-stage,
+body[data-theme="ember"] .mini-player-stage {
+  background: #140403;
+}
+
+body[data-theme="ember"] .external-stage-youtube,
+body[data-theme="ember"] .external-preview-card-youtube {
+  background:
+    radial-gradient(circle at top left, rgba(255, 79, 79, 0.34), transparent 34%),
+    linear-gradient(135deg, #341210, #1c0403 70%);
+}
+
+body[data-theme="ember"] .external-stage-spotify,
+body[data-theme="ember"] .external-preview-card-spotify {
+  background:
+    radial-gradient(circle at top left, rgba(255, 138, 61, 0.38), transparent 34%),
+    linear-gradient(135deg, #241210, #1c0403 70%);
+}
+
+body[data-theme="ember"] .external-preview-card {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 28%),
+    linear-gradient(135deg, #241210, #1c0403 72%);
+}
+
+body[data-theme="ember"] .message-attachment-card {
+  background: rgba(42, 12, 10, 0.78);
+  border-color: rgba(255, 120, 82, 0.18);
+}
+
+body[data-theme="ember"] .message-attachment-card.is-preview {
+  background: rgba(58, 18, 15, 0.86);
+}
+
+body[data-theme="ember"] .message-attachment-media {
+  background: #1c0403;
+}
+
+body[data-theme="ember"] .card-media::before {
+  background: linear-gradient(180deg, rgba(42, 12, 10, 0.04), rgba(42, 12, 10, 0.1) 40%, rgba(22, 6, 5, 0.72));
 }
 
 body[data-density="compact"] .page-shell {
