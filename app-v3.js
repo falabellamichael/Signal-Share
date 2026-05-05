@@ -2513,7 +2513,18 @@ function createFeedCard(post) {
 }
 
 function getAllPosts() { if (state.backendMode === "local" && state.userPosts.length === 0) return [...DEMO_POSTS]; return [...state.userPosts]; }
-function getVisiblePosts() { const query = state.search; const posts = getAllPosts().filter((post) => { const matchesFilter = state.filter === "all" || state.filter === post.mediaKind || (state.filter === "saved" && isPostSaved(post.id)); if (!matchesFilter) return false; if (!query) return true; const haystack = [post.title, post.caption, post.creator, post.tags.join(" ")].join(" ").toLowerCase(); return haystack.includes(query); }); return sortPosts(posts); }
+function getVisiblePosts() { 
+  const query = state.search; 
+  const all = healPosts(getAllPosts());
+  const posts = all.filter((post) => { 
+    const matchesFilter = state.filter === "all" || state.filter === post.mediaKind || (state.filter === "saved" && isPostSaved(post.id)); 
+    if (!matchesFilter) return false; 
+    if (!query) return true; 
+    const haystack = [post.title, post.caption, post.creator, post.tags.join(" ")].join(" ").toLowerCase(); 
+    return haystack.includes(query); 
+  }); 
+  return sortPosts(posts); 
+}
 function getFeedPageCount(totalPosts) { return Math.max(1, Math.ceil(totalPosts / FEED_POSTS_PER_PAGE)); }
 function clampFeedPage(totalPosts) { state.feedPage = Math.min(Math.max(1, state.feedPage), getFeedPageCount(totalPosts)); }
 function getCurrentFeedPagePosts(posts) { clampFeedPage(posts.length); const startIndex = (state.feedPage - 1) * FEED_POSTS_PER_PAGE; return posts.slice(startIndex, startIndex + FEED_POSTS_PER_PAGE); }
@@ -2975,12 +2986,14 @@ function parseExternalMediaUrl(raw) {
 function healPosts(posts) {
   if (!Array.isArray(posts)) return posts;
   return posts.map(post => {
-    // If it's a YouTube post but missing its ID or embed URL, try to repair it using the new regex
-    if (post.sourceKind === "youtube" && (!post.externalId || !post.embedUrl) && (post.externalUrl || post.src)) {
-      const repaired = parseYouTubeUrl(post.externalUrl || post.src);
+    // If it's a YouTube post but missing its ID or embed URL, try to repair it
+    const isYouTube = post.sourceKind === "youtube" || (post.externalUrl && post.externalUrl.includes("yout"));
+    if (isYouTube && (!post.externalId || !post.embedUrl)) {
+      const repaired = parseYouTubeUrl(post.externalUrl || post.src || post.mediaUrl || "");
       if (repaired) {
         post.externalId = repaired.externalId;
         post.embedUrl = repaired.embedUrl;
+        post.sourceKind = "youtube";
         post.mediaKind = "video";
       }
     }
@@ -2989,11 +3002,14 @@ function healPosts(posts) {
 }
 
 function parseYouTubeUrl(raw) {
-  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|live|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
+  if (!raw || typeof raw !== "string") return null;
+  const regex = /^.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/|shorts\/|live\/)|(?:(?:watch)?\?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*/;
   const match = raw.match(regex);
-  if (!match) return null;
-  const videoId = match[1];
-  return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
+  if (match && match[1].length === 11) {
+    const videoId = match[1];
+    return { provider: "youtube", mediaKind: "video", externalId: videoId, embedUrl: `https://www.youtube.com/embed/${videoId}?rel=0`, originalUrl: raw, label: `YouTube video ${videoId}` };
+  }
+  return null;
 }
 
 function parseSpotifyUrl(raw) {
