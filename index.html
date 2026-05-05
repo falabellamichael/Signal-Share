@@ -22,7 +22,7 @@
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=90" />
+    <link rel="stylesheet" href="./styles.css?v=91" />
     <link rel="stylesheet" href="./notifications.css" />
   </head>
   <body>
@@ -102,30 +102,72 @@
                 <span>Pick the room you want to work in.</span>
               </div>
 
-              <div class="theme-grid" id="themeGrid">
-                <button class="theme-swatch" data-theme-option="sunset" type="button" aria-pressed="false">
-                  <span class="theme-preview theme-preview-sunset"></span>
-                  <strong>Sunset</strong>
-                  <span>Warm default</span>
+              <div class="theme-picker" id="themePicker">
+                <button
+                  class="theme-picker-trigger"
+                  id="themePickerButton"
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="themePickerMenu"
+                >
+                  <span class="theme-preview theme-preview-sunset" id="themePickerPreview" aria-hidden="true"></span>
+                  <span class="theme-picker-copy">
+                    <strong id="themePickerLabel">Sunset</strong>
+                    <span id="themePickerDescription">Warm default</span>
+                  </span>
+                  <span class="theme-picker-chevron" aria-hidden="true">v</span>
                 </button>
 
-                <button class="theme-swatch" data-theme-option="midnight" type="button" aria-pressed="false">
-                  <span class="theme-preview theme-preview-midnight"></span>
-                  <strong>Midnight</strong>
-                  <span>Dark mode</span>
-                </button>
+                <div class="theme-picker-menu" id="themePickerMenu" role="listbox" aria-label="Theme" hidden>
+                  <button class="theme-option-tile" data-theme-option="sunset" type="button" role="option" aria-selected="false">
+                    <span class="theme-preview theme-preview-sunset" aria-hidden="true"></span>
+                    <span class="theme-option-copy">
+                      <strong>Sunset</strong>
+                      <span>Warm default</span>
+                    </span>
+                  </button>
 
-                <button class="theme-swatch" data-theme-option="gallery" type="button" aria-pressed="false">
-                  <span class="theme-preview theme-preview-gallery"></span>
-                  <strong>Gallery</strong>
-                  <span>Neutral light</span>
-                </button>
+                  <button class="theme-option-tile" data-theme-option="midnight" type="button" role="option" aria-selected="false">
+                    <span class="theme-preview theme-preview-midnight" aria-hidden="true"></span>
+                    <span class="theme-option-copy">
+                      <strong>Midnight</strong>
+                      <span>Dark mode</span>
+                    </span>
+                  </button>
 
-                <button class="theme-swatch" data-theme-option="aurora" type="button" aria-pressed="false">
-                  <span class="theme-preview theme-preview-aurora"></span>
-                  <strong>Aurora</strong>
-                  <span>Cool studio</span>
-                </button>
+                  <button class="theme-option-tile" data-theme-option="gallery" type="button" role="option" aria-selected="false">
+                    <span class="theme-preview theme-preview-gallery" aria-hidden="true"></span>
+                    <span class="theme-option-copy">
+                      <strong>Gallery</strong>
+                      <span>Neutral light</span>
+                    </span>
+                  </button>
+
+                  <button class="theme-option-tile" data-theme-option="aurora" type="button" role="option" aria-selected="false">
+                    <span class="theme-preview theme-preview-aurora" aria-hidden="true"></span>
+                    <span class="theme-option-copy">
+                      <strong>Aurora</strong>
+                      <span>Cool studio</span>
+                    </span>
+                  </button>
+
+                  <button class="theme-option-tile" data-theme-option="contrast" type="button" role="option" aria-selected="false">
+                    <span class="theme-preview theme-preview-contrast" aria-hidden="true"></span>
+                    <span class="theme-option-copy">
+                      <strong>High Contrast</strong>
+                      <span>Blackout signal</span>
+                    </span>
+                  </button>
+
+                  <button class="theme-option-tile" data-theme-option="ember" type="button" role="option" aria-selected="false">
+                    <span class="theme-preview theme-preview-ember" aria-hidden="true"></span>
+                    <span class="theme-option-copy">
+                      <strong>Ember Red</strong>
+                      <span>Companion glow</span>
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1204,7 +1246,7 @@
     </section>
 
     <script src="messenger-realtime.js?v=80"></script>
-    <script type="module" src="app-v3.js?v=95"></script>
+    <script type="module" src="app-v3.js?v=96"></script>
 
   </body>
 </html>

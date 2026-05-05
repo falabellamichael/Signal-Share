@@ -8,7 +8,7 @@ export function createAppUi(context) {
     POST_MODERATION_ERROR, LIKED_POSTS_KEY, POST_LIKES_TABLE, SAVED_POSTS_KEY, CREATOR_NAME_KEY,
     PLAYER_POSITION_KEY, PLAYER_VOLUME_KEY, USER_PREFERENCES_KEY, CURRENT_TERMS_VERSION, CURRENT_PRIVACY_VERSION,
     EXTERNAL_PROVIDERS, DEFAULT_PLAYER_VOLUME, DEFAULT_AUTH_REDIRECT_URL, DEFAULT_BLOCKED_TERMS, DEFAULT_SITE_SETTINGS,
-    DEFAULT_USER_PREFERENCES, APP_CONFIG, externalPreviewCache, isCurrentUserBanned, isUserBanned,
+    DEFAULT_USER_PREFERENCES, THEME_OPTIONS, APP_CONFIG, externalPreviewCache, isCurrentUserBanned, isUserBanned,
     isMessagingEnabled, canPublishToLiveFeed, isUserBlocked, canAccessAdminBanPanel, registerSiteServiceWorker,
     canUseBrowserNotifications, isNativeCapacitorApp, getCapacitorPlatform, getNativePushNotificationsPlugin, getNativeAppPlugin,
     supportsNativePushNotifications, supportsWebPushNotifications, trimNotificationText, maybeRequestMessageNotificationPermission, base64UrlToUint8Array,
@@ -78,7 +78,12 @@ export function createAppUi(context) {
     settingsMainPage: document.querySelector("#settingsMainPage"),
     settingsShortcutsPage: document.querySelector("#settingsShortcutsPage"),
     shortcutsList: document.querySelector("#shortcutsList"),
-    themeGrid: document.querySelector("#themeGrid"),
+    themePicker: document.querySelector("#themePicker"),
+    themePickerButton: document.querySelector("#themePickerButton"),
+    themePickerMenu: document.querySelector("#themePickerMenu"),
+    themePickerPreview: document.querySelector("#themePickerPreview"),
+    themePickerLabel: document.querySelector("#themePickerLabel"),
+    themePickerDescription: document.querySelector("#themePickerDescription"),
     densitySelect: document.querySelector("#densitySelect"),
     motionSelect: document.querySelector("#motionSelect"),
     statusBarStripToggle: document.querySelector("#statusBarStripToggle"),
@@ -246,7 +251,8 @@ export function createAppUi(context) {
       if (window.notifications) window.notifications.clearHistory();
       renderNotificationsHistory();
     });
-    elements.themeGrid.addEventListener("click", handleThemeOptionClick);
+    elements.themePickerButton?.addEventListener("click", toggleThemePicker);
+    elements.themePickerMenu?.addEventListener("click", handleThemeOptionClick);
     elements.densitySelect.addEventListener("change", handleDensityChange);
     elements.motionSelect.addEventListener("change", handleMotionChange);
     elements.statusBarStripToggle.addEventListener("change", handleStatusBarStripToggle);
@@ -320,6 +326,7 @@ export function createAppUi(context) {
     document.addEventListener("touchend", clearOverlayTouchState, { passive: true, capture: true });
     document.addEventListener("touchcancel", clearOverlayTouchState, { passive: true, capture: true });
     document.addEventListener("keydown", (event) => {
+      if (state.themePickerOpen && event.key === "Escape") { closeThemePicker(); return; }
       if (state.settingsPanelOpen && event.key === "Escape") { closeSettingsPanel(); return; }
       if (state.notificationsPanelOpen && event.key === "Escape") { closeNotificationsPanel(); return; }
       if (state.keyboardShortcutsPanelOpen && event.key === "Escape") { closeKeyboardShortcutsPanel(); return; }
@@ -335,6 +342,7 @@ export function createAppUi(context) {
       if (event.key === "ArrowLeft") stepViewer(-1);
       if (event.key === "ArrowRight") stepViewer(1);
     });
+    document.addEventListener("click", handleThemePickerOutsideClick);
     document.addEventListener("click", handleExpandedMessengerOutsideClick);
     
     // Notification Interactivity
@@ -848,7 +856,7 @@ export function createAppUi(context) {
 
   function openSettingsPanel() { state.settingsPanelOpen = true; state.settingsActivePage = "main"; setMobileHeaderHidden(false); renderSettingsPanel(); requestAnimationFrame(() => elements.settingsCloseButton?.focus?.()); }
 
-  function closeSettingsPanel(options = {}) { const { restoreFocus = true } = options; if (!state.settingsPanelOpen) return; state.settingsPanelOpen = false; renderSettingsPanel(); if (restoreFocus) elements.settingsToggleButton.focus(); }
+  function closeSettingsPanel(options = {}) { const { restoreFocus = true } = options; if (!state.settingsPanelOpen) return; state.settingsPanelOpen = false; state.themePickerOpen = false; renderSettingsPanel(); if (restoreFocus) elements.settingsToggleButton.focus(); }
 
   function toggleSettingsPanel(event) { if (event) { event.preventDefault(); event.stopPropagation(); } if (state.settingsPanelOpen) closeSettingsPanel(); else openSettingsPanel(); }
 
@@ -864,6 +872,7 @@ export function createAppUi(context) {
     if (!elements.settingsPanel) return;
     
     const isOpen = state.settingsPanelOpen;
+    if (!isOpen) state.themePickerOpen = false;
     elements.settingsPanel.hidden = !isOpen;
     elements.settingsPanel.classList.toggle("is-open", isOpen);
     elements.settingsPanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
@@ -882,13 +891,7 @@ export function createAppUi(context) {
         if (elements.statusBarStripToggle) elements.statusBarStripToggle.checked = state.preferences.statusBarStrip;
         if (elements.notificationHideSenderToggle) elements.notificationHideSenderToggle.checked = state.preferences.notificationHideSender;
         if (elements.notificationHideBodyToggle) elements.notificationHideBodyToggle.checked = state.preferences.notificationHideBody;
-        if (elements.themeGrid) {
-          elements.themeGrid.querySelectorAll("[data-theme-option]").forEach((button) => {
-            const isActive = button.dataset.themeOption === state.preferences.theme;
-            button.classList.toggle("is-active", isActive);
-            button.setAttribute("aria-pressed", isActive ? "true" : "false");
-          });
-        }
+        renderThemePicker();
       }
     }
   }
@@ -979,7 +982,54 @@ export function createAppUi(context) {
     });
   }
 
-  function handleThemeOptionClick(event) { const button = event.target.closest("[data-theme-option]"); if (!button) return; updateUserPreferences({ ...state.preferences, theme: button.dataset.themeOption }); }
+  function getThemeOption(value) {
+    return THEME_OPTIONS.find((option) => option.value === value) ?? THEME_OPTIONS[0];
+  }
+
+  function renderThemePicker() {
+    if (!elements.themePicker || !elements.themePickerButton || !elements.themePickerMenu) return;
+    const activeTheme = getThemeOption(state.preferences.theme);
+    elements.themePicker.classList.toggle("is-open", state.themePickerOpen);
+    elements.themePickerButton.setAttribute("aria-expanded", state.themePickerOpen ? "true" : "false");
+    elements.themePickerMenu.hidden = !state.themePickerOpen;
+    if (elements.themePickerLabel) elements.themePickerLabel.textContent = activeTheme.label;
+    if (elements.themePickerDescription) elements.themePickerDescription.textContent = activeTheme.description;
+    if (elements.themePickerPreview) elements.themePickerPreview.className = `theme-preview theme-preview-${activeTheme.value}`;
+    elements.themePickerMenu.querySelectorAll("[data-theme-option]").forEach((button) => {
+      const isActive = button.dataset.themeOption === state.preferences.theme;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+  }
+
+  function toggleThemePicker(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    state.themePickerOpen = !state.themePickerOpen;
+    renderThemePicker();
+  }
+
+  function closeThemePicker() {
+    if (!state.themePickerOpen) return;
+    state.themePickerOpen = false;
+    renderThemePicker();
+  }
+
+  function handleThemePickerOutsideClick(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!state.themePickerOpen || !target || elements.themePicker?.contains(target)) return;
+    closeThemePicker();
+  }
+
+  function handleThemeOptionClick(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    const button = target?.closest("[data-theme-option]");
+    if (!button) return;
+    state.themePickerOpen = false;
+    updateUserPreferences({ ...state.preferences, theme: button.dataset.themeOption });
+  }
 
   function handleDensityChange(event) { updateUserPreferences({ ...state.preferences, density: event.target.value }); }
 

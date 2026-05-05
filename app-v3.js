@@ -1,5 +1,5 @@
 import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js?v=92';
-import { createAppUi } from './app-v3-ui.js?v=95';
+import { createAppUi } from './app-v3-ui.js?v=96';
 
 
 
@@ -162,6 +162,15 @@ const DEFAULT_USER_PREFERENCES = Object.freeze({
   notificationHideSender: false,
   notificationHideBody: false,
 });
+const THEME_OPTIONS = Object.freeze([
+  { value: "sunset", label: "Sunset", description: "Warm default" },
+  { value: "midnight", label: "Midnight", description: "Dark mode" },
+  { value: "gallery", label: "Gallery", description: "Neutral light" },
+  { value: "aurora", label: "Aurora", description: "Cool studio" },
+  { value: "contrast", label: "High Contrast", description: "Blackout with sharp signal colors" },
+  { value: "ember", label: "Ember Red", description: "Deep red companion glow" },
+]);
+const THEME_VALUES = new Set(THEME_OPTIONS.map((option) => option.value));
 const APP_CONFIG = getAppConfig();
 let messageChimeAudioContext = null;
 let serviceWorkerRegistrationPromise = null;
@@ -213,6 +222,7 @@ if (!window[globalStateKey]) {
     mobileHeaderHidden: false,
     lastScrollY: 0,
     settingsPanelOpen: false,
+    themePickerOpen: false,
     notificationsPanelOpen: false,
     settingsActivePage: "main",
     adminBanPanelOpen: false,
@@ -303,7 +313,7 @@ const {
   POST_MODERATION_ERROR, LIKED_POSTS_KEY, POST_LIKES_TABLE, SAVED_POSTS_KEY, CREATOR_NAME_KEY,
   PLAYER_POSITION_KEY, PLAYER_VOLUME_KEY, USER_PREFERENCES_KEY, CURRENT_TERMS_VERSION, CURRENT_PRIVACY_VERSION,
   EXTERNAL_PROVIDERS, DEFAULT_PLAYER_VOLUME, DEFAULT_AUTH_REDIRECT_URL, DEFAULT_BLOCKED_TERMS, DEFAULT_SITE_SETTINGS,
-  DEFAULT_USER_PREFERENCES, APP_CONFIG, externalPreviewCache, isCurrentUserBanned, isUserBanned,
+  DEFAULT_USER_PREFERENCES, THEME_OPTIONS, APP_CONFIG, externalPreviewCache, isCurrentUserBanned, isUserBanned,
   isMessagingEnabled, canPublishToLiveFeed, isUserBlocked, canAccessAdminBanPanel, registerSiteServiceWorker,
   canUseBrowserNotifications, isNativeCapacitorApp, getCapacitorPlatform, getNativePushNotificationsPlugin, getNativeAppPlugin,
   supportsNativePushNotifications, supportsWebPushNotifications, trimNotificationText, maybeRequestMessageNotificationPermission, base64UrlToUint8Array,
@@ -1615,7 +1625,7 @@ function loadUserPreferences() {
 }
 
 function normalizeUserPreferences(raw = {}) {
-  const theme = ["sunset", "midnight", "gallery", "aurora"].includes(raw.theme) ? raw.theme : DEFAULT_USER_PREFERENCES.theme;
+  const theme = THEME_VALUES.has(raw.theme) ? raw.theme : DEFAULT_USER_PREFERENCES.theme;
   const density = ["airy", "compact"].includes(raw.density) ? raw.density : DEFAULT_USER_PREFERENCES.density;
   const motion = ["full", "calm"].includes(raw.motion) ? raw.motion : DEFAULT_USER_PREFERENCES.motion;
   const statusBarStrip = typeof raw.statusBarStrip === "boolean" ? raw.statusBarStrip : DEFAULT_USER_PREFERENCES.statusBarStrip;
