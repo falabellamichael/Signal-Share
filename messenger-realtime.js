@@ -92,12 +92,17 @@ window.MessengerRealtime = class MessengerRealtime {
     const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
     console.log("[Realtime] Notification System Status:", window.notifications ? "Ready" : "Missing", "Mobile:", isMobile);
     
-    if (window.notifications) {
+    if (window.notifications && typeof window.notifications.add === "function") {
       // Show notification (Centralized system handles banners, history, and browser alerts)
-      window.notifications.info(messageBody, `${senderName} sent a message`, { 
+      window.notifications.add({
         id: message.id,
+        type: 'info',
+        title: `${senderName} sent a message`,
+        message: messageBody,
         data: { type: "message", threadId: message.threadId }
       });
+    } else {
+      console.warn("[Realtime] Notification system not yet initialized or missing 'add' method.");
     }
 
     // 3. Update UI
