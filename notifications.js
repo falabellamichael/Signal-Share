@@ -1,55 +1,32 @@
-// Signal Share Notification System (VERSION 11 - FINAL RESTART)
-// Features: Themed badge colors, exclusive DOM control, and session-only counting.
+// Signal Share Notification System (V20 - STABLE REVERT)
+// Reverted the experimental overrides and data merging to restore the last known stable state.
 
-class NotificationSystem {
-  constructor() {
-    this.history = [];
-    this.count = 0;
-    this.init();
-  }
+(function() {
+  console.log("[Notifications] Loading V20...");
 
-  init() {
-    this.loadHistory();
-    this.resetBadge();
-    this.setupUI();
-    
-    // Listen for theme changes to update badge color
-    const observer = new MutationObserver(() => this.applyThemeStyles());
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
-    this.applyThemeStyles();
-    
-    console.log("[Notifications] V11 Initialized. Badge ID: globalNotificationCount");
-  }
+  let history = [];
+  let count = 0;
 
-  loadHistory() {
+  function load() {
     try {
-      this.history = JSON.parse(localStorage.getItem('notif_hist_v11') || '[]');
+      history = JSON.parse(localStorage.getItem('notif_v17_hist') || '[]');
+      count = parseInt(localStorage.getItem('notif_v17_count') || '0');
     } catch (e) {
-      this.history = [];
+      history = [];
+      count = 0;
     }
   }
 
-  saveHistory() {
-    localStorage.setItem('notif_hist_v11', JSON.stringify(this.history.slice(0, 50)));
-    if (window.renderNotificationsHistory) window.renderNotificationsHistory();
+  function save() {
+    localStorage.setItem('notif_v17_hist', JSON.stringify(history.slice(0, 50)));
+    localStorage.setItem('notif_v17_count', count.toString());
+    renderUI();
   }
 
-  setupUI() {
-    if (!document.getElementById('notification-container')) {
-      const c = document.createElement('div');
-      c.id = 'notification-container';
-      c.className = 'notification-container';
-      document.body.appendChild(c);
-    }
-  }
-
-  // The ONLY way an item enters the system
-  add(opts) {
+  function add(opts) {
     if (!opts || !opts.message) return;
-
-    // Strict de-duplication within current session history
-    const id = opts.id || Date.now();
-    if (this.history.some(n => n.id === id)) return;
+    const id = opts.id || ('n-' + Date.now() + Math.random());
+    if (history.some(n => n.id === id)) return;
 
     const item = {
       id,
@@ -59,103 +36,94 @@ class NotificationSystem {
       type: opts.type || 'info'
     };
 
-    this.history.unshift(item);
-    this.saveHistory();
-
+    history.unshift(item);
     if (!opts.silent) {
-      this.count++;
-      this.updateUI();
-      this.showBanner(item);
+      count++;
+      showBanner(item);
     }
+    save();
   }
 
-  updateUI() {
-    const badge = document.getElementById('globalNotificationCount');
+  function renderUI() {
+    const badge = document.getElementById('notificationBadge');
     if (badge) {
-      badge.textContent = this.count;
-      badge.style.display = this.count > 0 ? 'flex' : 'none';
-      this.applyThemeStyles();
+      badge.textContent = count;
+      badge.style.setProperty('display', count > 0 ? 'flex' : 'none', 'important');
+      badge.style.setProperty('bottom', '0px', 'important');
+      badge.style.setProperty('right', '4px', 'important');
+      applyThemeToBadge(badge);
     }
-    if (window.Capacitor?.Plugins?.Badge) {
-      window.Capacitor.Plugins.Badge.set({ count: this.count }).catch(() => {});
+
+    const list = document.getElementById('notificationsList');
+    if (list) {
+      list.innerHTML = '';
+      history.forEach(n => {
+        const li = document.createElement('li');
+        li.style.cssText = "padding:12px; margin-bottom:8px; border-radius:8px; background:rgba(255,255,255,0.05); border-left:4px solid #3b82f6; cursor:pointer; color:inherit; list-style:none;";
+        li.innerHTML = `<strong style="color:inherit;">${n.title}</strong><p style="margin:4px 0; font-size:0.9rem; opacity:0.8; color:inherit;">${n.message}</p>`;
+        list.appendChild(li);
+      });
     }
   }
 
-  applyThemeStyles() {
-    const badge = document.getElementById('globalNotificationCount');
+  function applyThemeToBadge(badge) {
     if (!badge) return;
-
-    // Get theme from HTML attribute (common in modern apps) or localStorage
-    const theme = document.documentElement.getAttribute('data-theme') || 
-                  document.body.className || 
-                  "sunset";
+    const currentTheme = document.body.dataset.theme || 
+                         document.documentElement.getAttribute('data-theme') || 
+                         document.body.getAttribute('data-theme') ||
+                         "sunset";
     
-    const isMidnight = theme.toLowerCase().includes('midnight');
-    
-    if (isMidnight) {
-      badge.style.background = '#3b82f6'; // Premium Blue for Midnight
-      badge.style.color = '#ffffff';
-    } else {
-      badge.style.background = '#000000'; // Black for every other theme
-      badge.style.color = '#ffffff';
-    }
+    const isMidnight = currentTheme.toLowerCase().includes('midnight');
+    badge.style.setProperty('background-color', isMidnight ? '#3b82f6' : '#000000', 'important');
+    badge.style.setProperty('color', '#ffffff', 'important');
+    badge.style.setProperty('opacity', '1', 'important');
+    badge.style.setProperty('visibility', 'visible', 'important');
   }
 
-  showBanner(item) {
-    const container = document.getElementById('notification-container');
-    if (!container) return;
-
+  function showBanner(item) {
+    let container = document.getElementById('notification-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'notification-container';
+      container.className = 'notification-container';
+      document.body.appendChild(container);
+    }
     const el = document.createElement('div');
     el.className = `notification notification-${item.type}`;
-    el.style.cursor = 'pointer';
-    el.innerHTML = `<strong>${item.title}</strong><div>${item.message}</div>`;
+    el.style.cssText = "background:rgba(0,0,0,0.95); color:white; padding:15px; margin-bottom:10px; border-radius:10px; border-left:5px solid #3b82f6; box-shadow:0 5px 20px rgba(0,0,0,0.5); z-index:10001; position:relative; pointer-events:auto;";
+    el.innerHTML = `<strong>${item.title}</strong><div style="font-size:0.9rem;">${item.message}</div>`;
     el.onclick = () => el.remove();
-    
     container.appendChild(el);
     setTimeout(() => { if (el.parentNode) el.remove(); }, 5000);
   }
 
-  resetBadge() {
-    this.count = 0;
-    this.updateUI();
-  }
-
-  clearHistory() {
-    this.history = [];
-    this.saveHistory();
-    this.resetBadge();
-  }
-
-  // Legacy Mapping
-  success(m, t, o) { this.add({ ...o, type: 'success', message: m, title: t }); }
-  error(m, t, o) { this.add({ ...o, type: 'error', message: m, title: t }); }
-  info(m, t, o) { this.add({ ...o, type: 'info', message: m, title: t }); }
-  warning(m, t, o) { this.add({ ...o, type: 'warning', message: m, title: t }); }
-  
-  showNotification(o) { this.add(o); }
-  addToHistory(o) { this.add(o); }
-  setUnreadCount(c) { if (c === 0) this.resetBadge(); }
-  incrementUnreadCount() { 
-    this.count++;
-    this.updateUI();
-  }
-  syncWithSupabase() {}
-}
-
-window.notifications = new NotificationSystem();
-
-window.renderNotificationsHistory = function() {
-  const list = document.getElementById('notificationsList');
-  if (!list) return;
-  list.innerHTML = '';
-  
-  window.notifications.history.forEach(n => {
-    const li = document.createElement('li');
-    li.style.cssText = "padding:12px; margin-bottom:8px; border-radius:8px; background:rgba(255,255,255,0.05); border-left:4px solid #3b82f6; cursor:pointer;";
-    li.innerHTML = `<strong>${n.title}</strong><p style="margin:4px 0; font-size:0.9rem; opacity:0.8;">${n.message}</p>`;
-    list.appendChild(li);
+  const themeObserver = new MutationObserver(() => {
+    const badge = document.getElementById('notificationBadge');
+    if (badge) applyThemeToBadge(badge);
   });
-  
-  const empty = document.getElementById('notificationsEmptyState');
-  if (empty) empty.style.display = window.notifications.history.length === 0 ? 'block' : 'none';
-};
+  themeObserver.observe(document.body, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'notif_v17_hist' || e.key === 'notif_v17_count') { load(); renderUI(); }
+  });
+
+  window.notifications = {
+    add: add,
+    success: (m, t, o) => add({...o, type:'success', message:m, title:t}),
+    error: (m, t, o) => add({...o, type:'error', message:m, title:t}),
+    info: (m, t, o) => add({...o, type:'info', message:m, title:t}),
+    warning: (m, t, o) => add({...o, type:'warning', message:m, title:t}),
+    clearHistory: () => { history = []; count = 0; save(); },
+    resetBadge: () => { count = 0; save(); },
+    incrementUnreadCount: () => { count++; save(); },
+    syncWithSupabase: () => {},
+    setUnreadCount: (c) => { if(c===0) { count = 0; save(); } }
+  };
+
+  window.renderNotificationsHistory = renderUI;
+  load();
+  if (document.readyState !== 'loading') renderUI();
+  else document.addEventListener('DOMContentLoaded', renderUI);
+  setTimeout(renderUI, 500);
+
+})();

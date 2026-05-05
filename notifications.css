@@ -9,9 +9,11 @@
   margin: 0;
   padding: 0;
   list-style: none;
+  pointer-events: none; /* Let taps pass through the invisible parts of the container */
 }
 
 .notification {
+  pointer-events: auto; /* Re-enable taps for the actual notification banners */
   position: relative;
   margin-bottom: 12px;
   padding: 16px 20px;

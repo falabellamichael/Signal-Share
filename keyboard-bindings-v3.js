@@ -109,7 +109,7 @@ class KeyboardBindings {
     // Navigation shortcuts
     this.registerShortcut('n', () => {
       // Navigate to notifications
-      const notificationButton = document.getElementById('notificationsLauncherButton');
+      const notificationButton = document.getElementById('notificationBell');
       if (notificationButton) {
         notificationButton.click();
       }

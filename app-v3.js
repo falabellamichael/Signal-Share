@@ -276,7 +276,7 @@ const elements = {
   settingsPanel: document.querySelector("#settingsPanel"),
   settingsBackdrop: document.querySelector("#settingsBackdrop"),
   settingsCloseButton: document.querySelector("#settingsCloseButton"),
-  notificationsLauncherButton: document.querySelector("#notificationsLauncherButton"),
+  notificationsLauncherButton: document.querySelector("#notificationBell"),
   notificationsPanel: document.querySelector("#notificationsPanel"),
   notificationsBackdrop: document.querySelector("#notificationsBackdrop"),
   notificationsCloseButton: document.querySelector("#notificationsCloseButton"),
@@ -943,7 +943,7 @@ function attachEventListeners() {
   elements.settingsBackdrop.addEventListener("click", closeSettingsPanel);
   elements.settingsCloseButton.addEventListener("click", closeSettingsPanel);
   
-  if (elements.notificationsLauncherButton) elements.notificationsLauncherButton.addEventListener("click", toggleNotificationsPanel);
+  // Listeners for bell button are now handled inline in index.html to prevent conflicts
   if (elements.keyboardShortcutsButton) elements.keyboardShortcutsButton.addEventListener("click", () => window.showSettingsPage && window.showSettingsPage('shortcuts'));
   if (elements.notificationsBackdrop) elements.notificationsBackdrop.addEventListener("click", closeNotificationsPanel);
   if (elements.notificationsCloseButton) elements.notificationsCloseButton.addEventListener("click", closeNotificationsPanel);
@@ -1240,6 +1240,15 @@ function render() {
   renderProfileView();
   syncSourceHelp();
   updateComposerAccess();
+}
+
+window.renderNotificationsPanel = function() {
+  const isOpen = state.notificationsPanelOpen;
+  if (elements.notificationsPanel) {
+    elements.notificationsPanel.hidden = !isOpen;
+    elements.notificationsPanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+  }
+  syncOverlayBodyState();
 }
 
 function renderStats() {
@@ -2279,10 +2288,21 @@ function closeNotificationsPanel(options = {}) {
   render(); 
   if (restoreFocus && elements.notificationsLauncherButton) elements.notificationsLauncherButton.focus(); 
 }
-function toggleNotificationsPanel(event) { 
+let lastToggleTime = 0;
+window.toggleNotificationsPanel = function(event) { 
+  const now = Date.now();
+  if (now - lastToggleTime < 300) return; // Prevent double-toggle
+  lastToggleTime = now;
+
   if (event) { event.preventDefault(); event.stopPropagation(); } 
   if (state.notificationsPanelOpen) closeNotificationsPanel(); else openNotificationsPanel(); 
 }
+
+// Compatibility with user snippet
+window.NotificationSystem = {
+  toggle: () => window.toggleNotificationsPanel()
+};
+window.toggleNotifications = () => window.toggleNotificationsPanel();
 
 function renderKeyboardShortcuts() {
   if (!elements.shortcutsList) return;
