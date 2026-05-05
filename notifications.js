@@ -1,8 +1,9 @@
-// Signal Share Notification System (V26 - UNREAD STATES)
-// Added: Tracking of 'read' vs 'unread' notifications with visual opacity differences.
+// Signal Share Notification System (V27 - AUTO-REMOVE ON NAV)
+// Added: Auto-removal of notification from history when navigating to a location.
+// Optimized: handleNotificationClick logic to support future drop-down features.
 
 (function() {
-  console.log("[Notifications] Loading V26...");
+  console.log("[Notifications] Loading V27...");
 
   let history = [];
   let count = 0;
@@ -35,7 +36,7 @@
       timestamp: Date.now(),
       type: opts.type || 'info',
       threadId: opts.threadId || "",
-      read: false // New items are always unread
+      read: false
     };
 
     history.unshift(item);
@@ -49,24 +50,33 @@
   function handleNotificationClick(n) {
     console.log("[Notifications] Item clicked:", n);
     
-    // Mark as read
+    // Mark as read immediately
     n.read = true;
-    save();
     
-    // Close the panel first
-    if (window.toggleNotificationsPanel) window.toggleNotificationsPanel();
-    
-    // Determine where to go
+    let actionTaken = false;
     const msg = (n.message + n.title).toLowerCase();
+
+    // Navigation Logic
     if (msg.includes('message') || msg.includes('text') || n.threadId) {
       if (window.openMessengerFromNotification) {
         window.openMessengerFromNotification(n.threadId || "");
+        actionTaken = true;
       }
     } else if (msg.includes('account') || msg.includes('profile')) {
       window.location.hash = "account";
+      actionTaken = true;
     } else if (msg.includes('feed') || msg.includes('like')) {
       window.location.hash = "feed";
+      actionTaken = true;
     }
+
+    // If we navigated, remove the notification from history and close panel
+    if (actionTaken) {
+      history = history.filter(item => item.id !== n.id);
+      if (window.toggleNotificationsPanel) window.toggleNotificationsPanel();
+    }
+
+    save();
   }
 
   function renderUI() {
@@ -89,15 +99,12 @@
         if (emptyState) emptyState.style.display = 'none';
         history.forEach(n => {
           const li = document.createElement('li');
-          
-          // Style based on READ state
           const isUnread = n.read === false;
           const bg = isUnread ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.05)";
           const opacity = isUnread ? "1" : "0.75";
           const border = isUnread ? "4px solid #3b82f6" : "4px solid rgba(255,255,255,0.2)";
           
           li.style.cssText = `padding:12px; margin-bottom:8px; border-radius:8px; background:${bg}; border-left:${border}; cursor:pointer; color:inherit; list-style:none; transition: all 0.2s; opacity:${opacity};`;
-          
           li.innerHTML = `<strong style="color:inherit;">${n.title}</strong><p style="margin:4px 0; font-size:0.9rem; opacity:0.8; color:inherit;">${n.message}</p>`;
           
           li.onclick = (e) => {
