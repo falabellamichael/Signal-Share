@@ -13,6 +13,8 @@ import {
   loadPostsFromDatabase, 
   savePostToDatabase, 
   deletePostFromDatabase, 
+  loadUserPreferences,
+  normalizeUserPreferences,
   setApiContext 
 } from './api-v3.js';
 
@@ -25,21 +27,16 @@ const elements = window.__SIGNAL_SHARE_ELEMENTS__;
 // Helper to ensure we can access core functions from app-v3.js
 const getCore = () => window;
 
-// --- Settings & Preferences ---
+// Storage and Preference helpers moved to api-v3.js
 
-function loadUserPreferences() {
-  try { return normalizeUserPreferences(JSON.parse(localStorage.getItem(window.USER_PREFERENCES_KEY) ?? "{}")); } catch { return { ...window.DEFAULT_USER_PREFERENCES }; }
+function updateActiveFilterChip() {
+  if (!elements.filterRow) return;
+  const chips = elements.filterRow.querySelectorAll("[data-filter]");
+  chips.forEach(chip => {
+    chip.classList.toggle("is-active", chip.dataset.filter === state.filter);
+  });
 }
 
-function normalizeUserPreferences(raw = {}) {
-  const theme = window.THEME_VALUES.has(raw.theme) ? raw.theme : window.DEFAULT_USER_PREFERENCES.theme;
-  const density = ["airy", "compact"].includes(raw.density) ? raw.density : window.DEFAULT_USER_PREFERENCES.density;
-  const motion = ["full", "calm"].includes(raw.motion) ? raw.motion : window.DEFAULT_USER_PREFERENCES.motion;
-  const statusBarStrip = typeof raw.statusBarStrip === "boolean" ? raw.statusBarStrip : window.DEFAULT_USER_PREFERENCES.statusBarStrip;
-  const notificationHideSender = typeof raw.notificationHideSender === "boolean" ? raw.notificationHideSender : window.DEFAULT_USER_PREFERENCES.notificationHideSender;
-  const notificationHideBody = typeof raw.notificationHideBody === "boolean" ? raw.notificationHideBody : window.DEFAULT_USER_PREFERENCES.notificationHideBody;
-  return { theme, density, motion, statusBarStrip, notificationHideSender, notificationHideBody };
-}
 
 function saveUserPreferences() { try { localStorage.setItem(window.USER_PREFERENCES_KEY, JSON.stringify(state.preferences)); } catch {} }
 

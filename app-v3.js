@@ -1,4 +1,24 @@
-import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js';
+import { 
+  createSupabaseClient, 
+  loadPostsFromSupabase, 
+  loadLikedPostsFromSupabase, 
+  publishPostToSupabase, 
+  compressImageFile, 
+  uploadFileToSupabase, 
+  uploadMessageAttachment, 
+  deleteHostedPost, 
+  normalizeSupabasePost, 
+  parseYouTubeUrl, 
+  openDatabase, 
+  loadPostsFromDatabase, 
+  savePostToDatabase, 
+  deletePostFromDatabase, 
+  setApiContext,
+  loadUserPreferences,
+  loadSavedPosts,
+  loadPlayerPosition,
+  loadPlayerVolume
+} from './api-v3.js';
 
 
 
@@ -1598,16 +1618,8 @@ function getSiteSettingsPayload() { return { id: "global", shell_width: state.si
 function normalizeSiteSettings(row = {}) { return { shellWidth: clampNumber(row.shell_width, 960, 1440, DEFAULT_SITE_SETTINGS.shellWidth), sectionGap: clampNumber(row.section_gap, 16, 40, DEFAULT_SITE_SETTINGS.sectionGap), surfaceRadius: clampNumber(row.surface_radius, 22, 44, DEFAULT_SITE_SETTINGS.surfaceRadius), mediaFit: row.media_fit === "contain" ? "contain" : DEFAULT_SITE_SETTINGS.mediaFit }; }
 function clampNumber(value, min, max, fallback) { const numeric = Number(value); if (!Number.isFinite(numeric)) return fallback; return Math.min(max, Math.max(min, Math.round(numeric))); }
 
-function loadPlayerPosition() {
-  try {
-    const raw = localStorage.getItem(PLAYER_POSITION_KEY); if (!raw) return null; const parsed = JSON.parse(raw); if (!parsed || typeof parsed !== "object") return null;
-    const x = Number(parsed.x); const y = Number(parsed.y); if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-    return { x: Math.round(x), y: Math.round(y) };
-  } catch { return null; }
-}
-
 function normalizePlayerVolume(value, fallback = DEFAULT_PLAYER_VOLUME) { const numeric = Number(value); if (!Number.isFinite(numeric)) return fallback; return Math.min(1, Math.max(0, numeric)); }
-function loadPlayerVolume() { try { const raw = localStorage.getItem(PLAYER_VOLUME_KEY); if (!raw) return DEFAULT_PLAYER_VOLUME; return normalizePlayerVolume(raw); } catch { return DEFAULT_PLAYER_VOLUME; } }
+// Moved to api-v3.js
 function savePlayerVolume(volume) { try { localStorage.setItem(PLAYER_VOLUME_KEY, `${normalizePlayerVolume(volume)}`); } catch {} }
 function savePlayerPosition(position) { try { if (!position) { localStorage.removeItem(PLAYER_POSITION_KEY); return; } localStorage.setItem(PLAYER_POSITION_KEY, JSON.stringify({ x: Math.round(position.x), y: Math.round(position.y) })); } catch {} }
 // Geometry helpers moved to app-ui-v3.js
@@ -1634,7 +1646,7 @@ function toggleSave(postId) { if (isPostSaved(postId)) state.savedPosts = state.
 function showFeedback(message, isError = false) { elements.formFeedback.textContent = message; elements.formFeedback.classList.toggle("is-error", isError); }
 function resetComposer() { elements.postForm.reset(); clearSelectedMedia(); state.previewExternal = null; hydrateRememberedCreator(); updateSourceHelp("none"); showFeedback(""); }
 function loadLikedPosts() { return loadScopedPostIds(LIKED_POSTS_KEY); }
-function loadSavedPosts() { try { return JSON.parse(localStorage.getItem(SAVED_POSTS_KEY) ?? "[]"); } catch { return []; } }
+// Moved to api-v3.js
 function resolvePostSource(post) { if (post.src) return post.src; if (post.blob) { const url = URL.createObjectURL(post.blob); state.generatedUrls.push(url); return url; } return ""; }
 function cleanupObjectUrls() { state.generatedUrls.forEach((url) => URL.revokeObjectURL(url)); state.generatedUrls = []; }
 function getLikeCount(post) { if (canUseLiveLikesForPost(post)) return post.likes; return post.likes + (state.likedPosts.includes(post.id) ? 1 : 0); }
