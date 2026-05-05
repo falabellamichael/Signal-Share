@@ -5048,3 +5048,6 @@ body[data-theme='contrast'] .feed-page-button.is-active { background: var(--acce
 body[data-theme='ember'] .profile-stat, body[data-theme='ember'] .feed-page-button { background: var(--surface-strong) !important; border-color: var(--line) !important; color: var(--text) !important; }
 body[data-theme='ember'] .feed-page-button.is-active { background: var(--accent) !important; color: #ffffff !important; border-color: transparent !important; }
 body[data-theme='ember'] .profile-stat-label, body[data-theme='ember'] .feed-pagination-summary { color: var(--muted) !important; }
+/* Profile Text Color Correction */
+body[data-theme='contrast'] .profile-view-dialog h2, body[data-theme='contrast'] .profile-view-dialog h3, body[data-theme='contrast'] .profile-view-dialog h4, body[data-theme='contrast'] .profile-view-dialog p, body[data-theme='contrast'] .profile-view-dialog .eyebrow, body[data-theme='contrast'] .profile-view-dialog .profile-meta { color: #ffffff !important; }
+body[data-theme='ember'] .profile-view-dialog h2, body[data-theme='ember'] .profile-view-dialog h3, body[data-theme='ember'] .profile-view-dialog h4, body[data-theme='ember'] .profile-view-dialog p, body[data-theme='ember'] .profile-view-dialog .eyebrow, body[data-theme='ember'] .profile-view-dialog .profile-meta { color: var(--text) !important; }
