@@ -485,13 +485,14 @@ body[data-theme="contrast"] .spotlight-card,
 body[data-theme="contrast"] .mini-panel,
 body[data-theme="contrast"] .feed-card,
 body[data-theme="contrast"] .viewer-dialog,
+body[data-theme="contrast"] .profile-view-dialog,
 body[data-theme="contrast"] .mini-player,
 body[data-theme="contrast"] .messenger-launcher,
 body[data-theme="contrast"] .admin-ban-launcher,
 body[data-theme="contrast"] .admin-ban-panel,
 body[data-theme="contrast"] .settings-dialog,
 body[data-theme="contrast"] .preview-card {
-  background: rgba(0, 0, 0, 0.94);
+  background: #000000;
   border-color: rgba(255, 255, 255, 0.5);
 }
 
