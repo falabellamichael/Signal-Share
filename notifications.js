@@ -92,9 +92,9 @@
           
           // Style based on READ state
           const isUnread = n.read === false;
-          const bg = isUnread ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)";
-          const opacity = isUnread ? "1" : "0.55";
-          const border = isUnread ? "4px solid #3b82f6" : "4px solid rgba(255,255,255,0.1)";
+          const bg = isUnread ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.05)";
+          const opacity = isUnread ? "1" : "0.75";
+          const border = isUnread ? "4px solid #3b82f6" : "4px solid rgba(255,255,255,0.2)";
           
           li.style.cssText = `padding:12px; margin-bottom:8px; border-radius:8px; background:${bg}; border-left:${border}; cursor:pointer; color:inherit; list-style:none; transition: all 0.2s; opacity:${opacity};`;
           
@@ -106,7 +106,7 @@
           };
           
           li.onmouseover = () => { 
-            li.style.background = isUnread ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.05)";
+            li.style.background = isUnread ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)";
             li.style.opacity = "1";
           };
           li.onmouseout = () => { 
