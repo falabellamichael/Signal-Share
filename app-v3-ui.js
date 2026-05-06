@@ -1579,24 +1579,15 @@ export function createAppUi(context) {
   }
 
   async function getYouTubePreviewMetadata(source) {
-    if (window.NativeBridge && typeof window.NativeBridge === "object") return null;
     const externalId = resolveYouTubePreviewExternalId(source); if (!externalId) return null;
-    const sourceUrl = `https://www.youtube.com/watch?v=${externalId}`;
-    const cacheKey = `youtube:oembed:${externalId}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
-    const request = fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(sourceUrl)}&format=json`).then((res) => (res.ok ? res.json() : null)).then((payload) => {
-      if (!payload || (!payload.title && !payload.thumbnail_url)) return null;
-      const metadata = {
-        title: typeof payload.title === "string" ? payload.title.trim() : "",
-        creator: typeof payload.author_name === "string" ? payload.author_name.trim() : "",
-        thumbnailUrl: typeof payload.thumbnail_url === "string" ? payload.thumbnail_url.trim() : ""
-      };
-      externalPreviewCache.set(cacheKey, metadata);
-      return metadata;
-    }).catch(() => {
-      externalPreviewCache.set(cacheKey, null);
-      return null;
-    });
-    externalPreviewCache.set(cacheKey, request); return request;
+    const cacheKey = `youtube:preview:${externalId}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
+    const metadata = {
+      title: typeof source?.title === "string" ? source.title.trim() : "",
+      creator: "",
+      thumbnailUrl: "",
+    };
+    externalPreviewCache.set(cacheKey, metadata);
+    return metadata;
   }
 
   function resolveYouTubePreviewSourceUrl(source) {
