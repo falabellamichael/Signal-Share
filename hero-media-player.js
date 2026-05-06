@@ -27,6 +27,7 @@ export function createHeroMediaPlayerController(options) {
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
   const DESKTOP_POLL_INTERVAL_MS = 3000;
+  const DESKTOP_POLL_MAX_FAILURES = 3;
 
   let listenersAttached = false;
   let nativeSnapshot = null;
@@ -152,9 +153,17 @@ export function createHeroMediaPlayerController(options) {
   function canUseDesktopBridge() {
     if (hasNativeSnapshotBridge()) return false;
     if (typeof window.fetch !== "function") return false;
-    return window.location.protocol === "http:"
-      || window.location.protocol === "https:"
-      || window.location.protocol === "file:";
+    const configuredEndpoint = typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT === "string"
+      && window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT.trim();
+    const configuredBaseUrl = typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_BASE_URL === "string"
+      && window.SIGNAL_SHARE_SYSTEM_MEDIA_BASE_URL.trim();
+    if (configuredEndpoint || configuredBaseUrl) return true;
+
+    const protocol = `${window.location.protocol || ""}`.toLowerCase();
+    if (protocol === "file:") return true;
+    if (protocol !== "http:" && protocol !== "https:") return false;
+    const host = `${window.location.hostname || ""}`.trim().toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
   }
 
   function pushDesktopEndpointCandidate(candidates, candidate, seen) {
@@ -288,6 +297,9 @@ export function createHeroMediaPlayerController(options) {
       .catch(() => {
         desktopSnapshot = null;
         desktopPollFailureCount += 1;
+        if (desktopPollFailureCount >= DESKTOP_POLL_MAX_FAILURES) {
+          stopDesktopSnapshotPolling();
+        }
         if (renderAfter) render();
         return null;
       });

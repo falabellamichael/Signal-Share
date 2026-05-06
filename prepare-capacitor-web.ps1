@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$root = Split-Path -Parent $PSScriptRoot
+$root = $PSScriptRoot
 $dist = Join-Path $root "dist"
 
 $files = @(
@@ -9,8 +9,17 @@ $files = @(
   "styles-1.css",
   "styles-2.css",
   "styles-3.css",
-  "app.js",
+  "notifications.css",
   "config.js",
+  "api-v3.js",
+  "app-v3.js",
+  "app-v3-ui.js",
+  "hero-media-player.js",
+  "notifications.js",
+  "profiles.js",
+  "messenger-realtime.js",
+  "keyboard-bindings-v3.js",
+  "notification-keyboard-integration.js",
   "site.webmanifest",
   "service-worker.js"
 )

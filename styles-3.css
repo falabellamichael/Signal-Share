@@ -737,9 +737,9 @@ button:disabled {
   }
 
   .hero-player-volume {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-    gap: 6px;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px 12px;
   }
 
   .hero-player-volume-value {
@@ -1475,11 +1475,23 @@ button:disabled {
 
   .card-actions,
   .mini-player-actions,
-  .mini-player-nav,
-  .hero-player-controls {
+  .mini-player-nav {
     grid-template-columns: 1fr;
   }
-}
+
+  .hero-player-controls {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+    margin: 12px 0;
+  }
+
+  .hero-player-controls .button {
+    min-height: 32px !important;
+    padding: 0 4px !important;
+    font-size: 0.75rem !important;
+    border-radius: 999px !important;
+  }\n}
 
 @media (max-width: 980px) and (orientation: landscape) {
   .profile-view {
@@ -1843,3 +1855,4 @@ body[data-theme='ember'] .message-row.is-self .message-bubble span {
   color: #fff !important; 
 }
 body[data-theme='ember'] .message-bubble span { color: rgba(255, 255, 255, 0.75) !important; }
+
