@@ -82,6 +82,12 @@ export function createHeroMediaPlayerController(options) {
     return Boolean(bridge && typeof bridge.openNowPlayingAccessSettings === "function");
   }
 
+  function canRenderInlineHeroPreviewVideo() {
+    // Android WebView can leave stale native playback chrome over muted preview videos.
+    // Use static preview cards there and keep inline video previews for web/desktop.
+    return !getNativeBridge();
+  }
+
   function normalizeNativeSnapshot(raw = {}) {
     const playbackState = normalizePlaybackState(raw.playbackState || (raw.active ? "playing" : "none"));
     return {
@@ -703,13 +709,17 @@ export function createHeroMediaPlayerController(options) {
       const metadata = getBrowserMediaMetadata();
       const metadataTitle = metadata?.title || fallbackMedia.getAttribute("title") || "";
       const metadataMeta = [metadata?.artist, metadata?.album].filter(Boolean).join(" · ");
-      if (fallbackMedia instanceof HTMLVideoElement && fallbackMedia.currentSrc) {
+      const showInlineFallbackVideoPreview = canRenderInlineHeroPreviewVideo()
+        && fallbackMedia instanceof HTMLVideoElement
+        && Boolean(fallbackMedia.currentSrc);
+      if (showInlineFallbackVideoPreview) {
         const previewVideo = document.createElement("video");
         previewVideo.className = "hero-player-preview-video";
         previewVideo.dataset.heroPreview = "true";
         previewVideo.muted = true;
         previewVideo.loop = true;
         previewVideo.autoplay = true;
+        previewVideo.controls = false;
         previewVideo.playsInline = true;
         previewVideo.preload = "metadata";
         previewVideo.src = fallbackMedia.currentSrc;
@@ -723,7 +733,7 @@ export function createHeroMediaPlayerController(options) {
         note,
         artworkUrl: metadata?.artworkUrl || "",
       });
-      if (fallbackMedia instanceof HTMLVideoElement && fallbackMedia.currentSrc) {
+      if (showInlineFallbackVideoPreview) {
         fallbackCard.classList.add("is-overlay-only");
       }
       elements.heroPlayerStage.appendChild(fallbackCard);
@@ -747,13 +757,15 @@ export function createHeroMediaPlayerController(options) {
 
     if (post.mediaKind === "video") {
       const source = resolveActivePlayerSource(post);
-      if (source) {
+      const showInlineAppVideoPreview = canRenderInlineHeroPreviewVideo() && Boolean(source);
+      if (showInlineAppVideoPreview) {
         const video = document.createElement("video");
         video.className = "hero-player-preview-video";
         video.dataset.heroPreview = "true";
         video.muted = true;
         video.loop = true;
         video.autoplay = true;
+        video.controls = false;
         video.playsInline = true;
         video.preload = "metadata";
         video.src = source;
@@ -765,7 +777,9 @@ export function createHeroMediaPlayerController(options) {
         meta: previewMeta,
         note: "Preview",
       });
-      overlay.classList.add("is-overlay-only");
+      if (showInlineAppVideoPreview) {
+        overlay.classList.add("is-overlay-only");
+      }
       elements.heroPlayerStage.appendChild(overlay);
       return;
     }
@@ -785,9 +799,18 @@ export function createHeroMediaPlayerController(options) {
     if (listenersAttached || !hasUi()) return;
     listenersAttached = true;
 
-    elements.heroPlayerPlayPauseButton.addEventListener("click", () => { handlePlayPause(); });
-    elements.heroPlayerPrevButton.addEventListener("click", handlePrevious);
-    elements.heroPlayerNextButton.addEventListener("click", handleNext);
+    elements.heroPlayerPlayPauseButton.addEventListener("click", (event) => {
+      handlePlayPause();
+      if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
+    });
+    elements.heroPlayerPrevButton.addEventListener("click", (event) => {
+      handlePrevious();
+      if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
+    });
+    elements.heroPlayerNextButton.addEventListener("click", (event) => {
+      handleNext();
+      if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
+    });
     elements.heroPlayerVolumeSlider.addEventListener("input", handleVolumeInput);
 
     window.addEventListener("signal:nativeBridgeReady", () => {
