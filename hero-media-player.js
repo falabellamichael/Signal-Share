@@ -132,6 +132,11 @@ export function createHeroMediaPlayerController(options) {
 
   function shouldUseNativeMode(post) {
     if (!nativeSnapshot) return false;
+    const hasAppPlaybackSession = Boolean(post)
+      || getActivePlayerMediaElement() instanceof HTMLMediaElement
+      || getFallbackPageMediaElement() instanceof HTMLMediaElement;
+    const canBootstrapAppPlayback = !post && getPlayableVisiblePostIds().length > 0;
+    if (hasAppPlaybackSession || canBootstrapAppPlayback) return false;
     if (nativeSnapshot.permissionRequired) return true;
     if (nativeSnapshot.active) return true;
     if (!post && hasNativeActionBridge()) return true;
