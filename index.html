@@ -323,13 +323,42 @@
           </div>
 
           <aside class="hero-panel" aria-label="Platform highlights">
-            <div class="panel-card panel-card-large">
-              <span>Shared publishing</span>
-              <strong>Local start, live upgrade</strong>
-              <p>
-                Test the full flow instantly, then switch to Supabase when you
-                want cross-device posts and hosted playback.
+            <div class="panel-card panel-card-large panel-card-device-player">
+              <span>On-device media</span>
+              <strong id="heroPlayerTitle">Nothing playing yet</strong>
+              <p id="heroPlayerCaption">
+                Open a playable post to control playback on this PC or mobile
+                device.
               </p>
+              <div class="hero-player-stage" id="heroPlayerStage">
+                <p class="hero-player-status" id="heroPlayerStatus">
+                  Use any Play button in the feed to start.
+                </p>
+              </div>
+              <div class="hero-player-controls">
+                <button class="button button-secondary" id="heroPlayerPrevButton" type="button">
+                  Previous
+                </button>
+                <button class="button button-secondary" id="heroPlayerPlayPauseButton" type="button">
+                  Play
+                </button>
+                <button class="button button-secondary" id="heroPlayerNextButton" type="button">
+                  Next
+                </button>
+              </div>
+              <div class="hero-player-volume">
+                <label class="hero-player-volume-label" for="heroPlayerVolumeSlider">Volume</label>
+                <input
+                  class="hero-player-volume-slider"
+                  id="heroPlayerVolumeSlider"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value="100"
+                />
+                <span class="hero-player-volume-value" id="heroPlayerVolumeValue">100%</span>
+              </div>
             </div>
             <div class="panel-card">
               <span>Flexible media</span>

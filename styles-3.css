@@ -732,6 +732,20 @@ button:disabled {
     border-radius: 22px;
   }
 
+  .hero-player-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-player-volume {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .hero-player-volume-value {
+    justify-self: end;
+  }
+
   .hero-visual {
     width: 146px;
     height: 146px;
@@ -1453,7 +1467,8 @@ button:disabled {
 
   .card-actions,
   .mini-player-actions,
-  .mini-player-nav {
+  .mini-player-nav,
+  .hero-player-controls {
     grid-template-columns: 1fr;
   }
 }

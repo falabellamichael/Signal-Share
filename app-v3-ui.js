@@ -1,3 +1,5 @@
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=1";
+
 export function createAppUi(context) {
   const {
     state, createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase,
@@ -215,6 +217,15 @@ export function createAppUi(context) {
     miniCloseButton: document.querySelector("#miniCloseButton"),
     miniPrevButton: document.querySelector("#miniPrevButton"),
     miniNextButton: document.querySelector("#miniNextButton"),
+    heroPlayerTitle: document.querySelector("#heroPlayerTitle"),
+    heroPlayerCaption: document.querySelector("#heroPlayerCaption"),
+    heroPlayerStatus: document.querySelector("#heroPlayerStatus"),
+    heroPlayerStage: document.querySelector("#heroPlayerStage"),
+    heroPlayerPlayPauseButton: document.querySelector("#heroPlayerPlayPauseButton"),
+    heroPlayerPrevButton: document.querySelector("#heroPlayerPrevButton"),
+    heroPlayerNextButton: document.querySelector("#heroPlayerNextButton"),
+    heroPlayerVolumeSlider: document.querySelector("#heroPlayerVolumeSlider"),
+    heroPlayerVolumeValue: document.querySelector("#heroPlayerVolumeValue"),
   };
 
   const OVERLAY_SCROLL_CONTAINER_SELECTOR = [
@@ -229,6 +240,23 @@ export function createAppUi(context) {
   ].join(",");
   let activeOverlayScrollContainer = null;
   let activeOverlayTouchY = 0;
+  const heroMediaPlayerController = createHeroMediaPlayerController({
+    state,
+    elements,
+    getControllablePlayerPost,
+    getActivePlayerMediaElement,
+    getPlayableVisiblePostIds,
+    getProfileSummaryForPost,
+    formatKind,
+    getSignalLabel,
+    formatTimestamp,
+    normalizePlayerVolume,
+    savePlayerVolume,
+    applyPlayerVolumeToActiveElement,
+    stepMiniPlayer,
+    renderMiniPlayer,
+    postMessageToYouTubePlayer,
+  });
 
   function attachEventListeners() {
     if (state.listenersAttached) return;
@@ -316,6 +344,7 @@ export function createAppUi(context) {
     elements.miniPlayerStage.addEventListener("click", handleMiniPlayerStageClick);
     elements.miniPlayerVolumeSlider.addEventListener("input", handleMiniPlayerVolumeInput);
     elements.miniPlayerHead.addEventListener("pointerdown", beginMiniPlayerDrag);
+    heroMediaPlayerController.attachEventListeners();
     window.addEventListener("pointermove", handleMiniPlayerDrag);
     window.addEventListener("pointerup", endMiniPlayerDrag);
     window.addEventListener("resize", handleViewportResize);
@@ -376,6 +405,7 @@ export function createAppUi(context) {
     renderOverview();
     renderFeed();
     renderMiniPlayer();
+    heroMediaPlayerController.render();
     renderViewer();
     renderProfileView();
     syncSourceHelp();
@@ -1336,9 +1366,11 @@ export function createAppUi(context) {
 
   function postMessageToYouTubePlayer(frame, func, args = []) { if (!(frame instanceof HTMLIFrameElement) || !frame.contentWindow) return; frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args }), "*"); }
 
-  function syncPlayerVolumeFromMediaElement(event) { const mediaElement = event?.target; if (!(mediaElement instanceof HTMLMediaElement)) return; state.playerVolume = normalizePlayerVolume(mediaElement.muted ? 0 : mediaElement.volume, state.playerVolume); savePlayerVolume(state.playerVolume); renderMiniPlayerVolumeControl(); }
+  function syncPlayerVolumeFromMediaElement(event) { const mediaElement = event?.target; if (!(mediaElement instanceof HTMLMediaElement)) return; state.playerVolume = normalizePlayerVolume(mediaElement.muted ? 0 : mediaElement.volume, state.playerVolume); savePlayerVolume(state.playerVolume); renderMiniPlayerVolumeControl(); heroMediaPlayerController.render(); }
 
-  function attachPersistentPlayerMediaListeners(mediaElement) { if (!(mediaElement instanceof HTMLMediaElement)) return; mediaElement.addEventListener("volumechange", syncPlayerVolumeFromMediaElement); }
+  function syncPlayerPlaybackFromMediaElement(event) { const mediaElement = event?.target; if (!(mediaElement instanceof HTMLMediaElement)) return; state.heroPlayerPlaybackState = mediaElement.paused ? "paused" : "playing"; heroMediaPlayerController.render(); }
+
+  function attachPersistentPlayerMediaListeners(mediaElement) { if (!(mediaElement instanceof HTMLMediaElement)) return; mediaElement.addEventListener("volumechange", syncPlayerVolumeFromMediaElement); mediaElement.addEventListener("play", syncPlayerPlaybackFromMediaElement); mediaElement.addEventListener("pause", syncPlayerPlaybackFromMediaElement); mediaElement.addEventListener("ended", syncPlayerPlaybackFromMediaElement); }
 
   function applyPlayerVolumeToActiveElement() {
     const mediaElement = getActivePlayerMediaElement(); if (mediaElement instanceof HTMLMediaElement) { const nextVolume = normalizePlayerVolume(state.playerVolume); mediaElement.volume = nextVolume; mediaElement.muted = nextVolume === 0; return true; }
@@ -1557,8 +1589,9 @@ export function createAppUi(context) {
   }
 
   function renderMiniPlayer() {
-    if (!state.playerPostId) { state.playerDrag = null; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); syncOverlayBodyState(); return; }
+    if (!state.playerPostId) { state.playerDrag = null; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); syncOverlayBodyState(); heroMediaPlayerController.render(); return; }
     const post = getPostById(state.playerPostId); if (!post || !isPlayablePost(post)) { closeMiniPlayer(); return; }
+    if (post.sourceKind === "youtube") state.heroPlayerPlaybackState = "playing";
     const creatorSummary = getProfileSummaryForPost(post);
     elements.miniPlayer.classList.add("is-open"); elements.miniPlayer.classList.toggle("is-expanded", state.miniPlayerExpanded); elements.miniPlayer.setAttribute("aria-hidden", "false");
     syncOverlayBodyState();
@@ -1567,6 +1600,7 @@ export function createAppUi(context) {
     const playableIds = getPlayableVisiblePostIds(); const canStep = playableIds.length > 1; elements.miniPrevButton.disabled = !canStep; elements.miniNextButton.disabled = !canStep;
     renderMiniPlayerMedia(elements.miniPlayerStage, post); renderMiniPlayerVolumeControl(); applyMiniPlayerPosition();
     window.requestAnimationFrame(() => { if (state.playerPostId === post.id) applyMiniPlayerPosition(); });
+    heroMediaPlayerController.render();
   }
 
   function renderViewer() {
@@ -1650,7 +1684,7 @@ export function createAppUi(context) {
 
   function collapseViewerToPlayer() { if (!state.viewerPostId) return; state.playerPostId = state.viewerPostId; state.miniPlayerExpanded = false; state.viewerPostId = null; elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); syncOverlayBodyState(); renderMiniPlayer(); }
 
-  function closeMiniPlayer() { state.playerPostId = null; state.miniPlayerExpanded = false; state.playerDrag = null; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); destroyActivePlayer(); syncOverlayBodyState(); }
+  function closeMiniPlayer() { state.playerPostId = null; state.miniPlayerExpanded = false; state.playerDrag = null; state.heroPlayerPlaybackState = "none"; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); destroyActivePlayer(); syncOverlayBodyState(); heroMediaPlayerController.render(); }
 
   function handleMiniPlayerStageClick(event) { if (!event.target.closest("iframe, video, audio") && !state.miniPlayerExpanded) expandMiniPlayer(); }
 
