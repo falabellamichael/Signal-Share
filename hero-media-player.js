@@ -729,8 +729,8 @@ export function createHeroMediaPlayerController(options) {
       elements.heroPlayerStage.appendChild(
         createPreviewCard({
           badge: "App media",
-          title: "Ready to play",
-          meta: "Press Play to start your media player.",
+          title: "",
+          meta: "",
         })
       );
       return;
@@ -887,7 +887,7 @@ export function createHeroMediaPlayerController(options) {
       elements.heroPlayerStatus.textContent = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
     } else if (!post) {
       elements.heroPlayerTitle.textContent = "Ready to play";
-      elements.heroPlayerCaption.textContent = "Press Play to start this app player, or play media on your PC.";
+      elements.heroPlayerCaption.textContent = "";
       elements.heroPlayerStatus.textContent = "App media standby";
     } else {
       const creatorSummary = getProfileSummaryForPost(post);
