@@ -1565,6 +1565,7 @@ h1 {
     linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.04)),
     rgba(15, 23, 32, 0.08);
   transform: rotate(24deg);
+  pointer-events: none;
 }
 
 .panel-card::before {
