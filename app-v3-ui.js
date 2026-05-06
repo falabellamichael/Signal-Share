@@ -89,6 +89,7 @@ export function createAppUi(context) {
     statusBarStripToggle: document.querySelector("#statusBarStripToggle"),
     notificationHideSenderToggle: document.querySelector("#notificationHideSenderToggle"),
     notificationHideBodyToggle: document.querySelector("#notificationHideBodyToggle"),
+    showEmailToggle: document.querySelector("#showEmailToggle"),
     resetPlayerPositionButton: document.querySelector("#resetPlayerPositionButton"),
     resetPreferencesButton: document.querySelector("#resetPreferencesButton"),
     messagesNavLink: document.querySelector("#messagesNavLink"),
@@ -258,6 +259,7 @@ export function createAppUi(context) {
     elements.statusBarStripToggle.addEventListener("change", handleStatusBarStripToggle);
     elements.notificationHideSenderToggle.addEventListener("change", handleNotificationHideSenderToggle);
     elements.notificationHideBodyToggle.addEventListener("change", handleNotificationHideBodyToggle);
+    elements.showEmailToggle.addEventListener("change", handleShowEmailToggle);
     elements.resetPlayerPositionButton.addEventListener("click", resetPlayerDockPosition);
     elements.resetPreferencesButton.addEventListener("click", resetUserPreferences);
     elements.messagesNavLink.addEventListener("click", handleMessagesNavClick);
@@ -631,18 +633,42 @@ export function createAppUi(context) {
   let lastPeopleRenderKey = "";
   let lastConversationRenderKey = "";
 
+  function maskEmailForProfileView(email = "") {
+    const normalized = String(email ?? "").trim().toLowerCase();
+    if (!normalized || !normalized.includes("@")) return "";
+    const [localPart, domainPart] = normalized.split("@");
+    if (!localPart || !domainPart) return "";
+    const domainSegments = domainPart.split(".");
+    const domainName = domainSegments[0] ?? "";
+    const domainTld = domainSegments.slice(1).join(".");
+    const maskedLocal = localPart.length <= 2
+      ? `${localPart[0] ?? "*"}*`
+      : `${localPart[0]}${"*".repeat(Math.max(1, localPart.length - 2))}${localPart[localPart.length - 1]}`;
+    const maskedDomainName = domainName.length <= 1
+      ? "*"
+      : `${domainName[0]}${"*".repeat(Math.max(1, domainName.length - 1))}`;
+    return `${maskedLocal}@${maskedDomainName}${domainTld ? `.${domainTld}` : ""}`;
+  }
+
+  function resolveVisibleMemberEmail(email = "") {
+    const normalized = String(email ?? "").trim().toLowerCase();
+    if (!normalized || !state.preferences.showEmail) return "";
+    if (canRevealMemberEmails()) return normalized;
+    return maskEmailForProfileView(normalized);
+  }
+
   function renderPeopleList(isReady) {
-    const currentKey = `${isReady}-${state.availableProfiles.length}-${state.peopleSearch}-${state.messengerBusy}-${state.blockedUserIds.length}-${state.bannedUserIds.length}-${state.pendingBlockUserId}`;
+    const currentKey = `${isReady}-${state.availableProfiles.length}-${state.peopleSearch}-${state.messengerBusy}-${state.blockedUserIds.length}-${state.bannedUserIds.length}-${state.pendingBlockUserId}-${state.preferences.showEmail}`;
     if (currentKey === lastPeopleRenderKey) return;
     lastPeopleRenderKey = currentKey;
-    elements.peopleList.innerHTML = ""; const canRevealEmails = canRevealMemberEmails(); const visibleProfiles = getFilteredPeopleProfiles();
+    elements.peopleList.innerHTML = ""; const visibleProfiles = getFilteredPeopleProfiles();
     if (!isReady) { elements.peopleEmpty.hidden = false; elements.peopleEmpty.textContent = "Sign in with an activated account to see other members."; return; }
     if (state.availableProfiles.length === 0) { elements.peopleEmpty.hidden = false; elements.peopleEmpty.textContent = "No other members are visible yet. Another signed-in user needs to join first."; return; }
     if (visibleProfiles.length === 0) { elements.peopleEmpty.hidden = false; elements.peopleEmpty.textContent = "No people match this search."; return; }
     elements.peopleEmpty.hidden = true;
     visibleProfiles.forEach((profile) => {
       const displayName = resolveMemberDisplayName(profile); const blocked = isUserBlocked(state, profile.id); const banned = isUserBanned(state, profile.id); const item = document.createElement("div"); item.className = "person-item"; const row = document.createElement("div"); row.className = "person-row"; const button = document.createElement("button"); button.type = "button"; button.className = "person-button"; if (blocked || banned) button.classList.add("is-blocked"); button.disabled = blocked || banned || state.messengerBusy;
-      const name = document.createElement("strong"); name.textContent = displayName; const meta = document.createElement("span"); meta.textContent = canRevealEmails ? profile.email : "Member"; const action = document.createElement("span"); action.className = "person-action"; action.textContent = banned ? "Banned" : (blocked ? "Blocked" : "Message");
+      const name = document.createElement("strong"); name.textContent = displayName; const meta = document.createElement("span"); meta.textContent = resolveVisibleMemberEmail(profile.email) || "Member"; const action = document.createElement("span"); action.className = "person-action"; action.textContent = banned ? "Banned" : (blocked ? "Blocked" : "Message");
       button.append(name, meta, action); button.addEventListener("click", () => { state.pendingBlockUserId = ""; void openOrCreateThread(profile.id); });
       const blockButton = document.createElement("button"); blockButton.type = "button"; blockButton.className = "person-block-button"; if (blocked) blockButton.classList.add("is-blocked"); blockButton.setAttribute("aria-label", `${blocked ? "Unblock" : "Block"} ${displayName}`); blockButton.title = state.blockingAvailable ? `${blocked ? "Unblock" : "Block"} ${displayName}` : "Blocking needs the latest Supabase messenger schema."; blockButton.disabled = state.messengerBusy || !state.blockingAvailable || banned; blockButton.innerHTML = '<svg viewBox="0 0 24 24" role="presentation" focusable="false" aria-hidden="true"><circle cx="12" cy="12" r="7.25" fill="none" stroke="currentColor" stroke-width="1.75"></circle><path d="M8.5 15.5 15.5 8.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75"></path></svg>'; blockButton.addEventListener("click", (event) => { event.stopPropagation(); state.pendingDeleteThreadId = ""; state.pendingBlockUserId = state.pendingBlockUserId === profile.id ? "" : profile.id; renderMessenger(); });
       row.append(button, blockButton); item.appendChild(row);
@@ -891,6 +917,7 @@ export function createAppUi(context) {
         if (elements.statusBarStripToggle) elements.statusBarStripToggle.checked = state.preferences.statusBarStrip;
         if (elements.notificationHideSenderToggle) elements.notificationHideSenderToggle.checked = state.preferences.notificationHideSender;
         if (elements.notificationHideBodyToggle) elements.notificationHideBodyToggle.checked = state.preferences.notificationHideBody;
+        if (elements.showEmailToggle) elements.showEmailToggle.checked = state.preferences.showEmail;
         renderThemePicker();
       }
     }
@@ -1040,6 +1067,12 @@ export function createAppUi(context) {
   function handleNotificationHideSenderToggle(event) { updateUserPreferences({ ...state.preferences, notificationHideSender: event.target.checked }); }
 
   function handleNotificationHideBodyToggle(event) { updateUserPreferences({ ...state.preferences, notificationHideBody: event.target.checked }); }
+
+  function handleShowEmailToggle(event) {
+    updateUserPreferences({ ...state.preferences, showEmail: event.target.checked });
+    renderMessenger();
+    renderProfileView();
+  }
 
   function resetPlayerDockPosition() { state.playerPosition = null; savePlayerPosition(null); applyMiniPlayerPosition(); }
 
@@ -1541,7 +1574,8 @@ export function createAppUi(context) {
     if (!state.activeProfileKey) { elements.profileView.classList.remove("is-open"); elements.profileView.setAttribute("aria-hidden", "true"); syncOverlayBodyState(); return; }
     const profile = getProfileSummaryByKey(state.activeProfileKey); if (!profile) { state.activeProfileKey = ""; elements.profileView.classList.remove("is-open"); elements.profileView.setAttribute("aria-hidden", "true"); syncOverlayBodyState(); return; }
     const posts = getPostsForProfileKey(profile.key); const totalLikes = posts.reduce((sum, post) => sum + getLikeCount(post), 0); const latestPost = posts[0] ?? null; const isSelf = Boolean(profile.userId && profile.userId === state.currentUser?.id); const metaParts = [];
-    if (canRevealMemberEmails() && profile.email) metaParts.push(profile.email);
+    const visibleEmail = resolveVisibleMemberEmail(profile.email);
+    if (visibleEmail) metaParts.push(visibleEmail);
     metaParts.push(isSelf ? "Your live profile" : "Live member profile"); if (profile.createdAt) metaParts.push(`Joined ${formatTimestamp(profile.createdAt)}`);
     elements.profileView.classList.add("is-open"); elements.profileView.setAttribute("aria-hidden", "false"); syncOverlayBodyState();
     elements.profileBadge.textContent = getProfileInitials(profile.displayName); elements.profileTitle.textContent = profile.displayName; elements.profileMeta.textContent = metaParts.join(" · ");

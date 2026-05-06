@@ -74,8 +74,13 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles
+add column if not exists theme text not null default 'sunset',
+add column if not exists density text not null default 'airy',
+add column if not exists motion text not null default 'full',
+add column if not exists status_bar_strip boolean not null default true,
 add column if not exists notification_hide_sender boolean not null default false,
 add column if not exists notification_hide_body boolean not null default false,
+add column if not exists show_email boolean not null default false,
 add column if not exists notification_sync_cursor timestamptz,
 add column if not exists notification_seen_ids jsonb not null default '[]'::jsonb;
 

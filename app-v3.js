@@ -161,6 +161,7 @@ const DEFAULT_USER_PREFERENCES = Object.freeze({
   statusBarStrip: true,
   notificationHideSender: false,
   notificationHideBody: false,
+  showEmail: false,
 });
 const THEME_OPTIONS = Object.freeze([
   { value: "sunset", label: "Sunset", description: "Warm default" },
@@ -1145,8 +1146,13 @@ function normalizeProfile(row) {
     id: row.id, 
     email: row.email, 
     displayName: row.display_name, 
+    theme: typeof row.theme === "string" ? row.theme : "",
+    density: typeof row.density === "string" ? row.density : "",
+    motion: typeof row.motion === "string" ? row.motion : "",
+    statusBarStrip: typeof row.status_bar_strip === "boolean" ? row.status_bar_strip : null,
     notificationHideSender: Boolean(row.notification_hide_sender),
     notificationHideBody: Boolean(row.notification_hide_body),
+    showEmail: typeof row.show_email === "boolean" ? row.show_email : null,
     createdAt: row.created_at, 
     updatedAt: row.updated_at 
   }; 
@@ -1185,7 +1191,7 @@ async function syncCurrentProfileToSupabase(displayNameOverride = "") {
     const fullPayload = {
       ...payload,
       theme: state.preferences.theme, density: state.preferences.density, motion: state.preferences.motion, status_bar_strip: state.preferences.statusBarStrip, notification_hide_sender: state.preferences.notificationHideSender,
-      notification_hide_body: state.preferences.notificationHideBody
+      notification_hide_body: state.preferences.notificationHideBody, show_email: state.preferences.showEmail
     };
     const { data, error } = await state.supabase.from("profiles").upsert(fullPayload, { onConflict: "id" }).select().single();
     if (error) {
@@ -1228,8 +1234,13 @@ async function refreshCurrentUserBanState() {
       // Sync DB preferences to local state
       updateUserPreferences({
         ...state.preferences,
+        theme: profile.theme || state.preferences.theme,
+        density: profile.density || state.preferences.density,
+        motion: profile.motion || state.preferences.motion,
+        statusBarStrip: typeof profile.statusBarStrip === "boolean" ? profile.statusBarStrip : state.preferences.statusBarStrip,
         notificationHideSender: profile.notificationHideSender,
-        notificationHideBody: profile.notificationHideBody
+        notificationHideBody: profile.notificationHideBody,
+        showEmail: typeof profile.showEmail === "boolean" ? profile.showEmail : state.preferences.showEmail
       });
     }
     state.currentUserBanned = Boolean(await loadCurrentUserBanFromSupabase());
@@ -1652,7 +1663,8 @@ function normalizeUserPreferences(raw = {}) {
   const statusBarStrip = typeof raw.statusBarStrip === "boolean" ? raw.statusBarStrip : DEFAULT_USER_PREFERENCES.statusBarStrip;
   const notificationHideSender = typeof raw.notificationHideSender === "boolean" ? raw.notificationHideSender : DEFAULT_USER_PREFERENCES.notificationHideSender;
   const notificationHideBody = typeof raw.notificationHideBody === "boolean" ? raw.notificationHideBody : DEFAULT_USER_PREFERENCES.notificationHideBody;
-  return { theme, density, motion, statusBarStrip, notificationHideSender, notificationHideBody };
+  const showEmail = typeof raw.showEmail === "boolean" ? raw.showEmail : DEFAULT_USER_PREFERENCES.showEmail;
+  return { theme, density, motion, statusBarStrip, notificationHideSender, notificationHideBody, showEmail };
 }
 
 function saveUserPreferences() { try { localStorage.setItem(USER_PREFERENCES_KEY, JSON.stringify(state.preferences)); } catch {} }
