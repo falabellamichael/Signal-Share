@@ -1422,7 +1422,17 @@ export function createAppUi(context) {
     const image = document.createElement("img"); image.className = "external-preview-image"; image.alt = `${source.title} preview`; image.loading = variant === "spotlight" ? "eager" : "lazy"; image.referrerPolicy = "strict-origin-when-cross-origin";
     const overlay = document.createElement("div"); overlay.className = "external-preview-overlay"; const badge = document.createElement("span"); badge.className = "external-preview-badge"; badge.textContent = formatProviderName(source.provider); const title = document.createElement("strong"); title.className = "external-preview-title"; title.textContent = source.title; const description = document.createElement("p"); description.className = "external-preview-copy"; description.textContent = note || source.creator || "External media preview";
     overlay.append(badge, title, description); stage.append(image, overlay);
-    if (source.provider === "youtube") { void applyExternalPreviewMetadata(stage, image, title, badge, source); loadPreviewImageCandidates(stage, image, resolveYouTubePreviewCandidates(source)); }
+    if (source.provider === "youtube") {
+      void applyExternalPreviewMetadata(stage, image, title, badge, source);
+      const externalId = resolveYouTubePreviewExternalId(source);
+      const thumbnailCacheKey = externalId ? `youtube:thumbnail:${externalId}` : "";
+      const cachedThumbnail = thumbnailCacheKey ? externalPreviewCache.get(thumbnailCacheKey) : null;
+      if (typeof cachedThumbnail === "string" && cachedThumbnail.trim()) {
+        loadPreviewImageCandidates(stage, image, [cachedThumbnail.trim()], { cacheKey: thumbnailCacheKey });
+      } else {
+        loadPreviewImageCandidates(stage, image, resolveYouTubePreviewCandidates(source), { cacheKey: thumbnailCacheKey });
+      }
+    }
     else if (source.provider === "spotify") {
       badge.textContent = formatExternalPreviewBadge(source.provider, deriveSpotifyCreatorFromSourceTitle(source));
       void applyExternalPreviewMetadata(stage, image, title, badge, source);
@@ -1468,9 +1478,10 @@ export function createAppUi(context) {
     return /^(audio|music|post|song|spotify|track|untitled)$/i.test(String(value ?? "").trim());
   }
 
-  function loadPreviewImageCandidates(stage, image, candidates) {
+  function loadPreviewImageCandidates(stage, image, candidates, options = {}) {
+    const { cacheKey = "" } = options;
     const urls = candidates.filter(Boolean); if (!urls.length) return;
-    let index = 0; const tryNext = () => { if (index >= urls.length) { image.removeAttribute("src"); return; } const nextUrl = urls[index]; index += 1; image.onload = () => { stage.classList.add("has-image"); image.onload = null; image.onerror = null; }; image.onerror = () => { stage.classList.remove("has-image"); tryNext(); }; image.src = nextUrl; };
+    let index = 0; const tryNext = () => { if (index >= urls.length) { image.removeAttribute("src"); return; } const nextUrl = urls[index]; index += 1; image.onload = () => { stage.classList.add("has-image"); if (cacheKey) externalPreviewCache.set(cacheKey, nextUrl); image.onload = null; image.onerror = null; }; image.onerror = () => { stage.classList.remove("has-image"); tryNext(); }; image.src = nextUrl; };
     tryNext();
   }
 
@@ -1570,11 +1581,11 @@ export function createAppUi(context) {
     const externalId = resolveYouTubePreviewExternalId(source);
     if (!externalId) return [];
     return [
-      `https://i.ytimg.com/vi/${externalId}/maxresdefault.jpg`,
-      `https://i.ytimg.com/vi/${externalId}/sddefault.jpg`,
-      `https://i.ytimg.com/vi/${externalId}/hqdefault.jpg`,
       `https://i.ytimg.com/vi/${externalId}/mqdefault.jpg`,
-      `https://img.youtube.com/vi/${externalId}/0.jpg`
+      `https://i.ytimg.com/vi/${externalId}/hqdefault.jpg`,
+      `https://i.ytimg.com/vi/${externalId}/sddefault.jpg`,
+      `https://img.youtube.com/vi/${externalId}/0.jpg`,
+      `https://i.ytimg.com/vi/${externalId}/maxresdefault.jpg`
     ];
   }
 
@@ -1605,8 +1616,37 @@ export function createAppUi(context) {
     elements.miniPlayerVolumeSlider.value = `${volumePercent}`; elements.miniPlayerVolumeValue.textContent = `${volumePercent}%`;
   }
 
+  function moveFocusOutOfMiniPlayer() {
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLElement)) return;
+    if (!elements.miniPlayer.contains(activeElement)) return;
+
+    const focusCandidates = [
+      state.returnFocusElement,
+      elements.heroPlayerPlayPauseButton,
+      elements.messagesNavLink,
+      elements.settingsToggleButton,
+      elements.searchInput,
+    ];
+
+    for (const candidate of focusCandidates) {
+      if (!(candidate instanceof HTMLElement)) continue;
+      if (!document.contains(candidate)) continue;
+      if (elements.miniPlayer.contains(candidate)) continue;
+      if (candidate.hasAttribute("disabled")) continue;
+      try {
+        candidate.focus({ preventScroll: true });
+        return;
+      } catch {
+        // Try next candidate.
+      }
+    }
+
+    activeElement.blur();
+  }
+
   function renderMiniPlayer() {
-    if (!state.playerPostId) { state.playerDrag = null; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); syncOverlayBodyState(); heroMediaPlayerController.render(); return; }
+    if (!state.playerPostId) { moveFocusOutOfMiniPlayer(); state.playerDrag = null; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); syncOverlayBodyState(); heroMediaPlayerController.render(); return; }
     const post = getPostById(state.playerPostId); if (!post || !isPlayablePost(post)) { closeMiniPlayer(); return; }
     if (post.sourceKind === "youtube") state.heroPlayerPlaybackState = "playing";
     const creatorSummary = getProfileSummaryForPost(post);
@@ -1701,7 +1741,7 @@ export function createAppUi(context) {
 
   function collapseViewerToPlayer() { if (!state.viewerPostId) return; state.playerPostId = state.viewerPostId; state.miniPlayerExpanded = false; state.viewerPostId = null; elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); syncOverlayBodyState(); renderMiniPlayer(); }
 
-  function closeMiniPlayer() { state.playerPostId = null; state.miniPlayerExpanded = false; state.playerDrag = null; state.heroPlayerPlaybackState = "none"; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); destroyActivePlayer(); syncOverlayBodyState(); heroMediaPlayerController.render(); }
+  function closeMiniPlayer() { moveFocusOutOfMiniPlayer(); state.playerPostId = null; state.miniPlayerExpanded = false; state.playerDrag = null; state.heroPlayerPlaybackState = "none"; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; clearMiniPlayerMedia(); destroyActivePlayer(); syncOverlayBodyState(); heroMediaPlayerController.render(); state.returnFocusElement = null; }
 
   function handleMiniPlayerStageClick(event) { if (!event.target.closest("iframe, video, audio") && !state.miniPlayerExpanded) expandMiniPlayer(); }
 
