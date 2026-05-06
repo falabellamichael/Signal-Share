@@ -575,11 +575,20 @@ body[data-theme="midnight"] .feed-page-button:hover:not(:disabled) {
 }
 
 .mini-player-meta,
-.mini-player-tags,
-.mini-player-nav {
+.mini-player-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 12px;
+}
+
+.mini-player-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.mini-player-nav .button {
+  width: 100%;
 }
 
 button:disabled {
@@ -1420,7 +1429,7 @@ button:disabled {
 
   .mini-player-nav {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .mini-player-audio {

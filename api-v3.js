@@ -201,7 +201,13 @@ export function normalizeSupabasePost(row) {
   const hasValidEmbed = typeof post.embedUrl === "string" && post.embedUrl.includes("youtube.com/embed/");
   
   if (isYouTubeHint && (!post.externalId || !hasValidEmbed)) {
-    const repaired = parseYouTubeUrl(post.externalUrl || post.embedUrl || post.externalId || post.mediaUrl || post.src || post.label || post.caption || post.title || "");
+    const repairCandidates = [post.externalUrl, post.embedUrl, post.externalId, post.mediaUrl, post.src, post.label, post.caption, post.title];
+    let repaired = null;
+    for (const candidate of repairCandidates) {
+      if (typeof candidate !== "string" || !candidate.trim()) continue;
+      repaired = parseYouTubeUrl(candidate);
+      if (repaired) break;
+    }
     if (repaired) {
       post.externalId = repaired.externalId;
       post.embedUrl = repaired.embedUrl;

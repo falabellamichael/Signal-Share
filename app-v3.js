@@ -1,5 +1,5 @@
-import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js?v=92';
-import { createAppUi } from './app-v3-ui.js?v=107';
+import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js?v=93';
+import { createAppUi } from './app-v3-ui.js?v=109';
 
 
 
@@ -1944,7 +1944,13 @@ function healPosts(posts) {
     const hasValidEmbed = typeof post.embedUrl === "string" && post.embedUrl.includes("youtube.com/embed/");
     
     if (isYouTubeHint && (!post.externalId || !hasValidEmbed)) {
-      const repaired = parseYouTubeUrl(post.externalUrl || post.embedUrl || post.externalId || post.src || post.mediaUrl || post.label || post.caption || post.title || "");
+      const repairCandidates = [post.externalUrl, post.embedUrl, post.externalId, post.src, post.mediaUrl, post.label, post.caption, post.title];
+      let repaired = null;
+      for (const candidate of repairCandidates) {
+        if (typeof candidate !== "string" || !candidate.trim()) continue;
+        repaired = parseYouTubeUrl(candidate);
+        if (repaired) break;
+      }
       if (repaired) {
         return {
           ...post,
