@@ -1079,6 +1079,10 @@ button:disabled {
 
   .message-emoji-panel {
     gap: 6px;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+    padding: 8px;
   }
 
   .emoji-chip {
@@ -1110,6 +1114,7 @@ button:disabled {
   .messenger-section .message-list,
   .messenger-section.is-expanded .message-list {
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -1642,6 +1647,7 @@ button:disabled {
     align-content: start;
     padding: 4px 2px 2px 0;
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -1686,7 +1692,10 @@ button:disabled {
     max-height: none;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 0 0 4px;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+    padding: 8px;
     scrollbar-width: none;
   }
 

@@ -2,7 +2,7 @@
 @import url("./styles-1.css?v=1");
 
 /* styles-2.css: core layout/components, including messenger/feed structural styles. */
-@import url("./styles-2.css?v=1");
+@import url("./styles-2.css?v=3");
 
 /* styles-3.css: responsive and device-specific overrides (mobile, small screens, landscape). */
-@import url("./styles-3.css?v=2");
+@import url("./styles-3.css?v=4");
