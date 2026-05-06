@@ -62,8 +62,9 @@ final class PhoneNowPlayingHelper {
         String creator = extractNowPlayingCreator(controller.getMetadata(), title);
         String appLabel = resolveMediaAppLabel(context, packageName);
         String stateLabel = resolvePlaybackStateLabel(controller.getPlaybackState());
+        String playbackState = resolvePlaybackState(controller.getPlaybackState());
         String artworkUri = extractNowPlayingArtworkUri(controller.getMetadata(), openUri);
-        return Snapshot.active(title, buildMediaMeta(appLabel, creator, stateLabel), packageName, openUri, artworkUri);
+        return Snapshot.active(title, buildMediaMeta(appLabel, creator, stateLabel), packageName, openUri, artworkUri, playbackState);
     }
 
     static boolean performAction(Context context, String action) {
@@ -751,20 +752,34 @@ final class PhoneNowPlayingHelper {
     }
 
     private static String resolvePlaybackStateLabel(PlaybackState playbackState) {
+        String playbackStateValue = resolvePlaybackState(playbackState);
+        switch (playbackStateValue) {
+            case "playing":
+                return "Playing";
+            case "paused":
+                return "Paused";
+            case "buffering":
+                return "Buffering";
+            default:
+                return "Active";
+        }
+    }
+
+    private static String resolvePlaybackState(PlaybackState playbackState) {
         if (playbackState == null) {
-            return "Active";
+            return "active";
         }
 
         switch (playbackState.getState()) {
             case PlaybackState.STATE_PLAYING:
-                return "Playing";
+                return "playing";
             case PlaybackState.STATE_PAUSED:
-                return "Paused";
+                return "paused";
             case PlaybackState.STATE_BUFFERING:
             case PlaybackState.STATE_CONNECTING:
-                return "Buffering";
+                return "buffering";
             default:
-                return "Active";
+                return "active";
         }
     }
 
@@ -791,29 +806,31 @@ final class PhoneNowPlayingHelper {
         final String appPackage;
         final String openUri;
         final String artworkUri;
+        final String playbackState;
         final boolean active;
         final boolean permissionRequired;
 
-        private Snapshot(String title, String meta, String appPackage, String openUri, String artworkUri, boolean active, boolean permissionRequired) {
+        private Snapshot(String title, String meta, String appPackage, String openUri, String artworkUri, String playbackState, boolean active, boolean permissionRequired) {
             this.title = title;
             this.meta = meta;
             this.appPackage = appPackage;
             this.openUri = openUri;
             this.artworkUri = artworkUri;
+            this.playbackState = playbackState;
             this.active = active;
             this.permissionRequired = permissionRequired;
         }
 
-        static Snapshot active(String title, String meta, String appPackage, String openUri, String artworkUri) {
-            return new Snapshot(title, meta, appPackage, openUri, artworkUri, true, false);
+        static Snapshot active(String title, String meta, String appPackage, String openUri, String artworkUri, String playbackState) {
+            return new Snapshot(title, meta, appPackage, openUri, artworkUri, playbackState, true, false);
         }
 
         static Snapshot idle(String appPackage, String openUri) {
-            return new Snapshot("", "", appPackage, openUri, "", false, false);
+            return new Snapshot("", "", appPackage, openUri, "", "none", false, false);
         }
 
         static Snapshot permissionRequired() {
-            return new Snapshot("", "", "", "", "", false, true);
+            return new Snapshot("", "", "", "", "", "none", false, true);
         }
 
         byte[] toBytes() {
@@ -824,6 +841,7 @@ final class PhoneNowPlayingHelper {
                 json.put("appPackage", appPackage);
                 json.put("openUri", openUri);
                 json.put("artworkUri", artworkUri);
+                json.put("playbackState", playbackState);
                 json.put("active", active);
                 json.put("permissionRequired", permissionRequired);
                 return json.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);

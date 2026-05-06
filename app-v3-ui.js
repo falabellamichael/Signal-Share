@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=1";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=3";
 
 export function createAppUi(context) {
   const {
@@ -224,6 +224,7 @@ export function createAppUi(context) {
     heroPlayerPlayPauseButton: document.querySelector("#heroPlayerPlayPauseButton"),
     heroPlayerPrevButton: document.querySelector("#heroPlayerPrevButton"),
     heroPlayerNextButton: document.querySelector("#heroPlayerNextButton"),
+    heroPlayerOpenButton: document.querySelector("#heroPlayerOpenButton"),
     heroPlayerVolumeSlider: document.querySelector("#heroPlayerVolumeSlider"),
     heroPlayerVolumeValue: document.querySelector("#heroPlayerVolumeValue"),
   };
@@ -256,6 +257,8 @@ export function createAppUi(context) {
     stepMiniPlayer,
     renderMiniPlayer,
     postMessageToYouTubePlayer,
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
   });
 
   function attachEventListeners() {

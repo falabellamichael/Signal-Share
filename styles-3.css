@@ -746,6 +746,14 @@ button:disabled {
     justify-self: end;
   }
 
+  .hero-player-stage {
+    min-height: 168px;
+  }
+
+  .hero-player-preview-overlay {
+    padding: 10px;
+  }
+
   .hero-visual {
     width: 146px;
     height: 146px;

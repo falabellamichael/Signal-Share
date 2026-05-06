@@ -1657,6 +1657,98 @@ h1 {
   cursor: not-allowed;
 }
 
+#heroPlayerOpenButton {
+  width: 100%;
+  justify-content: center;
+}
+
+.hero-player-preview {
+  position: relative;
+  min-height: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  display: grid;
+  align-content: end;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    var(--surface-strong);
+}
+
+.hero-player-preview-image,
+.hero-player-preview-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-player-preview-video {
+  background: #0f1720;
+}
+
+.hero-player-preview-overlay {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(12, 19, 26, 0.08) 0%, rgba(12, 19, 26, 0.78) 64%, rgba(12, 19, 26, 0.9) 100%);
+  color: #f8fbff;
+}
+
+.hero-player-preview-badge {
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(6, 11, 16, 0.42);
+}
+
+.hero-player-preview-title,
+.hero-player-preview-meta,
+.hero-player-preview-note {
+  margin: 0;
+}
+
+.hero-player-preview-title {
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.hero-player-preview-meta {
+  font-size: 0.85rem;
+  opacity: 0.95;
+  line-height: 1.45;
+}
+
+.hero-player-preview-note {
+  font-size: 0.78rem;
+  opacity: 0.84;
+  line-height: 1.35;
+}
+
+.hero-player-preview.is-overlay-only {
+  background: none;
+  min-height: 0;
+}
+
+.hero-player-preview.is-overlay-only .hero-player-preview-overlay {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03)),
+    var(--surface-strong);
+}
+
+body[data-theme="contrast"] .hero-player-preview-overlay {
+  color: #ffffff;
+}
+
 .composer-grid {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;

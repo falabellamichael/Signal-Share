@@ -14,6 +14,8 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.getcapacitor.BridgeActivity;
 
+import java.nio.charset.StandardCharsets;
+
 public class MainActivity extends BridgeActivity {
     private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 1001;
     private static final String NATIVE_BRIDGE_OBJECT = "NativeBridge";
@@ -32,6 +34,46 @@ public class MainActivity extends BridgeActivity {
                     swipeRefreshLayout.setEnabled(enabled);
                 }
             });
+        }
+
+        @android.webkit.JavascriptInterface
+        public String getNowPlayingSnapshot() {
+            try {
+                return new String(
+                        PhoneNowPlayingHelper.readSnapshot(MainActivity.this).toBytes(),
+                        StandardCharsets.UTF_8
+                );
+            } catch (Exception ignored) {
+                return "{}";
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        public boolean performNowPlayingAction(String action) {
+            try {
+                return PhoneNowPlayingHelper.performAction(MainActivity.this, action);
+            } catch (Exception ignored) {
+                return false;
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        public boolean hasNowPlayingAccess() {
+            try {
+                return PhoneNowPlayingHelper.hasNotificationListenerAccess(MainActivity.this);
+            } catch (Exception ignored) {
+                return false;
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        public void openNowPlayingAccessSettings() {
+            mainHandler.post(MainActivity.this::openNowPlayingAccessSettings);
+        }
+
+        @android.webkit.JavascriptInterface
+        public void openNowPlayingMediaApp(String preferredPackageName, String preferredUri, boolean explicit) {
+            mainHandler.post(() -> MainActivity.this.openNowPlayingMediaApp(preferredPackageName, preferredUri, explicit));
         }
     };
 
