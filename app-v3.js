@@ -479,6 +479,28 @@ async function handleIncomingAppUrl(urlString = "") {
   } catch (_error) {
     return;
   }
+  const hashParams = new URLSearchParams(parsedUrl.hash.replace(/^#/, ""));
+  const accessToken = hashParams.get("access_token") || parsedUrl.searchParams.get("access_token");
+  const refreshToken = hashParams.get("refresh_token") || parsedUrl.searchParams.get("refresh_token");
+  const authError = hashParams.get("error_description") || parsedUrl.searchParams.get("error_description");
+  if (authError) {
+    showAuthFeedback(decodeURIComponent(authError), true);
+    return;
+  }
+  if (state.supabase && accessToken && refreshToken) {
+    const { error } = await state.supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error) {
+      console.error("Auth session could not be restored from incoming app URL", error);
+      showAuthFeedback(error.message || "Verification link could not be completed in the app.", true);
+      return;
+    }
+    state.pendingActivationEmail = "";
+    render();
+    return;
+  }
   if (parsedUrl.protocol === "signalshare:" && parsedUrl.host === "messages") {
     const threadId = decodeURIComponent(parsedUrl.pathname.replace(/^\/+/, ""));
     await openMessengerThreadFromNotification(threadId);

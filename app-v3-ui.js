@@ -246,7 +246,7 @@ export function createAppUi(context) {
     
     // Listeners for bell button are now handled inline in index.html to prevent conflicts
     if (elements.keyboardShortcutsButton) elements.keyboardShortcutsButton.addEventListener("click", () => window.showSettingsPage && window.showSettingsPage('shortcuts'));
-    if (elements.notificationsBackdrop) elements.notificationsBackdrop.addEventListener("click", closeNotificationsPanel);
+    if (elements.notificationsBackdrop) elements.notificationsBackdrop.addEventListener("click", handleNotificationsBackdropClick);
     if (elements.notificationsCloseButton) elements.notificationsCloseButton.addEventListener("click", closeNotificationsPanel);
     if (elements.clearNotificationsButton) elements.clearNotificationsButton.addEventListener("click", () => {
       if (window.notifications) window.notifications.clearHistory();
@@ -923,13 +923,26 @@ export function createAppUi(context) {
     }
   }
 
+  let notificationsOpenedAt = 0;
+
   function openNotificationsPanel() { 
     state.notificationsPanelOpen = true; 
+    notificationsOpenedAt = performance.now();
     setMobileHeaderHidden(false); 
     render();
     if (window.notifications?.resetBadge) window.notifications.resetBadge();
     if (window.renderNotificationsHistory) window.renderNotificationsHistory();
     requestAnimationFrame(() => elements.notificationsCloseButton?.focus?.()); 
+  }
+
+  function handleNotificationsBackdropClick(event) {
+    // Prevent the opening tap from immediately re-closing the panel on mobile.
+    if (performance.now() - notificationsOpenedAt < 220) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    closeNotificationsPanel();
   }
 
   function closeNotificationsPanel(options = {}) { 
@@ -956,8 +969,7 @@ export function createAppUi(context) {
     const bell = elements.notificationsLauncherButton;
     bell.style.cssText = "background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; color: inherit; padding: 0 8px; z-index: 10000; pointer-events: auto !important; -webkit-tap-highlight-color: rgba(0,0,0,0); flex-shrink: 0; min-height: 44px; min-width: 44px;";
     
-    // Use pointerdown for the fastest, cleanest response on both PC and Mobile
-    bell.addEventListener("pointerdown", (e) => {
+    bell.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       window.toggleNotificationsPanel(e);

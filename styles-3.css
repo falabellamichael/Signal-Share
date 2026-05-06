@@ -1476,6 +1476,21 @@ button:disabled {
     );
   }
 
+  #notificationsPanel .settings-dialog {
+    top: calc(max(var(--viewport-offset-top), env(safe-area-inset-top, 0px)) + 10px);
+    right: 8px;
+    left: auto;
+    width: min(420px, calc(100vw - 16px));
+    max-width: min(420px, calc(100vw - 16px));
+    max-height: calc(
+      var(--viewport-visible-height) -
+      max(var(--viewport-offset-top), env(safe-area-inset-top, 0px)) -
+      max(var(--viewport-offset-bottom), env(safe-area-inset-bottom, 0px)) -
+      18px
+    );
+    overflow-y: auto;
+  }
+
   .messenger-section,
   .messenger-section.is-expanded {
     top: calc(max(var(--viewport-offset-top), env(safe-area-inset-top, 0px)) + 14px);
