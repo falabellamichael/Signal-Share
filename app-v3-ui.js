@@ -1542,8 +1542,32 @@ export function createAppUi(context) {
 
   function getSpotifyPreviewMarket() { const locale = (Array.isArray(navigator.languages) && navigator.languages[0]) || navigator.language || navigator.userLanguage || ""; const match = `${locale}`.trim().match(/[-_]([A-Za-z]{2})$/); return match ? match[1].toUpperCase() : "US"; }
 
+  function resolveYouTubePreviewExternalId(source) {
+    const directId = typeof source?.externalId === "string" ? source.externalId.trim() : "";
+    if (/^[a-zA-Z0-9_-]{11}$/.test(directId)) return directId;
+
+    const values = [
+      source?.externalUrl,
+      source?.embedUrl,
+      source?.originalUrl,
+      source?.mediaUrl,
+      source?.src,
+      source?.label,
+      source?.title,
+    ];
+
+    for (const value of values) {
+      if (typeof value !== "string" || !value.trim()) continue;
+      const parsed = parseYouTubeUrl(value);
+      const parsedId = typeof parsed?.externalId === "string" ? parsed.externalId.trim() : "";
+      if (/^[a-zA-Z0-9_-]{11}$/.test(parsedId)) return parsedId;
+    }
+
+    return "";
+  }
+
   function resolveYouTubePreviewCandidates(source) {
-    const externalId = source.externalId || parseYouTubeUrl(source.externalUrl || source.embedUrl || source.originalUrl || source.label || "")?.externalId || "";
+    const externalId = resolveYouTubePreviewExternalId(source);
     if (!externalId) return [];
     return [
       `https://i.ytimg.com/vi/${externalId}/maxresdefault.jpg`,
@@ -1555,8 +1579,10 @@ export function createAppUi(context) {
   }
 
   async function getYouTubePreviewMetadata(source) {
-    const sourceUrl = resolveYouTubePreviewSourceUrl(source); if (!sourceUrl) return null;
-    const cacheKey = `youtube:oembed:${sourceUrl}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
+    if (window.NativeBridge && typeof window.NativeBridge === "object") return null;
+    const externalId = resolveYouTubePreviewExternalId(source); if (!externalId) return null;
+    const sourceUrl = `https://www.youtube.com/watch?v=${externalId}`;
+    const cacheKey = `youtube:oembed:${externalId}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
     const request = fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(sourceUrl)}&format=json`).then((res) => (res.ok ? res.json() : null)).then((payload) => {
       if (!payload || (!payload.title && !payload.thumbnail_url)) return null;
       const metadata = {
@@ -1574,10 +1600,8 @@ export function createAppUi(context) {
   }
 
   function resolveYouTubePreviewSourceUrl(source) {
-    const externalId = source.externalId || parseYouTubeUrl(source.externalUrl || source.embedUrl || source.originalUrl || source.label || "")?.externalId || "";
+    const externalId = resolveYouTubePreviewExternalId(source);
     if (externalId) return `https://www.youtube.com/watch?v=${externalId}`;
-    if (source.externalUrl) return source.externalUrl;
-    if (source.originalUrl) return source.originalUrl;
     return "";
   }
 

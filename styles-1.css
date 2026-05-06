@@ -897,14 +897,14 @@ select {
   display: grid;
   place-items: center;
   font-family: "Instrument Serif", serif;
-  font-size: 2.6rem;
+  font-size: 2.5rem;
   line-height: 1;
   letter-spacing: -0.08em;
   pointer-events: none;
 }
 
 .brand-glyph-back {
-  transform: translate(-14px, -18px);
+  transform: translate(-4px, -5px);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   -webkit-background-clip: text;
   background-clip: text;
@@ -914,7 +914,7 @@ select {
 
 .brand-glyph-front {
   z-index: 1;
-  transform: translate(14px, 18px);
+  transform: translate(5px, 5px);
   color: transparent;
   -webkit-text-stroke: 1.35px rgba(246, 239, 227, 0.72);
   opacity: 0.95;
@@ -1912,5 +1912,8 @@ body[data-theme="contrast"] .hero-player-preview-overlay {
   padding: 14px;
   border-radius: calc(var(--radius-md) + 4px);
   background:
+
+
+
 
 
