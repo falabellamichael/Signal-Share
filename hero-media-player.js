@@ -23,10 +23,19 @@ export function createHeroMediaPlayerController(options) {
   const NATIVE_ACTION_NEXT = "next";
   const NATIVE_ACTION_PREVIOUS = "previous";
   const NATIVE_POLL_INTERVAL_MS = 3000;
+  const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
+  const DESKTOP_ACTION_NEXT = "next";
+  const DESKTOP_ACTION_PREVIOUS = "previous";
+  const DESKTOP_POLL_INTERVAL_MS = 3000;
 
   let listenersAttached = false;
   let nativeSnapshot = null;
   let nativePollTimerId = 0;
+  let desktopSnapshot = null;
+  let desktopPollTimerId = 0;
+  let desktopSnapshotEndpoint = "";
+  let desktopActionEndpoint = "";
+  let desktopPollFailureCount = 0;
 
   function hasUi() {
     return Boolean(
@@ -39,7 +48,6 @@ export function createHeroMediaPlayerController(options) {
       && elements.heroPlayerNextButton
       && elements.heroPlayerVolumeSlider
       && elements.heroPlayerVolumeValue
-      && elements.heroPlayerOpenButton
     );
   }
 
@@ -130,6 +138,172 @@ export function createHeroMediaPlayerController(options) {
     return false;
   }
 
+  function canUseDesktopBridge() {
+    if (hasNativeSnapshotBridge()) return false;
+    if (typeof window.fetch !== "function") return false;
+    return window.location.protocol === "http:"
+      || window.location.protocol === "https:"
+      || window.location.protocol === "file:";
+  }
+
+  function pushDesktopEndpointCandidate(candidates, candidate, seen) {
+    if (typeof candidate !== "string") return;
+    const trimmed = candidate.trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(trimmed);
+  }
+
+  function getDesktopSnapshotEndpoint() {
+    if (desktopSnapshotEndpoint) return desktopSnapshotEndpoint;
+    if (typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT === "string" && window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT.trim()) {
+      return window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT.trim();
+    }
+    return "/api/system-media/current";
+  }
+
+  function resolveDesktopSnapshotEndpoints() {
+    const candidates = [];
+    const seen = new Set();
+    pushDesktopEndpointCandidate(candidates, desktopSnapshotEndpoint, seen);
+
+    if (typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT === "string" && window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT.trim()) {
+      pushDesktopEndpointCandidate(candidates, window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT.trim(), seen);
+    }
+
+    try {
+      pushDesktopEndpointCandidate(candidates, new URL("/api/system-media/current", window.location.href).toString(), seen);
+    } catch {
+      pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);
+    }
+
+    if (typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_BASE_URL === "string" && window.SIGNAL_SHARE_SYSTEM_MEDIA_BASE_URL.trim()) {
+      const baseUrl = window.SIGNAL_SHARE_SYSTEM_MEDIA_BASE_URL.trim().replace(/\/+$/, "");
+      pushDesktopEndpointCandidate(candidates, `${baseUrl}/api/system-media/current`, seen);
+    }
+
+    const locationHost = `${window.location.hostname || ""}`.trim().toLowerCase();
+    const shouldTryLoopback = window.location.protocol === "file:"
+      || (window.location.protocol === "http:" && locationHost !== "localhost" && locationHost !== "127.0.0.1");
+    if (shouldTryLoopback) {
+      pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
+      pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
+    }
+
+    if (!candidates.length) {
+      pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);
+    }
+    return candidates;
+  }
+
+  function deriveDesktopActionEndpoint(snapshotEndpoint) {
+    if (typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_ACTION_ENDPOINT === "string" && window.SIGNAL_SHARE_SYSTEM_MEDIA_ACTION_ENDPOINT.trim()) {
+      return window.SIGNAL_SHARE_SYSTEM_MEDIA_ACTION_ENDPOINT.trim();
+    }
+    if (!snapshotEndpoint) return "/api/system-media/action";
+    try {
+      const url = new URL(snapshotEndpoint, window.location.href);
+      url.pathname = url.pathname.replace(/\/current$/i, "/action");
+      return url.toString();
+    } catch {
+      if (snapshotEndpoint.endsWith("/current")) {
+        return `${snapshotEndpoint.slice(0, -"/current".length)}/action`;
+      }
+      return "/api/system-media/action";
+    }
+  }
+
+  function getDesktopActionEndpoint() {
+    if (desktopActionEndpoint) return desktopActionEndpoint;
+    return deriveDesktopActionEndpoint(getDesktopSnapshotEndpoint());
+  }
+
+  function normalizeDesktopSnapshot(raw = {}) {
+    const playbackState = normalizePlaybackState(raw.playbackState || (raw.active ? "playing" : "none"));
+    return {
+      source: `${raw.source || "windows-smtc"}`.trim(),
+      available: Boolean(raw.available),
+      active: Boolean(raw.active),
+      permissionRequired: false,
+      title: typeof raw.title === "string" ? raw.title.trim() : "",
+      meta: typeof raw.meta === "string" ? raw.meta.trim() : "",
+      appPackage: typeof raw.appPackage === "string" ? raw.appPackage.trim() : "",
+      openUri: typeof raw.openUri === "string" ? raw.openUri.trim() : "",
+      artworkUri: typeof raw.artworkUri === "string" ? raw.artworkUri.trim() : "",
+      playbackState,
+    };
+  }
+
+  async function readDesktopSnapshot() {
+    if (!canUseDesktopBridge()) return null;
+    let lastError = null;
+    const endpoints = resolveDesktopSnapshotEndpoints();
+    for (const endpoint of endpoints) {
+      try {
+        const response = await window.fetch(endpoint, {
+          method: "GET",
+          cache: "no-store",
+          credentials: "omit",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+        if (!response.ok) throw new Error(`Desktop media endpoint returned ${response.status}.`);
+        const payload = await response.json();
+        desktopSnapshotEndpoint = endpoint;
+        desktopActionEndpoint = deriveDesktopActionEndpoint(endpoint);
+        return normalizeDesktopSnapshot(payload);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError || new Error("Desktop media endpoint is unavailable.");
+  }
+
+  function refreshDesktopSnapshot({ renderAfter = true } = {}) {
+    if (!canUseDesktopBridge()) {
+      desktopSnapshot = null;
+      return Promise.resolve(null);
+    }
+    return readDesktopSnapshot()
+      .then((snapshot) => {
+        desktopSnapshot = snapshot;
+        desktopPollFailureCount = 0;
+        if (renderAfter) render();
+        return desktopSnapshot;
+      })
+      .catch(() => {
+        desktopSnapshot = null;
+        desktopPollFailureCount += 1;
+        if (renderAfter) render();
+        return null;
+      });
+  }
+
+  function startDesktopSnapshotPolling() {
+    if (desktopPollTimerId || !canUseDesktopBridge()) return;
+    refreshDesktopSnapshot({ renderAfter: false });
+    desktopPollTimerId = window.setInterval(() => {
+      if (document.hidden) return;
+      refreshDesktopSnapshot();
+    }, DESKTOP_POLL_INTERVAL_MS);
+  }
+
+  function stopDesktopSnapshotPolling() {
+    if (!desktopPollTimerId) return;
+    window.clearInterval(desktopPollTimerId);
+    desktopPollTimerId = 0;
+  }
+
+  function shouldUseDesktopMode(post) {
+    if (!desktopSnapshot) return false;
+    if (desktopSnapshot.active) return true;
+    if (!post && desktopSnapshot.available) return true;
+    return false;
+  }
+
   function getFallbackPageMediaElement() {
     const activeMedia = getActivePlayerMediaElement();
     const candidates = Array.from(document.querySelectorAll("audio, video"));
@@ -194,7 +368,9 @@ export function createHeroMediaPlayerController(options) {
     const session = navigator.mediaSession;
     const playbackState = mode === "device"
       ? normalizePlaybackState(nativeSnapshot?.playbackState)
-      : (post || fallbackMedia ? getLocalPlaybackState() : "none");
+      : mode === "desktop"
+        ? normalizePlaybackState(desktopSnapshot?.playbackState)
+        : (post || fallbackMedia ? getLocalPlaybackState() : "none");
     try { session.playbackState = playbackState; } catch {}
 
     const MetadataCtor = typeof window !== "undefined" ? window.MediaMetadata : null;
@@ -206,6 +382,13 @@ export function createHeroMediaPlayerController(options) {
           title: nativeSnapshot.title || "Device media",
           artist: nativeSnapshot.meta || "Now playing on this device",
           album: "Device playback",
+        });
+      } else if (mode === "desktop" && desktopSnapshot) {
+        session.metadata = new MetadataCtor({
+          title: desktopSnapshot.title || "Desktop media",
+          artist: desktopSnapshot.meta || "Now playing on this PC",
+          album: "System media",
+          artwork: desktopSnapshot.artworkUri ? [{ src: desktopSnapshot.artworkUri }] : [],
         });
       } else if (post) {
         const creatorSummary = getProfileSummaryForPost(post);
@@ -283,10 +466,37 @@ export function createHeroMediaPlayerController(options) {
     }
   }
 
+  function performDesktopAction(action) {
+    if (!canUseDesktopBridge()) return Promise.resolve(false);
+    return window.fetch(getDesktopActionEndpoint(), {
+      method: "POST",
+      credentials: "omit",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ action }),
+    })
+      .then((response) => response.ok ? response.json() : { ok: false })
+      .then((payload) => {
+        window.setTimeout(() => { refreshDesktopSnapshot(); }, 260);
+        return Boolean(payload?.ok);
+      })
+      .catch(() => false);
+  }
+
   function handlePlayPause(forcePlay) {
     const post = getControllablePlayerPost();
     if (shouldUseNativeMode(post)) {
+      if (nativeSnapshot?.permissionRequired && hasNativeSettingsBridge()) {
+        try { getNativeBridge().openNowPlayingAccessSettings(); } catch {}
+        return;
+      }
       performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
+      return;
+    }
+    if (shouldUseDesktopMode(post) && desktopSnapshot?.active) {
+      performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
       return;
     }
 
@@ -296,9 +506,14 @@ export function createHeroMediaPlayerController(options) {
       return;
     }
 
+    const hadControllablePost = Boolean(post);
     if (!ensureControllablePost()) {
       render();
       return;
+    }
+    if (!hadControllablePost) {
+      state.miniPlayerExpanded = true;
+      renderMiniPlayer();
     }
     toggleLocalPlayback(forcePlay);
     render();
@@ -308,6 +523,10 @@ export function createHeroMediaPlayerController(options) {
     const post = getControllablePlayerPost();
     if (shouldUseNativeMode(post)) {
       performNativeAction(NATIVE_ACTION_PREVIOUS);
+      return;
+    }
+    if (shouldUseDesktopMode(post) && desktopSnapshot?.active) {
+      performDesktopAction(DESKTOP_ACTION_PREVIOUS);
       return;
     }
 
@@ -330,6 +549,10 @@ export function createHeroMediaPlayerController(options) {
       performNativeAction(NATIVE_ACTION_NEXT);
       return;
     }
+    if (shouldUseDesktopMode(post) && desktopSnapshot?.active) {
+      performDesktopAction(DESKTOP_ACTION_NEXT);
+      return;
+    }
 
     if (!post && getFallbackPageMediaElement() instanceof HTMLMediaElement) {
       render();
@@ -344,34 +567,10 @@ export function createHeroMediaPlayerController(options) {
     state.heroPlayerPlaybackState = "paused";
   }
 
-  function handleOpenButtonClick() {
-    const post = getControllablePlayerPost();
-    if (shouldUseNativeMode(post)) {
-      if (nativeSnapshot?.permissionRequired && hasNativeSettingsBridge()) {
-        try { getNativeBridge().openNowPlayingAccessSettings(); } catch {}
-        return;
-      }
-      if (hasNativeOpenBridge()) {
-        try {
-          getNativeBridge().openNowPlayingMediaApp(
-            nativeSnapshot?.appPackage || "",
-            nativeSnapshot?.openUri || "",
-            false
-          );
-        } catch {}
-      }
-      return;
-    }
-
-    if (ensureControllablePost()) {
-      state.miniPlayerExpanded = true;
-      renderMiniPlayer();
-    }
-  }
-
   function handleVolumeInput(event) {
     const post = getControllablePlayerPost();
     if (shouldUseNativeMode(post)) return;
+    if (shouldUseDesktopMode(post) && desktopSnapshot?.active) return;
     const rawValue = Number(event.target?.value);
     state.playerVolume = normalizePlayerVolume(rawValue / 100, state.playerVolume);
     savePlayerVolume(state.playerVolume);
@@ -445,7 +644,7 @@ export function createHeroMediaPlayerController(options) {
             badge: "Device media",
             title: "Permission required",
             meta: "Enable notification access to control device playback.",
-            note: "Tap Enable Access below.",
+            note: "Press Play to open access settings.",
           })
         );
         return;
@@ -467,6 +666,29 @@ export function createHeroMediaPlayerController(options) {
           badge: "Device media",
           title: "No active session",
           meta: "Start playback in any media app on this device.",
+        })
+      );
+      return;
+    }
+
+    if (mode === "desktop") {
+      if (desktopSnapshot?.active) {
+        elements.heroPlayerStage.appendChild(
+          createPreviewCard({
+            badge: "PC system media",
+            title: desktopSnapshot.title || "Now playing",
+            meta: desktopSnapshot.meta || "Current desktop playback",
+            note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
+            artworkUrl: desktopSnapshot.artworkUri || "",
+          })
+        );
+        return;
+      }
+      elements.heroPlayerStage.appendChild(
+        createPreviewCard({
+          badge: "PC system media",
+          title: "Waiting for playback",
+          meta: "Start playback in YouTube, Spotify, or another desktop media app.",
         })
       );
       return;
@@ -507,8 +729,8 @@ export function createHeroMediaPlayerController(options) {
       elements.heroPlayerStage.appendChild(
         createPreviewCard({
           badge: "App media",
-          title: "Nothing playing yet",
-          meta: "Use any Play button in the feed to start.",
+          title: "Ready to play",
+          meta: "Press Play to start your media player.",
         })
       );
       return;
@@ -562,7 +784,6 @@ export function createHeroMediaPlayerController(options) {
     elements.heroPlayerPrevButton.addEventListener("click", handlePrevious);
     elements.heroPlayerNextButton.addEventListener("click", handleNext);
     elements.heroPlayerVolumeSlider.addEventListener("input", handleVolumeInput);
-    elements.heroPlayerOpenButton.addEventListener("click", handleOpenButtonClick);
 
     window.addEventListener("signal:nativeBridgeReady", () => {
       startNativeSnapshotPolling();
@@ -574,10 +795,17 @@ export function createHeroMediaPlayerController(options) {
         startNativeSnapshotPolling();
         refreshNativeSnapshot();
       }
+      if (canUseDesktopBridge()) {
+        startDesktopSnapshotPolling();
+        refreshDesktopSnapshot();
+      }
     });
 
     if (hasNativeSnapshotBridge()) {
       startNativeSnapshotPolling();
+    }
+    if (canUseDesktopBridge()) {
+      startDesktopSnapshotPolling();
     }
   }
 
@@ -587,14 +815,26 @@ export function createHeroMediaPlayerController(options) {
       nativeSnapshot = null;
       stopNativeSnapshotPolling();
     }
+    if (!canUseDesktopBridge()) {
+      desktopSnapshot = null;
+      stopDesktopSnapshotPolling();
+    }
 
     const post = getControllablePlayerPost();
     const mediaElement = getActivePlayerMediaElement();
     const fallbackMedia = getFallbackPageMediaElement();
     const browserMetadata = getBrowserMediaMetadata();
-    const mode = shouldUseNativeMode(post) ? "device" : "app";
-    const playbackState = mode === "device" ? normalizePlaybackState(nativeSnapshot?.playbackState) : getLocalPlaybackState();
-    const supportsPlayback = mode === "device" ? hasNativeActionBridge() : supportsLocalProgrammaticPlayback(post);
+    const mode = shouldUseNativeMode(post) ? "device" : (shouldUseDesktopMode(post) ? "desktop" : "app");
+    const playbackState = mode === "device"
+      ? normalizePlaybackState(nativeSnapshot?.playbackState)
+      : mode === "desktop"
+        ? normalizePlaybackState(desktopSnapshot?.playbackState)
+        : getLocalPlaybackState();
+    const supportsPlayback = mode === "device"
+      ? hasNativeActionBridge()
+      : mode === "desktop"
+        ? Boolean(desktopSnapshot?.active)
+        : supportsLocalProgrammaticPlayback(post);
     const supportsVolume = mode === "app" && (
       mediaElement instanceof HTMLMediaElement
       || fallbackMedia instanceof HTMLMediaElement
@@ -602,9 +842,18 @@ export function createHeroMediaPlayerController(options) {
     );
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
     const playableCount = getPlayableVisiblePostIds().length;
+    const canBootstrapPlayback = !post
+      && playableCount > 0
+      && !(fallbackMedia instanceof HTMLMediaElement)
+      && (
+        mode === "app"
+        || (mode === "desktop" && !desktopSnapshot?.active)
+      );
     const canStep = mode === "device"
       ? hasNativeActionBridge()
-      : (!(fallbackMedia instanceof HTMLMediaElement) && playableCount > 1);
+      : mode === "desktop"
+        ? Boolean(desktopSnapshot?.active)
+        : (!(fallbackMedia instanceof HTMLMediaElement) && playableCount > 1);
 
     if (mode === "device") {
       if (nativeSnapshot?.permissionRequired) {
@@ -620,6 +869,16 @@ export function createHeroMediaPlayerController(options) {
         elements.heroPlayerCaption.textContent = "Start playback in any media app to control it here.";
         elements.heroPlayerStatus.textContent = "Device system media";
       }
+    } else if (mode === "desktop") {
+      if (desktopSnapshot?.active) {
+        elements.heroPlayerTitle.textContent = desktopSnapshot.title || "Now playing";
+        elements.heroPlayerCaption.textContent = desktopSnapshot.meta || "Desktop playback";
+        elements.heroPlayerStatus.textContent = "PC system media";
+      } else {
+        elements.heroPlayerTitle.textContent = "PC media idle";
+        elements.heroPlayerCaption.textContent = "Start playback in YouTube, Spotify, or another desktop app.";
+        elements.heroPlayerStatus.textContent = "PC system media";
+      }
     } else if (!post && fallbackMedia instanceof HTMLMediaElement) {
       const fallbackTitle = browserMetadata?.title || fallbackMedia.getAttribute("title") || "Now playing in this browser";
       const fallbackMeta = [browserMetadata?.artist, browserMetadata?.album].filter(Boolean).join(" · ");
@@ -627,9 +886,9 @@ export function createHeroMediaPlayerController(options) {
       elements.heroPlayerCaption.textContent = fallbackMeta || "Active browser media session";
       elements.heroPlayerStatus.textContent = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
     } else if (!post) {
-      elements.heroPlayerTitle.textContent = "Nothing playing yet";
-      elements.heroPlayerCaption.textContent = "Open a playable post to control playback on this PC or mobile device.";
-      elements.heroPlayerStatus.textContent = "Use any Play button in the feed to start.";
+      elements.heroPlayerTitle.textContent = "Ready to play";
+      elements.heroPlayerCaption.textContent = "Press Play to start this app player, or play media on your PC.";
+      elements.heroPlayerStatus.textContent = "App media standby";
     } else {
       const creatorSummary = getProfileSummaryForPost(post);
       elements.heroPlayerTitle.textContent = post.title;
@@ -638,8 +897,10 @@ export function createHeroMediaPlayerController(options) {
     }
 
     elements.heroPlayerPlayPauseButton.textContent = playbackState === "playing" ? "Pause" : "Play";
-    elements.heroPlayerPlayPauseButton.disabled = !supportsPlayback;
-    elements.heroPlayerPlayPauseButton.title = supportsPlayback ? "" : "No controllable playback session found.";
+    elements.heroPlayerPlayPauseButton.disabled = !(supportsPlayback || canBootstrapPlayback);
+    elements.heroPlayerPlayPauseButton.title = supportsPlayback || canBootstrapPlayback
+      ? ""
+      : "No controllable playback session found.";
 
     elements.heroPlayerPrevButton.disabled = !canStep;
     elements.heroPlayerNextButton.disabled = !canStep;
@@ -647,20 +908,6 @@ export function createHeroMediaPlayerController(options) {
     elements.heroPlayerVolumeSlider.disabled = !supportsVolume;
     elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
     elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
-
-    if (mode === "device") {
-      elements.heroPlayerOpenButton.hidden = false;
-      if (nativeSnapshot?.permissionRequired) {
-        elements.heroPlayerOpenButton.textContent = "Enable Access";
-      } else {
-        elements.heroPlayerOpenButton.textContent = "Open Media App";
-      }
-    } else if (!post && fallbackMedia instanceof HTMLMediaElement) {
-      elements.heroPlayerOpenButton.hidden = true;
-    } else {
-      elements.heroPlayerOpenButton.hidden = false;
-      elements.heroPlayerOpenButton.textContent = "Open Player";
-    }
 
     renderStagePreview(mode, post, fallbackMedia);
     syncMediaSession(post, mode, fallbackMedia);
