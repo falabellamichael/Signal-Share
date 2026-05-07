@@ -17,6 +17,7 @@ export function createHeroMediaPlayerController(options) {
     postMessageToYouTubePlayer,
     parseYouTubeUrl,
     resolveActivePlayerSource,
+    getSpotifyPreviewMetadata,
   } = options;
 
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
@@ -609,15 +610,7 @@ export function createHeroMediaPlayerController(options) {
     const card = document.createElement("div");
     card.className = "hero-player-preview";
 
-    if (artworkUrl) {
-      const image = document.createElement("img");
-      image.className = "hero-player-preview-image";
-      image.alt = title ? `${title} artwork` : "Now playing artwork";
-      image.loading = "lazy";
-      image.referrerPolicy = "strict-origin-when-cross-origin";
-      image.src = artworkUrl;
-      card.appendChild(image);
-    }
+    applyPreviewCardArtwork(card, title, artworkUrl);
 
     const overlay = document.createElement("div");
     overlay.className = "hero-player-preview-overlay";
@@ -639,6 +632,50 @@ export function createHeroMediaPlayerController(options) {
     }
     card.appendChild(overlay);
     return card;
+  }
+
+  function applyPreviewCardArtwork(card, title, artworkUrl) {
+    if (!(card instanceof HTMLElement)) return false;
+    const nextArtwork = typeof artworkUrl === "string" ? artworkUrl.trim() : "";
+    if (!nextArtwork) return false;
+    let image = card.querySelector(".hero-player-preview-image");
+    if (!(image instanceof HTMLImageElement)) {
+      image = document.createElement("img");
+      image.className = "hero-player-preview-image";
+      image.loading = "lazy";
+      image.referrerPolicy = "strict-origin-when-cross-origin";
+      card.prepend(image);
+    }
+    image.alt = title ? `${title} artwork` : "Now playing artwork";
+    image.src = nextArtwork;
+    return true;
+  }
+
+  async function resolveSpotifyPreviewArtwork(post) {
+    if (!post || post.sourceKind !== "spotify" || typeof getSpotifyPreviewMetadata !== "function") return "";
+    const metadata = await getSpotifyPreviewMetadata({
+      provider: "spotify",
+      title: post.title ?? "",
+      creator: post.creator ?? "",
+      externalId: post.externalId ?? "",
+      externalUrl: post.externalUrl ?? "",
+      embedUrl: post.embedUrl ?? "",
+      originalUrl: post.originalUrl ?? post.externalUrl ?? "",
+      label: post.label ?? "",
+      caption: post.caption ?? "",
+    }).catch(() => null);
+    return typeof metadata?.thumbnailUrl === "string" ? metadata.thumbnailUrl.trim() : "";
+  }
+
+  function hydrateSpotifyPreviewArtwork(card, post) {
+    if (!post || post.sourceKind !== "spotify") return;
+    const expectedPostId = post.id;
+    void resolveSpotifyPreviewArtwork(post).then((artworkUrl) => {
+      if (!artworkUrl || !card.isConnected) return;
+      const currentPost = getControllablePlayerPost();
+      if (!currentPost || currentPost.id !== expectedPostId) return;
+      applyPreviewCardArtwork(card, post.title, artworkUrl);
+    });
   }
 
   function resolveAppPreviewArtwork(post) {
@@ -788,6 +825,7 @@ export function createHeroMediaPlayerController(options) {
         title: post.title,
         meta: previewMeta,
         note: "Preview",
+        artworkUrl: showInlineAppVideoPreview ? "" : previewArtwork,
       });
       if (showInlineAppVideoPreview) {
         overlay.classList.add("is-overlay-only");
@@ -796,15 +834,17 @@ export function createHeroMediaPlayerController(options) {
       return;
     }
 
-    elements.heroPlayerStage.appendChild(
-      createPreviewCard({
-        badge: `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`,
-        title: post.title,
-        meta: previewMeta,
-        note: post.sourceKind === "spotify" ? "Control playback with Spotify in the docked player." : "",
-        artworkUrl: previewArtwork,
-      })
-    );
+    const previewCard = createPreviewCard({
+      badge: `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`,
+      title: post.title,
+      meta: previewMeta,
+      note: post.sourceKind === "spotify" ? "Control playback with Spotify in the docked player." : "",
+      artworkUrl: previewArtwork,
+    });
+    elements.heroPlayerStage.appendChild(previewCard);
+    if (!previewArtwork && post.sourceKind === "spotify") {
+      hydrateSpotifyPreviewArtwork(previewCard, post);
+    }
   }
 
   function attachEventListeners() {
