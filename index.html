@@ -24,6 +24,12 @@
     />
     <link rel="stylesheet" href="./styles.css?v=120" />
     <link rel="stylesheet" href="./notifications.css" />
+    <script>
+      // Early SDK placeholders for async script loading
+      window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || (() => {});
+      window.onYouTubeIframeAPIReady = window.onYouTubeIframeAPIReady || (() => {});
+    </script>
+
     <script src="https://www.youtube.com/iframe_api" async></script>
     <script src="https://sdk.scdn.co/spotify-player.js" async></script>
   </head>

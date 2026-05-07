@@ -1,8 +1,5 @@
 import { renderHeroStagePreview } from "./hero-media-player-preview.js?v=1";
 
-// SDK placeholders for early script loading
-window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || (() => console.log("[Spotify] Ready (default)"));
-window.onYouTubeIframeAPIReady = window.onYouTubeIframeAPIReady || (() => console.log("[YouTube] Ready (default)"));
 
 
 export function createHeroMediaPlayerController(options) {
@@ -27,9 +24,6 @@ export function createHeroMediaPlayerController(options) {
     getSpotifyPreviewImageUrl,
     parseYouTubeUrl,
     resolveActivePlayerSource,
-    getFallbackPageMediaElement,
-    getBrowserMediaMetadata,
-    getStandbyPreviewPost,
 
   } = options;
 
@@ -61,43 +55,7 @@ export function createHeroMediaPlayerController(options) {
     console.log("[Hero] SDK hooks initialized.");
   }
 
-  function escapeRegex(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
 
-  function syncMediaSession(meta) {
-    if (!("mediaSession" in navigator)) return;
-    if (!meta || (!meta.title && !meta.artist)) {
-      navigator.mediaSession.metadata = null;
-      return;
-    }
-
-    try {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: meta.title || "Signal Share",
-        artist: meta.artist || "App Media",
-        artwork: meta.artwork ? [{ src: meta.artwork, sizes: "512x512", type: "image/jpeg" }] : []
-      });
-
-      // Set action handlers
-      const handlers = {
-        play: () => handlePlayPause(true),
-        pause: () => handlePlayPause(false),
-        previoustrack: () => handlePrevious(),
-        nexttrack: () => handleNext(),
-      };
-
-      Object.entries(handlers).forEach(([action, handler]) => {
-        try {
-          navigator.mediaSession.setActionHandler(action, handler);
-        } catch (err) {
-          // Some browsers might not support all actions
-        }
-      });
-    } catch (error) {
-      console.error("[MediaSession] Sync failed", error);
-    }
-  }
 
   function hasUi() {
     return Boolean(
