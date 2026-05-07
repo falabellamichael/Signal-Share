@@ -717,7 +717,7 @@ export function createHeroMediaPlayerController(options) {
         || ""
       );
       const videoId = post.externalId || parsed?.externalId || "";
-      return videoId ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` : "";
+      return videoId ? `https://img.youtube.com/vi/${videoId}/0.jpg` : "";
     }
     if (post.mediaKind === "image") return resolveActivePlayerSource(post) || "";
     return "";

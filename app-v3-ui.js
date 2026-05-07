@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=12";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=13";
 
 export function createAppUi(context) {
   const {
@@ -1612,10 +1612,10 @@ export function createAppUi(context) {
     const externalId = resolveYouTubePreviewExternalId(source);
     if (!externalId) return [];
     return [
-      `https://i.ytimg.com/vi/${externalId}/mqdefault.jpg`,
+      `https://img.youtube.com/vi/${externalId}/0.jpg`,
       `https://i.ytimg.com/vi/${externalId}/hqdefault.jpg`,
       `https://i.ytimg.com/vi/${externalId}/sddefault.jpg`,
-      `https://img.youtube.com/vi/${externalId}/0.jpg`,
+      `https://i.ytimg.com/vi/${externalId}/default.jpg`,
       `https://i.ytimg.com/vi/${externalId}/maxresdefault.jpg`
     ];
   }
