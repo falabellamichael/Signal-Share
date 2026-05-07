@@ -11,12 +11,12 @@ import { createAppUi } from './app-v3-ui.js?v=131';
  * @returns {boolean} True if user is banned, false otherwise
  */
 function isCurrentUserBanned(state) {
-  try {
-    return state.currentUserBanned || false;
-  } catch (error) {
-    console.error("Error in isCurrentUserBanned:", error);
-    return false;
-  }
+    try {
+        return state.currentUserBanned || false;
+    } catch (error) {
+        console.error("Error in isCurrentUserBanned:", error);
+        return false;
+    }
 }
 
 /**
@@ -26,15 +26,15 @@ function isCurrentUserBanned(state) {
  * @returns {boolean} True if user is banned, false otherwise
  */
 function isUserBanned(state, userId) {
-  try {
-    if (!Array.isArray(state.bannedUserIds)) {
-      return false;
+    try {
+        if (!Array.isArray(state.bannedUserIds)) {
+            return false;
+        }
+        return state.bannedUserIds.includes(userId);
+    } catch (error) {
+        console.error("Error in isUserBanned:", error);
+        return false;
     }
-    return state.bannedUserIds.includes(userId);
-  } catch (error) {
-    console.error("Error in isUserBanned:", error);
-    return false;
-  }
 }
 
 /**
@@ -43,7 +43,7 @@ function isUserBanned(state, userId) {
  * @returns {boolean} True if messaging is enabled, false otherwise
  */
 function isMessagingEnabled(state) {
-  return state.backendMode === "supabase" && Boolean(state.currentUser);
+    return state.backendMode === "supabase" && Boolean(state.currentUser);
 }
 
 /**
@@ -52,7 +52,7 @@ function isMessagingEnabled(state) {
  * @returns {boolean} True if user can publish, false otherwise
  */
 function canPublishToLiveFeed(state) {
-  return Boolean(state.currentUser) && !isCurrentUserBanned(state);
+    return Boolean(state.currentUser) && !isCurrentUserBanned(state);
 }
 
 /**
@@ -71,7 +71,7 @@ function isUserBlocked(state, userId) {
  * @returns {boolean} True if user has admin privileges
  */
 function canAccessAdminBanPanel(state) {
-  return Boolean(state.currentUser) && isCurrentUserAdmin();
+    return Boolean(state.currentUser) && isCurrentUserAdmin();
 }
 
 const DEMO_POSTS = [
@@ -338,7 +338,7 @@ function trimNotificationText(value, maxLength = 120) {
 
 function maybeRequestMessageNotificationPermission() {
   if (!canUseBrowserNotifications() || Notification.permission !== "default") return;
-  void Notification.requestPermission().catch(() => { });
+  void Notification.requestPermission().catch(() => {});
 }
 
 function base64UrlToUint8Array(value) {
@@ -550,7 +550,7 @@ async function initializeNativePushNotifications() {
   if (!supportsNativePushNotifications() || !push || nativePushListenersAttached) return;
   try {
     await push.createChannel?.({ id: "messages_alerts", name: "Messages", description: "Direct Messenger notifications", importance: 5, visibility: 1, sound: "default" });
-  } catch (_error) { }
+  } catch (_error) {}
   try {
     await push.addListener("registration", (token) => {
       nativePushToken = token.value ?? "";
@@ -592,7 +592,7 @@ async function initializeNativePushNotifications() {
   try {
     const permission = await push.checkPermissions();
     if (permission.receive === "granted") await push.register();
-  } catch (_error) { }
+  } catch (_error) {}
 }
 
 async function safelyInitializeNativePushNotifications() {
@@ -841,9 +841,9 @@ async function handleAuthStateChange(event, session) {
     render();
     return;
   }
-  if (event === "SIGNED_IN") {
-    state.pendingActivationEmail = "";
-    showAuthFeedback("Signed in successfully.");
+  if (event === "SIGNED_IN") { 
+    state.pendingActivationEmail = ""; 
+    showAuthFeedback("Signed in successfully."); 
     if (window.notifications && state.currentUser) {
       void window.notifications.syncWithSupabase(state.supabase, state.currentUser.id);
     }
@@ -964,11 +964,11 @@ async function handleFormSubmit(event) {
   try {
     let post;
     if (parsedExternal) post = buildExternalPost(basePost, parsedExternal); else post = buildUploadPost(basePost, state.selectedFile);
-    if (state.backendMode === "supabase") {
+    if (state.backendMode === "supabase") { 
       const insertedPost = await publishPostToSupabase(post, (percentage) => {
         showFeedback(`Uploading: ${percentage}%...`);
-      });
-      state.userPosts = [insertedPost, ...state.userPosts];
+      }); 
+      state.userPosts = [insertedPost, ...state.userPosts]; 
     }
     else if (state.db) { await savePostToDatabase(post); state.userPosts = await loadPostsFromDatabase(); }
     else { state.userPosts = [post, ...state.userPosts]; }
@@ -992,7 +992,7 @@ async function handleFormSubmit(event) {
 
 function clearMessengerState() {
   unsubscribeMessagingChannels();
-  state.profileRecord = null; state.availableProfiles = []; state.blockedUserIds = []; state.bannedUserIds = []; state.blockingAvailable = true; state.banningAvailable = true; state.peopleSearch = ""; state.adminBanSearch = ""; state.conversationSearch = ""; state.directThreads = []; state.activeThreadId = null; state.activeMessages = []; state.pendingBlockUserId = ""; state.pendingBanUserId = ""; state.pendingDeleteThreadId = ""; state.adminBanPanelOpen = false; state.adminBanBusy = false; state.adminBanFeedback = ""; state.adminBanFeedbackIsError = false; state.messengerBusy = 0; state.messengerError = "";
+  state.profileRecord = null; state.availableProfiles = []; state.blockedUserIds = []; state.bannedUserIds = []; state.blockingAvailable = true; state.banningAvailable = true; state.peopleSearch = ""; state.adminBanSearch = ""; state.conversationSearch = ""; state.directThreads = []; state.activeThreadId = null; state.activeMessages = []; state.pendingBlockUserId = ""; state.pendingBanUserId = ""; state.pendingDeleteThreadId = ""; state.adminBanPanelOpen = false; state.adminBanBusy = false; state.adminBanFeedback = ""; state.adminBanFeedbackIsError = false;  state.messengerBusy = 0; state.messengerError = "";
   state.listenersAttached = false;
   state.lastMessageSubmitTime = 0;
   clearMessageAttachmentSelection({ preserveFeedback: true });
@@ -1068,11 +1068,11 @@ function getDefaultProfileName() {
 }
 function formatDisplayNameFromEmail(email = "") { const localPart = String(email ?? "").trim().split("@")[0] ?? ""; const prettyName = localPart.replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "); return prettyName ? prettyName.slice(0, 40) : ""; }
 function resolveMemberDisplayName(profile, fallback = "Member") { if (!profile || typeof profile !== "object") return fallback; const displayName = String(profile.displayName ?? "").trim(); if (displayName && !normalizeEmailForMatch(displayName).includes("@")) return displayName.slice(0, 40); const prettyEmailName = formatDisplayNameFromEmail(profile.email); return prettyEmailName || (displayName ? displayName.slice(0, 40) : fallback); }
-function normalizeProfile(row) {
-  return {
-    id: row.id,
-    email: row.email,
-    displayName: row.display_name,
+function normalizeProfile(row) { 
+  return { 
+    id: row.id, 
+    email: row.email, 
+    displayName: row.display_name, 
     theme: typeof row.theme === "string" ? row.theme : "",
     density: typeof row.density === "string" ? row.density : "",
     motion: typeof row.motion === "string" ? row.motion : "",
@@ -1080,9 +1080,9 @@ function normalizeProfile(row) {
     notificationHideSender: Boolean(row.notification_hide_sender),
     notificationHideBody: Boolean(row.notification_hide_body),
     showEmail: typeof row.show_email === "boolean" ? row.show_email : null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
+    createdAt: row.created_at, 
+    updatedAt: row.updated_at 
+  }; 
 }
 function normalizeUserBlock(row) { return { blockerId: row.blocker_id, blockedId: row.blocked_id, createdAt: row.created_at }; }
 function normalizeUserBan(row) { return { bannedId: row.banned_id, bannedBy: row.banned_by, reason: row.reason ?? "", createdAt: row.created_at }; }
@@ -1104,14 +1104,14 @@ function canonicalizeThreadPair(l, r) { return [l, r].sort((a, b) => a.localeCom
 async function syncCurrentProfileToSupabase(displayNameOverride = "") {
   const rawDisplayName = (displayNameOverride || state.profileRecord?.displayName || getDefaultProfileName()).trim().slice(0, 40);
   if (rawDisplayName.length < 2) throw new Error("Use a display name with at least 2 characters.");
-
+  
   // Prepare payload
-  const payload = {
-    id: state.currentUser.id,
-    email: getCurrentUserEmail(),
+  const payload = { 
+    id: state.currentUser.id, 
+    email: getCurrentUserEmail(), 
     display_name: rawDisplayName
   };
-
+  
   // Only add privacy columns if they are likely to exist or we want to try
   // We'll use a try-catch for the specific columns if they fail
   try {
@@ -1124,10 +1124,10 @@ async function syncCurrentProfileToSupabase(displayNameOverride = "") {
     if (error) {
       // If error suggests missing columns, fallback to basic payload
       if (error.message?.includes("column") || error.code === "PGRST204" || error.code === "42703") {
-        console.warn("[Profiles] Privacy columns missing, falling back to basic sync");
-        const { data: fallbackData, error: fallbackError } = await state.supabase.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
-        if (fallbackError) throw fallbackError;
-        return finalizeProfileSync(fallbackData);
+         console.warn("[Profiles] Privacy columns missing, falling back to basic sync");
+         const { data: fallbackData, error: fallbackError } = await state.supabase.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
+         if (fallbackError) throw fallbackError;
+         return finalizeProfileSync(fallbackData);
       }
       throw error;
     }
@@ -1138,10 +1138,10 @@ async function syncCurrentProfileToSupabase(displayNameOverride = "") {
 }
 
 function finalizeProfileSync(data) {
-  const profile = normalizeProfile(data);
-  state.profileRecord = profile;
-  rememberCreator(profile.displayName);
-  if (elements.creatorInput) elements.creatorInput.value = profile.displayName;
+  const profile = normalizeProfile(data); 
+  state.profileRecord = profile; 
+  rememberCreator(profile.displayName); 
+  if (elements.creatorInput) elements.creatorInput.value = profile.displayName; 
   return profile;
 }
 
@@ -1186,7 +1186,7 @@ async function refreshMessengerState(options = {}) {
   state.messengerBusy++;
   try {
     let ownProfile = await loadOwnProfileFromSupabase(); if (!ownProfile) ownProfile = await syncCurrentProfileToSupabase(getDefaultProfileName());
-    const allSettled = Promise.allSettled ? Promise.allSettled.bind(Promise) : function (promises) { return Promise.all(promises.map(p => p.then(value => ({ status: 'fulfilled', value }), reason => ({ status: 'rejected', reason })))); };
+    const allSettled = Promise.allSettled ? Promise.allSettled.bind(Promise) : function(promises) { return Promise.all(promises.map(p => p.then(value => ({status: 'fulfilled', value}), reason => ({status: 'rejected', reason})))); };
     const [profilesResult, threadsResult, blocksResult, bansResult] = await allSettled([loadProfilesFromSupabase(), loadDirectThreadsFromSupabase(), loadBlockedUsersFromSupabase(), loadUserBansFromSupabase()]);
     if (profilesResult.status !== "fulfilled") throw profilesResult.reason; if (threadsResult.status !== "fulfilled") throw threadsResult.reason;
     let blocks = [], blockingAvailable = true; if (blocksResult.status === "fulfilled") blocks = blocksResult.value; else if (isBlockingBackendUnavailable(blocksResult.reason)) blockingAvailable = false; else throw blocksResult.reason;
@@ -1223,13 +1223,13 @@ async function subscribeMessagingChannels(options = {}) {
   try {
     isMessagingSubscribing = true;
     if (force) unsubscribeMessagingChannels();
-
+    
     // Initialize the new dedicated Realtime system
     if (!messengerRealtime) {
       messengerRealtime = new MessengerRealtime(state);
     }
     messengerRealtime.init();
-
+    
     // Explicitly set the reference so the rest of the app knows we're live
     if (messengerRealtime.channel) state.messagesChannel = messengerRealtime.channel;
     console.log("[Messenger] Realtime system initialized.");
@@ -1238,16 +1238,16 @@ async function subscribeMessagingChannels(options = {}) {
     state.threadsChannel = state.supabase.channel(`direct-threads-${state.currentUser.id}-${sessionHash}`);
     state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "direct_threads" }, () => void refreshMessengerState({ preserveActiveThread: true }))
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => void refreshMessengerState({ preserveActiveThread: true }));
-
+    
     if (state.blockingAvailable) {
       state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_blocks" }, () => void refreshMessengerState({ preserveActiveThread: true }));
     }
-
+    
     if (state.banningAvailable) {
-      state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState().then(() => {
-        if (canAccessAdminBanPanel(state)) void refreshAdminBanState();
-        if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true });
-        else { clearMessengerState(); render(); }
+      state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState().then(() => { 
+        if (canAccessAdminBanPanel(state)) void refreshAdminBanState(); 
+        if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true }); 
+        else { clearMessengerState(); render(); } 
       }));
     }
     state.threadsChannel.subscribe();
@@ -1261,8 +1261,8 @@ async function subscribeMessagingChannels(options = {}) {
         // Prevent spam by using a stable composite ID (one notification per person per post)
         const notificationId = `like-${like.post_id}-${like.user_id}`;
         const message = `Someone liked your post: ${likedPost.title || "Untitled"}`;
-
-        window.notifications.success(message, "New Like!", {
+        
+        window.notifications.success(message, "New Like!", { 
           id: notificationId,
           silent: isMobile // On mobile, add to history silently (no banner)
         });
@@ -1287,12 +1287,12 @@ function playIncomingMessageSound() {
   const AudioContextCtor = window.AudioContext || window.webkitAudioContext; if (!AudioContextCtor) return;
   try {
     if (!messageChimeAudioContext) messageChimeAudioContext = new AudioContextCtor();
-    const ctx = messageChimeAudioContext; if (ctx.state === "suspended") void ctx.resume().catch(() => { });
+    const ctx = messageChimeAudioContext; if (ctx.state === "suspended") void ctx.resume().catch(() => {});
     const startAt = ctx.currentTime + 0.01; const oscillator = ctx.createOscillator(); const gainNode = ctx.createGain();
     oscillator.type = "sine"; oscillator.frequency.setValueAtTime(740, startAt); oscillator.frequency.exponentialRampToValueAtTime(980, startAt + 0.08);
     gainNode.gain.setValueAtTime(0.0001, startAt); gainNode.gain.exponentialRampToValueAtTime(0.12, startAt + 0.02); gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.18);
     oscillator.connect(gainNode); gainNode.connect(ctx.destination); oscillator.start(startAt); oscillator.stop(startAt + 0.2);
-  } catch (_error) { }
+  } catch (_error) {}
 }
 
 async function handleProfileSave() {
@@ -1369,8 +1369,8 @@ async function deleteConversation(threadId) {
     renderMessenger();
   } finally {
     if (state.messengerBusy > 0) {
-      state.messengerBusy = Math.max(0, state.messengerBusy - 1);
-      renderMessenger();
+       state.messengerBusy = Math.max(0, state.messengerBusy - 1);
+       renderMessenger();
     }
   }
 }
@@ -1418,7 +1418,7 @@ async function handleMessageSubmit(event) {
     event.preventDefault();
     event.stopPropagation();
   }
-
+  
   // 1. Synchronous state lock
   if (state.messengerBusy || !isMessagingEnabled(state) || !state.activeThreadId) return;
 
@@ -1451,9 +1451,9 @@ async function handleMessageSubmit(event) {
   window.__SIGNAL_LAST_SUBMITTED_AT__ = now;
   state.lastMessageSubmitTime = now;
   state.messengerBusy++;
-
+  
   // Disable UI immediately
-  elements.messageInput.value = "";
+  elements.messageInput.value = ""; 
   elements.messageInput.disabled = true;
   elements.sendMessageButton.disabled = true;
   renderMessenger();
@@ -1471,7 +1471,7 @@ async function handleMessageSubmit(event) {
 
   try {
     const messageId = crypto.randomUUID();
-
+    
     // 6. PRE-FLIGHT OPTIMISTIC UI: Merge and render immediately before network requests
     // This makes the UI respond instantly. The subsequent insert and Realtime echos
     // will update this message in place because they share the same messageId.
@@ -1513,23 +1513,21 @@ async function handleMessageSubmit(event) {
     if (state.messagesChannel) {
       const recipientId = getThreadPartnerId(state.directThreads.find(t => t.id === state.activeThreadId));
       const targetChannelName = `messenger_live_${recipientId.slice(0, 8)}`;
-
+      
       const tempChannel = state.supabase.channel(targetChannelName);
       tempChannel.subscribe((status) => {
         if (status === "SUBSCRIBED") {
           tempChannel.send({
             type: "broadcast",
             event: "new-message",
-            payload: {
-              payload: {
-                id: messageId,
-                thread_id: state.activeThreadId,
-                sender_id: state.currentUser.id,
-                body: body || null,
-                created_at: new Date().toISOString(),
-                ...attachmentPayload
-              }
-            }
+            payload: { payload: {
+              id: messageId,
+              thread_id: state.activeThreadId,
+              sender_id: state.currentUser.id,
+              body: body || null,
+              created_at: new Date().toISOString(),
+              ...attachmentPayload
+            }}
           }).then(() => {
             // Cleanup the temporary sending channel
             setTimeout(() => tempChannel.unsubscribe(), 5000);
@@ -1564,7 +1562,7 @@ async function handleMessageSubmit(event) {
 
     const activeThread = getActiveThread();
     if (activeThread) mergeThread({ ...activeThread, updatedAt: new Date().toISOString() });
-
+    
     clearMessageAttachmentSelection({ preserveFeedback: true });
     showMessengerFeedback("");
   } catch (error) {
@@ -1597,17 +1595,17 @@ function normalizeUserPreferences(raw = {}) {
   return { theme, density, motion, statusBarStrip, notificationHideSender, notificationHideBody, showEmail };
 }
 
-function saveUserPreferences() { try { localStorage.setItem(USER_PREFERENCES_KEY, JSON.stringify(state.preferences)); } catch { } }
+function saveUserPreferences() { try { localStorage.setItem(USER_PREFERENCES_KEY, JSON.stringify(state.preferences)); } catch {} }
 
 
 
 
 
 
-function updateUserPreferences(nextPreferences) {
-  state.preferences = normalizeUserPreferences(nextPreferences);
-  applyUserPreferences(state.preferences);
-  saveUserPreferences();
+function updateUserPreferences(nextPreferences) { 
+  state.preferences = normalizeUserPreferences(nextPreferences); 
+  applyUserPreferences(state.preferences); 
+  saveUserPreferences(); 
   if (state.supabase && state.currentUser) {
     void syncCurrentProfileToSupabase().catch(err => {
       console.error("[Preferences] Sync failed:", err);
@@ -1616,7 +1614,7 @@ function updateUserPreferences(nextPreferences) {
       }
     });
   }
-  renderSettingsPanel();
+  renderSettingsPanel(); 
 }
 
 function isCurrentUserActivated() { if (!state.currentUser) return false; return Boolean(state.currentUser.email_confirmed_at || state.currentUser.confirmed_at); }
@@ -1646,7 +1644,7 @@ function getPersonalStateScope() { return state.currentUser?.id ? `user:${state.
 function getScopedStorageKey(baseKey, scope = getPersonalStateScope()) { return `${baseKey}:${scope}`; }
 function parseStoredPostIds(rawValue) { try { const parsed = JSON.parse(rawValue ?? "[]"); return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string" && v.trim()) : []; } catch { return []; } }
 function loadScopedPostIds(baseKey, scope = getPersonalStateScope()) { const scoped = parseStoredPostIds(localStorage.getItem(getScopedStorageKey(baseKey, scope))); if (scoped.length || scope !== "guest") return scoped; return parseStoredPostIds(localStorage.getItem(baseKey)); }
-function persistScopedPostIds(baseKey, ids, scope = getPersonalStateScope()) { const normalizedIds = Array.isArray(ids) ? ids.filter((v) => typeof v === "string" && v.trim()) : []; try { localStorage.setItem(getScopedStorageKey(baseKey, scope), JSON.stringify(normalizedIds)); if (scope === "guest") localStorage.removeItem(baseKey); } catch { } }
+function persistScopedPostIds(baseKey, ids, scope = getPersonalStateScope()) { const normalizedIds = Array.isArray(ids) ? ids.filter((v) => typeof v === "string" && v.trim()) : []; try { localStorage.setItem(getScopedStorageKey(baseKey, scope), JSON.stringify(normalizedIds)); if (scope === "guest") localStorage.removeItem(baseKey); } catch {} }
 
 async function refreshLikedPostsState() {
   if (state.supabase && state.backendMode === "supabase" && state.currentUser) { try { state.likedPosts = await loadLikedPostsFromSupabase(); return; } catch (error) { console.error("Like state could not be loaded from Supabase", error); } }
@@ -1680,8 +1678,8 @@ function loadPlayerPosition() {
 
 function normalizePlayerVolume(value, fallback = DEFAULT_PLAYER_VOLUME) { const numeric = Number(value); if (!Number.isFinite(numeric)) return fallback; return Math.min(1, Math.max(0, numeric)); }
 function loadPlayerVolume() { try { const raw = localStorage.getItem(PLAYER_VOLUME_KEY); if (!raw) return DEFAULT_PLAYER_VOLUME; return normalizePlayerVolume(raw); } catch { return DEFAULT_PLAYER_VOLUME; } }
-function savePlayerVolume(volume) { try { localStorage.setItem(PLAYER_VOLUME_KEY, `${normalizePlayerVolume(volume)}`); } catch { } }
-function savePlayerPosition(position) { try { if (!position) { localStorage.removeItem(PLAYER_POSITION_KEY); return; } localStorage.setItem(PLAYER_POSITION_KEY, JSON.stringify({ x: Math.round(position.x), y: Math.round(position.y) })); } catch { } }
+function savePlayerVolume(volume) { try { localStorage.setItem(PLAYER_VOLUME_KEY, `${normalizePlayerVolume(volume)}`); } catch {} }
+function savePlayerPosition(position) { try { if (!position) { localStorage.removeItem(PLAYER_POSITION_KEY); return; } localStorage.setItem(PLAYER_POSITION_KEY, JSON.stringify({ x: Math.round(position.x), y: Math.round(position.y) })); } catch {} }
 function getPlayerViewportPadding() { return window.innerWidth <= 760 ? 12 : 20; }
 function clampPlayerPosition(position) { if (!position) return null; const padding = getPlayerViewportPadding(); const width = elements.miniPlayer.offsetWidth || Math.min(360, Math.max(240, window.innerWidth - padding * 2)); const height = elements.miniPlayer.offsetHeight || 280; const maxX = Math.max(padding, window.innerWidth - width - padding); const maxY = Math.max(padding, window.innerHeight - height - padding); return { x: Math.min(maxX, Math.max(padding, Math.round(position.x))), y: Math.min(maxY, Math.max(padding, Math.round(position.y))) }; }
 
@@ -1695,17 +1693,17 @@ async function handleAdminSettingsSubmit(event) { event.preventDefault(); if (st
 
 
 function getAllPosts() { if (state.backendMode === "local" && state.userPosts.length === 0) return [...DEMO_POSTS]; return [...state.userPosts]; }
-function getVisiblePosts() {
-  const query = state.search;
+function getVisiblePosts() { 
+  const query = state.search; 
   const all = healPosts(getAllPosts());
-  const posts = all.filter((post) => {
-    const matchesFilter = state.filter === "all" || state.filter === post.mediaKind || (state.filter === "saved" && isPostSaved(post.id));
-    if (!matchesFilter) return false;
-    if (!query) return true;
-    const haystack = [post.title, post.caption, post.creator, post.tags.join(" ")].join(" ").toLowerCase();
-    return haystack.includes(query);
-  });
-  return sortPosts(posts);
+  const posts = all.filter((post) => { 
+    const matchesFilter = state.filter === "all" || state.filter === post.mediaKind || (state.filter === "saved" && isPostSaved(post.id)); 
+    if (!matchesFilter) return false; 
+    if (!query) return true; 
+    const haystack = [post.title, post.caption, post.creator, post.tags.join(" ")].join(" ").toLowerCase(); 
+    return haystack.includes(query); 
+  }); 
+  return sortPosts(posts); 
 }
 
 
@@ -1846,10 +1844,10 @@ function healPosts(posts) {
     // Aggressive YouTube detection: check ALL fields for a hint of YouTube (Syncing logic from MainActivity)
     const fields = [post.externalUrl, post.embedUrl, post.externalId, post.mediaUrl, post.src, post.label, post.caption, post.title].join(" ");
     const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("youtu") || fields.toLowerCase().includes("vnd.youtube");
-
+    
     // Check if embedUrl is actually valid for YouTube
     const hasValidEmbed = typeof post.embedUrl === "string" && post.embedUrl.includes("youtube.com/embed/");
-
+    
     if (isYouTubeHint && (!post.externalId || !hasValidEmbed)) {
       const repairCandidates = [post.externalUrl, post.embedUrl, post.externalId, post.src, post.mediaUrl, post.label, post.caption, post.title];
       let repaired = null;
@@ -2057,7 +2055,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
   }
 
   function safeSetStorage(key, value) {
-    try { localStorage.setItem(key, value); } catch { }
+    try { localStorage.setItem(key, value); } catch {}
   }
 
   function getHeroStage() {
@@ -2117,24 +2115,45 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       #heroPlayerOptionRow.hero-player-option-row {
         display: grid !important;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: clamp(0.45rem, 1.1vw, 0.7rem);
+        gap: clamp(0.4rem, 1vw, 0.65rem);
         align-items: stretch;
-        margin-top: clamp(0.55rem, 1.3vw, 0.8rem);
+        margin-top: clamp(0.52rem, 1.15vw, 0.72rem);
       }
       #heroPlayerOptionRow .button {
         min-width: 0 !important;
         width: 100% !important;
-        min-height: clamp(2.45rem, 4.8vw, 3.2rem) !important;
-        padding: clamp(0.55rem, 1.35vw, 0.85rem) clamp(0.65rem, 1.4vw, 1rem) !important;
-        font-size: clamp(0.78rem, 1.55vw, 1rem) !important;
-        line-height: 1.05 !important;
+        min-height: clamp(2.25rem, 4vw, 2.9rem) !important;
+        padding: clamp(0.48rem, 1.1vw, 0.72rem) clamp(0.55rem, 1.15vw, 0.88rem) !important;
+        font-size: clamp(0.72rem, 1.35vw, 0.92rem) !important;
+        line-height: 1.02 !important;
         white-space: nowrap !important;
+      }
+      #heroPlayerStage {
+        min-height: clamp(220px, 44vw, 460px) !important;
+      }
+      #heroPlayerStage .hero-player-active-stage,
+      #heroPlayerStage .safe-hero-visual-preview {
+        width: 100% !important;
+        aspect-ratio: 16 / 9 !important;
+        min-height: clamp(220px, 44vw, 460px) !important;
+        height: auto !important;
+        max-height: none !important;
+      }
+      #heroPlayerStage iframe.hero-player-active-frame,
+      #heroPlayerStage iframe[data-hero-provider],
+      #heroPlayerStage video[data-hero-provider],
+      #heroPlayerStage audio[data-hero-provider] {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: inherit !important;
+        display: block !important;
       }
       .safe-hero-visual-preview {
         position: relative;
         width: 100%;
-        height: 100%;
-        min-height: 220px;
+        height: auto;
+        aspect-ratio: 16 / 9;
+        min-height: clamp(220px, 44vw, 460px);
         border-radius: 12px;
         overflow: hidden;
         background: #050505;
@@ -2160,8 +2179,8 @@ window.onSpotifyWebPlaybackSDKReady = () => {
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
-        width: clamp(3.35rem, 7vw, 4.75rem);
-        height: clamp(2.35rem, 5vw, 3.3rem);
+        width: clamp(2.65rem, 5.1vw, 3.65rem);
+        height: clamp(1.9rem, 3.65vw, 2.55rem);
         border: 0;
         border-radius: 0.75rem;
         background: #ff0b0b;
@@ -2176,9 +2195,9 @@ window.onSpotifyWebPlaybackSDKReady = () => {
         content: "";
         width: 0;
         height: 0;
-        border-top: clamp(0.48rem, 1vw, 0.66rem) solid transparent;
-        border-bottom: clamp(0.48rem, 1vw, 0.66rem) solid transparent;
-        border-left: clamp(0.78rem, 1.55vw, 1.05rem) solid currentColor;
+        border-top: clamp(0.36rem, 0.75vw, 0.52rem) solid transparent;
+        border-bottom: clamp(0.36rem, 0.75vw, 0.52rem) solid transparent;
+        border-left: clamp(0.58rem, 1.15vw, 0.82rem) solid currentColor;
         margin-left: 0.16rem;
       }
       .safe-hero-preview-copy {
@@ -2200,12 +2219,12 @@ window.onSpotifyWebPlaybackSDKReady = () => {
         font-size: clamp(0.76rem, 1.45vw, 0.95rem);
         opacity: 0.9;
       }
-      @media (max-width: 560px) {
+      @media (max-width: 440px) {
         #heroPlayerOptionRow.hero-player-option-row {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
         #heroPlayerAutoplayToggle {
-          grid-column: 2;
+          grid-column: 1 / -1;
         }
       }
     `;
@@ -2216,7 +2235,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     if (!post) return false;
     try {
       if (typeof isPlayablePost === "function") return Boolean(isPlayablePost(post));
-    } catch { }
+    } catch {}
     return post.mediaKind === "video" || post.mediaKind === "audio" || post.sourceKind === "youtube" || post.sourceKind === "spotify";
   }
 
@@ -2245,12 +2264,12 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     try {
       const ids = typeof getPlayableVisiblePostIds === "function" ? getPlayableVisiblePostIds() : [];
       if (Array.isArray(ids)) ids.forEach((id) => push(getPlayableById(id)));
-    } catch { }
+    } catch {}
 
     try {
       const allPosts = typeof getAllPosts === "function" ? getAllPosts() : [];
       if (Array.isArray(allPosts)) allPosts.forEach(push);
-    } catch { }
+    } catch {}
 
     return posts;
   }
@@ -2286,7 +2305,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     try {
       const controllable = typeof getControllablePlayerPost === "function" ? getControllablePlayerPost() : null;
       if (isPlayable(controllable)) return controllable;
-    } catch { }
+    } catch {}
 
     return latestPlayable || null;
   }
@@ -2309,7 +2328,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       try {
         const parsed = typeof parseYouTubeUrl === "function" ? parseYouTubeUrl(value) : null;
         if (parsed?.externalId && /^[a-zA-Z0-9_-]{11}$/.test(parsed.externalId)) return parsed.externalId;
-      } catch { }
+      } catch {}
       const match = value.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/i);
       if (match?.[1]) return match[1];
     }
@@ -2344,7 +2363,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
         const resolved = resolveActivePlayerSource(post);
         if (resolved) return resolved;
       }
-    } catch { }
+    } catch {}
     return String(post?.src || post?.mediaUrl || "").trim();
   }
 
@@ -2405,7 +2424,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       rel: "0",
       modestbranding: "1",
     });
-    try { params.set("origin", window.location.origin); } catch { }
+    try { params.set("origin", window.location.origin); } catch {}
     return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
   }
 
@@ -2481,12 +2500,15 @@ window.onSpotifyWebPlaybackSDKReady = () => {
 
     try {
       if (state) {
-        state.heroPlayerPostId = post.id || "";
+        const postId = post.id || "";
+        state.heroPlayerPostId = postId;
+        state.playerPostId = postId || state.playerPostId;
+        state.activePlayerPostId = postId || state.activePlayerPostId;
         state.heroPlayerPlaybackState = autoplay ? "playing" : "paused";
         // Keep the feed observer from snapping the hero back to the latest card after Next/Previous.
-        state.activeFeedPostId = post.id || state.activeFeedPostId;
+        state.activeFeedPostId = postId || state.activeFeedPostId;
       }
-    } catch { }
+    } catch {}
 
     stage.dataset.safeHeroLocked = "true";
     stage.dataset.safeHeroPostId = post.id || "";
@@ -2503,7 +2525,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     } else if (provider === "youtube" || provider === "spotify") {
       const shell = document.createElement("div");
       shell.className = "hero-player-active-stage";
-      shell.style.cssText = "width:100%;height:100%;position:relative;border-radius:12px;overflow:hidden;background:#000;";
+      shell.style.cssText = "width:100%;aspect-ratio:16/9;min-height:clamp(220px,44vw,460px);height:auto;position:relative;border-radius:12px;overflow:hidden;background:#000;";
 
       const iframe = document.createElement("iframe");
       iframe.dataset.heroProvider = provider;
@@ -2513,11 +2535,13 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       iframe.referrerPolicy = "strict-origin-when-cross-origin";
       iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
       iframe.allowFullscreen = true;
-      iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
+      iframe.style.cssText = "width:100%;height:100%;min-height:inherit;border:0;display:block;";
       iframe.addEventListener("load", () => {
         if (autoplay) {
           setHeroPlaying(true);
-          if (provider === "youtube") window.setTimeout(() => postToHeroYouTube("playVideo"), 250);
+          if (provider === "youtube") {
+            [150, 450, 900, 1400].forEach((delay) => window.setTimeout(() => postToHeroYouTube("playVideo"), delay));
+          }
         }
       }, { once: true });
       shell.appendChild(iframe);
@@ -2529,8 +2553,8 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       media.controls = true;
       media.autoplay = autoplay;
       media.playsInline = true;
-      media.style.cssText = "width:100%;height:100%;display:block;border-radius:12px;background:#000;object-fit:contain;";
-      try { media.volume = Math.max(0, Math.min(1, Number(state?.playerVolume ?? 1))); } catch { }
+      media.style.cssText = "width:100%;aspect-ratio:16/9;min-height:clamp(220px,44vw,460px);height:auto;display:block;border-radius:12px;background:#000;object-fit:contain;";
+      try { media.volume = Math.max(0, Math.min(1, Number(state?.playerVolume ?? 1))); } catch {}
       media.addEventListener("play", () => setHeroPlaying(true));
       media.addEventListener("pause", () => setHeroPlaying(false));
       node = media;
@@ -2562,6 +2586,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
         return mountHeroMedia(post, { autoplay: true, forceReload: true });
       }
       const ok = postToHeroYouTube("playVideo");
+      [250, 650, 1100].forEach((delay) => window.setTimeout(() => postToHeroYouTube("playVideo"), delay));
       setHeroPlaying(true);
       return ok;
     }
@@ -2609,9 +2634,8 @@ window.onSpotifyWebPlaybackSDKReady = () => {
   function openMediaInHero() {
     const post = getHeroTargetPost();
     if (!post) return;
-    // For YouTube, Open Media shows our cleaner/smaller clickable hero preview.
-    // Press the preview or Play to load the live iframe and start playback.
-    mountHeroMedia(post, { autoplay: false, previewOnly: post.sourceKind === "youtube" });
+    // Open the real media player in the hero stage, but do not autoplay.
+    mountHeroMedia(post, { autoplay: false, previewOnly: false, forceReload: true });
   }
 
   function stepHeroMedia(delta) {
@@ -2635,7 +2659,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     try {
       if (post?.id && typeof openMiniPlayer === "function") openMiniPlayer(post.id);
       else if (typeof renderMiniPlayer === "function") renderMiniPlayer();
-    } catch { }
+    } catch {}
 
     window.setTimeout(() => {
       safeSetStorage(HERO_DOCK_HIDDEN_KEY, "false");
