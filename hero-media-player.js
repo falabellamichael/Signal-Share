@@ -16,8 +16,6 @@ export function createHeroMediaPlayerController(options) {
     stepMiniPlayer,
     renderMiniPlayer,
     postMessageToYouTubePlayer,
-    parseYouTubeUrl,
-    resolveActivePlayerSource,
   } = options;
 
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
@@ -82,12 +80,6 @@ export function createHeroMediaPlayerController(options) {
   function hasNativeSettingsBridge() {
     const bridge = getNativeBridge();
     return Boolean(bridge && typeof bridge.openNowPlayingAccessSettings === "function");
-  }
-
-  function canRenderInlineHeroPreviewVideo() {
-    // Android WebView can leave stale native playback chrome over muted preview videos.
-    // Use static preview cards there and keep inline video previews for web/desktop.
-    return !getNativeBridge();
   }
 
   function normalizeNativeSnapshot(raw = {}) {
@@ -625,130 +617,10 @@ export function createHeroMediaPlayerController(options) {
     render();
   }
 
-  function resolveAppPreviewArtwork(post) {
-    if (!post) return "";
-    if (post.sourceKind === "youtube") {
-      const parsed = parseYouTubeUrl?.(
-        post.externalUrl
-        || post.embedUrl
-        || post.originalUrl
-        || post.label
-        || ""
-      );
-      const videoId = post.externalId || parsed?.externalId || "";
-      return videoId ? `https://img.youtube.com/vi/${videoId}/0.jpg` : "";
-    }
-    if (post.mediaKind === "image") return resolveActivePlayerSource(post) || "";
-    return "";
-  }
-
   function renderStagePreview(mode, post, fallbackMedia) {
-    elements.heroPlayerStage.replaceChildren();
-    if (mode === "device") {
-      if (nativeSnapshot?.active) {
-        const artworkUrl = typeof nativeSnapshot.artworkUri === "string" ? nativeSnapshot.artworkUri.trim() : "";
-        if (artworkUrl) {
-          const artwork = document.createElement("img");
-          artwork.className = "hero-player-preview-image";
-          artwork.alt = nativeSnapshot.title ? `${nativeSnapshot.title} artwork` : "Now playing artwork";
-          artwork.loading = "lazy";
-          artwork.referrerPolicy = "strict-origin-when-cross-origin";
-          artwork.src = artworkUrl;
-          elements.heroPlayerStage.appendChild(artwork);
-        }
-      }
-      return;
-    }
-
-    if (mode === "desktop") {
-      if (desktopSnapshot?.active) {
-        const artworkUrl = typeof desktopSnapshot.artworkUri === "string" ? desktopSnapshot.artworkUri.trim() : "";
-        if (artworkUrl) {
-          const artwork = document.createElement("img");
-          artwork.className = "hero-player-preview-image";
-          artwork.alt = desktopSnapshot.title ? `${desktopSnapshot.title} artwork` : "Now playing artwork";
-          artwork.loading = "lazy";
-          artwork.referrerPolicy = "strict-origin-when-cross-origin";
-          artwork.src = artworkUrl;
-          elements.heroPlayerStage.appendChild(artwork);
-        }
-      }
-      return;
-    }
-
-    if (!post && fallbackMedia instanceof HTMLMediaElement) {
-      const showInlineFallbackVideoPreview = canRenderInlineHeroPreviewVideo()
-        && fallbackMedia instanceof HTMLVideoElement
-        && Boolean(fallbackMedia.currentSrc);
-      if (showInlineFallbackVideoPreview) {
-        const previewVideo = document.createElement("video");
-        previewVideo.className = "hero-player-preview-video";
-        previewVideo.dataset.heroPreview = "true";
-        previewVideo.muted = true;
-        previewVideo.loop = true;
-        previewVideo.autoplay = true;
-        previewVideo.controls = false;
-        previewVideo.playsInline = true;
-        previewVideo.preload = "metadata";
-        previewVideo.src = fallbackMedia.currentSrc;
-        elements.heroPlayerStage.appendChild(previewVideo);
-        return;
-      }
-      const metadata = getBrowserMediaMetadata();
-      const artworkUrl = metadata?.artworkUrl || "";
-      if (artworkUrl) {
-        const artwork = document.createElement("img");
-        artwork.className = "hero-player-preview-image";
-        artwork.alt = "Now playing artwork";
-        artwork.loading = "lazy";
-        artwork.referrerPolicy = "strict-origin-when-cross-origin";
-        artwork.src = artworkUrl;
-        elements.heroPlayerStage.appendChild(artwork);
-      }
-      return;
-    }
-
-    if (!post) return;
-
-    const previewArtwork = resolveAppPreviewArtwork(post);
-
-    if (post.mediaKind === "video") {
-      const source = resolveActivePlayerSource(post);
-      const showInlineAppVideoPreview = canRenderInlineHeroPreviewVideo() && Boolean(source);
-      if (showInlineAppVideoPreview) {
-        const video = document.createElement("video");
-        video.className = "hero-player-preview-video";
-        video.dataset.heroPreview = "true";
-        video.muted = true;
-        video.loop = true;
-        video.autoplay = true;
-        video.controls = false;
-        video.playsInline = true;
-        video.preload = "metadata";
-        video.src = source;
-        elements.heroPlayerStage.appendChild(video);
-        return;
-      }
-      if (previewArtwork) {
-        const artwork = document.createElement("img");
-        artwork.className = "hero-player-preview-image";
-        artwork.alt = post.title ? `${post.title} artwork` : "Preview artwork";
-        artwork.loading = "lazy";
-        artwork.referrerPolicy = "strict-origin-when-cross-origin";
-        artwork.src = previewArtwork;
-        elements.heroPlayerStage.appendChild(artwork);
-      }
-      return;
-    }
-
-    if (!previewArtwork) return;
-    const artwork = document.createElement("img");
-    artwork.className = "hero-player-preview-image";
-    artwork.alt = post.title ? `${post.title} artwork` : "Preview artwork";
-    artwork.loading = "lazy";
-    artwork.referrerPolicy = "strict-origin-when-cross-origin";
-    artwork.src = previewArtwork;
-    elements.heroPlayerStage.appendChild(artwork);
+    // Disable all play-card preview rendering. Keep only the status text in the stage.
+    if (elements.heroPlayerStatus) elements.heroPlayerStage.replaceChildren(elements.heroPlayerStatus);
+    else elements.heroPlayerStage.replaceChildren();
   }
 
   function attachEventListeners() {

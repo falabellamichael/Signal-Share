@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=13";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=14";
 
 export function createAppUi(context) {
   const {
@@ -288,8 +288,6 @@ export function createAppUi(context) {
     stepMiniPlayer,
     renderMiniPlayer,
     postMessageToYouTubePlayer,
-    parseYouTubeUrl,
-    resolveActivePlayerSource,
   });
 
   function attachEventListeners() {
