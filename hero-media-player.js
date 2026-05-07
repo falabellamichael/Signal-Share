@@ -32,6 +32,7 @@ export function createHeroMediaPlayerController(options) {
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
   const DESKTOP_POLL_INTERVAL_MS = 3000;
+  const LOCAL_NETWORK_PROMPT_COOLDOWN_MS = 30000;
 
   let listenersAttached = false;
   let nativeSnapshot = null;
@@ -41,6 +42,8 @@ export function createHeroMediaPlayerController(options) {
   let desktopSnapshotEndpoint = "";
   let desktopActionEndpoint = "";
   let desktopPollFailureCount = 0;
+  let localNetworkPromptInFlight = false;
+  let localNetworkPromptLastAttemptAt = 0;
   let pendingDesktopArtworkKey = "";
   const desktopArtworkFallbackCache = new Map();
 
@@ -216,6 +219,49 @@ export function createHeroMediaPlayerController(options) {
     } catch {
       return init;
     }
+  }
+
+  function isLocalNetworkAccessPromptEligible() {
+    if (!window.isSecureContext) return false;
+    const protocol = `${window.location.protocol || ""}`.toLowerCase();
+    return protocol === "https:" || protocol === "http:" || protocol === "file:";
+  }
+
+  function getEndpointAddressSpace(url = "") {
+    try {
+      const resolved = new URL(url, window.location.href);
+      return getTargetAddressSpaceForHostname(resolved.hostname);
+    } catch {
+      return "";
+    }
+  }
+
+  function maybeTriggerLocalNetworkAccessPrompt(endpoint = "") {
+    if (!endpoint) return;
+    if (!isLocalNetworkAccessPromptEligible()) return;
+    const addressSpace = getEndpointAddressSpace(endpoint);
+    if (addressSpace !== "local" && addressSpace !== "loopback") return;
+    if (localNetworkPromptInFlight) return;
+
+    const now = Date.now();
+    if (now - localNetworkPromptLastAttemptAt < LOCAL_NETWORK_PROMPT_COOLDOWN_MS) return;
+    localNetworkPromptLastAttemptAt = now;
+    localNetworkPromptInFlight = true;
+
+    window.fetch(endpoint, withLocalNetworkFetchOptions(endpoint, {
+      method: "GET",
+      mode: "no-cors",
+      cache: "no-store",
+      credentials: "omit",
+    }))
+      .catch(() => null)
+      .finally(() => {
+        localNetworkPromptInFlight = false;
+        window.setTimeout(() => {
+          if (document.hidden || !canUseDesktopBridge()) return;
+          refreshDesktopSnapshot();
+        }, 900);
+      });
   }
 
   function getDesktopSnapshotEndpoint() {
@@ -460,6 +506,11 @@ export function createHeroMediaPlayerController(options) {
         lastError = error;
       }
     }
+    const permissionPromptEndpoint = endpoints.find((candidate) => {
+      const addressSpace = getEndpointAddressSpace(candidate);
+      return addressSpace === "local" || addressSpace === "loopback";
+    });
+    if (permissionPromptEndpoint) maybeTriggerLocalNetworkAccessPrompt(permissionPromptEndpoint);
     throw lastError || new Error("Desktop media endpoint is unavailable.");
   }
 
