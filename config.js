@@ -1,7 +1,12 @@
+const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const redirectUrl = isLocal
+  ? "http://127.0.0.1:3000"
+  : "https://falabellamichael.github.io/Signal-Share/";
+
 window.SIGNAL_SHARE_CONFIG = {
   supabaseUrl: "https://gswptxeikjmihdjxoiar.supabase.co",
   supabaseAnonKey: "sb_publishable_gIwGxzf1C4cD55l9XS16wg_Qn-LuYqT",
-  authRedirectUrl: "https://falabellamichael.github.io/Signal-Share/",
+  authRedirectUrl: redirectUrl,
   postsTable: "posts",
   storageBucket: "media",
   webPushPublicKey: "",
