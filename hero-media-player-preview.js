@@ -84,42 +84,44 @@ function resolveSpotifyPreview(post) {
   return null;
 }
 
-function createYouTubeEmbedSource(videoId) {
+function createYouTubeEmbedSource(videoId, autoplay = false) {
   if (!videoId) return "";
   const params = new URLSearchParams({
-    autoplay: "0",
+    autoplay: autoplay ? "1" : "0",
     controls: "1",
     playsinline: "1",
     rel: "0",
     modestbranding: "1",
     enablejsapi: "1",
+    origin: window.location.origin,
   });
-
-  if (typeof window !== "undefined" && /^https?:$/.test(window.location.protocol)) {
-    params.set("origin", window.location.origin);
-  }
-
   return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
 }
 
-function createSpotifyEmbedSource(spotifyPreview) {
+function createSpotifyEmbedSource(spotifyPreview, autoplay = false) {
   if (!spotifyPreview?.id) return "";
   const type = SPOTIFY_TYPES.has(spotifyPreview.type) ? spotifyPreview.type : "track";
-  return `https://open.spotify.com/embed/${type}/${spotifyPreview.id}?utm_source=generator&theme=0`;
+  const params = new URLSearchParams({
+    utm_source: "generator",
+    theme: "0",
+  });
+  if (autoplay) params.set("autoplay", "1");
+  return `https://open.spotify.com/embed/${type}/${spotifyPreview.id}?${params.toString()}`;
 }
 
-function createActivePlayerDescriptor(post, parseYouTubeUrl) {
+function createActivePlayerDescriptor(post, parseYouTubeUrl, options = {}) {
   if (!post) return null;
+  const autoplay = Boolean(options.autoplay);
 
   if (post.sourceKind === "youtube") {
     const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
-    const src = createYouTubeEmbedSource(videoId);
+    const src = createYouTubeEmbedSource(videoId, autoplay);
     return src ? { provider: "youtube", src, title: "YouTube player" } : null;
   }
 
   if (post.sourceKind === "spotify") {
     const spotifyPreview = resolveSpotifyPreview(post);
-    const src = createSpotifyEmbedSource(spotifyPreview);
+    const src = createSpotifyEmbedSource(spotifyPreview, autoplay);
     return src ? { provider: "spotify", src, title: "Spotify player" } : null;
   }
 
@@ -268,11 +270,12 @@ function createActivePlayerStage(descriptor) {
 
   const iframe = document.createElement("iframe");
   iframe.className = "hero-player-active-frame";
+  iframe.dataset.heroProvider = descriptor.provider || "external";
   iframe.src = descriptor.src;
   iframe.title = descriptor.title || "External media player";
   iframe.loading = "eager";
   iframe.referrerPolicy = "strict-origin-when-cross-origin";
-  iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+  iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
   iframe.allowFullscreen = true;
   iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
 
@@ -280,8 +283,8 @@ function createActivePlayerStage(descriptor) {
   return container;
 }
 
-function commitActivePlayer(stage, post, parseYouTubeUrl) {
-  const descriptor = createActivePlayerDescriptor(post, parseYouTubeUrl);
+function commitActivePlayer(stage, post, parseYouTubeUrl, options = {}) {
+  const descriptor = createActivePlayerDescriptor(post, parseYouTubeUrl, options);
   if (!descriptor) return false;
 
   const key = `active-player|${descriptor.provider}|${descriptor.src}`;
@@ -398,6 +401,12 @@ export function renderHeroStagePreview(options = {}) {
   } = options;
 
   if (!stage) return;
+
+  const standalonePost = window.__SIGNAL_SHARE_HERO_STANDALONE_POST__ || null;
+  const standaloneAutoplay = window.__SIGNAL_SHARE_HERO_STANDALONE_AUTOPLAY__ === "true";
+  if (standalonePost && commitActivePlayer(stage, standalonePost, parseYouTubeUrl, { autoplay: standaloneAutoplay })) {
+    return;
+  }
 
   const previewOptions = {
     getProfileSummaryForPost,
