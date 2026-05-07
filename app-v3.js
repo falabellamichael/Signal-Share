@@ -2173,10 +2173,13 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       if (next) attemptHeroStartupPlayback({ force: true });
     });
 
-    const dockButton = makeButton("heroPlayerDockToggle", "Show dock");
+    const dockButton = makeButton("heroPlayerDockToggle", "Show Player");
     dockButton.addEventListener("click", () => setDockHidden(!isDockHidden()));
 
-    controls.append(autoplayButton, dockButton);
+    const openMediaButton = makeButton("heroPlayerOpenMediaButton", "Open Media");
+    openMediaButton.addEventListener("click", () => openHeroCurrentMedia({ autoplay: false }));
+
+    controls.append(autoplayButton, dockButton, openMediaButton);
   }
 
   function syncHeroRuntimeControls() {
@@ -2195,11 +2198,20 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     const dockButton = document.querySelector("#heroPlayerDockToggle");
     if (dockButton) {
       const hidden = isDockHidden();
-      dockButton.textContent = hidden ? "Show dock" : "Hide dock";
+      dockButton.textContent = hidden ? "Show Player" : "Hide Player";
       dockButton.setAttribute("aria-pressed", hidden ? "false" : "true");
       dockButton.title = hidden
-        ? "Show the floating mini-player dock."
-        : "Hide the floating mini-player dock while keeping playback alive.";
+        ? "Show the floating mini-player for feed playback."
+        : "Hide the floating mini-player while keeping playback alive.";
+    }
+
+    const openMediaButton = document.querySelector("#heroPlayerOpenMediaButton");
+    if (openMediaButton) {
+      const hasTarget = Boolean(getHeroTargetPostId());
+      openMediaButton.disabled = !hasTarget;
+      openMediaButton.title = hasTarget
+        ? "Load the current or waiting media into the hero player without opening the mini-player."
+        : "No playable media is ready yet.";
     }
   }
 
@@ -2491,6 +2503,24 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     return true;
   }
 
+  function openHeroCurrentMedia(options = {}) {
+    const { autoplay = false } = options;
+    const targetPostId = getHeroTargetPostId();
+    if (!targetPostId) return false;
+
+    const mounted = mountHeroStandalonePlayer(targetPostId, {
+      autoplay: Boolean(autoplay),
+      preserveExisting: true,
+    });
+    if (!mounted) return false;
+
+    rememberCurrentPlayerPost();
+    setDockHidden(true, { persist: true });
+    setTimeout(syncMiniDockVisibility, 50);
+    syncHeroRuntimeControls();
+    return true;
+  }
+
   function toggleHeroStandalonePlayer(postId = "") {
     const targetPostId = postId || getHeroTargetPostId();
     const currentPost = window.__SIGNAL_SHARE_HERO_STANDALONE_POST__;
@@ -2584,8 +2614,15 @@ window.onSpotifyWebPlaybackSDKReady = () => {
   function handlePlaybackMemoryCapture(event) {
     const playTrigger = event.target?.closest?.("#miniPlayPauseButton, [data-action='play'], [data-action='open-player']");
     if (!playTrigger) return;
+
+    // Feed/list/player buttons should use the normal site behavior: open the floating mini-player.
+    // Only the hero Play button and hero Open Media button use the hero-only playback path.
+    if (playTrigger.closest?.("#heroPlayerStage, .hero-player-controls")) return;
+
     window.requestAnimationFrame(() => {
       rememberCurrentPlayerPost();
+      setDockHidden(false, { persist: true });
+      try { if (typeof renderMiniPlayer === "function") renderMiniPlayer(); } catch { }
       syncMiniDockVisibility();
     });
   }
