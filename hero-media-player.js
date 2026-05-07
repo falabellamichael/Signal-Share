@@ -709,14 +709,29 @@ export function createHeroMediaPlayerController(options) {
   function resolveAppPreviewArtwork(post) {
     if (!post) return "";
     if (post.sourceKind === "youtube") {
-      const parsed = parseYouTubeUrl?.(
-        post.externalUrl
-        || post.embedUrl
-        || post.originalUrl
-        || post.label
-        || ""
-      );
-      const videoId = post.externalId || parsed?.externalId || "";
+      const directId = typeof post.externalId === "string" ? post.externalId.trim() : "";
+      let videoId = /^[a-zA-Z0-9_-]{11}$/.test(directId) ? directId : "";
+      if (!videoId && typeof parseYouTubeUrl === "function") {
+        const candidates = [
+          post.externalUrl,
+          post.embedUrl,
+          post.originalUrl,
+          post.mediaUrl,
+          post.src,
+          post.label,
+          post.caption,
+          post.title,
+        ];
+        for (const candidate of candidates) {
+          if (typeof candidate !== "string" || !candidate.trim()) continue;
+          const parsed = parseYouTubeUrl(candidate);
+          const parsedId = typeof parsed?.externalId === "string" ? parsed.externalId.trim() : "";
+          if (/^[a-zA-Z0-9_-]{11}$/.test(parsedId)) {
+            videoId = parsedId;
+            break;
+          }
+        }
+      }
       return videoId ? `https://img.youtube.com/vi/${videoId}/0.jpg` : "";
     }
     if (post.mediaKind === "image") return resolveActivePlayerSource(post) || "";
@@ -837,7 +852,11 @@ export function createHeroMediaPlayerController(options) {
 
     if (post.mediaKind === "video") {
       const source = resolveActivePlayerSource(post);
-      const showInlineAppVideoPreview = canRenderInlineHeroPreviewVideo() && Boolean(source);
+      // YouTube sources are iframe embeds, not direct video files, so they should
+      // use thumbnail artwork instead of a <video> preview element.
+      const showInlineAppVideoPreview = post.sourceKind !== "youtube"
+        && canRenderInlineHeroPreviewVideo()
+        && Boolean(source);
       if (showInlineAppVideoPreview) {
         const video = document.createElement("video");
         video.className = "hero-player-preview-video";
