@@ -31,13 +31,6 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: "Method not allowed." }, 405);
   }
 
-  if (!SPOTIFY_CLIENT_ID) {
-    return jsonResponse({ error: "Client ID Missing" }, 400);
-  }
-  if (!SPOTIFY_CLIENT_SECRET) {
-    return jsonResponse({ error: "Client Secret Missing" }, 400);
-  }
-
   const url = new URL(request.url);
   const payload =
     request.method === "POST" ? await request.json().catch(() => ({} as Record<string, unknown>)) : null;
@@ -54,18 +47,24 @@ Deno.serve(async (request) => {
   const market =
     normalizeMarket(typeof payload?.market === "string" ? payload.market : url.searchParams.get("market")) ||
     SPOTIFY_DEFAULT_MARKET;
-  const accessToken = await getSpotifyAccessToken();
-  if (!accessToken) {
-    return jsonResponse({ error: "Spotify authentication failed. Check your Client ID and Secret in Supabase secrets." }, 401);
+  const canonicalUrl = buildSpotifyCanonicalUrl(resource);
+
+  let catalogMetadata: SpotifyPreviewMetadata | null = null;
+  if (SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET) {
+    const accessToken = await getSpotifyAccessToken();
+    if (accessToken) {
+      catalogMetadata = await fetchSpotifyPreviewMetadata(resource, accessToken, market);
+    }
   }
 
-  const metadata = await fetchSpotifyPreviewMetadata(resource, accessToken, market);
-  if (!metadata) {
-    // If the Catalog API fails, we could try a fallback or just be more descriptive
-    return jsonResponse({ error: `Spotify API refused the request for this ${resource.type}. It might be region-locked or private.` }, 404);
+  // Fallback path: Spotify oEmbed is public and often works even when Web API scopes/quotas are restricted.
+  const oEmbedMetadata = await fetchSpotifyOEmbedMetadata(canonicalUrl || sourceUrl);
+  const metadata = mergeSpotifyPreviewMetadata(catalogMetadata, oEmbedMetadata);
+  if (metadata) {
+    return jsonResponse(metadata);
   }
 
-  return jsonResponse(metadata);
+  return jsonResponse({ error: `Spotify metadata unavailable for this ${resource.type}.` }, 404);
 });
 
 async function getSpotifyAccessToken() {
@@ -157,6 +156,58 @@ function buildSpotifyResourceEndpoint(resource: SpotifyResource, market: string)
     default:
       return "";
   }
+}
+
+function buildSpotifyCanonicalUrl(resource: SpotifyResource) {
+  if (!resource?.type || !resource?.id) return "";
+  return `https://open.spotify.com/${resource.type}/${resource.id}`;
+}
+
+async function fetchSpotifyOEmbedMetadata(resourceUrl: string): Promise<SpotifyPreviewMetadata | null> {
+  const trimmedUrl = `${resourceUrl || ""}`.trim();
+  if (!trimmedUrl) return null;
+
+  const endpoint = `https://open.spotify.com/oembed?url=${encodeURIComponent(trimmedUrl)}`;
+  const response = await fetch(endpoint, {
+    headers: {
+      Accept: "application/json",
+    },
+  }).catch(() => null);
+
+  if (!response?.ok) {
+    return null;
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const title = readString(payload.title);
+  const creator = readString(payload.author_name);
+  const thumbnailUrl = readString(payload.thumbnail_url);
+  if (!title && !creator && !thumbnailUrl) {
+    return null;
+  }
+
+  return {
+    title,
+    creator,
+    thumbnailUrl,
+  };
+}
+
+function mergeSpotifyPreviewMetadata(
+  catalogMetadata: SpotifyPreviewMetadata | null,
+  oEmbedMetadata: SpotifyPreviewMetadata | null
+): SpotifyPreviewMetadata | null {
+  if (!catalogMetadata && !oEmbedMetadata) return null;
+
+  return {
+    title: readString(catalogMetadata?.title) || readString(oEmbedMetadata?.title),
+    creator: readString(catalogMetadata?.creator) || readString(oEmbedMetadata?.creator),
+    thumbnailUrl: readString(catalogMetadata?.thumbnailUrl) || readString(oEmbedMetadata?.thumbnailUrl),
+  };
 }
 
 function normalizeSpotifyPreviewMetadata(type: SpotifyResource["type"], payload: Record<string, unknown>) {
