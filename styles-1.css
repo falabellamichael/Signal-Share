@@ -1601,6 +1601,8 @@ h1 {
 
 .hero-player-stage {
   min-height: 132px;
+  position: relative;
+  overflow: hidden;
   border-radius: 18px;
   padding: 14px 16px;
   display: flex;

@@ -619,42 +619,6 @@ export function createHeroMediaPlayerController(options) {
     render();
   }
 
-  function createPreviewCard({ badge, title, meta, note, artworkUrl = "" }) {
-    const card = document.createElement("div");
-    card.className = "hero-player-preview";
-
-    if (artworkUrl) {
-      const image = document.createElement("img");
-      image.className = "hero-player-preview-image";
-      image.alt = title ? `${title} artwork` : "Now playing artwork";
-      image.loading = "lazy";
-      image.referrerPolicy = "strict-origin-when-cross-origin";
-      image.src = artworkUrl;
-      card.appendChild(image);
-    }
-
-    const overlay = document.createElement("div");
-    overlay.className = "hero-player-preview-overlay";
-    const badgeNode = document.createElement("span");
-    badgeNode.className = "hero-player-preview-badge";
-    badgeNode.textContent = badge;
-    const titleNode = document.createElement("strong");
-    titleNode.className = "hero-player-preview-title";
-    titleNode.textContent = title;
-    const metaNode = document.createElement("p");
-    metaNode.className = "hero-player-preview-meta";
-    metaNode.textContent = meta;
-    overlay.append(badgeNode, titleNode, metaNode);
-    if (note) {
-      const noteNode = document.createElement("p");
-      noteNode.className = "hero-player-preview-note";
-      noteNode.textContent = note;
-      overlay.appendChild(noteNode);
-    }
-    card.appendChild(overlay);
-    return card;
-  }
-
   function resolveAppPreviewArtwork(post) {
     if (!post) return "";
     if (post.sourceKind === "youtube") {
@@ -675,66 +639,38 @@ export function createHeroMediaPlayerController(options) {
   function renderStagePreview(mode, post, fallbackMedia) {
     elements.heroPlayerStage.replaceChildren();
     if (mode === "device") {
-      if (nativeSnapshot?.permissionRequired) {
-        elements.heroPlayerStage.appendChild(
-          createPreviewCard({
-            badge: "Device media",
-            title: "Permission required",
-            meta: "Enable notification access to control device playback.",
-            note: "Press Play to open access settings.",
-          })
-        );
-        return;
-      }
       if (nativeSnapshot?.active) {
-        elements.heroPlayerStage.appendChild(
-          createPreviewCard({
-            badge: "Device media",
-            title: nativeSnapshot.title || "Now playing",
-            meta: nativeSnapshot.meta || "Current device playback",
-            note: nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing",
-            artworkUrl: nativeSnapshot.artworkUri || "",
-          })
-        );
-        return;
+        const artworkUrl = typeof nativeSnapshot.artworkUri === "string" ? nativeSnapshot.artworkUri.trim() : "";
+        if (artworkUrl) {
+          const artwork = document.createElement("img");
+          artwork.className = "hero-player-preview-image";
+          artwork.alt = nativeSnapshot.title ? `${nativeSnapshot.title} artwork` : "Now playing artwork";
+          artwork.loading = "lazy";
+          artwork.referrerPolicy = "strict-origin-when-cross-origin";
+          artwork.src = artworkUrl;
+          elements.heroPlayerStage.appendChild(artwork);
+        }
       }
-      elements.heroPlayerStage.appendChild(
-        createPreviewCard({
-          badge: "Device media",
-          title: "No active session",
-          meta: "Start playback in any media app on this device.",
-        })
-      );
       return;
     }
 
     if (mode === "desktop") {
       if (desktopSnapshot?.active) {
-        elements.heroPlayerStage.appendChild(
-          createPreviewCard({
-            badge: "PC system media",
-            title: desktopSnapshot.title || "Now playing",
-            meta: desktopSnapshot.meta || "Current desktop playback",
-            note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
-            artworkUrl: desktopSnapshot.artworkUri || "",
-          })
-        );
-        return;
+        const artworkUrl = typeof desktopSnapshot.artworkUri === "string" ? desktopSnapshot.artworkUri.trim() : "";
+        if (artworkUrl) {
+          const artwork = document.createElement("img");
+          artwork.className = "hero-player-preview-image";
+          artwork.alt = desktopSnapshot.title ? `${desktopSnapshot.title} artwork` : "Now playing artwork";
+          artwork.loading = "lazy";
+          artwork.referrerPolicy = "strict-origin-when-cross-origin";
+          artwork.src = artworkUrl;
+          elements.heroPlayerStage.appendChild(artwork);
+        }
       }
-      elements.heroPlayerStage.appendChild(
-        createPreviewCard({
-          badge: "PC system media",
-          title: "Waiting for playback",
-          meta: "Start playback in YouTube, Spotify, or another desktop media app.",
-        })
-      );
       return;
     }
 
     if (!post && fallbackMedia instanceof HTMLMediaElement) {
-      const metadata = getBrowserMediaMetadata();
-      const metadataTitle = metadata?.title || fallbackMedia.getAttribute("title") || "";
-      const metadataMeta = [metadata?.artist, metadata?.album].filter(Boolean).join(" · ");
       const showInlineFallbackVideoPreview = canRenderInlineHeroPreviewVideo()
         && fallbackMedia instanceof HTMLVideoElement
         && Boolean(fallbackMedia.currentSrc);
@@ -744,42 +680,31 @@ export function createHeroMediaPlayerController(options) {
         previewVideo.dataset.heroPreview = "true";
         previewVideo.muted = true;
         previewVideo.loop = true;
-        previewVideo.autoplay = false;
+        previewVideo.autoplay = true;
         previewVideo.controls = false;
         previewVideo.playsInline = true;
         previewVideo.preload = "metadata";
         previewVideo.src = fallbackMedia.currentSrc;
         elements.heroPlayerStage.appendChild(previewVideo);
+        return;
       }
-      const note = fallbackMedia.paused ? "Paused" : "Playing";
-      const fallbackCard = createPreviewCard({
-        badge: "PC media",
-        title: metadataTitle || "Now playing in this browser",
-        meta: metadataMeta || "Controlling active browser playback",
-        note,
-        artworkUrl: metadata?.artworkUrl || "",
-      });
-      if (showInlineFallbackVideoPreview) {
-        fallbackCard.classList.add("is-overlay-only");
+      const metadata = getBrowserMediaMetadata();
+      const artworkUrl = metadata?.artworkUrl || "";
+      if (artworkUrl) {
+        const artwork = document.createElement("img");
+        artwork.className = "hero-player-preview-image";
+        artwork.alt = "Now playing artwork";
+        artwork.loading = "lazy";
+        artwork.referrerPolicy = "strict-origin-when-cross-origin";
+        artwork.src = artworkUrl;
+        elements.heroPlayerStage.appendChild(artwork);
       }
-      elements.heroPlayerStage.appendChild(fallbackCard);
       return;
     }
 
-    if (!post) {
-      elements.heroPlayerStage.appendChild(
-        createPreviewCard({
-          badge: "App media",
-          title: "Ready to play",
-          meta: "Latest feed preview will appear here.",
-        })
-      );
-      return;
-    }
+    if (!post) return;
 
-    const creatorSummary = getProfileSummaryForPost(post);
     const previewArtwork = resolveAppPreviewArtwork(post);
-    const previewMeta = `${creatorSummary?.displayName ?? post.creator} · ${formatTimestamp(post.createdAt)}`;
 
     if (post.mediaKind === "video") {
       const source = resolveActivePlayerSource(post);
@@ -790,35 +715,34 @@ export function createHeroMediaPlayerController(options) {
         video.dataset.heroPreview = "true";
         video.muted = true;
         video.loop = true;
-        video.autoplay = false;
+        video.autoplay = true;
         video.controls = false;
         video.playsInline = true;
         video.preload = "metadata";
         video.src = source;
         elements.heroPlayerStage.appendChild(video);
+        return;
       }
-      const overlay = createPreviewCard({
-        badge: `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`,
-        title: post.title,
-        meta: previewMeta,
-        note: "Preview",
-      });
-      if (showInlineAppVideoPreview) {
-        overlay.classList.add("is-overlay-only");
+      if (previewArtwork) {
+        const artwork = document.createElement("img");
+        artwork.className = "hero-player-preview-image";
+        artwork.alt = post.title ? `${post.title} artwork` : "Preview artwork";
+        artwork.loading = "lazy";
+        artwork.referrerPolicy = "strict-origin-when-cross-origin";
+        artwork.src = previewArtwork;
+        elements.heroPlayerStage.appendChild(artwork);
       }
-      elements.heroPlayerStage.appendChild(overlay);
       return;
     }
 
-    elements.heroPlayerStage.appendChild(
-      createPreviewCard({
-        badge: `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`,
-        title: post.title,
-        meta: previewMeta,
-        note: post.sourceKind === "spotify" ? "Control playback with Spotify in the docked player." : "",
-        artworkUrl: previewArtwork,
-      })
-    );
+    if (!previewArtwork) return;
+    const artwork = document.createElement("img");
+    artwork.className = "hero-player-preview-image";
+    artwork.alt = post.title ? `${post.title} artwork` : "Preview artwork";
+    artwork.loading = "lazy";
+    artwork.referrerPolicy = "strict-origin-when-cross-origin";
+    artwork.src = previewArtwork;
+    elements.heroPlayerStage.appendChild(artwork);
   }
 
   function attachEventListeners() {
@@ -879,8 +803,6 @@ export function createHeroMediaPlayerController(options) {
     const fallbackMedia = getFallbackPageMediaElement();
     const browserMetadata = getBrowserMediaMetadata();
     const mode = shouldUseNativeMode(post) ? "device" : (shouldUseDesktopMode(post) ? "desktop" : "app");
-    const standbyPreviewPost = mode === "app" && !(fallbackMedia instanceof HTMLMediaElement) ? getStandbyPreviewPost() : null;
-    const displayPost = post || standbyPreviewPost;
     const playbackState = mode === "device"
       ? normalizePlaybackState(nativeSnapshot?.playbackState)
       : mode === "desktop"
@@ -941,15 +863,15 @@ export function createHeroMediaPlayerController(options) {
       elements.heroPlayerTitle.textContent = fallbackTitle;
       elements.heroPlayerCaption.textContent = fallbackMeta || "Active browser media session";
       elements.heroPlayerStatus.textContent = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
-    } else if (!displayPost) {
+    } else if (!post) {
       elements.heroPlayerTitle.textContent = "Ready to play";
       elements.heroPlayerCaption.textContent = "";
       elements.heroPlayerStatus.textContent = "App media standby";
     } else {
-      const creatorSummary = getProfileSummaryForPost(displayPost);
-      elements.heroPlayerTitle.textContent = displayPost.title;
-      elements.heroPlayerCaption.textContent = `${formatKind(displayPost.mediaKind)} / ${getSignalLabel(displayPost)}`;
-      elements.heroPlayerStatus.textContent = `${creatorSummary?.displayName ?? displayPost.creator} · ${formatTimestamp(displayPost.createdAt)}`;
+      const creatorSummary = getProfileSummaryForPost(post);
+      elements.heroPlayerTitle.textContent = post.title;
+      elements.heroPlayerCaption.textContent = `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`;
+      elements.heroPlayerStatus.textContent = `${creatorSummary?.displayName ?? post.creator} · ${formatTimestamp(post.createdAt)}`;
     }
 
     elements.heroPlayerPlayPauseButton.textContent = playbackState === "playing" ? "Pause" : "Play";
@@ -965,7 +887,7 @@ export function createHeroMediaPlayerController(options) {
     elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
     elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
 
-    renderStagePreview(mode, displayPost, fallbackMedia);
+    renderStagePreview(mode, post, fallbackMedia);
     syncMediaSession(post, mode, fallbackMedia);
   }
 
