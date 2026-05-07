@@ -37,6 +37,8 @@ final class PhoneNowPlayingHelper {
     private static final String KEY_LAST_MEDIA_PACKAGE = "last_media_package";
     private static final String KEY_LAST_MEDIA_URI = "last_media_uri";
     private static final String SPOTIFY_PACKAGE_NAME = "com.spotify.music";
+    private static final String YOUTUBE_PACKAGE_NAME = "com.google.android.youtube";
+    private static final String YOUTUBE_MUSIC_PACKAGE_NAME = "com.google.android.apps.youtube.music";
 
     private PhoneNowPlayingHelper() {
     }
@@ -284,6 +286,7 @@ final class PhoneNowPlayingHelper {
 
     private static int scoreMediaController(MediaController controller) {
         int score = 0;
+        String packageName = controller.getPackageName();
         PlaybackState playbackState = controller.getPlaybackState();
         if (playbackState != null) {
             switch (playbackState.getState()) {
@@ -316,11 +319,28 @@ final class PhoneNowPlayingHelper {
             score += 100;
         }
 
-        if (!TextUtils.isEmpty(controller.getPackageName())) {
+        if (!TextUtils.isEmpty(packageName)) {
             score += 25;
         }
 
+        if (isPreferredNowPlayingPackage(packageName)) {
+            // Prefer Spotify/YouTube/YouTube Music snapshots even over generic feed/browser sessions.
+            score += 400;
+        }
+
         return score;
+    }
+
+    private static boolean isPreferredNowPlayingPackage(String packageName) {
+        if (TextUtils.isEmpty(packageName)) {
+            return false;
+        }
+        String normalized = packageName.trim().toLowerCase();
+        return normalized.contains("spotify")
+                || normalized.contains("youtube")
+                || normalized.equals(YOUTUBE_PACKAGE_NAME)
+                || normalized.equals(YOUTUBE_MUSIC_PACKAGE_NAME)
+                || normalized.contains("signalshare");
     }
 
     private static String extractNowPlayingTitle(MediaMetadata metadata) {

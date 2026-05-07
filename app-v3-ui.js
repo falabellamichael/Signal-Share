@@ -272,11 +272,47 @@ export function createAppUi(context) {
     });
   }
 
+  function getFallbackPageMediaElement() {
+    // Find any active media element on the page that isn't our primary player
+    const candidates = Array.from(document.querySelectorAll("video, audio"));
+    return candidates.find(el => {
+      if (el === state.activePlayerElement) return false;
+      if (el.closest("#heroPlayerStage")) return false;
+      return !el.paused || el.currentTime > 0;
+    }) || null;
+  }
+
+  function getBrowserMediaMetadata() {
+    if (!("mediaSession" in navigator) || !navigator.mediaSession.metadata) return null;
+    const meta = navigator.mediaSession.metadata;
+    return {
+      title: meta.title,
+      artist: meta.artist,
+      artwork: meta.artwork?.[0]?.src || ""
+    };
+  }
+
+  function getStandbyPreviewPost() {
+    // Pick the most recent playable post from the feed that isn't the current one
+    const posts = getAllPosts() || [];
+    const playable = posts.filter(p => isPlayablePost(p) && p.id !== state.playerPostId);
+    return playable[0] || null;
+  }
+
+  function sanitizeSnapshotMeta(text) {
+    if (typeof text !== "string") return "";
+    return text.replace(/\s*[-·|]\s*Signal\s*Share\s*$/i, "").trim();
+  }
+
   const heroMediaPlayerController = createHeroMediaPlayerController({
     state,
     elements,
     getControllablePlayerPost,
     getActivePlayerMediaElement,
+    getFallbackPageMediaElement,
+    getBrowserMediaMetadata,
+    getStandbyPreviewPost,
+    sanitizeSnapshotMeta,
     getPlayableVisiblePostIds,
     getAllPosts,
     getPostById,

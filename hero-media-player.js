@@ -22,6 +22,10 @@ export function createHeroMediaPlayerController(options) {
     getSpotifyPreviewImageUrl,
     parseYouTubeUrl,
     resolveActivePlayerSource,
+    getFallbackPageMediaElement,
+    getBrowserMediaMetadata,
+    getStandbyPreviewPost,
+    sanitizeSnapshotMeta,
   } = options;
 
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
@@ -46,6 +50,52 @@ export function createHeroMediaPlayerController(options) {
   let localNetworkPromptLastAttemptAt = 0;
   let pendingDesktopArtworkKey = "";
   const desktopArtworkFallbackCache = new Map();
+
+  function initializeSdkHooks() {
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      console.log("[Spotify] Web Playback SDK is ready.");
+      // Note: Full player initialization requires a premium token.
+      // We can hook this into our auth state in the future.
+    };
+
+    window.onYouTubeIframeAPIReady = () => {
+      console.log("[YouTube] Iframe API is ready.");
+    };
+  }
+
+  function syncMediaSession(meta) {
+    if (!("mediaSession" in navigator)) return;
+    if (!meta || (!meta.title && !meta.artist)) {
+      navigator.mediaSession.metadata = null;
+      return;
+    }
+
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: meta.title || "Signal Share",
+        artist: meta.artist || "App Media",
+        artwork: meta.artwork ? [{ src: meta.artwork, sizes: "512x512", type: "image/jpeg" }] : []
+      });
+
+      // Set action handlers
+      const handlers = {
+        play: () => handlePlayPause(true),
+        pause: () => handlePlayPause(false),
+        previoustrack: () => handlePrevious(),
+        nexttrack: () => handleNext(),
+      };
+
+      Object.entries(handlers).forEach(([action, handler]) => {
+        try {
+          navigator.mediaSession.setActionHandler(action, handler);
+        } catch (err) {
+          // Some browsers might not support all actions
+        }
+      });
+    } catch (error) {
+      console.error("[MediaSession] Sync failed", error);
+    }
+  }
 
   function hasUi() {
     return Boolean(
@@ -991,6 +1041,7 @@ export function createHeroMediaPlayerController(options) {
       sanitizeSnapshotMeta,
       parseYouTubeUrl,
       resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
     });
   }
 
@@ -1137,8 +1188,19 @@ export function createHeroMediaPlayerController(options) {
     elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
 
     renderStagePreview(mode, post, fallbackMedia);
-    syncMediaSession(post, mode, fallbackMedia);
+    syncMediaSession({
+      title: elements.heroPlayerTitle.textContent,
+      artist: elements.heroPlayerCaption.textContent,
+      artwork: post ? resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl }) : (browserMetadata?.artwork || ""),
+    });
   }
+
+  function initialize() {
+    attachEventListeners();
+    initializeSdkHooks();
+  }
+
+  initialize();
 
   return {
     attachEventListeners,

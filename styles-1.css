@@ -1,4 +1,4 @@
-﻿/* styles.css – add to the bottom of the file */
+/* styles.css – add to the bottom of the file */
 .ban-overlay {
   position: fixed;
   inset: 0;
@@ -1904,3 +1904,28 @@ h1 {
   padding: 14px;
   border-radius: calc(var(--radius-md) + 4px);
   background:
+  var(--surface);
+  border: 1px solid var(--line);
+}
+
+.hero-player-preview:not(.has-image) {
+  background: linear-gradient(135deg, var(--surface) 0%, var(--bg-main) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-player-preview:not(.has-image)::before {
+  content: "";
+ position: absolute;
+ inset: -100%;
+ background: radial-gradient(circle at center, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 60%);
+ animation: hero-preview-glow 10s ease-in-out infinite alternate;
+ pointer-events: none;
+}
+
+@keyframes hero-preview-glow {
+ 0% { transform: translate(-5%, -5%) scale(1); opacity: 0.4; }
+ 50% { transform: translate(5%, 5%) scale(1.1); opacity: 0.7; }
+ 100% { transform: translate(-2%, 8%) scale(1); opacity: 0.5; }
+}
+}

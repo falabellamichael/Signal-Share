@@ -4,7 +4,7 @@
   "version": "1.1.0",
   "description": "Signal Share PWA and Capacitor wrapper scaffold.",
   "scripts": {
-    "prepare:web": "powershell -ExecutionPolicy Bypass -File ./scripts/prepare-capacitor-web.ps1",
+    "prepare:web": "powershell -ExecutionPolicy Bypass -File ./prepare-capacitor-web.ps1",
     "cap:sync": "npm run prepare:web && npx cap sync android",
     "cap:open": "npx cap open android",
     "start": "node backend/server.js"

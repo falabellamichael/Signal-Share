@@ -1,0 +1,4 @@
+◇ injected env (3) from backend\.env // tip: ⌁ auth for agents [www.vestauth.com]
+[Bridge] Server on http://localhost:3000
+[Bridge] User verified: ebf1f2fb-b537-4975-b3fe-56dc056d04f5
+[Bridge] Subscribing to actions for ebf1f2fb-b537-4975-b3fe-56dc056d04f5...
