@@ -272,53 +272,6 @@ if (!window[globalStateKey]) {
 const state = window[globalStateKey];
 window.state = state; // Also expose as window.state for backward compatibility and cross-module access
 
-const {
-  elements, attachEventListeners, render, renderStats, renderAccountState,
-  setMessengerStatus, renderMessengerDock, syncMessengerDockScrollState, renderMessenger, focusMessengerPrimaryControl,
-  openMessengerDock, collapseMessengerDock, closeMessengerDock, toggleMessengerExpansion, handleMessengerLauncherClick,
-  handleMessagesNavClick, handleMessengerMinimizeClick, handleExpandedMessengerOutsideClick, renderAdminBanPanel, renderAdminBanList,
-  getFilteredAdminBanProfiles, showAdminBanFeedback, handleAdminBanLauncherClick, closeAdminBanPanel, renderPeopleList,
-  renderConversationList, renderActiveThread, showProfileFeedback, showMessengerFeedback, renderMessageEmojiPanel,
-  toggleMessageEmojiPicker, closeMessageEmojiPicker, handleMessageEmojiPanelClick, insertEmojiIntoMessage, handleMessageAttachmentInputChange,
-  handleMessageAttachmentSelection, clearMessageAttachmentSelection, renderMessageAttachmentPreview, getMessageSenderLabel, createMessageAttachmentPreviewNode,
-  createMessageAttachmentNode, createMessageAttachmentTrigger, openMessageAttachmentViewer, createMessageFileNode, getMessageAttachmentKind,
-  formatAttachmentTypeLabel, syncComposerCreatorWithAccount, updateComposerAccess, setStatusPill, showAuthFeedback,
-  applyUserPreferences, openSettingsPanel, closeSettingsPanel, toggleSettingsPanel, renderSettingsPanel,
-  openNotificationsPanel, closeNotificationsPanel, renderKeyboardShortcuts, handleThemeOptionClick, handleDensityChange,
-  handleMotionChange, handleStatusBarStripToggle, handleNotificationHideSenderToggle, handleNotificationHideBodyToggle, resetPlayerDockPosition,
-  resetPlayerVolume, resetUserPreferences, syncSourceHelp, applyMiniPlayerPosition, beginMiniPlayerDrag,
-  handleMiniPlayerDrag, endMiniPlayerDrag, handleViewportResize, isMobileHeaderViewport, isMobileMessengerViewport,
-  isTouchCompactViewport, isLandscapeViewport, resolveMessengerExpandedState, syncMobileMessengerMode, updateViewportMetrics,
-  setMobileHeaderHidden, syncMobileHeaderVisibility, handleWindowScroll, applySiteSettings, handleAdminSettingsInput,
-  handleAdminSettingsReset, updateAdminSettingsValues, renderAdminEditor, renderTagCloud, renderOverview,
-  renderFeed, createFeedCard, getFeedPageCount, clampFeedPage, getCurrentFeedPagePosts,
-  resetFeedPagination, renderFeedPagination, syncOverlayBodyState, syncProfileNavAvatar, getProfileInitials,
-  renderSpotlight, renderCreatorBoard, renderCardMedia, renderSpotlightMedia, renderViewerMedia,
-  renderViewerAttachmentMedia, renderMiniPlayerMedia, getActivePlayerMediaElement, getControllablePlayerPost, resolveExternalEmbedSource,
-  buildPersistentPlayerSource, postMessageToYouTubePlayer, syncPlayerVolumeFromMediaElement, attachPersistentPlayerMediaListeners, applyPlayerVolumeToActiveElement,
-  mountPersistentPlayer, createPersistentPlayer, applyPersistentPlayerVariant, appendMedia, renderExternalMedia,
-  createExternalPreviewStage, applyExternalPreviewMetadata, formatExternalPreviewBadge, deriveSpotifyCreatorFromSourceTitle, isGenericSpotifyCreatorFallback,
-  loadPreviewImageCandidates, loadSpotifyPreviewImage, getExternalPreviewMetadata, getSpotifyPreviewMetadata, fetchSpotifyPreviewCatalogMetadata,
-  fetchSpotifyPreviewOEmbedMetadata, getSpotifyPreviewImageUrl, getSpotifyPreviewMarket, resolveYouTubePreviewCandidates, getYouTubePreviewMetadata,
-  resolveYouTubePreviewSourceUrl, resolveSpotifyPreviewSourceUrl, renderMiniPlayerVolumeControl, renderMiniPlayer, renderViewer,
-  renderProfileView, openOwnProfile, openProfileByKey, closeProfile, openViewer,
-  closeViewer, stepViewer, openMiniPlayer, expandMiniPlayer, collapseViewerToPlayer,
-  closeMiniPlayer, handleMiniPlayerStageClick, handleMiniPlayerVolumeInput, getPlayableVisiblePostIds, stepMiniPlayer,
-  renderPreview, renderExternalPreview, clearPreviewOnly, updateSourceHelp, updateActiveFilterChip,
-  showFeedback, resetComposer, clearSelectedMedia, clearViewerMedia, clearMiniPlayerMedia,
-  destroyActivePlayer, hydrateRememberedCreator, ensureOverlay, showOverlay, hideOverlay,
-} = createAppUi({
-
-  window.addEventListener("load", () => {
-    serviceWorkerRegistrationPromise = navigator.serviceWorker
-      .register("./service-worker.js")
-      .catch((error) => {
-        console.error("Service worker registration failed", error);
-        return null;
-      });
-  });
-}
-
 function canUseBrowserNotifications() {
   return "Notification" in window && window.isSecureContext;
 }
@@ -329,6 +282,15 @@ function isNativeCapacitorApp() {
   if (typeof window.Capacitor.getPlatform === "function") return window.Capacitor.getPlatform() !== "web";
   return false;
 }
+
+window.addEventListener("load", () => {
+  serviceWorkerRegistrationPromise = navigator.serviceWorker
+    .register("./service-worker.js")
+    .catch((error) => {
+      console.error("Service worker registration failed", error);
+      return null;
+    });
+});
 
 function getCapacitorPlatform() {
   return window.Capacitor?.getPlatform?.() ?? "web";
@@ -1904,64 +1866,46 @@ function parseSpotifyUrl(raw) {
 
 function formatProviderName(p) { return p.charAt(0).toUpperCase() + p.slice(1); }
 function isHostedPostingEnabled() { return Boolean(APP_CONFIG.supabaseUrl && APP_CONFIG.supabaseAnonKey && window.supabase); }
-
-function getAppConfig() {
-  const config = window.SIGNAL_SHARE_CONFIG ?? {};
-  return {
-    supabaseUrl: config.supabaseUrl?.trim() ?? "", supabaseAnonKey: config.supabaseAnonKey?.trim() ?? "", authRedirectUrl: config.authRedirectUrl?.trim() ?? "", postsTable: config.postsTable?.trim() || "posts", storageBucket: config.storageBucket?.trim() || "media", webPushPublicKey: config.webPushPublicKey?.trim() ?? "", notificationFunctionName: config.notificationFunctionName?.trim() || "send-message-notification", spotifyPreviewFunctionName: config.spotifyPreviewFunctionName?.trim() || "spotify-preview-metadata", adminEmails: Array.isArray(config.adminEmails) ? config.adminEmails.map((e) => normalizeEmailForMatch(e)).filter(Boolean) : [],
-  };
-}
-
-
-function updatePostLikeCount(id, delta) { state.userPosts = state.userPosts.map((p) => p.id === id ? { ...p, likes: Math.max(0, (p.likes ?? 0) + delta) } : p); }
-          externalId: repaired.externalId,
-          embedUrl: repaired.embedUrl,
-          src: repaired.embedUrl, // Sync src for player compatibility
-          sourceKind: "youtube",
-          mediaKind: "video",
-          provider: "youtube"
-        };
-      }
-    }
-    return post;
-  });
-}
-
-// parseYouTubeUrl is now imported from api-v3.js to ensure consistency across the app
-
-function parseSpotifyUrl(raw) {
-  let url; try { url = new URL(raw); } catch { return null; }
-  const host = url.hostname.replace(/^open\./, "").replace(/^play\./, ""); if (host !== "spotify.com") return null;
-  const segments = url.pathname.split("/").filter(Boolean); const allowed = ["track", "album", "playlist", "artist", "episode", "show"]; const [type, id] = segments;
-  if (!allowed.includes(type) || !id) return null;
-  return { provider: "spotify", mediaKind: "audio", externalId: id, embedUrl: `https://open.spotify.com/embed/${type}/${id}?utm_source=generator`, originalUrl: raw, label: `Spotify ${type}` };
-}
-
-function formatProviderName(p) { return p.charAt(0).toUpperCase() + p.slice(1); }
-function isHostedPostingEnabled() { return Boolean(APP_CONFIG.supabaseUrl && APP_CONFIG.supabaseAnonKey && window.supabase); }
-
-function getAppConfig() {
-  const config = window.SIGNAL_SHARE_CONFIG ?? {};
-  return {
-    supabaseUrl: config.supabaseUrl?.trim() ?? "", supabaseAnonKey: config.supabaseAnonKey?.trim() ?? "", authRedirectUrl: config.authRedirectUrl?.trim() ?? "", postsTable: config.postsTable?.trim() || "posts", storageBucket: config.storageBucket?.trim() || "media", webPushPublicKey: config.webPushPublicKey?.trim() ?? "", notificationFunctionName: config.notificationFunctionName?.trim() || "send-message-notification", spotifyPreviewFunctionName: config.spotifyPreviewFunctionName?.trim() || "spotify-preview-metadata", adminEmails: Array.isArray(config.adminEmails) ? config.adminEmails.map((e) => normalizeEmailForMatch(e)).filter(Boolean) : [],
-  };
-}
-
-
-function updatePostLikeCount(id, delta) { state.userPosts = state.userPosts.map((p) => p.id === id ? { ...p, likes: Math.max(0, (p.likes ?? 0) + delta) } : p); }
-
-
-
 function createDemoGraphic({ title, subtitle, palette }) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${palette[0]}" /><stop offset="52%" stop-color="${palette[1]}" /><stop offset="100%" stop-color="${palette[2]}" /></linearGradient></defs><rect width="1200" height="900" rx="50" fill="url(#bg)" /><circle cx="920" cy="180" r="140" fill="rgba(255,255,255,0.22)" /><circle cx="340" cy="660" r="210" fill="rgba(255,255,255,0.14)" /><rect x="92" y="92" width="1016" height="716" rx="34" fill="rgba(15,23,32,0.12)" stroke="rgba(255,255,255,0.35)" /><text x="124" y="300" fill="white" font-size="132" font-family="Georgia, serif">${title}</text><text x="126" y="386" fill="rgba(255,255,255,0.82)" font-size="40" font-family="Arial, sans-serif">${subtitle}</text><text x="126" y="734" fill="rgba(255,255,255,0.7)" font-size="32" font-family="Arial, sans-serif">Signal Share demo post</text></svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-const {
-  createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase,
-  compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost,
-  openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase,
-  setApiContext, DEMO_POSTS, 
+export const {
+  elements, attachEventListeners, render, renderStats, renderAccountState,
+  setMessengerStatus, renderMessengerDock, syncMessengerDockScrollState, renderMessenger, focusMessengerPrimaryControl,
+  openMessengerDock, collapseMessengerDock, closeMessengerDock, toggleMessengerExpansion, handleMessengerLauncherClick,
+  handleMessagesNavClick, handleMessengerMinimizeClick, handleExpandedMessengerOutsideClick, renderAdminBanPanel, renderAdminBanList,
+  getFilteredAdminBanProfiles, showAdminBanFeedback, handleAdminBanLauncherClick, closeAdminBanPanel, renderPeopleList,
+  renderConversationList, renderActiveThread, showProfileFeedback, showMessengerFeedback, renderMessageEmojiPanel,
+  toggleMessageEmojiPicker, closeMessageEmojiPicker, handleMessageEmojiPanelClick, insertEmojiIntoMessage, handleMessageAttachmentInputChange,
+  handleMessageAttachmentSelection, clearMessageAttachmentSelection, renderMessageAttachmentPreview, getMessageSenderLabel, createMessageAttachmentPreviewNode,
+  createMessageAttachmentNode, createMessageAttachmentTrigger, openMessageAttachmentViewer, createMessageFileNode, getMessageAttachmentKind,
+  formatAttachmentTypeLabel, syncComposerCreatorWithAccount, updateComposerAccess, setStatusPill, showAuthFeedback,
+  applyUserPreferences, openSettingsPanel, closeSettingsPanel, toggleSettingsPanel, renderSettingsPanel,
+  openNotificationsPanel, closeNotificationsPanel, renderKeyboardShortcuts, handleThemeOptionClick, handleDensityChange,
+  handleMotionChange, handleStatusBarStripToggle, handleNotificationHideSenderToggle, handleNotificationHideBodyToggle, resetPlayerDockPosition,
+  resetPlayerVolume, resetUserPreferences, syncSourceHelp, applyMiniPlayerPosition, beginMiniPlayerDrag,
+  handleMiniPlayerDrag, endMiniPlayerDrag, handleViewportResize, isMobileHeaderViewport, isMobileMessengerViewport,
+  isTouchCompactViewport, isLandscapeViewport, resolveMessengerExpandedState, syncMobileMessengerMode, updateViewportMetrics,
+  setMobileHeaderHidden, syncMobileHeaderVisibility, handleWindowScroll, applySiteSettings, handleAdminSettingsInput,
+  handleAdminSettingsReset, updateAdminSettingsValues, renderAdminEditor, renderTagCloud, renderOverview,
+  renderFeed, createFeedCard, getFeedPageCount, clampFeedPage, getCurrentFeedPagePosts,
+  resetFeedPagination, renderFeedPagination, syncOverlayBodyState, syncProfileNavAvatar, getProfileInitials,
+  renderSpotlight, renderCreatorBoard, renderCardMedia, renderSpotlightMedia, renderViewerMedia,
+  renderViewerAttachmentMedia, renderMiniPlayerMedia, getActivePlayerMediaElement, getControllablePlayerPost, resolveExternalEmbedSource,
+  buildPersistentPlayerSource, postMessageToYouTubePlayer, syncPlayerVolumeFromMediaElement, attachPersistentPlayerMediaListeners, applyPlayerVolumeToActiveElement,
+  mountPersistentPlayer, createPersistentPlayer, applyPersistentPlayerVariant, appendMedia, renderExternalMedia,
+  createExternalPreviewStage, applyExternalPreviewMetadata, formatExternalPreviewBadge, deriveSpotifyCreatorFromSourceTitle, isGenericSpotifyCreatorFallback,
+  loadPreviewImageCandidates, loadSpotifyPreviewImage, getExternalPreviewMetadata, getSpotifyPreviewMetadata, fetchSpotifyPreviewCatalogMetadata,
+  fetchSpotifyPreviewOEmbedMetadata, getSpotifyPreviewImageUrl, getSpotifyPreviewMarket, resolveYouTubePreviewCandidates, getYouTubePreviewMetadata,
+  resolveYouTubePreviewSourceUrl, resolveSpotifyPreviewSourceUrl, renderMiniPlayerVolumeControl, renderMiniPlayer, renderViewer,
+  renderProfileView, openOwnProfile, openProfileByKey, closeProfile, openViewer,
+  closeViewer, stepViewer, openMiniPlayer, expandMiniPlayer, collapseViewerToPlayer,
+  closeMiniPlayer, handleMiniPlayerStageClick, handleMiniPlayerVolumeInput, getPlayableVisiblePostIds, stepMiniPlayer,
+  renderPreview, renderExternalPreview, clearPreviewOnly, updateSourceHelp, updateActiveFilterChip,
+  showFeedback, resetComposer, clearSelectedMedia, clearViewerMedia, clearMiniPlayerMedia,
+  destroyActivePlayer, hydrateRememberedCreator, ensureOverlay, showOverlay, hideOverlay,
 } = createAppUi({
   state, createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase,
   compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost,
@@ -2008,4 +1952,8 @@ const {
   getLatestPostedPostId, formatTimestamp, formatFileSize, parseTags, getMediaKind,
   resolveViewerSource, resolveActivePlayerSource, compareByNewest, getSpotlightPost, getPostById,
   isPostSaved, rememberCreatorInput, rememberCreator, buildUploadPost, buildExternalPost,
+  parseExternalMediaUrl, healPosts, parseSpotifyUrl, formatProviderName, isHostedPostingEnabled,
+  getAppConfig, createDemoGraphic,
 });
+
+initialize();
