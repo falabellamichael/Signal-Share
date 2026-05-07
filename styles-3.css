@@ -742,7 +742,15 @@ button:disabled {
   }
 
   .hero-player-controls {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .hero-player-controls .button {
+    width: 100%;
+    min-width: 0;
+    padding: 0 8px;
+    font-size: 0.85rem;
   }
 
   .hero-player-volume {
@@ -1430,6 +1438,14 @@ button:disabled {
   .mini-player-nav {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .mini-player-nav .button {
+    width: 100%;
+    min-width: 0;
+    padding: 0 8px;
+    font-size: 0.82rem;
   }
 
   .mini-player-audio {
@@ -1483,14 +1499,26 @@ button:disabled {
   }
 
   .card-actions,
-  .mini-player-actions,
+  .mini-player-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .mini-player-nav {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .mini-player-nav .button {
+    width: 100%;
+    min-width: 0;
+    padding: 0 4px;
+    font-size: 0.72rem;
+    min-height: 32px;
   }
 
   .hero-player-controls {
     display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 6px !important;
     margin: 12px 0;
   }
@@ -1498,8 +1526,9 @@ button:disabled {
   .hero-player-controls .button {
     min-height: 32px !important;
     padding: 0 4px !important;
-    font-size: 0.75rem !important;
+    font-size: 0.72rem !important;
     border-radius: 999px !important;
+    min-width: 0 !important;
   }\n}
 
 @media (max-width: 980px) and (orientation: landscape) {
