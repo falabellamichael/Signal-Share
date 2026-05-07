@@ -184,26 +184,26 @@ export function createHeroMediaPlayerController(options) {
   function getTargetAddressSpaceForHostname(hostname = "") {
     const value = `${hostname || ""}`.trim().toLowerCase();
     if (!value) return "";
-    if (value === "localhost" || value.endsWith(".localhost")) return "loopback";
-    if (value.endsWith(".local")) return "local";
-    if (value === "::1" || value === "[::1]") return "loopback";
+    if (value === "localhost" || value.endsWith(".localhost")) return "local";
+    if (value.endsWith(".local")) return "private";
+    if (value === "::1" || value === "[::1]") return "local";
     if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) {
       const octets = value.split(".").map((entry) => Number.parseInt(entry, 10));
       if (octets.some((entry) => Number.isNaN(entry) || entry < 0 || entry > 255)) return "";
       const [a, b] = octets;
-      if (a === 127) return "loopback";
-      if (a === 10) return "local";
-      if (a === 169 && b === 254) return "local";
-      if (a === 172 && b >= 16 && b <= 31) return "local";
-      if (a === 192 && b === 168) return "local";
+      if (a === 127) return "local";
+      if (a === 10) return "private";
+      if (a === 169 && b === 254) return "private";
+      if (a === 172 && b >= 16 && b <= 31) return "private";
+      if (a === 192 && b === 168) return "private";
       return "";
     }
     const bracketedIpv6 = value.match(/^\[([0-9a-f:.]+)\]$/i);
     const ipv6 = (bracketedIpv6?.[1] || value).toLowerCase();
     if (!ipv6.includes(":")) return "";
-    if (ipv6 === "::1") return "loopback";
-    if (ipv6.startsWith("fe80:")) return "local";
-    if (ipv6.startsWith("fc") || ipv6.startsWith("fd")) return "local";
+    if (ipv6 === "::1") return "local";
+    if (ipv6.startsWith("fe80:")) return "private";
+    if (ipv6.startsWith("fc") || ipv6.startsWith("fd")) return "private";
     return "";
   }
 
@@ -211,7 +211,7 @@ export function createHeroMediaPlayerController(options) {
     try {
       const resolved = new URL(url, window.location.href);
       const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
-      if (addressSpace !== "local" && addressSpace !== "loopback") return init;
+      if (addressSpace !== "local" && addressSpace !== "private") return init;
       return {
         ...init,
         targetAddressSpace: addressSpace,
@@ -240,7 +240,7 @@ export function createHeroMediaPlayerController(options) {
     if (!endpoint) return;
     if (!isLocalNetworkAccessPromptEligible()) return;
     const addressSpace = getEndpointAddressSpace(endpoint);
-    if (addressSpace !== "local" && addressSpace !== "loopback") return;
+    if (addressSpace !== "local" && addressSpace !== "private") return;
     if (localNetworkPromptInFlight) return;
 
     const now = Date.now();
@@ -508,7 +508,7 @@ export function createHeroMediaPlayerController(options) {
     }
     const permissionPromptEndpoint = endpoints.find((candidate) => {
       const addressSpace = getEndpointAddressSpace(candidate);
-      return addressSpace === "local" || addressSpace === "loopback";
+      return addressSpace === "local" || addressSpace === "private";
     });
     if (permissionPromptEndpoint) maybeTriggerLocalNetworkAccessPrompt(permissionPromptEndpoint);
     throw lastError || new Error("Desktop media endpoint is unavailable.");
