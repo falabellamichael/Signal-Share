@@ -302,45 +302,57 @@ export function createHeroMediaPlayerController(options) {
   }
 
   function getSpotifyFallbackCandidates(snapshot, post) {
-    const candidates = [];
+    const ranked = [];
     const seenIds = new Set();
     const snapshotTitle = normalizeText(snapshot?.title);
     const snapshotMeta = normalizeText(snapshot?.meta);
+    const hasSnapshotText = Boolean(snapshotTitle || snapshotMeta);
 
-    const pushCandidate = (candidate) => {
+    function scoreCandidate(candidate = {}) {
+      const title = normalizeText(candidate.title);
+      const creator = normalizeText(candidate.creator);
+      let score = 0;
+
+      if (snapshotTitle && title) {
+        if (title === snapshotTitle) score += 12;
+        else if (title.includes(snapshotTitle) || snapshotTitle.includes(title)) score += 8;
+      }
+
+      if (snapshotMeta) {
+        if (creator && creator === snapshotMeta) score += 8;
+        else if (creator && (creator.includes(snapshotMeta) || snapshotMeta.includes(creator))) score += 5;
+        if (title && title.includes(snapshotMeta)) score += 2;
+      }
+
+      if (!hasSnapshotText) score += 1;
+      return score;
+    }
+
+    const pushCandidate = (candidate, boost = 0) => {
       if (!candidate || candidate.sourceKind !== "spotify") return;
       const id = `${candidate.id || ""}`.trim() || `${candidate.externalId || candidate.embedUrl || candidate.externalUrl || ""}`.trim();
       if (!id || seenIds.has(id)) return;
+      const score = scoreCandidate(candidate) + boost;
+      if (hasSnapshotText && score <= 0) return;
       seenIds.add(id);
-      candidates.push(candidate);
+      ranked.push({ candidate, score });
     };
 
-    pushCandidate(post);
-    pushCandidate(getControllablePlayerPost());
-    pushCandidate(getStandbyPreviewPost());
+    pushCandidate(post, 3);
+    pushCandidate(getControllablePlayerPost(), 2);
+    pushCandidate(getStandbyPreviewPost(), 1);
 
     if (typeof getAllPosts === "function") {
       const posts = getAllPosts();
       if (Array.isArray(posts) && posts.length) {
-        const scored = posts
-          .filter((entry) => entry?.sourceKind === "spotify")
-          .map((entry) => {
-            const title = normalizeText(entry.title);
-            let score = 0;
-            if (snapshotTitle && title === snapshotTitle) score += 6;
-            if (snapshotTitle && (title.includes(snapshotTitle) || snapshotTitle.includes(title))) score += 4;
-            if (snapshotMeta && title.includes(snapshotMeta)) score += 3;
-            if (snapshotMeta && normalizeText(entry.creator).includes(snapshotMeta)) score += 2;
-            return { entry, score };
-          })
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 12);
-
-        for (const item of scored) pushCandidate(item.entry);
+        for (const entry of posts) pushCandidate(entry, 0);
       }
     }
 
-    return candidates;
+    return ranked
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 12)
+      .map((item) => item.candidate);
   }
 
   async function hydrateDesktopSpotifyArtwork(snapshot, post) {
@@ -355,7 +367,6 @@ export function createHeroMediaPlayerController(options) {
     const cachedArtwork = desktopArtworkFallbackCache.get(snapshotKey);
     if (cachedArtwork) {
       snapshot.artworkUri = cachedArtwork;
-      render();
       return;
     }
 
