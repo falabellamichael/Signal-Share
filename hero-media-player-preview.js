@@ -260,7 +260,12 @@ export function createActivePlayerStage(descriptor) {
   const container = document.createElement("div");
   container.className = "hero-player-active-stage";
   container.dataset.provider = descriptor.provider || "external";
-  container.style.cssText = "width:min(100%, calc(clamp(160px, 30vw, 320px) * 1.7778));height:clamp(160px, 30vw, 320px);aspect-ratio:16/9;margin-inline:auto;position:relative;border-radius:18px;overflow:hidden;background:#000;box-shadow:0 10px 30px rgba(0,0,0,0.4);";
+
+  // Use a more flexible base style and let CSS or provider-specific overrides handle the rest
+  container.style.cssText =
+    descriptor.provider === "spotify"
+      ? "width:100%;height:152px;border-radius:18px;overflow:hidden;background:#000;margin:14px auto;"
+      : "width:100%;aspect-ratio:16/9;background:#000;border-radius:18px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin:14px auto;box-shadow:0 10px 30px rgba(0,0,0,0.4);";
 
   const iframe = document.createElement("iframe");
   iframe.className = "hero-player-active-frame";
@@ -304,7 +309,21 @@ function commitActivePlayer(stage, post, options) {
     node.src = src;
     node.controls = true;
     node.playsInline = true;
-    node.style.cssText = "display:block;border-radius:18px;background:#000;object-fit:contain;width:100%;height:100%;";
+    node.style.cssText =
+      post.mediaKind === "audio"
+        ? "display:block;width:100%;height:80px;background:transparent;margin:10px 0;"
+        : "display:block;border-radius:18px;background:#000;object-fit:contain;width:100%;height:100%;";
+    
+    // For local audio, we want the stage itself to be smaller
+    if (post.mediaKind === "audio") {
+      stage.style.aspect-ratio = "auto";
+      stage.style.height = "auto";
+      stage.style.minHeight = "0";
+    } else {
+      stage.style.aspect-ratio = "16/9";
+      stage.style.height = "";
+    }
+
     setStageContent(stage, node, key);
     return true;
   }
