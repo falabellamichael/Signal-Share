@@ -1602,7 +1602,7 @@ h1 {
   margin-top: 4px;
 }
 
-.hero-player-stage {
+.legacy-hero-player-stage {
   min-height: 132px;
   position: relative;
   overflow: hidden;

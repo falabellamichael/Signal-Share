@@ -260,7 +260,7 @@ export function createActivePlayerStage(descriptor) {
   const container = document.createElement("div");
   container.className = "hero-player-active-stage";
   container.dataset.provider = descriptor.provider || "external";
-  container.style.cssText = "width:min(100%, calc(clamp(190px, 36vw, 380px) * 1.7778));height:clamp(190px, 36vw, 380px);aspect-ratio:16/9;margin-inline:auto;position:relative;border-radius:12px;overflow:hidden;background:#000;";
+  container.style.cssText = "width:min(100%, calc(clamp(200px, 42vw, 480px) * 1.7778));height:clamp(200px, 42vw, 480px);aspect-ratio:16/9;margin-inline:auto;position:relative;border-radius:18px;overflow:hidden;background:#000;box-shadow:0 10px 30px rgba(0,0,0,0.4);";
 
   const iframe = document.createElement("iframe");
   iframe.className = "hero-player-active-frame";
@@ -304,7 +304,7 @@ function commitActivePlayer(stage, post, options) {
     node.src = src;
     node.controls = true;
     node.playsInline = true;
-    node.style.cssText = "display:block;border-radius:12px;background:#000;object-fit:contain;width:100%;height:100%;";
+    node.style.cssText = "display:block;border-radius:18px;background:#000;object-fit:contain;width:100%;height:100%;";
     setStageContent(stage, node, key);
     return true;
   }

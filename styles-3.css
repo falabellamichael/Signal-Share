@@ -763,7 +763,7 @@ button:disabled {
     justify-self: end;
   }
 
-  .hero-player-stage {
+  .legacy-hero-player-stage {
     min-height: 168px;
   }
 
