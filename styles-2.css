@@ -1487,7 +1487,9 @@
 .external-preview-card {
   position: relative;
   overflow: hidden;
-  min-height: 220px;
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 28%),
     linear-gradient(135deg, #161f29, #0f1720 72%);
@@ -1503,7 +1505,7 @@
 }
 
 .external-preview-card-card {
-  min-height: 220px;
+  min-height: 280px;
 }
 
 .external-preview-card-spotlight {
@@ -1688,6 +1690,8 @@
 
 .card-media {
   position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
   background:
     linear-gradient(135deg, rgba(238, 108, 77, 0.18), rgba(42, 157, 143, 0.24)),
     #161f29;

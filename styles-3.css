@@ -1868,23 +1868,28 @@ body[data-theme='contrast'] .profile-view { background: #000000 !important; }
 
 /* Settings Dialog Polish */
 .settings-dialog {
-  padding: 24px !important;
-  gap: 20px !important;
-  border-radius: 28px !important;
+  padding: 32px !important;
+  gap: 24px !important;
+  border-radius: 32px !important;
+}
+#settingsMainPage,
+#settingsShortcutsPage {
+  display: grid !important;
+  gap: 28px !important;
 }
 .settings-head {
   margin-bottom: 8px !important;
   gap: 10px !important;
 }
 .settings-fields {
-  gap: 16px !important;
+  gap: 20px !important;
   margin-top: 12px !important;
 }
 .settings-field {
-  gap: 8px !important;
+  gap: 12px !important;
 }
 .settings-actions {
-  gap: 12px !important;
+  gap: 16px !important;
   margin-top: 16px !important;
 }
 .settings-toggle-field {
