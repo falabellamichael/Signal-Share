@@ -1645,7 +1645,6 @@ export function createAppUi(context) {
   function loadPreviewImageCandidates(stage, image, candidates, options = {}) {
     const { cacheKey = "" } = options;
     const urls = candidates.filter(Boolean); if (!urls.length) return;
-    let index = 0; const tryNext = () => { if (index >= urls.length) { image.removeAttribute("src"); return; } const nextUrl = urls[index]; index += 1; image.onload = () => { stage.classList.add("has-image"); if (cacheKey) externalPreviewCache.set(cacheKey, nextUrl); image.onload = null; image.onerror = null; }; image.onerror = () => { stage.classList.remove("has-image"); tryNext(); }; image.src = nextUrl; };
     tryNext();
   }
 
@@ -1696,21 +1695,9 @@ export function createAppUi(context) {
   }
 
   async function fetchSpotifyPreviewOEmbedMetadata(sourceUrl) { 
-    const response = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(sourceUrl)}`).catch(() => null); 
-    if (!response?.ok) return null; 
-    const payload = await response.json().catch(() => null); 
-    if (!payload || typeof payload !== "object") return null; 
-    let creator = typeof payload.author_name === "string" ? payload.author_name.trim() : "";
-    if (!creator && typeof payload.title === "string") {
-      const title = payload.title.trim();
-      const match = title.match(/^(.+?) - (?:song|album|playlist|artist) by (.+?)(?: \| Spotify)?$/i) || title.match(/^(.+?) by (.+?)(?: \| Spotify)?$/i);
-      if (match && match[2]) creator = match[2].trim();
-    }
-    return { 
-      title: typeof payload.title === "string" ? payload.title.trim() : "", 
-      creator: creator, 
-      thumbnailUrl: typeof payload.thumbnail_url === "string" ? payload.thumbnail_url.trim() : "" 
-    }; 
+    // Spotify oEmbed endpoint does not support CORS for client-side requests from a browser.
+    // We rely on the Edge Function (fetchSpotifyPreviewCatalogMetadata) for metadata instead.
+    return null; 
   }
 
   async function getSpotifyPreviewImageUrl(source) { const metadata = await getSpotifyPreviewMetadata(source); return typeof metadata?.thumbnailUrl === "string" ? metadata.thumbnailUrl : ""; }

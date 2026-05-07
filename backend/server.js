@@ -31,9 +31,13 @@ const MAX_ARTWORK_BYTES = 1200000;
 
 app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {
+  const requestedHeaders = typeof req.headers["access-control-request-headers"] === "string"
+    ? req.headers["access-control-request-headers"].trim()
+    : "";
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", requestedHeaders || "Content-Type");
+  res.setHeader("Access-Control-Allow-Private-Network", "true");
   if (req.method === "OPTIONS") {
     res.status(204).end();
     return;

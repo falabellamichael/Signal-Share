@@ -214,7 +214,7 @@ export function createHeroMediaPlayerController(options) {
       if (addressSpace !== "local" && addressSpace !== "loopback") return init;
       return {
         ...init,
-        targetAddressSpace: "local",
+        targetAddressSpace: addressSpace,
       };
     } catch {
       return init;
