@@ -1570,18 +1570,18 @@ export function createAppUi(context) {
      heroMediaPlayerController.render();
    }
  
-+  function stepHeroPlayer(direction) {
-+    const playableIds = getPlayableVisiblePostIds();
-+    if (playableIds.length < 2) return;
-+    const currentHeroPost = getHeroPost();
-+    const currentIndex = currentHeroPost ? playableIds.indexOf(currentHeroPost.id) : -1;
-+    let nextIndex = currentIndex + direction;
-+    if (nextIndex < 0) nextIndex = playableIds.length - 1;
-+    if (nextIndex >= playableIds.length) nextIndex = 0;
-+    const nextPost = getPostById(playableIds[nextIndex]);
-+    if (nextPost) setHeroPost(nextPost);
-+  }
-+
+  function stepHeroPlayer(direction) {
+    const playableIds = getPlayableVisiblePostIds();
+    if (playableIds.length < 2) return;
+    const currentHeroPost = getHeroPost();
+    const currentIndex = currentHeroPost ? playableIds.indexOf(currentHeroPost.id) : -1;
+    let nextIndex = currentIndex + direction;
+    if (nextIndex < 0) nextIndex = playableIds.length - 1;
+    if (nextIndex >= playableIds.length) nextIndex = 0;
+    const nextPost = getPostById(playableIds[nextIndex]);
+    if (nextPost) setHeroPost(nextPost);
+  }
+
 
 
   function getActivePlayerMediaElement() {
