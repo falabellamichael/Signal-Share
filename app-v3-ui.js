@@ -241,6 +241,36 @@ export function createAppUi(context) {
   ].join(",");
   let activeOverlayScrollContainer = null;
   let activeOverlayTouchY = 0;
+  let feedScrollObserver = null;
+
+  function initializeFeedScrollObserver() {
+    if (feedScrollObserver || !window.IntersectionObserver) return;
+    feedScrollObserver = new IntersectionObserver((entries) => {
+      if (state.activePlayerPostId) return; // Don't override preview if something is actually playing
+
+      let mostVisibleEntry = null;
+      let maxRatio = 0;
+
+      for (const entry of entries) {
+        if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
+          maxRatio = entry.intersectionRatio;
+          mostVisibleEntry = entry;
+        }
+      }
+
+      if (mostVisibleEntry && mostVisibleEntry.intersectionRatio > 0.25) {
+        const postId = mostVisibleEntry.target.dataset.postId;
+        if (postId && state.activeFeedPostId !== postId) {
+          state.activeFeedPostId = postId;
+          heroMediaPlayerController.render();
+        }
+      }
+    }, {
+      root: null,
+      threshold: [0, 0.25, 0.5, 0.75, 1.0]
+    });
+  }
+
   const heroMediaPlayerController = createHeroMediaPlayerController({
     state,
     elements,
@@ -350,6 +380,7 @@ export function createAppUi(context) {
     elements.miniPlayerVolumeSlider.addEventListener("input", handleMiniPlayerVolumeInput);
     elements.miniPlayerHead.addEventListener("pointerdown", beginMiniPlayerDrag);
     heroMediaPlayerController.attachEventListeners();
+    initializeFeedScrollObserver();
     window.addEventListener("pointermove", handleMiniPlayerDrag);
     window.addEventListener("pointerup", endMiniPlayerDrag);
     window.addEventListener("resize", handleViewportResize);
@@ -1234,10 +1265,29 @@ export function createAppUi(context) {
 
   function renderOverview() { const posts = getVisiblePosts(); renderSpotlight(posts); renderCreatorBoard(posts); }
 
-  function renderFeed() { elements.feedGrid.innerHTML = ""; const posts = getVisiblePosts(); const pagePosts = getCurrentFeedPagePosts(posts); pagePosts.forEach((post) => elements.feedGrid.appendChild(createFeedCard(post))); elements.emptyState.hidden = posts.length !== 0; renderFeedPagination(posts); }
+  function renderFeed() {
+    elements.feedGrid.innerHTML = "";
+    const posts = getVisiblePosts();
+    const pagePosts = getCurrentFeedPagePosts(posts);
+    
+    if (feedScrollObserver) feedScrollObserver.disconnect();
+    
+    pagePosts.forEach((post) => {
+      const card = createFeedCard(post);
+      elements.feedGrid.appendChild(card);
+      if (feedScrollObserver) feedScrollObserver.observe(card);
+    });
+    
+    elements.emptyState.hidden = posts.length !== 0;
+    renderFeedPagination(posts);
+  }
 
   function createFeedCard(post) {
-    const fragment = elements.feedCardTemplate.content.cloneNode(true); const mediaContainer = fragment.querySelector(".card-media"); const kind = fragment.querySelector(".card-kind"); const signal = fragment.querySelector(".card-signal"); const title = fragment.querySelector(".card-title"); const caption = fragment.querySelector(".card-caption"); const creator = fragment.querySelector(".card-creator"); const time = fragment.querySelector(".card-time"); const tags = fragment.querySelector(".card-tags"); const openButton = fragment.querySelector(".open-button"); const saveButton = fragment.querySelector(".save-button"); const likeButton = fragment.querySelector(".like-button"); const deleteButton = fragment.querySelector(".delete-button"); const creatorSummary = getProfileSummaryForPost(post);
+    const fragment = elements.feedCardTemplate.content.cloneNode(true);
+    const cardElement = fragment.querySelector(".feed-card");
+    if (cardElement) cardElement.dataset.postId = post.id;
+    
+    const mediaContainer = fragment.querySelector(".card-media"); const kind = fragment.querySelector(".card-kind"); const signal = fragment.querySelector(".card-signal"); const title = fragment.querySelector(".card-title"); const caption = fragment.querySelector(".card-caption"); const creator = fragment.querySelector(".card-creator"); const time = fragment.querySelector(".card-time"); const tags = fragment.querySelector(".card-tags"); const openButton = fragment.querySelector(".open-button"); const saveButton = fragment.querySelector(".save-button"); const likeButton = fragment.querySelector(".like-button"); const deleteButton = fragment.querySelector(".delete-button"); const creatorSummary = getProfileSummaryForPost(post);
     kind.textContent = formatKind(post.mediaKind); signal.textContent = getSignalLabel(post); title.textContent = post.title; caption.textContent = post.caption; creator.textContent = creatorSummary?.displayName ?? post.creator; time.textContent = formatTimestamp(post.createdAt); likeButton.textContent = `${getLikeCount(post)} likes`; saveButton.textContent = isPostSaved(post.id) ? "Saved" : "Save"; saveButton.setAttribute("aria-pressed", isPostSaved(post.id) ? "true" : "false"); saveButton.classList.toggle("is-saved", isPostSaved(post.id)); openButton.textContent = isPlayablePost(post) ? "Play" : "Open";
     const isLiked = state.likedPosts.includes(post.id); likeButton.setAttribute("aria-pressed", isLiked ? "true" : "false"); if (isLiked) likeButton.classList.add("is-liked");
     if (creatorSummary) creator.addEventListener("click", (event) => openProfileByKey(creatorSummary.key, event.currentTarget));

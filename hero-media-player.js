@@ -456,6 +456,12 @@ export function createHeroMediaPlayerController(options) {
     const playableIds = getPlayableVisiblePostIds();
     if (!playableIds.length) return null;
     if (typeof getPostById !== "function") return null;
+
+    // Prioritize the scroll-tracked active post if it's playable and visible
+    if (state.activeFeedPostId && playableIds.includes(state.activeFeedPostId)) {
+      return getPostById(state.activeFeedPostId);
+    }
+
     return getPostById(playableIds[0]);
   }
 
