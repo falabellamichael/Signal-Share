@@ -1771,21 +1771,26 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 14px;
-}
 
-.tag-pill {
 
 .hero-player-stage,
-.hero-player-active-stage,
-.hero-player-active-iframe {
-  width: 100%;
+.hero-player-active-stage {
+  width: min(100%, calc(clamp(200px, 42vw, 480px) * 1.7778));
+  height: clamp(200px, 42vw, 480px);
   aspect-ratio: 16 / 9;
-  min-height: 220px;
-  max-height: min(56vh, 520px);
+  background: #000;
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 14px auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
 }
 
 .hero-player-active-iframe {
+  width: 100%;
+  height: 100%;
   display: block;
   border: 0;
-  border-radius: 18px;
 }
