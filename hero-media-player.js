@@ -5,6 +5,7 @@ export function createHeroMediaPlayerController(options) {
     getControllablePlayerPost,
     getActivePlayerMediaElement,
     getPlayableVisiblePostIds,
+    getAllPosts,
     getPostById,
     getProfileSummaryForPost,
     formatKind,
@@ -16,6 +17,7 @@ export function createHeroMediaPlayerController(options) {
     stepMiniPlayer,
     renderMiniPlayer,
     postMessageToYouTubePlayer,
+    getSpotifyPreviewImageUrl,
     parseYouTubeUrl,
     resolveActivePlayerSource,
   } = options;
@@ -37,6 +39,8 @@ export function createHeroMediaPlayerController(options) {
   let desktopSnapshotEndpoint = "";
   let desktopActionEndpoint = "";
   let desktopPollFailureCount = 0;
+  let pendingDesktopArtworkKey = "";
+  const desktopArtworkFallbackCache = new Map();
 
   function hasUi() {
     return Boolean(
@@ -57,6 +61,10 @@ export function createHeroMediaPlayerController(options) {
     if (normalized === "playing") return "playing";
     if (normalized === "paused") return "paused";
     return "none";
+  }
+
+  function normalizeText(value = "") {
+    return `${value || ""}`.trim().toLowerCase();
   }
 
   function getNativeBridge() {
@@ -283,6 +291,97 @@ export function createHeroMediaPlayerController(options) {
       artworkUri: typeof raw.artworkUri === "string" ? raw.artworkUri.trim() : "",
       playbackState,
     };
+  }
+
+  function getDesktopSnapshotArtworkKey(snapshot = {}) {
+    const app = normalizeText(snapshot.appPackage);
+    const title = normalizeText(snapshot.title);
+    const meta = normalizeText(snapshot.meta);
+    if (!app && !title && !meta) return "";
+    return `${app}|${title}|${meta}`;
+  }
+
+  function getSpotifyFallbackCandidates(snapshot, post) {
+    const candidates = [];
+    const seenIds = new Set();
+    const snapshotTitle = normalizeText(snapshot?.title);
+    const snapshotMeta = normalizeText(snapshot?.meta);
+
+    const pushCandidate = (candidate) => {
+      if (!candidate || candidate.sourceKind !== "spotify") return;
+      const id = `${candidate.id || ""}`.trim() || `${candidate.externalId || candidate.embedUrl || candidate.externalUrl || ""}`.trim();
+      if (!id || seenIds.has(id)) return;
+      seenIds.add(id);
+      candidates.push(candidate);
+    };
+
+    pushCandidate(post);
+    pushCandidate(getControllablePlayerPost());
+    pushCandidate(getStandbyPreviewPost());
+
+    if (typeof getAllPosts === "function") {
+      const posts = getAllPosts();
+      if (Array.isArray(posts) && posts.length) {
+        const scored = posts
+          .filter((entry) => entry?.sourceKind === "spotify")
+          .map((entry) => {
+            const title = normalizeText(entry.title);
+            let score = 0;
+            if (snapshotTitle && title === snapshotTitle) score += 6;
+            if (snapshotTitle && (title.includes(snapshotTitle) || snapshotTitle.includes(title))) score += 4;
+            if (snapshotMeta && title.includes(snapshotMeta)) score += 3;
+            if (snapshotMeta && normalizeText(entry.creator).includes(snapshotMeta)) score += 2;
+            return { entry, score };
+          })
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 12);
+
+        for (const item of scored) pushCandidate(item.entry);
+      }
+    }
+
+    return candidates;
+  }
+
+  async function hydrateDesktopSpotifyArtwork(snapshot, post) {
+    if (!snapshot || snapshot.artworkUri) return;
+    if (typeof getSpotifyPreviewImageUrl !== "function") return;
+    const appPackage = normalizeText(snapshot.appPackage);
+    if (!appPackage.includes("spotify")) return;
+
+    const snapshotKey = getDesktopSnapshotArtworkKey(snapshot);
+    if (!snapshotKey || pendingDesktopArtworkKey === snapshotKey) return;
+
+    const cachedArtwork = desktopArtworkFallbackCache.get(snapshotKey);
+    if (cachedArtwork) {
+      snapshot.artworkUri = cachedArtwork;
+      render();
+      return;
+    }
+
+    pendingDesktopArtworkKey = snapshotKey;
+    const candidates = getSpotifyFallbackCandidates(snapshot, post);
+    for (const candidate of candidates) {
+      const source = {
+        provider: "spotify",
+        title: candidate.title || "",
+        externalId: candidate.externalId || "",
+        externalUrl: candidate.externalUrl || "",
+        originalUrl: candidate.externalUrl || "",
+        embedUrl: candidate.embedUrl || "",
+        label: candidate.label || "",
+      };
+      const artworkUrl = await getSpotifyPreviewImageUrl(source).catch(() => "");
+      if (artworkUrl && getDesktopSnapshotArtworkKey(snapshot) === snapshotKey) {
+        desktopArtworkFallbackCache.set(snapshotKey, artworkUrl);
+        snapshot.artworkUri = artworkUrl;
+        pendingDesktopArtworkKey = "";
+        render();
+        return;
+      }
+    }
+
+    pendingDesktopArtworkKey = "";
   }
 
   async function readDesktopSnapshot() {
@@ -806,12 +905,20 @@ export function createHeroMediaPlayerController(options) {
 
     if (mode === "desktop") {
       if (desktopSnapshot?.active) {
+        const snapshotArtworkKey = getDesktopSnapshotArtworkKey(desktopSnapshot);
+        if (desktopSnapshot.artworkUri && snapshotArtworkKey) {
+          desktopArtworkFallbackCache.set(snapshotArtworkKey, desktopSnapshot.artworkUri);
+        }
+        if (!desktopSnapshot.artworkUri) {
+          void hydrateDesktopSpotifyArtwork(desktopSnapshot, post);
+        }
+        const resolvedArtwork = desktopSnapshot.artworkUri || (snapshotArtworkKey ? desktopArtworkFallbackCache.get(snapshotArtworkKey) || "" : "");
         stage.appendChild(createPreviewCard({
           badge: "PC system media",
           title: desktopSnapshot.title || "Now playing",
           meta: desktopSnapshot.meta || "Desktop playback",
           note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
-          artworkUrl: desktopSnapshot.artworkUri || "",
+          artworkUrl: resolvedArtwork,
         }));
         return;
       }

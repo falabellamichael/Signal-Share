@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=20";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=21";
 
 export function createAppUi(context) {
   const {
@@ -277,6 +277,7 @@ export function createAppUi(context) {
     getControllablePlayerPost,
     getActivePlayerMediaElement,
     getPlayableVisiblePostIds,
+    getAllPosts,
     getPostById,
     getProfileSummaryForPost,
     formatKind,
@@ -288,6 +289,7 @@ export function createAppUi(context) {
     stepMiniPlayer,
     renderMiniPlayer,
     postMessageToYouTubePlayer,
+    getSpotifyPreviewImageUrl,
     parseYouTubeUrl,
     resolveActivePlayerSource,
   });
@@ -1667,7 +1669,80 @@ export function createAppUi(context) {
     return "";
   }
 
-  function resolveSpotifyPreviewSourceUrl(source) { if (source.externalUrl) return source.externalUrl; if (source.originalUrl) return source.originalUrl; if (source.embedUrl) { try { const embedUrl = new URL(source.embedUrl); const segments = embedUrl.pathname.split("/").filter(Boolean); const typeIndex = segments[0] === "embed" ? 1 : 0; const type = segments[typeIndex]; const externalId = segments[typeIndex + 1] || source.externalId || ""; if (type && externalId) return `https://open.spotify.com/${type}/${externalId}`; } catch { return ""; } } return ""; }
+  function isSpotifyEntityType(value = "") {
+    return ["track", "album", "playlist", "artist", "episode", "show"].includes(`${value || ""}`.trim().toLowerCase());
+  }
+
+  function buildSpotifyCanonicalUrl(typeValue = "", idValue = "") {
+    const type = `${typeValue || ""}`.trim().toLowerCase();
+    const externalId = `${idValue || ""}`.trim().replace(/[/?#].*$/, "");
+    if (!isSpotifyEntityType(type) || !externalId || !/^[A-Za-z0-9]+$/.test(externalId)) return "";
+    return `https://open.spotify.com/${type}/${externalId}`;
+  }
+
+  function parseSpotifyUri(rawValue = "") {
+    const match = `${rawValue || ""}`.trim().match(/^spotify:(track|album|playlist|artist|episode|show):([A-Za-z0-9]+)$/i);
+    if (!match) return null;
+    return { type: match[1].toLowerCase(), externalId: match[2] };
+  }
+
+  function inferSpotifyTypeFromSource(source = {}) {
+    const values = [source.embedUrl, source.externalUrl, source.originalUrl, source.label, source.caption, source.title];
+    for (const value of values) {
+      if (typeof value !== "string" || !value.trim()) continue;
+      const match = value.match(/(?:^|[/:])(track|album|playlist|artist|episode|show)(?:[/:]|$)/i);
+      if (match?.[1]) return match[1].toLowerCase();
+    }
+    return "track";
+  }
+
+  function resolveSpotifyPreviewSourceUrl(source) {
+    const values = [source?.externalUrl, source?.originalUrl, source?.embedUrl, source?.mediaUrl, source?.src, source?.externalId];
+
+    for (const rawValue of values) {
+      if (typeof rawValue !== "string" || !rawValue.trim()) continue;
+      const value = rawValue.trim();
+
+      const uri = parseSpotifyUri(value);
+      if (uri) {
+        const fromUri = buildSpotifyCanonicalUrl(uri.type, uri.externalId);
+        if (fromUri) return fromUri;
+      }
+
+      const parsedSpotify = parseSpotifyUrl(value);
+      if (parsedSpotify?.embedUrl) {
+        try {
+          const parsedEmbed = new URL(parsedSpotify.embedUrl);
+          const segments = parsedEmbed.pathname.split("/").filter(Boolean);
+          const type = segments[1];
+          const externalId = segments[2] || parsedSpotify.externalId || "";
+          const fromEmbed = buildSpotifyCanonicalUrl(type, externalId);
+          if (fromEmbed) return fromEmbed;
+        } catch {}
+      }
+
+      try {
+        const candidateUrl = new URL(value);
+        const host = candidateUrl.hostname.replace(/^www\./i, "").replace(/^open\./i, "").replace(/^play\./i, "");
+        if (host !== "spotify.com") continue;
+        const segments = candidateUrl.pathname.split("/").filter(Boolean);
+        if (segments[0] && /^intl-[a-z]{2,5}$/i.test(segments[0])) segments.shift();
+        if (segments[0] === "embed") segments.shift();
+        const type = segments[0];
+        const externalId = segments[1] || "";
+        const canonical = buildSpotifyCanonicalUrl(type, externalId);
+        if (canonical) return canonical;
+      } catch {}
+    }
+
+    const directExternalId = `${source?.externalId || ""}`.trim();
+    const uriExternalId = parseSpotifyUri(directExternalId);
+    if (uriExternalId) return buildSpotifyCanonicalUrl(uriExternalId.type, uriExternalId.externalId);
+    if (/^[A-Za-z0-9]{16,}$/.test(directExternalId)) {
+      return buildSpotifyCanonicalUrl(inferSpotifyTypeFromSource(source), directExternalId);
+    }
+    return "";
+  }
 
   function renderMiniPlayerVolumeControl() {
     const post = getPostById(state.playerPostId); const mediaElement = getActivePlayerMediaElement(); const hasNativeVolumeControl = mediaElement instanceof HTMLMediaElement; const supportsCustomVolume = hasNativeVolumeControl || post?.sourceKind === "youtube";
