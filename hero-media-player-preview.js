@@ -316,11 +316,11 @@ function commitActivePlayer(stage, post, options) {
     
     // For local audio, we want the stage itself to be smaller
     if (post.mediaKind === "audio") {
-      stage.style.aspect-ratio = "auto";
+      stage.style.aspectRatio = "auto";
       stage.style.height = "auto";
       stage.style.minHeight = "0";
     } else {
-      stage.style.aspect-ratio = "16/9";
+      stage.style.aspectRatio = "16/9";
       stage.style.height = "";
     }
 
