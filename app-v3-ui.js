@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=12";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=13";
 
 export function createAppUi(context) {
   const {
@@ -1395,7 +1395,7 @@ export function createAppUi(context) {
 
   function createPersistentPlayer(post) {
     if (post.sourceKind === "youtube" || post.sourceKind === "spotify") {
-      const frame = document.createElement("iframe"); frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; frame.setAttribute("allowfullscreen", ""); frame.addEventListener("load", () => { if (state.activePlayerElement === frame) applyPlayerVolumeToActiveElement(); }); return frame;
+      const frame = document.createElement("iframe"); frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; frame.addEventListener("load", () => { if (state.activePlayerElement === frame) applyPlayerVolumeToActiveElement(); }); return frame;
     }
     if (post.mediaKind === "video") { const video = document.createElement("video"); video.controls = true; video.preload = "metadata"; video.playsInline = true; video.src = resolveActivePlayerSource(post); attachPersistentPlayerMediaListeners(video); return video; }
     const shell = document.createElement("div"); const audioStage = document.createElement("div"); audioStage.dataset.audioStage = "true"; const label = document.createElement("span"); label.textContent = "Audio drop"; const title = document.createElement("strong"); title.textContent = post.title; const audio = document.createElement("audio"); audio.dataset.audioPlayer = "true"; audio.controls = true; audio.preload = "metadata"; audio.src = resolveActivePlayerSource(post); attachPersistentPlayerMediaListeners(audio); audioStage.append(label, title); shell.append(audioStage, audio); return shell;
@@ -1420,8 +1420,8 @@ export function createAppUi(context) {
   }
 
   function renderExternalMedia(container, post, variant) {
-    if (variant === "viewer") { const frame = document.createElement("iframe"); frame.className = post.sourceKind === "youtube" ? "viewer-embed viewer-youtube" : "viewer-embed viewer-spotify"; frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.height = post.sourceKind === "youtube" ? "100%" : "440"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; frame.setAttribute("allowfullscreen", ""); container.appendChild(frame); return; }
-    if (variant === "mini") { const frame = document.createElement("iframe"); frame.className = post.sourceKind === "youtube" ? "mini-player-embed mini-youtube" : "mini-player-embed mini-spotify"; frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.height = post.sourceKind === "youtube" ? "192" : "152"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; frame.setAttribute("allowfullscreen", ""); container.appendChild(frame); return; }
+    if (variant === "viewer") { const frame = document.createElement("iframe"); frame.className = post.sourceKind === "youtube" ? "viewer-embed viewer-youtube" : "viewer-embed viewer-spotify"; frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.height = post.sourceKind === "youtube" ? "100%" : "440"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; container.appendChild(frame); return; }
+    if (variant === "mini") { const frame = document.createElement("iframe"); frame.className = post.sourceKind === "youtube" ? "mini-player-embed mini-youtube" : "mini-player-embed mini-spotify"; frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.height = post.sourceKind === "youtube" ? "192" : "152"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; container.appendChild(frame); return; }
     container.appendChild(createExternalPreviewStage({ provider: post.sourceKind, title: post.title, creator: post.creator, externalId: post.externalId ?? "", externalUrl: post.externalUrl ?? "", embedUrl: post.embedUrl ?? "", label: post.label ?? "", caption: post.caption ?? "" }, { variant, note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player." }));
   }
 
@@ -1590,10 +1590,10 @@ export function createAppUi(context) {
     const externalId = resolveYouTubePreviewExternalId(source);
     if (!externalId) return [];
     return [
-      `https://i.ytimg.com/vi/${externalId}/mqdefault.jpg`,
-      `https://i.ytimg.com/vi/${externalId}/hqdefault.jpg`,
-      `https://i.ytimg.com/vi/${externalId}/sddefault.jpg`,
       `https://img.youtube.com/vi/${externalId}/0.jpg`,
+      `https://i.ytimg.com/vi/${externalId}/hqdefault.jpg`,
+      `https://i.ytimg.com/vi/${externalId}/mqdefault.jpg`,
+      `https://i.ytimg.com/vi/${externalId}/sddefault.jpg`,
       `https://i.ytimg.com/vi/${externalId}/maxresdefault.jpg`
     ];
   }
