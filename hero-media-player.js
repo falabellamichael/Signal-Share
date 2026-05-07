@@ -26,7 +26,6 @@ export function createHeroMediaPlayerController(options) {
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
   const DESKTOP_POLL_INTERVAL_MS = 3000;
-  const DESKTOP_POLL_MAX_FAILURES = 3;
 
   let listenersAttached = false;
   let nativeSnapshot = null;
@@ -154,9 +153,7 @@ export function createHeroMediaPlayerController(options) {
 
     const protocol = `${window.location.protocol || ""}`.toLowerCase();
     if (protocol === "file:") return true;
-    if (protocol !== "http:" && protocol !== "https:") return false;
-    const host = `${window.location.hostname || ""}`.trim().toLowerCase();
-    return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
+    return protocol === "http:" || protocol === "https:";
   }
 
   function pushDesktopEndpointCandidate(candidates, candidate, seen) {
@@ -197,13 +194,10 @@ export function createHeroMediaPlayerController(options) {
       pushDesktopEndpointCandidate(candidates, `${baseUrl}/api/system-media/current`, seen);
     }
 
-    const locationHost = `${window.location.hostname || ""}`.trim().toLowerCase();
-    const shouldTryLoopback = window.location.protocol === "file:"
-      || (window.location.protocol === "http:" && locationHost !== "localhost" && locationHost !== "127.0.0.1");
-    if (shouldTryLoopback) {
-      pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
-      pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
-    }
+    // Always try loopback candidates so desktop control still works when the app
+    // UI runs on a different localhost port than the Node media bridge.
+    pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
+    pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
 
     if (!candidates.length) {
       pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);
@@ -290,9 +284,6 @@ export function createHeroMediaPlayerController(options) {
       .catch(() => {
         desktopSnapshot = null;
         desktopPollFailureCount += 1;
-        if (desktopPollFailureCount >= DESKTOP_POLL_MAX_FAILURES) {
-          stopDesktopSnapshotPolling();
-        }
         if (renderAfter) render();
         return null;
       });
