@@ -10,42 +10,53 @@ window.MessengerRealtime = class MessengerRealtime {
     this.sessionHash = Math.random().toString(36).substring(2, 10);
     this.isConnecting = false;
     this.processedMessageIds = new Set(); // Prevent double-counting messages in same session
+    this.retryTimeout = null;
   }
 
   init() {
-    if (!this.state.supabase || !this.state.currentUser || this.isConnecting) return;
+    if (!this.state.supabase || !this.state.currentUser || this.isConnecting || this.channel) return;
     this.isConnecting = true;
-    this.stop(); 
+    if (this.retryTimeout) {
+      clearTimeout(this.retryTimeout);
+      this.retryTimeout = null;
+    }
+
+    this.stop();
+    this.isConnecting = true;
+
+    const userId = this.state.currentUser.id;
+    const channelName = `messenger_live_${userId.slice(0, 8)}`; 
     
-    // Tiny delay to ensure client readiness
-    setTimeout(() => {
-      const userId = this.state.currentUser.id;
-      const channelName = `messenger_live_${userId.slice(0, 8)}`; 
-      
-      console.log("[Realtime] Connecting to hardened channel:", channelName);
-      
-      this.channel = this.state.supabase.channel(channelName)
-        .on("postgres_changes", { 
-          event: "INSERT", 
-          schema: "public", 
-          table: "messages" 
-        }, (payload) => {
-          this.handleNewMessage(payload.new);
-        })
-        .on("broadcast", { event: "new-message" }, (payload) => {
-          this.handleNewMessage(payload.payload);
-        })
-        .subscribe((status, err) => {
+    console.log("[Realtime] Connecting to hardened channel:", channelName);
+    
+    this.channel = this.state.supabase.channel(channelName)
+      .on("postgres_changes", { 
+        event: "INSERT", 
+        schema: "public", 
+        table: "messages" 
+      }, (payload) => {
+        this.handleNewMessage(payload.new);
+      })
+      .on("broadcast", { event: "new-message" }, (payload) => {
+        this.handleNewMessage(payload.payload);
+      })
+      .subscribe((status, err) => {
+        if (status === "SUBSCRIBED") {
           this.isConnecting = false;
-          if (status === "SUBSCRIBED") {
-            console.log("[Realtime] Connected.");
+          console.log("[Realtime] Connected.");
+          return;
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED" || err) {
+          this.isConnecting = false;
+          console.error("[Realtime] Transport issue. Retrying...", err || status);
+          if (!this.retryTimeout) {
+            this.retryTimeout = setTimeout(() => {
+              this.retryTimeout = null;
+              this.init();
+            }, 5000);
           }
-          if (err || status === "CHANNEL_ERROR") {
-            console.error("[Realtime] Transport issue. Retrying...", err);
-            setTimeout(() => this.init(), 5000);
-          }
-        });
-    }, 1000);
+        }
+      });
 
     // Heartbeat to monitor health
     if (this.heartbeat) clearInterval(this.heartbeat);
@@ -119,6 +130,11 @@ window.MessengerRealtime = class MessengerRealtime {
   }
 
   stop() {
+    this.isConnecting = false;
+    if (this.retryTimeout) {
+      clearTimeout(this.retryTimeout);
+      this.retryTimeout = null;
+    }
     if (this.heartbeat) clearInterval(this.heartbeat);
     if (this.channel) {
       console.log("[Realtime] Stopping and removing channel...");

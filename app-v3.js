@@ -1194,7 +1194,7 @@ async function refreshMessengerState(options = {}) {
     state.profileRecord = ownProfile; state.blockingAvailable = blockingAvailable; state.banningAvailable = banningAvailable; state.blockedUserIds = blocks.map((b) => b.blockedId); state.bannedUserIds = bans.map((b) => b.bannedId); state.availableProfiles = profilesResult.value.filter((p) => p.id !== state.currentUser.id); state.directThreads = sortThreads(threadsResult.value.filter((t) => !isThreadBlocked(t)));
     if (!preserveActiveThread || !state.directThreads.some((t) => t.id === state.activeThreadId)) state.activeThreadId = state.directThreads[0]?.id ?? null;
     if (state.activeThreadId) state.activeMessages = await loadMessagesFromSupabase(state.activeThreadId); else state.activeMessages = [];
-    subscribeMessagingChannels({ force }); state.messengerError = "";
+    subscribeMessagingChannels(); state.messengerError = "";
   } catch (error) { console.error("Messenger state could not be loaded", error); state.profileRecord = null; state.availableProfiles = []; state.blockedUserIds = []; state.bannedUserIds = []; state.blockingAvailable = true; state.banningAvailable = true; state.directThreads = []; state.activeThreadId = null; state.activeMessages = []; state.messengerError = formatBackendError(error) || "Messenger could not load for this account."; }
   finally { state.messengerBusy = Math.max(0, state.messengerBusy - 1); renderMessenger(); }
 }
@@ -1204,7 +1204,6 @@ function unsubscribeMessagingChannels() {
   if (state.threadsChannel) { state.threadsChannel.unsubscribe(); state.threadsChannel = null; }
   if (state.messagesChannel) { state.messagesChannel.unsubscribe(); state.messagesChannel = null; }
   if (state.likesChannel) { state.likesChannel.unsubscribe(); state.likesChannel = null; }
-  try { state.supabase.removeAllChannels(); } catch (_error) {}
 }
 
 
@@ -1214,13 +1213,16 @@ let messengerRealtime = null;
 
 async function subscribeMessagingChannels(options = {}) {
   const { force = false } = options;
-  if (isMessagingSubscribing || (!force && state.threadsChannel && state.messagesChannel) || !isMessagingEnabled(state)) {
+  const realtimeReadyOrConnecting = Boolean(messengerRealtime && (messengerRealtime.isConnecting || messengerRealtime.channel));
+  const hasLiveSubscriptions = Boolean(state.threadsChannel || state.likesChannel || state.messagesChannel || realtimeReadyOrConnecting);
+
+  if (isMessagingSubscribing || (!force && hasLiveSubscriptions) || !isMessagingEnabled(state)) {
     if (!isMessagingEnabled(state)) unsubscribeMessagingChannels();
     return;
   }
   try {
     isMessagingSubscribing = true;
-    unsubscribeMessagingChannels();
+    if (force) unsubscribeMessagingChannels();
     
     // Initialize the new dedicated Realtime system
     if (!messengerRealtime) {
@@ -1229,7 +1231,7 @@ async function subscribeMessagingChannels(options = {}) {
     messengerRealtime.init();
     
     // Explicitly set the reference so the rest of the app knows we're live
-    state.messagesChannel = messengerRealtime.channel;
+    if (messengerRealtime.channel) state.messagesChannel = messengerRealtime.channel;
     console.log("[Messenger] Realtime system initialized.");
     const sessionHash = messengerRealtime.sessionHash;
 
