@@ -1600,15 +1600,22 @@ h1 {
 }
 
 .hero-player-stage {
+  position: relative;
+  overflow: hidden;
   min-height: 132px;
   border-radius: 18px;
   padding: 14px 16px;
   display: flex;
   align-items: end;
+  transition: min-height 180ms ease;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03)),
     var(--surface-strong);
   border: 1px solid var(--line);
+}
+
+.hero-player-stage.is-playing {
+  min-height: clamp(220px, 62vh, 640px);
 }
 
 .hero-player-status {

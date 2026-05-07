@@ -827,14 +827,7 @@ export function createHeroMediaPlayerController(options) {
       return;
     }
 
-    if (!post) {
-      elements.heroPlayerStage.appendChild(
-        createPreviewCard({
-          badge: "App media",
-          title: "",
-          meta: "",
-        })
-      );
+    if (standbyPreview || !post) {
       return;
     }
 
@@ -954,6 +947,13 @@ export function createHeroMediaPlayerController(options) {
       : mode === "desktop"
         ? normalizePlaybackState(desktopSnapshot?.playbackState)
         : getLocalPlaybackState();
+    const shouldExpandStage = mode === "app"
+      && playbackState === "playing"
+      && (
+        mediaElement instanceof HTMLVideoElement
+        || fallbackMedia instanceof HTMLVideoElement
+        || displayPost?.mediaKind === "video"
+      );
     const supportsPlayback = mode === "device"
       ? hasNativeActionBridge()
       : mode === "desktop"
@@ -1036,6 +1036,7 @@ export function createHeroMediaPlayerController(options) {
     elements.heroPlayerVolumeSlider.disabled = !supportsVolume;
     elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
     elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
+    elements.heroPlayerStage.classList.toggle("is-playing", shouldExpandStage);
 
     renderStagePreview(mode, displayPost, fallbackMedia, {
       standbyPreview: !post && Boolean(displayPost) && mode === "app" && !(fallbackMedia instanceof HTMLMediaElement),
