@@ -17,6 +17,9 @@ export function createHeroMediaPlayerController(options) {
     postMessageToYouTubePlayer,
     parseYouTubeUrl,
     resolveActivePlayerSource,
+    getSpotifyPreviewMetadata,
+    getPostById,
+    getVisiblePosts,
   } = options;
 
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
@@ -602,22 +605,24 @@ export function createHeroMediaPlayerController(options) {
     if (!(getActivePlayerMediaElement() instanceof HTMLMediaElement) && fallbackMedia instanceof HTMLMediaElement) {
       try { fallbackMedia.volume = state.playerVolume; } catch {}
     }
-    render();
+
+    const mode = shouldUseNativeMode(post) ? "device" : (shouldUseDesktopMode(post) ? "desktop" : "app");
+
+    // Minimal UI update during sliding to keep it smooth
+    const volumePercent = Math.round(state.playerVolume * 100);
+    if (elements.heroPlayerVolumeValue) elements.heroPlayerVolumeValue.textContent = `${volumePercent}%`;
+    if (elements.miniPlayerVolumeValue) elements.miniPlayerVolumeValue.textContent = `${volumePercent}%`;
+    if (elements.miniPlayerVolumeSlider) elements.miniPlayerVolumeSlider.value = `${volumePercent}`;
+    if (elements.heroPlayerVolumeSlider) elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
+
+    syncMediaSession(post, mode, fallbackMedia);
   }
 
   function createPreviewCard({ badge, title, meta, note, artworkUrl = "" }) {
     const card = document.createElement("div");
     card.className = "hero-player-preview";
 
-    if (artworkUrl) {
-      const image = document.createElement("img");
-      image.className = "hero-player-preview-image";
-      image.alt = title ? `${title} artwork` : "Now playing artwork";
-      image.loading = "lazy";
-      image.referrerPolicy = "strict-origin-when-cross-origin";
-      image.src = artworkUrl;
-      card.appendChild(image);
-    }
+    applyPreviewCardArtwork(card, title, artworkUrl);
 
     const overlay = document.createElement("div");
     overlay.className = "hero-player-preview-overlay";
@@ -641,6 +646,66 @@ export function createHeroMediaPlayerController(options) {
     return card;
   }
 
+  function applyPreviewCardArtwork(card, title, artworkUrl) {
+    if (!(card instanceof HTMLElement)) return false;
+    const nextArtwork = typeof artworkUrl === "string" ? artworkUrl.trim() : "";
+    if (!nextArtwork) return false;
+    let image = card.querySelector(".hero-player-preview-image");
+    if (!(image instanceof HTMLImageElement)) {
+      image = document.createElement("img");
+      image.className = "hero-player-preview-image";
+      image.loading = "lazy";
+      image.referrerPolicy = "strict-origin-when-cross-origin";
+      card.prepend(image);
+    }
+    image.alt = title ? `${title} artwork` : "Now playing artwork";
+    image.src = nextArtwork;
+    return true;
+  }
+
+  async function resolveSpotifyPreviewArtwork(post) {
+    if (!post || post.sourceKind !== "spotify" || typeof getSpotifyPreviewMetadata !== "function") return "";
+    const metadata = await getSpotifyPreviewMetadata({
+      provider: "spotify",
+      title: post.title ?? "",
+      creator: post.creator ?? "",
+      externalId: post.externalId ?? "",
+      externalUrl: post.externalUrl ?? "",
+      embedUrl: post.embedUrl ?? "",
+      originalUrl: post.originalUrl ?? post.externalUrl ?? "",
+      label: post.label ?? "",
+      caption: post.caption ?? "",
+    }).catch(() => null);
+    return typeof metadata?.thumbnailUrl === "string" ? metadata.thumbnailUrl.trim() : "";
+  }
+
+  function hydrateSpotifyPreviewArtwork(card, post) {
+    if (!post || post.sourceKind !== "spotify") return;
+    const expectedPostId = post.id;
+    void resolveSpotifyPreviewArtwork(post).then((artworkUrl) => {
+      if (!artworkUrl || !card.isConnected) return;
+      const currentPost = getControllablePlayerPost();
+      const standbyPost = getStandbyPreviewPost();
+      const isCurrentPost = Boolean(currentPost && currentPost.id === expectedPostId);
+      const isStandbyPost = Boolean(!currentPost && standbyPost && standbyPost.id === expectedPostId);
+      if (!isCurrentPost && !isStandbyPost) return;
+      applyPreviewCardArtwork(card, post.title, artworkUrl);
+    });
+  }
+
+  function getStandbyPreviewPost() {
+    if (typeof getVisiblePosts === "function") {
+      const visiblePosts = getVisiblePosts();
+      if (Array.isArray(visiblePosts) && visiblePosts.length) {
+        return visiblePosts[0] || null;
+      }
+    }
+    if (typeof getPostById !== "function") return null;
+    const playableIds = getPlayableVisiblePostIds();
+    if (!Array.isArray(playableIds) || !playableIds.length) return null;
+    return getPostById(playableIds[0]) || null;
+  }
+
   function resolveAppPreviewArtwork(post) {
     if (!post) return "";
     if (post.sourceKind === "youtube") {
@@ -658,7 +723,17 @@ export function createHeroMediaPlayerController(options) {
     return "";
   }
 
-  function renderStagePreview(mode, post, fallbackMedia) {
+  let lastRenderedStageKey = "";
+
+  function renderStagePreview(mode, post, fallbackMedia, options = {}) {
+    const { standbyPreview = false } = options;
+
+    // Optimization: Skip full stage re-render if the core content hasn't changed.
+    // This makes volume sliding and other rapid state updates much smoother.
+    const currentStageKey = `${mode}-${post?.id || "none"}-${standbyPreview}-${fallbackMedia?.currentSrc || "none"}`;
+    if (currentStageKey === lastRenderedStageKey) return;
+    lastRenderedStageKey = currentStageKey;
+
     elements.heroPlayerStage.replaceChildren();
     if (mode === "device") {
       if (nativeSnapshot?.permissionRequired) {
@@ -788,6 +863,7 @@ export function createHeroMediaPlayerController(options) {
         title: post.title,
         meta: previewMeta,
         note: "Preview",
+        artworkUrl: showInlineAppVideoPreview ? "" : previewArtwork,
       });
       if (showInlineAppVideoPreview) {
         overlay.classList.add("is-overlay-only");
@@ -796,15 +872,17 @@ export function createHeroMediaPlayerController(options) {
       return;
     }
 
-    elements.heroPlayerStage.appendChild(
-      createPreviewCard({
-        badge: `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`,
-        title: post.title,
-        meta: previewMeta,
-        note: post.sourceKind === "spotify" ? "Control playback with Spotify in the docked player." : "",
-        artworkUrl: previewArtwork,
-      })
-    );
+    const previewCard = createPreviewCard({
+      badge: `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`,
+      title: post.title,
+      meta: previewMeta,
+      note: post.sourceKind === "spotify" ? "Control playback with Spotify in the docked player." : "",
+      artworkUrl: previewArtwork,
+    });
+    elements.heroPlayerStage.appendChild(previewCard);
+    if (!previewArtwork && post.sourceKind === "spotify") {
+      hydrateSpotifyPreviewArtwork(previewCard, post);
+    }
   }
 
   function attachEventListeners() {
@@ -865,6 +943,12 @@ export function createHeroMediaPlayerController(options) {
     const fallbackMedia = getFallbackPageMediaElement();
     const browserMetadata = getBrowserMediaMetadata();
     const mode = shouldUseNativeMode(post) ? "device" : (shouldUseDesktopMode(post) ? "desktop" : "app");
+    const standbyPreviewPost = !post
+      && mode === "app"
+      && !(fallbackMedia instanceof HTMLMediaElement)
+      ? getStandbyPreviewPost()
+      : null;
+    const displayPost = post || standbyPreviewPost;
     const playbackState = mode === "device"
       ? normalizePlaybackState(nativeSnapshot?.playbackState)
       : mode === "desktop"
@@ -925,15 +1009,19 @@ export function createHeroMediaPlayerController(options) {
       elements.heroPlayerTitle.textContent = fallbackTitle;
       elements.heroPlayerCaption.textContent = fallbackMeta || "Active browser media session";
       elements.heroPlayerStatus.textContent = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
+    } else if (!post && displayPost) {
+      elements.heroPlayerTitle.textContent = "Ready to play";
+      elements.heroPlayerCaption.textContent = "";
+      elements.heroPlayerStatus.textContent = "App media standby";
     } else if (!post) {
       elements.heroPlayerTitle.textContent = "Ready to play";
       elements.heroPlayerCaption.textContent = "";
       elements.heroPlayerStatus.textContent = "App media standby";
     } else {
-      const creatorSummary = getProfileSummaryForPost(post);
-      elements.heroPlayerTitle.textContent = post.title;
-      elements.heroPlayerCaption.textContent = `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`;
-      elements.heroPlayerStatus.textContent = `${creatorSummary?.displayName ?? post.creator} · ${formatTimestamp(post.createdAt)}`;
+      const creatorSummary = getProfileSummaryForPost(displayPost);
+      elements.heroPlayerTitle.textContent = displayPost.title;
+      elements.heroPlayerCaption.textContent = `${formatKind(displayPost.mediaKind)} / ${getSignalLabel(displayPost)}`;
+      elements.heroPlayerStatus.textContent = `${creatorSummary?.displayName ?? displayPost.creator} · ${formatTimestamp(displayPost.createdAt)}`;
     }
 
     elements.heroPlayerPlayPauseButton.textContent = playbackState === "playing" ? "Pause" : "Play";
@@ -949,7 +1037,9 @@ export function createHeroMediaPlayerController(options) {
     elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
     elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
 
-    renderStagePreview(mode, post, fallbackMedia);
+    renderStagePreview(mode, displayPost, fallbackMedia, {
+      standbyPreview: !post && Boolean(displayPost) && mode === "app" && !(fallbackMedia instanceof HTMLMediaElement),
+    });
     syncMediaSession(post, mode, fallbackMedia);
   }
 

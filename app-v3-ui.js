@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=9";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=12";
 
 export function createAppUi(context) {
   const {
@@ -234,6 +234,9 @@ export function createAppUi(context) {
     ".viewer-dialog",
     ".profile-view-dialog",
     ".messenger-section",
+    ".messenger-sidebar",
+    ".conversation-list",
+    ".people-list",
     ".admin-ban-panel",
     ".mini-player",
     ".message-list",
@@ -259,6 +262,9 @@ export function createAppUi(context) {
     postMessageToYouTubePlayer,
     parseYouTubeUrl,
     resolveActivePlayerSource,
+    getSpotifyPreviewMetadata,
+    getPostById,
+    getVisiblePosts,
   });
 
   function attachEventListeners() {
@@ -1190,13 +1196,30 @@ export function createAppUi(context) {
     if (!(target instanceof Element)) return null;
     const overlayRoot = getOpenOverlayRoots().find((root) => root.contains(target));
     if (!overlayRoot) return null;
-    const scrollContainer = target.closest(OVERLAY_SCROLL_CONTAINER_SELECTOR);
-    if (scrollContainer && overlayRoot.contains(scrollContainer)) return scrollContainer;
+
+    let current = target;
+    while (current && overlayRoot.contains(current)) {
+      const container = current.closest(OVERLAY_SCROLL_CONTAINER_SELECTOR);
+      if (!container || !overlayRoot.contains(container)) break;
+
+      const maxScroll = container.scrollHeight - container.clientHeight;
+      const style = window.getComputedStyle(container);
+      const canScroll = maxScroll > 0 && (style.overflowY === "auto" || style.overflowY === "scroll");
+
+      if (canScroll) return container;
+      if (container === overlayRoot) break;
+      current = container.parentElement;
+    }
+
     return overlayRoot;
   }
 
   function handleOverlayTouchStart(event) {
     const touch = event.touches?.[0];
+    if (event.target instanceof HTMLInputElement && event.target.type === "range") {
+      activeOverlayScrollContainer = null;
+      return;
+    }
     activeOverlayScrollContainer = getOverlayScrollContainer(event.target);
     if (!touch || !activeOverlayScrollContainer) return;
     activeOverlayTouchY = touch.clientY;
@@ -1793,7 +1816,18 @@ export function createAppUi(context) {
 
   function handleMiniPlayerStageClick(event) { if (!event.target.closest("iframe, video, audio") && !state.miniPlayerExpanded) expandMiniPlayer(); }
 
-  function handleMiniPlayerVolumeInput(event) { state.playerVolume = normalizePlayerVolume(Number(event.target.value) / 100, state.playerVolume); savePlayerVolume(state.playerVolume); applyPlayerVolumeToActiveElement(); renderMiniPlayerVolumeControl(); }
+  function handleMiniPlayerVolumeInput(event) {
+    state.playerVolume = normalizePlayerVolume(Number(event.target.value) / 100, state.playerVolume);
+    savePlayerVolume(state.playerVolume);
+    applyPlayerVolumeToActiveElement();
+
+    const volumePercent = Math.round(state.playerVolume * 100);
+    if (elements.miniPlayerVolumeValue) elements.miniPlayerVolumeValue.textContent = `${volumePercent}%`;
+    if (elements.heroPlayerVolumeValue) elements.heroPlayerVolumeValue.textContent = `${volumePercent}%`;
+    if (elements.heroPlayerVolumeSlider) elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
+
+    heroMediaPlayerController.render();
+  }
 
   function getPlayableVisiblePostIds() { return state.visiblePostIds.filter((id) => isPlayablePost(getPostById(id))); }
 
