@@ -1,4 +1,4 @@
-import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js?v=1";
+import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js";
 
 
 
@@ -1193,6 +1193,7 @@ export function createHeroMediaPlayerController(options) {
       artist: elements.heroPlayerCaption.textContent,
       artwork: post ? resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl }) : (browserMetadata?.artwork || ""),
     });
+    if (typeof renderMiniPlayer === "function") renderMiniPlayer();
   }
 
   function initialize() {
@@ -1205,6 +1206,10 @@ export function createHeroMediaPlayerController(options) {
   return {
     attachEventListeners,
     render,
+    handlePlayPause,
+    handleNext,
+    handlePrevious,
+    handleVolumeInput,
     openNowPlayingMediaApp: (packageName, uri) => {
       if (hasNativeActionBridge()) {
         try { getNativeBridge().openNowPlayingMediaApp(packageName, uri, true); return true; } catch { return false; }

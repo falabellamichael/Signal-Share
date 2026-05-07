@@ -559,6 +559,10 @@ final class PhoneNowPlayingHelper {
             return value;
         }
 
+        if (value.matches("^[A-Za-z0-9]{22}$")) {
+            return "spotify:track:" + value;
+        }
+
         String[] playableTypes = new String[]{"track", "album", "playlist", "artist", "episode", "show"};
         for (String playableType : playableTypes) {
             if (value.startsWith(playableType + ":")) {

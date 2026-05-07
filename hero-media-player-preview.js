@@ -1,66 +1,222 @@
-/**
- * Resolves the YouTube video ID from a post's various URL fields.
- */
-function resolveYouTubePreviewId(post, parseYouTubeUrl) {
-  if (!post) return "";
-  const candidates = [
+const YOUTUBE_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
+const SPOTIFY_TYPES = new Set(["track", "album", "playlist", "artist", "episode", "show"]);
+
+function toCleanString(value) {
+  return typeof value === "string" ? value.trim() : value == null ? "" : `${value}`.trim();
+}
+
+function isThenable(value) {
+  return Boolean(value && typeof value.then === "function");
+}
+
+function safeCall(fn, fallback, ...args) {
+  if (typeof fn !== "function") return fallback;
+  try {
+    const result = fn(...args);
+    return result == null ? fallback : result;
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function getPostCandidateValues(post) {
+  if (!post) return [];
+  return [
     post.externalId,
     post.embedUrl,
     post.externalUrl,
     post.src,
     post.mediaUrl,
     post.label,
-  ];
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    const value = `${candidate}`.trim();
-    if (!value) continue;
-    if (typeof parseYouTubeUrl === "function") {
-      const parsed = parseYouTubeUrl(value);
-      if (parsed?.externalId) return parsed.externalId;
-    }
-    const match = value.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/i);
-    if (match?.[1]) return match[1];
-  }
-  return "";
+    post.caption,
+    post.title,
+  ]
+    .map(toCleanString)
+    .filter(Boolean);
 }
 
 /**
- * Resolves the artwork URL for a post. 
+ * Resolves the YouTube video ID from a post's various URL fields.
+ */
+export function resolveYouTubePreviewId(post, parseYouTubeUrl) {
+  if (!post) return "";
+
+  for (const value of getPostCandidateValues(post)) {
+    if (YOUTUBE_ID_PATTERN.test(value)) return value;
+
+    if (typeof parseYouTubeUrl === "function") {
+      const parsed = safeCall(parseYouTubeUrl, null, value);
+      if (parsed?.externalId && YOUTUBE_ID_PATTERN.test(parsed.externalId)) {
+        return parsed.externalId;
+      }
+    }
+
+    const match = value.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/i);
+    if (match?.[1]) return match[1];
+  }
+
+  return "";
+}
+
+function resolveSpotifyPreview(post) {
+  if (!post || post.sourceKind !== "spotify") return null;
+
+  const idFromExternalId = toCleanString(post.externalId);
+  const label = toCleanString(post.label).toLowerCase();
+  const labelType = Array.from(SPOTIFY_TYPES).find((type) => label.includes(type));
+
+  if (idFromExternalId) {
+    return { type: labelType || "track", id: idFromExternalId };
+  }
+
+  for (const value of getPostCandidateValues(post)) {
+    const uriMatch = value.match(/^spotify:(track|album|playlist|artist|episode|show):([A-Za-z0-9]+)$/i);
+    if (uriMatch) {
+      return { type: uriMatch[1].toLowerCase(), id: uriMatch[2] };
+    }
+
+    const urlMatch = value.match(/open\.spotify\.com\/(?:intl-[a-z0-9-]+\/)?(?:embed\/)?(track|album|playlist|artist|episode|show)\/([A-Za-z0-9]+)/i);
+    if (urlMatch) {
+      return { type: urlMatch[1].toLowerCase(), id: urlMatch[2] };
+    }
+  }
+
+  return null;
+}
+
+function createYouTubeEmbedSource(videoId) {
+  if (!videoId) return "";
+  const params = new URLSearchParams({
+    autoplay: "0",
+    controls: "1",
+    playsinline: "1",
+    rel: "0",
+    modestbranding: "1",
+    enablejsapi: "1",
+    origin: window.location.origin,
+  });
+  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+}
+
+function createSpotifyEmbedSource(spotifyPreview) {
+  if (!spotifyPreview?.id) return "";
+  const type = SPOTIFY_TYPES.has(spotifyPreview.type) ? spotifyPreview.type : "track";
+  return `https://open.spotify.com/embed/${type}/${spotifyPreview.id}?utm_source=generator&theme=0`;
+}
+
+export function createActivePlayerDescriptor(post, parseYouTubeUrl) {
+  if (!post) return null;
+
+  if (post.sourceKind === "youtube") {
+    const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
+    const src = createYouTubeEmbedSource(videoId);
+    return src ? { provider: "youtube", src, title: "YouTube player" } : null;
+  }
+
+  if (post.sourceKind === "spotify") {
+    const spotifyPreview = resolveSpotifyPreview(post);
+    const src = createSpotifyEmbedSource(spotifyPreview);
+    return src ? { provider: "spotify", src, title: "Spotify player" } : null;
+  }
+
+  return null;
+}
+
+function getArtworkCacheKey(artworkUrl) {
+  if (typeof artworkUrl === "string") return artworkUrl;
+  if (isThenable(artworkUrl)) return "async-artwork";
+  return "";
+}
+
+function getCardKey({ badge = "", title = "", meta = "", note = "", artworkUrl = "" }) {
+  return ["card", badge, title, meta, note, getArtworkCacheKey(artworkUrl)].map(toCleanString).join("|");
+}
+
+function setStageContent(stage, node, key, options = {}) {
+  if (!stage || !node) return;
+  const normalizedKey = toCleanString(key) || `render-${Date.now()}`;
+  const shouldPreserveSameKey = options.preserveSameKey !== false;
+
+  if (shouldPreserveSameKey && stage.dataset.heroPreviewKey === normalizedKey && stage.firstElementChild) {
+    return;
+  }
+
+  stage.dataset.heroPreviewKey = normalizedKey;
+  stage.replaceChildren(node);
+}
+
+/**
+ * Resolves the artwork URL for a post.
  * Supports synchronous string returns (YouTube, images) and asynchronous Promises (Spotify).
  */
 export function resolveAppPreviewArtwork(post, options = {}) {
   if (!post) return "";
   const { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl } = options;
-  
+
   if (post.sourceKind === "youtube") {
     const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
     return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "";
   }
-  
+
   if (post.sourceKind === "spotify") {
-    if (typeof getSpotifyPreviewImageUrl === "function") {
-      return getSpotifyPreviewImageUrl(post); // Returns a Promise
-    }
-    return "";
+    return typeof getSpotifyPreviewImageUrl === "function" ? getSpotifyPreviewImageUrl(post) : "";
   }
-  
+
   if (post.mediaKind === "image") {
-    if (typeof resolveActivePlayerSource === "function") {
-      const resolved = resolveActivePlayerSource(post);
-      if (resolved) return resolved;
-    }
-    if (typeof post.src === "string" && post.src.trim()) return post.src.trim();
-    if (typeof post.mediaUrl === "string" && post.mediaUrl.trim()) return post.mediaUrl.trim();
+    const resolved = safeCall(resolveActivePlayerSource, "", post);
+    if (resolved) return resolved;
+
+    const src = toCleanString(post.src);
+    if (src) return src;
+
+    const mediaUrl = toCleanString(post.mediaUrl);
+    if (mediaUrl) return mediaUrl;
   }
+
   return "";
+}
+
+function attachArtwork(card, title, artworkUrl) {
+  if (!artworkUrl) return;
+
+  const image = document.createElement("img");
+  image.className = "hero-player-preview-image";
+  image.alt = title ? `${title} preview` : "Playback preview";
+  image.loading = "lazy";
+  image.decoding = "async";
+  image.referrerPolicy = "strict-origin-when-cross-origin";
+  image.addEventListener("error", () => image.remove(), { once: true });
+
+  const addImage = (url) => {
+    const cleanUrl = toCleanString(url);
+    if (!cleanUrl || !card.isConnected) return;
+    image.src = cleanUrl;
+    if (!image.parentNode) card.prepend(image);
+  };
+
+  if (typeof artworkUrl === "string") {
+    image.src = artworkUrl;
+    card.prepend(image);
+    return;
+  }
+
+  if (isThenable(artworkUrl)) {
+    const requestToken = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    card.dataset.artworkRequestToken = requestToken;
+    artworkUrl
+      .then((url) => {
+        if (card.dataset.artworkRequestToken !== requestToken) return;
+        addImage(url);
+      })
+      .catch(() => {});
+  }
 }
 
 /**
  * Constructs the DOM element for the preview card.
  * Handles both synchronous image sources and asynchronous Promises.
  */
-function createPreviewCard({ badge, title, meta, note, artworkUrl }) {
+export function createPreviewCard({ badge = "", title = "", meta = "", note = "", artworkUrl = "" }) {
   const card = document.createElement("article");
   card.className = "hero-player-preview";
 
@@ -93,62 +249,47 @@ function createPreviewCard({ badge, title, meta, note, artworkUrl }) {
     copy.appendChild(noteNode);
   }
 
-  // Support for both synchronous URLs and async Promises (for Spotify)
-  if (artworkUrl) {
-    const image = document.createElement("img");
-    image.className = "hero-player-preview-image";
-    image.alt = title ? `${title} preview` : "Playback preview";
-    image.loading = "lazy";
-    image.referrerPolicy = "strict-origin-when-cross-origin";
-
-    if (typeof artworkUrl === "string") {
-      image.src = artworkUrl;
-      card.appendChild(image);
-    } else if (typeof artworkUrl.then === "function") {
-      // It's a Promise: Inject when resolved.
-      artworkUrl.then((url) => {
-        if (url && typeof url === "string") {
-          image.src = url;
-          // Innovative Edge: Allows a CSS fade-in transition targeting `.is-loaded`
-          image.onload = () => image.classList.add('is-loaded');
-          card.insertBefore(image, copy);
-        }
-      }).catch(() => {
-        // Silent catch to prevent console errors on failed remote loads
-      });
-    }
-  }
-
   card.appendChild(copy);
+  attachArtwork(card, title, artworkUrl);
   return card;
 }
 
-function renderActivePlayerStage(post, parseYouTubeUrl) {
-  if (!post) return null;
-  const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
-  const spotifyId = post.sourceKind === "spotify" ? (post.externalId || post.src?.match(/track\/([a-zA-Z0-9]+)/)?.[1]) : "";
+export function createActivePlayerStage(descriptor) {
+  if (!descriptor?.src) return null;
 
-  if (videoId || spotifyId) {
-    const container = document.createElement("div");
-    container.className = "hero-player-active-stage";
-    container.style.cssText = "width: 100%; height: 100%; position: relative; border-radius: 12px; overflow: hidden; background: #000;";
+  const container = document.createElement("div");
+  container.className = "hero-player-active-stage";
+  container.dataset.provider = descriptor.provider || "external";
+  container.style.cssText = "width:min(100%, calc(clamp(190px, 36vw, 380px) * 1.7778));height:clamp(190px, 36vw, 380px);aspect-ratio:16/9;margin-inline:auto;position:relative;border-radius:12px;overflow:hidden;background:#000;";
 
-    const iframe = document.createElement("iframe");
-    iframe.style.cssText = "width: 100%; height: 100%; border: none;";
-    iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+  const iframe = document.createElement("iframe");
+  iframe.className = "hero-player-active-frame";
+  iframe.src = descriptor.src;
+  iframe.title = descriptor.title || "External media player";
+  iframe.loading = "eager";
+  iframe.referrerPolicy = "strict-origin-when-cross-origin";
+  iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+  iframe.allowFullscreen = true;
+  iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
 
-    if (post.sourceKind === "youtube") {
-      iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1`;
-      iframe.title = "YouTube player";
-    } else {
-      iframe.src = `https://open.spotify.com/embed/track/${spotifyId}?utm_source=generator&theme=0`;
-      iframe.title = "Spotify player";
-    }
+  container.appendChild(iframe);
+  return container;
+}
 
-    container.appendChild(iframe);
-    return container;
+function commitActivePlayer(stage, post, parseYouTubeUrl) {
+  const descriptor = createActivePlayerDescriptor(post, parseYouTubeUrl);
+  if (!descriptor) return false;
+
+  const key = `active-player|${descriptor.provider}|${descriptor.src}`;
+  if (stage.dataset.heroPreviewKey === key && stage.querySelector(".hero-player-active-frame")) {
+    return true;
   }
-  return null;
+
+  const activeStage = createActivePlayerStage(descriptor);
+  if (!activeStage) return false;
+
+  setStageContent(stage, activeStage, key);
+  return true;
 }
 
 function createPostStandbyPreview(post, options = {}) {
@@ -160,24 +301,75 @@ function createPostStandbyPreview(post, options = {}) {
     resolveActivePlayerSource,
     getSpotifyPreviewImageUrl,
   } = options;
-  
-  const creatorSummary = typeof getProfileSummaryForPost === "function" ? getProfileSummaryForPost(post) : null;
+
+  const creatorSummary = safeCall(getProfileSummaryForPost, null, post);
   const creatorName = creatorSummary?.displayName ?? post.creator ?? "Signal Share";
-  const formatLabel = typeof formatKind === "function" ? formatKind(post.mediaKind) : "";
+  const formatLabel = safeCall(formatKind, "", post.mediaKind);
   const providerLabel = post.sourceKind === "youtube"
     ? "YouTube"
     : post.sourceKind === "spotify"
       ? "Spotify"
       : "";
   const meta = [creatorName, formatLabel, providerLabel].filter(Boolean).join(" · ");
-  
-  return createPreviewCard({
-    badge: `Up Next · ${providerLabel || "App Media"}`,
-    title: post.title || "Next playable post",
-    meta,
-    note: "Press Play to start playback.",
-    artworkUrl: resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl }),
+  const artworkUrl = resolveAppPreviewArtwork(post, {
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
   });
+
+  return {
+    key: getCardKey({
+      badge: `Up Next · ${providerLabel || "App Media"}`,
+      title: post.title || "Next playable post",
+      meta,
+      note: "Press Play to start playback.",
+      artworkUrl,
+    }),
+    node: createPreviewCard({
+      badge: `Up Next · ${providerLabel || "App Media"}`,
+      title: post.title || "Next playable post",
+      meta,
+      note: "Press Play to start playback.",
+      artworkUrl,
+    }),
+  };
+}
+
+function createCardResult(cardOptions) {
+  return {
+    key: getCardKey(cardOptions),
+    node: createPreviewCard(cardOptions),
+  };
+}
+
+function commitCard(stage, cardOptions) {
+  const result = createCardResult(cardOptions);
+  setStageContent(stage, result.node, result.key);
+}
+
+function commitStandbyOrFallback(stage, standbyPost, previewOptions, fallbackCardOptions) {
+  const standby = createPostStandbyPreview(standbyPost, previewOptions);
+  if (standby) {
+    setStageContent(stage, standby.node, standby.key);
+    return;
+  }
+  commitCard(stage, fallbackCardOptions);
+}
+
+function canUseFallbackMedia(fallbackMedia) {
+  return typeof HTMLMediaElement !== "undefined" && fallbackMedia instanceof HTMLMediaElement;
+}
+
+function formatPostBadge(post, formatKind, getSignalLabel) {
+  const kind = safeCall(formatKind, post?.mediaKind ? `${post.mediaKind} post` : "Media post", post?.mediaKind || "media");
+  const signal = safeCall(getSignalLabel, "Live on feed", post);
+  return [kind, signal].filter(Boolean).join(" / ");
+}
+
+function formatPostMeta(post, creatorSummary, formatTimestamp) {
+  const creator = creatorSummary?.displayName ?? post?.creator ?? "Signal Share";
+  const timestamp = safeCall(formatTimestamp, "", post?.createdAt);
+  return [creator, timestamp].filter(Boolean).join(" · ");
 }
 
 export function renderHeroStagePreview(options = {}) {
@@ -202,157 +394,123 @@ export function renderHeroStagePreview(options = {}) {
   } = options;
 
   if (!stage) return;
-  stage.replaceChildren();
+
+  // When the direct hero player owns the stage, do not let the normal preview render
+  // snap it back to the latest feed item after Next/Previous or Play.
+  if (stage.dataset.safeHeroLocked === "true") {
+    const lockedPostId = stage.dataset.safeHeroPostId || "";
+    const incomingPostId = post?.id || matchedPost?.id || "";
+    if (!incomingPostId || incomingPostId !== lockedPostId) return;
+    if (stage.dataset.safeHeroKey && stage.firstElementChild) return;
+  }
+
+  const previewOptions = {
+    getProfileSummaryForPost,
+    formatKind,
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
+  };
 
   const standbyPost = !post && typeof getStandbyPreviewPost === "function"
-    ? getStandbyPreviewPost()
+    ? safeCall(getStandbyPreviewPost, null)
     : null;
 
   if (mode === "device") {
     if (nativeSnapshot?.permissionRequired) {
-      stage.appendChild(createPreviewCard({
+      commitCard(stage, {
         badge: "Device media",
         title: "Enable access",
         meta: "Allow media access to control this device.",
         note: "Use Play to open settings.",
-      }));
+      });
       return;
     }
 
     if (nativeSnapshot?.active) {
-      if (matchedPost && (matchedPost.sourceKind === "youtube" || matchedPost.sourceKind === "spotify")) {
-        const activeStage = renderActivePlayerStage(matchedPost, parseYouTubeUrl);
-        if (activeStage) {
-          stage.appendChild(activeStage);
-          return;
-        }
-      }
+      if (matchedPost && commitActivePlayer(stage, matchedPost, parseYouTubeUrl)) return;
 
-      stage.appendChild(createPreviewCard({
+      commitCard(stage, {
         badge: "Device media",
         title: nativeSnapshot.title || "Now playing",
         meta: nativeSnapshot.meta || "Current device playback",
         note: nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing",
         artworkUrl: nativeSnapshot.artworkUri || "",
-      }));
+      });
       return;
     }
 
-    const standbyCard = createPostStandbyPreview(standbyPost, {
-      getProfileSummaryForPost,
-      formatKind,
-      parseYouTubeUrl,
-      resolveActivePlayerSource,
-      getSpotifyPreviewImageUrl,
-    });
-    if (standbyCard) {
-      stage.appendChild(standbyCard);
-      return;
-    }
-
-    stage.appendChild(createPreviewCard({
+    commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "Device media",
       title: "No active playback",
       meta: "Start a track in any media app on this device.",
-    }));
+    });
     return;
   }
 
   if (mode === "desktop") {
     if (desktopSnapshot?.active) {
-      if (matchedPost && (matchedPost.sourceKind === "youtube" || matchedPost.sourceKind === "spotify")) {
-        const activeStage = renderActivePlayerStage(matchedPost, parseYouTubeUrl);
-        if (activeStage) {
-          stage.appendChild(activeStage);
-          return;
-        }
-      }
+      if (matchedPost && commitActivePlayer(stage, matchedPost, parseYouTubeUrl)) return;
 
-      const resolvedArtwork = desktopSnapshot.artworkUri || "";
-      stage.appendChild(createPreviewCard({
+      commitCard(stage, {
         badge: "PC system media",
         title: desktopSnapshot.title || "Now playing",
         meta: desktopSnapshot.meta || "Desktop playback",
         note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
-        artworkUrl: resolvedArtwork,
-      }));
+        artworkUrl: desktopSnapshot.artworkUri || "",
+      });
       return;
     }
 
-    const standbyCard = createPostStandbyPreview(standbyPost, {
-      getProfileSummaryForPost,
-      formatKind,
-      parseYouTubeUrl,
-      resolveActivePlayerSource,
-      getSpotifyPreviewImageUrl,
-    });
-    if (standbyCard) {
-      stage.appendChild(standbyCard);
-      return;
-    }
-
-    stage.appendChild(createPreviewCard({
+    commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "PC system media",
       title: "Waiting for playback",
       meta: "Start YouTube, Spotify, or another desktop app.",
-    }));
+    });
     return;
   }
 
-  if (!post && fallbackMedia instanceof HTMLMediaElement) {
-    const metadata = typeof getBrowserMediaMetadata === "function" ? getBrowserMediaMetadata() : null;
+  if (!post && canUseFallbackMedia(fallbackMedia)) {
+    const metadata = safeCall(getBrowserMediaMetadata, null);
     const fallbackTitle = metadata?.title || fallbackMedia.getAttribute("title") || "Browser playback";
     const fallbackMetaRaw = [metadata?.artist, metadata?.album].filter(Boolean).join(" · ");
     const fallbackMeta = typeof sanitizeSnapshotMeta === "function"
-      ? sanitizeSnapshotMeta(fallbackMetaRaw, "")
+      ? safeCall(sanitizeSnapshotMeta, fallbackMetaRaw, fallbackMetaRaw, "")
       : fallbackMetaRaw;
-    stage.appendChild(createPreviewCard({
+
+    commitCard(stage, {
       badge: "Browser media",
       title: fallbackTitle,
       meta: fallbackMeta || "Active browser media session",
       note: fallbackMedia.paused ? "Paused" : "Playing",
       artworkUrl: metadata?.artworkUrl || "",
-    }));
+    });
     return;
   }
 
   if (!post) {
-    const standbyCard = createPostStandbyPreview(standbyPost, {
-      getProfileSummaryForPost,
-      formatKind,
-      parseYouTubeUrl,
-      resolveActivePlayerSource,
-      getSpotifyPreviewImageUrl,
-    });
-    if (standbyCard) {
-      stage.appendChild(standbyCard);
-      return;
-    }
-    stage.appendChild(createPreviewCard({
+    commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "Signal Share",
       title: "Ready for your signal",
       meta: "Select a track or video to start listening.",
       note: "Your media will appear here.",
-    }));
+    });
     return;
   }
 
-  const creatorSummary = typeof getProfileSummaryForPost === "function" ? getProfileSummaryForPost(post) : null;
-  console.log("[HeroPreview] Rendering app mode for post:", post.id, "source:", post.sourceKind);
+  if (commitActivePlayer(stage, post, parseYouTubeUrl)) return;
 
-  // Dynamic Edge: If it's an active app post, render the REAL player in the Hero stage.
-  if (post.sourceKind === "youtube" || post.sourceKind === "spotify") {
-    const activeStage = renderActivePlayerStage(post, parseYouTubeUrl);
-    if (activeStage) {
-      stage.appendChild(activeStage);
-      return;
-    }
-  }
+  const creatorSummary = safeCall(getProfileSummaryForPost, null, post);
+  const artworkUrl = resolveAppPreviewArtwork(post, {
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
+  });
 
-  stage.appendChild(createPreviewCard({
-    badge: `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`,
+  commitCard(stage, {
+    badge: formatPostBadge(post, formatKind, getSignalLabel),
     title: post.title || "Now playing",
-    meta: `${creatorSummary?.displayName ?? post.creator ?? "Signal Share"} · ${formatTimestamp(post.createdAt)}`,
-    artworkUrl: resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl }),
-  }));
+    meta: formatPostMeta(post, creatorSummary, formatTimestamp),
+    artworkUrl,
+  });
 }
