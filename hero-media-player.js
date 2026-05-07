@@ -750,7 +750,7 @@ export function createHeroMediaPlayerController(options) {
       const pTitle = normalizeText(p.title);
       const pCreator = normalizeText(p.creator);
       if (pTitle === title && (pCreator === meta || !meta)) return true;
-      if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) return true;
+if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) return true;
       return false;
     }) || null;
   }
@@ -758,7 +758,7 @@ export function createHeroMediaPlayerController(options) {
   function getLocalPlaybackState() {
     const mediaElement = getActivePlayerMediaElement() || getFallbackPageMediaElement();
     if (mediaElement instanceof HTMLMediaElement) return mediaElement.paused ? "paused" : "playing";
-    if (state.playerPostId) return normalizePlaybackState(state.heroPlayerPlaybackState || "paused");
+    if (state.playerPostId || state.heroPlayerPostId) return normalizePlaybackState(state.heroPlayerPlaybackState || "paused");
     return "none";
   }
 
@@ -802,7 +802,7 @@ export function createHeroMediaPlayerController(options) {
         ? normalizePlaybackState(nativeSnapshot?.playbackState)
         : mode === "desktop"
           ? normalizePlaybackState(desktopSnapshot?.playbackState)
-          : (post || fallbackMedia ? getLocalPlaybackState() : "none");
+          : getLocalPlaybackState();
 
       if (mode === "device" && nativeSnapshot) {
         title = nativeSnapshot.title || "Device media";
@@ -1171,7 +1171,7 @@ export function createHeroMediaPlayerController(options) {
       ? hasNativeActionBridge()
       : mode === "desktop"
         ? Boolean(desktopSnapshot?.available)
-        : supportsLocalProgrammaticPlayback(post);
+        : (playableCount > 0);
     const supportsVolume = mode === "app" && (
       mediaElement instanceof HTMLMediaElement
       || fallbackMedia instanceof HTMLMediaElement
@@ -1191,7 +1191,7 @@ export function createHeroMediaPlayerController(options) {
       ? hasNativeActionBridge()
       : mode === "desktop"
         ? Boolean(desktopSnapshot?.available)
-        : (!(fallbackMedia instanceof HTMLMediaElement) && playableCount > 1);
+        : (playableCount > 1);
 
     if (mode === "device") {
       if (nativeSnapshot?.permissionRequired) {
