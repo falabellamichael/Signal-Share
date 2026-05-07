@@ -195,21 +195,21 @@ export function createHeroMediaPlayerController(options) {
       pushDesktopEndpointCandidate(candidates, window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT.trim(), seen);
     }
 
-    try {
-      pushDesktopEndpointCandidate(candidates, new URL("/api/system-media/current", window.location.href).toString(), seen);
-    } catch {
-      pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);
-    }
-
     if (typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_BASE_URL === "string" && window.SIGNAL_SHARE_SYSTEM_MEDIA_BASE_URL.trim()) {
       const baseUrl = window.SIGNAL_SHARE_SYSTEM_MEDIA_BASE_URL.trim().replace(/\/+$/, "");
       pushDesktopEndpointCandidate(candidates, `${baseUrl}/api/system-media/current`, seen);
     }
 
-    // Always try loopback candidates so desktop control still works when the app
-    // UI runs on a different localhost port than the Node media bridge.
+    // Prefer loopback candidates before same-origin so local desktop media bridge
+    // does not emit avoidable 404s when the UI is served by a non-Node host.
     pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
     pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
+
+    try {
+      pushDesktopEndpointCandidate(candidates, new URL("/api/system-media/current", window.location.href).toString(), seen);
+    } catch {
+      pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);
+    }
 
     if (!candidates.length) {
       pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);

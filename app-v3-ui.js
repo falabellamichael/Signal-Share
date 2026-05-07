@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=24";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=25";
 
 export function createAppUi(context) {
   const {
