@@ -104,15 +104,31 @@ function selectPreferredMediaSession() {
   const allSessions = SMTCMonitor.getMediaSessions();
   const sessions = Array.isArray(allSessions) ? allSessions : [];
   const withPlayback = sessions.filter((session) => mapPlaybackState(session.playback?.playbackStatus) !== "none");
-  const spotifySessions = withPlayback.filter((session) => `${session?.sourceAppId || ""}`.toLowerCase().includes("spotify"));
-  const preferredSpotify = pickBestSession(spotifySessions);
-  if (preferredSpotify) return preferredSpotify;
-
   const current = SMTCMonitor.getCurrentMediaSession();
-  if (current) return current;
+  const currentState = mapPlaybackState(current?.playback?.playbackStatus);
+  const currentHasMetadata = Boolean(
+    `${current?.media?.title || ""}`.trim()
+    || `${current?.media?.artist || current?.media?.albumArtist || ""}`.trim()
+  );
+  if (current && currentState !== "none" && currentHasMetadata) return current;
+
+  const activelyPlaying = withPlayback.filter(
+    (session) => mapPlaybackState(session.playback?.playbackStatus) === "playing"
+  );
+
+  const bestPlayingSession = pickBestSession(activelyPlaying);
+  if (bestPlayingSession) return bestPlayingSession;
+
+  // Prefer Spotify as a fallback only when nothing is actively playing.
+  const spotifyFallback = pickBestSession(
+    withPlayback.filter((session) => `${session?.sourceAppId || ""}`.toLowerCase().includes("spotify"))
+  );
+  if (spotifyFallback) return spotifyFallback;
 
   const activeSession = pickBestSession(withPlayback);
   if (activeSession) return activeSession;
+
+  if (current) return current;
 
   return pickBestSession(sessions);
 }

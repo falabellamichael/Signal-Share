@@ -524,7 +524,7 @@ export function createHeroMediaPlayerController(options) {
       performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
       return;
     }
-    if (shouldUseDesktopMode(post) && desktopSnapshot?.active) {
+    if (shouldUseDesktopMode(post) && desktopSnapshot?.available) {
       performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
       return;
     }
@@ -560,7 +560,7 @@ export function createHeroMediaPlayerController(options) {
       performNativeAction(NATIVE_ACTION_PREVIOUS);
       return;
     }
-    if (shouldUseDesktopMode(post) && desktopSnapshot?.active) {
+    if (shouldUseDesktopMode(post) && desktopSnapshot?.available) {
       performDesktopAction(DESKTOP_ACTION_PREVIOUS);
       return;
     }
@@ -584,7 +584,7 @@ export function createHeroMediaPlayerController(options) {
       performNativeAction(NATIVE_ACTION_NEXT);
       return;
     }
-    if (shouldUseDesktopMode(post) && desktopSnapshot?.active) {
+    if (shouldUseDesktopMode(post) && desktopSnapshot?.available) {
       performDesktopAction(DESKTOP_ACTION_NEXT);
       return;
     }
@@ -605,7 +605,7 @@ export function createHeroMediaPlayerController(options) {
   function handleVolumeInput(event) {
     const post = getControllablePlayerPost();
     if (shouldUseNativeMode(post)) return;
-    if (shouldUseDesktopMode(post) && desktopSnapshot?.active) return;
+    if (shouldUseDesktopMode(post) && desktopSnapshot?.available) return;
     const rawValue = Number(event.target?.value);
     state.playerVolume = normalizePlayerVolume(rawValue / 100, state.playerVolume);
     savePlayerVolume(state.playerVolume);
@@ -689,7 +689,7 @@ export function createHeroMediaPlayerController(options) {
     const supportsPlayback = mode === "device"
       ? hasNativeActionBridge()
       : mode === "desktop"
-        ? Boolean(desktopSnapshot?.active)
+        ? Boolean(desktopSnapshot?.available)
         : supportsLocalProgrammaticPlayback(post);
     const supportsVolume = mode === "app" && (
       mediaElement instanceof HTMLMediaElement
@@ -708,7 +708,7 @@ export function createHeroMediaPlayerController(options) {
     const canStep = mode === "device"
       ? hasNativeActionBridge()
       : mode === "desktop"
-        ? Boolean(desktopSnapshot?.active)
+        ? Boolean(desktopSnapshot?.available)
         : (!(fallbackMedia instanceof HTMLMediaElement) && playableCount > 1);
 
     if (mode === "device") {
