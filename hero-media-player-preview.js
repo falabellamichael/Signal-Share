@@ -208,7 +208,7 @@ function attachArtwork(card, title, artworkUrl) {
         if (card.dataset.artworkRequestToken !== requestToken) return;
         addImage(url);
       })
-      .catch(() => { });
+      .catch(() => {});
   }
 }
 
@@ -394,6 +394,15 @@ export function renderHeroStagePreview(options = {}) {
   } = options;
 
   if (!stage) return;
+
+  // When the direct hero player owns the stage, do not let the normal preview render
+  // snap it back to the latest feed item after Next/Previous or Play.
+  if (stage.dataset.safeHeroLocked === "true") {
+    const lockedPostId = stage.dataset.safeHeroPostId || "";
+    const incomingPostId = post?.id || matchedPost?.id || "";
+    if (!incomingPostId || incomingPostId !== lockedPostId) return;
+    if (stage.dataset.safeHeroKey && stage.firstElementChild) return;
+  }
 
   const previewOptions = {
     getProfileSummaryForPost,

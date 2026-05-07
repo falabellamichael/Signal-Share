@@ -2109,6 +2109,109 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     dock.style.removeProperty("pointer-events");
   }
 
+  function ensureHeroStyles() {
+    if (document.querySelector("#safeHeroPlayerAddonStyles")) return;
+    const style = document.createElement("style");
+    style.id = "safeHeroPlayerAddonStyles";
+    style.textContent = `
+      #heroPlayerOptionRow.hero-player-option-row {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(0.45rem, 1.1vw, 0.7rem);
+        align-items: stretch;
+        margin-top: clamp(0.55rem, 1.3vw, 0.8rem);
+      }
+      #heroPlayerOptionRow .button {
+        min-width: 0 !important;
+        width: 100% !important;
+        min-height: clamp(2.45rem, 4.8vw, 3.2rem) !important;
+        padding: clamp(0.55rem, 1.35vw, 0.85rem) clamp(0.65rem, 1.4vw, 1rem) !important;
+        font-size: clamp(0.78rem, 1.55vw, 1rem) !important;
+        line-height: 1.05 !important;
+        white-space: nowrap !important;
+      }
+      .safe-hero-visual-preview {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        min-height: 220px;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #050505;
+        border: 1px solid rgba(255,255,255,0.14);
+        cursor: pointer;
+      }
+      .safe-hero-visual-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        filter: saturate(1.05) contrast(1.05);
+      }
+      .safe-hero-visual-preview::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, rgba(0,0,0,0.48), rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.44));
+        pointer-events: none;
+      }
+      .safe-hero-preview-play {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: clamp(3.35rem, 7vw, 4.75rem);
+        height: clamp(2.35rem, 5vw, 3.3rem);
+        border: 0;
+        border-radius: 0.75rem;
+        background: #ff0b0b;
+        color: white;
+        display: grid;
+        place-items: center;
+        z-index: 2;
+        box-shadow: 0 14px 34px rgba(0,0,0,0.34);
+        cursor: pointer;
+      }
+      .safe-hero-preview-play::before {
+        content: "";
+        width: 0;
+        height: 0;
+        border-top: clamp(0.48rem, 1vw, 0.66rem) solid transparent;
+        border-bottom: clamp(0.48rem, 1vw, 0.66rem) solid transparent;
+        border-left: clamp(0.78rem, 1.55vw, 1.05rem) solid currentColor;
+        margin-left: 0.16rem;
+      }
+      .safe-hero-preview-copy {
+        position: absolute;
+        left: clamp(0.9rem, 2vw, 1.35rem);
+        top: clamp(0.8rem, 1.8vw, 1.15rem);
+        z-index: 2;
+        max-width: min(72%, 32rem);
+        color: white;
+        text-shadow: 0 1px 12px rgba(0,0,0,0.6);
+      }
+      .safe-hero-preview-title {
+        margin: 0;
+        font-size: clamp(1rem, 2.1vw, 1.45rem);
+        font-weight: 800;
+      }
+      .safe-hero-preview-meta {
+        margin: 0.15rem 0 0;
+        font-size: clamp(0.76rem, 1.45vw, 0.95rem);
+        opacity: 0.9;
+      }
+      @media (max-width: 560px) {
+        #heroPlayerOptionRow.hero-player-option-row {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        #heroPlayerAutoplayToggle {
+          grid-column: 2;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function isPlayable(post) {
     if (!post) return false;
     try {
@@ -2165,11 +2268,14 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     const fromHero = getCurrentHeroPost();
     if (isPlayable(fromHero)) return fromHero;
 
+    // The hero starts from the current/latest feed item, not from an old mini-player session.
+    const latestPlayable = findFirstPlayablePost();
     const ids = [
-      state?.playerPostId,
-      state?.activePlayerPostId,
       state?.activeFeedPostId,
+      latestPlayable?.id,
       safeGetStorage(HERO_LAST_POST_KEY, ""),
+      state?.activePlayerPostId,
+      state?.playerPostId,
     ];
 
     for (const id of ids) {
@@ -2182,7 +2288,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       if (isPlayable(controllable)) return controllable;
     } catch { }
 
-    return findFirstPlayablePost();
+    return latestPlayable || null;
   }
 
   function rememberPost(post) {
@@ -2242,6 +2348,55 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     return String(post?.src || post?.mediaUrl || "").trim();
   }
 
+  function getHeroArtwork(post) {
+    if (!post) return "";
+    if (post.sourceKind === "youtube") {
+      const videoId = resolveYouTubeId(post);
+      return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "";
+    }
+    if (post.mediaKind === "image") return String(post.src || post.mediaUrl || "").trim();
+    return "";
+  }
+
+  function createHeroVisualPreview(post) {
+    const preview = document.createElement("button");
+    preview.type = "button";
+    preview.className = "safe-hero-visual-preview";
+    preview.setAttribute("aria-label", `Play ${post?.title || "hero media"}`);
+    preview.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      mountHeroMedia(post, { autoplay: true, forceReload: true });
+    });
+
+    const artwork = getHeroArtwork(post);
+    if (artwork) {
+      const image = document.createElement("img");
+      image.src = artwork;
+      image.alt = post?.title ? `${post.title} preview` : "Media preview";
+      image.decoding = "async";
+      image.loading = "eager";
+      preview.appendChild(image);
+    }
+
+    const copy = document.createElement("div");
+    copy.className = "safe-hero-preview-copy";
+    const title = document.createElement("p");
+    title.className = "safe-hero-preview-title";
+    title.textContent = post?.title || "Ready to play";
+    const meta = document.createElement("p");
+    meta.className = "safe-hero-preview-meta";
+    meta.textContent = post?.creator || post?.sourceKind || "Signal Share";
+    copy.append(title, meta);
+
+    const playIcon = document.createElement("span");
+    playIcon.className = "safe-hero-preview-play";
+    playIcon.setAttribute("aria-hidden", "true");
+
+    preview.append(copy, playIcon);
+    return preview;
+  }
+
   function buildYouTubeSrc(videoId, autoplay) {
     const params = new URLSearchParams({
       autoplay: autoplay ? "1" : "0",
@@ -2295,7 +2450,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     return getHeroStage()?.querySelector?.("video[data-hero-provider='upload'], audio[data-hero-provider='upload']") || null;
   }
 
-  function mountHeroMedia(post, { autoplay = false } = {}) {
+  function mountHeroMedia(post, { autoplay = false, forceReload = false, previewOnly = false } = {}) {
     const stage = getHeroStage();
     if (!stage || !isPlayable(post)) return false;
 
@@ -2320,17 +2475,32 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       return false;
     }
 
-    const key = `safe-hero|${provider}|${post.id || "no-id"}|${src}`;
+    const key = `safe-hero|${provider}|${post.id || "no-id"}|${src}|${previewOnly ? "preview" : "player"}`;
     rememberPost(post);
     updateHeroCopy(post);
 
-    if (stage.dataset.safeHeroKey === key && stage.firstElementChild) {
+    try {
+      if (state) {
+        state.heroPlayerPostId = post.id || "";
+        state.heroPlayerPlaybackState = autoplay ? "playing" : "paused";
+        // Keep the feed observer from snapping the hero back to the latest card after Next/Previous.
+        state.activeFeedPostId = post.id || state.activeFeedPostId;
+      }
+    } catch { }
+
+    stage.dataset.safeHeroLocked = "true";
+    stage.dataset.safeHeroPostId = post.id || "";
+    stage.dataset.safeHeroProvider = provider;
+
+    if (!forceReload && stage.dataset.safeHeroKey === key && stage.firstElementChild) {
       if (autoplay) playMountedHeroMedia(post);
       return true;
     }
 
     let node;
-    if (provider === "youtube" || provider === "spotify") {
+    if (previewOnly && provider === "youtube") {
+      node = createHeroVisualPreview(post);
+    } else if (provider === "youtube" || provider === "spotify") {
       const shell = document.createElement("div");
       shell.className = "hero-player-active-stage";
       shell.style.cssText = "width:100%;height:100%;position:relative;border-radius:12px;overflow:hidden;background:#000;";
@@ -2344,6 +2514,12 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
       iframe.allowFullscreen = true;
       iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
+      iframe.addEventListener("load", () => {
+        if (autoplay) {
+          setHeroPlaying(true);
+          if (provider === "youtube") window.setTimeout(() => postToHeroYouTube("playVideo"), 250);
+        }
+      }, { once: true });
       shell.appendChild(iframe);
       node = shell;
     } else {
@@ -2381,6 +2557,10 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     }
 
     if (post?.sourceKind === "youtube") {
+      const frame = getHeroStage()?.querySelector?.("iframe[data-hero-provider='youtube']");
+      if (!frame || !String(frame.src || "").includes("autoplay=1")) {
+        return mountHeroMedia(post, { autoplay: true, forceReload: true });
+      }
       const ok = postToHeroYouTube("playVideo");
       setHeroPlaying(true);
       return ok;
@@ -2428,7 +2608,10 @@ window.onSpotifyWebPlaybackSDKReady = () => {
 
   function openMediaInHero() {
     const post = getHeroTargetPost();
-    if (post) mountHeroMedia(post, { autoplay: false });
+    if (!post) return;
+    // For YouTube, Open Media shows our cleaner/smaller clickable hero preview.
+    // Press the preview or Play to load the live iframe and start playback.
+    mountHeroMedia(post, { autoplay: false, previewOnly: post.sourceKind === "youtube" });
   }
 
   function stepHeroMedia(delta) {
@@ -2440,7 +2623,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     let index = posts.findIndex((post) => post.id && post.id === currentId);
     if (index < 0) index = 0;
     const next = posts[(index + delta + posts.length) % posts.length];
-    if (next) mountHeroMedia(next, { autoplay: true });
+    if (next) mountHeroMedia(next, { autoplay: true, forceReload: true });
   }
 
   function showMiniPlayerForCurrentMedia() {
@@ -2471,6 +2654,7 @@ window.onSpotifyWebPlaybackSDKReady = () => {
   }
 
   function ensureHeroOptionButtons() {
+    ensureHeroStyles();
     if (document.querySelector("#heroPlayerOptionRow")) return true;
     const controls = getHeroControls();
     if (!controls) return false;
@@ -2478,7 +2662,6 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     const row = document.createElement("div");
     row.id = "heroPlayerOptionRow";
     row.className = "hero-player-option-row";
-    row.style.cssText = "display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin-top:0.65rem;";
 
     const showButton = buildHeroOptionButton("heroPlayerDockToggle", "Show Player");
     showButton.addEventListener("click", () => {
@@ -2539,6 +2722,17 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     interceptHeroButton(elements?.heroPlayerNextButton || document.querySelector("#heroPlayerNextButton"), () => stepHeroMedia(1));
   }
 
+  function attachHeroStageClick() {
+    const stage = getHeroStage();
+    if (!stage || stage.dataset.safeHeroStageClick === "true") return;
+    stage.dataset.safeHeroStageClick = "true";
+    stage.addEventListener("click", (event) => {
+      if (event.target?.closest?.("iframe, video, audio, button, a")) return;
+      const post = getHeroTargetPost();
+      if (post) mountHeroMedia(post, { autoplay: true, forceReload: true });
+    }, true);
+  }
+
   function attachMiniCloseInterceptor() {
     const closeButton = elements?.miniCloseButton || document.querySelector("#miniCloseButton");
     if (!closeButton || closeButton.dataset.safeHideOnly === "true") return;
@@ -2582,8 +2776,10 @@ window.onSpotifyWebPlaybackSDKReady = () => {
       return;
     }
 
+    ensureHeroStyles();
     ensureHeroOptionButtons();
     attachHeroButtonInterceptors();
+    attachHeroStageClick();
     attachMiniCloseInterceptor();
     attachFeedPlayUnhide();
     syncHeroOptionButtons();
