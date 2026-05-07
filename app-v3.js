@@ -1261,7 +1261,6 @@ async function subscribeMessagingChannels(options = {}) {
 // Expose helpers globally for MessengerRealtime
 window.playIncomingMessageSound = playIncomingMessageSound;
 window.mergeActiveMessage = mergeActiveMessage;
-window.renderActiveThread = renderActiveThread;
 window.refreshMessengerState = refreshMessengerState;
 
 function playIncomingMessageSound() {
@@ -1965,5 +1964,7 @@ export const {
   parseExternalMediaUrl, healPosts, parseSpotifyUrl, formatProviderName, isHostedPostingEnabled,
   getAppConfig, createDemoGraphic,
 });
+
+window.renderActiveThread = renderActiveThread;
 
 initialize();
