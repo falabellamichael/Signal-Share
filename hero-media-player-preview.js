@@ -182,9 +182,7 @@ export function renderHeroStagePreview(options = {}) {
 
   if (mode === "desktop") {
     if (desktopSnapshot?.active) {
-      // Strict policy: avoid guessed fallback artwork for desktop sessions.
-      // If the session artwork is unreliable, show no preview image instead of a wrong one.
-      const resolvedArtwork = "";
+      const resolvedArtwork = desktopSnapshot.artworkUri || "";
       stage.appendChild(createPreviewCard({
         badge: "PC system media",
         title: desktopSnapshot.title || "Now playing",

@@ -1494,7 +1494,6 @@
   height: 100%;
   display: block;
   object-fit: var(--feed-media-fit);
-  opacity: 0;
   transition: opacity 220ms ease;
 }
 
