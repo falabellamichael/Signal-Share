@@ -1606,7 +1606,7 @@ export function createAppUi(context) {
 
   async function applyExternalPreviewMetadata(stage, image, titleElement, badgeElement, source) {
     const metadata = await getExternalPreviewMetadata(source);
-    if (!stage.isConnected || !metadata) return;
+    if (!metadata) return;
     if (typeof metadata.title === "string" && metadata.title.trim()) {
       const previewTitle = metadata.title.trim();
       titleElement.textContent = previewTitle;
