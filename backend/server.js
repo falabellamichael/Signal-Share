@@ -149,14 +149,17 @@ function selectPreferredMediaSession() {
     `${current?.media?.title || ""}`.trim()
     || `${current?.media?.artist || current?.media?.albumArtist || ""}`.trim()
   );
-  if (current && currentState !== "none" && currentHasMetadata) return current;
 
   const activelyPlaying = withPlayback.filter(
     (session) => mapPlaybackState(session.playback?.playbackStatus) === "playing"
   );
 
+  // Always prioritize sessions that are actively playing. This enables clean
+  // handoff: paused Spotify -> playing YouTube, and paused YouTube -> playing Spotify.
   const bestPlayingSession = pickBestSession(activelyPlaying);
   if (bestPlayingSession) return bestPlayingSession;
+
+  if (current && currentState !== "none" && currentHasMetadata) return current;
 
   // Prefer Spotify as a fallback only when nothing is actively playing.
   const spotifyFallback = pickBestSession(
