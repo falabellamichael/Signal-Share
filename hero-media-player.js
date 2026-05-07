@@ -178,38 +178,40 @@ export function createHeroMediaPlayerController(options) {
     candidates.push(trimmed);
   }
 
-  function isLocalNetworkHostname(hostname = "") {
+  function getTargetAddressSpaceForHostname(hostname = "") {
     const value = `${hostname || ""}`.trim().toLowerCase();
-    if (!value) return false;
-    if (value === "localhost" || value.endsWith(".localhost") || value.endsWith(".local")) return true;
-    if (value === "::1" || value === "[::1]") return true;
+    if (!value) return "";
+    if (value === "localhost" || value.endsWith(".localhost")) return "loopback";
+    if (value.endsWith(".local")) return "local";
+    if (value === "::1" || value === "[::1]") return "loopback";
     if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) {
       const octets = value.split(".").map((entry) => Number.parseInt(entry, 10));
-      if (octets.some((entry) => Number.isNaN(entry) || entry < 0 || entry > 255)) return false;
+      if (octets.some((entry) => Number.isNaN(entry) || entry < 0 || entry > 255)) return "";
       const [a, b] = octets;
-      if (a === 10) return true;
-      if (a === 127) return true;
-      if (a === 169 && b === 254) return true;
-      if (a === 172 && b >= 16 && b <= 31) return true;
-      if (a === 192 && b === 168) return true;
-      return false;
+      if (a === 127) return "loopback";
+      if (a === 10) return "local";
+      if (a === 169 && b === 254) return "local";
+      if (a === 172 && b >= 16 && b <= 31) return "local";
+      if (a === 192 && b === 168) return "local";
+      return "";
     }
     const bracketedIpv6 = value.match(/^\[([0-9a-f:.]+)\]$/i);
     const ipv6 = (bracketedIpv6?.[1] || value).toLowerCase();
-    if (!ipv6.includes(":")) return false;
-    if (ipv6 === "::1") return true;
-    if (ipv6.startsWith("fe80:")) return true;
-    if (ipv6.startsWith("fc") || ipv6.startsWith("fd")) return true;
-    return false;
+    if (!ipv6.includes(":")) return "";
+    if (ipv6 === "::1") return "loopback";
+    if (ipv6.startsWith("fe80:")) return "local";
+    if (ipv6.startsWith("fc") || ipv6.startsWith("fd")) return "local";
+    return "";
   }
 
   function withLocalNetworkFetchOptions(url, init = {}) {
     try {
       const resolved = new URL(url, window.location.href);
-      if (!isLocalNetworkHostname(resolved.hostname)) return init;
+      const targetAddressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
+      if (!targetAddressSpace) return init;
       return {
         ...init,
-        targetAddressSpace: "local",
+        targetAddressSpace,
       };
     } catch {
       return init;
