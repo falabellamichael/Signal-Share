@@ -1565,7 +1565,7 @@ export function createAppUi(context) {
       stage.classList.add("external-preview-launchable");
       stage.setAttribute("role", "button");
       stage.setAttribute("tabindex", "0");
-      const launchNativeExternal = () => { void Promise.resolve(launchNativeExternalMediaApp(post)); };
+      const launchNativeExternal = () => { void launchNativeExternalMediaApp(post); };
       stage.addEventListener("click", launchNativeExternal);
       stage.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
@@ -1655,12 +1655,10 @@ export function createAppUi(context) {
 
       const temp = new Image();
       temp.onload = () => {
-        if (!stage.isConnected) return;
         image.src = url;
         if (cacheKey) externalPreviewCache.set(cacheKey, url);
       };
       temp.onerror = () => {
-        if (!stage.isConnected) return;
         tryNext();
       };
       temp.src = url;

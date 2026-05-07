@@ -470,12 +470,40 @@ async function syncToSupabase() {
   }
 }
 
+function subscribeToMediaActions() {
+  if (!isWindows || !userId) return;
+  console.log(`[Supabase] Subscribing to media actions for user ${userId}...`);
+  
+  supabase
+    .channel('media_actions')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'system_media_actions',
+      filter: `user_id=eq.${userId}`
+    }, async (payload) => {
+      const { action, app_package } = payload.new;
+      console.log(`[Supabase] Remote action received: ${action} (${app_package || 'unknown app'})`);
+      
+      try {
+        await sendSystemMediaKey(action, app_package);
+        // After performing the action, sync back the state immediately
+        await syncToSupabase();
+      } catch (err) {
+        console.error("Failed to perform remote action:", err);
+      }
+    })
+    .subscribe((status) => {
+      console.log(`[Supabase] Media actions subscription status: ${status}`);
+    });
+}
+
 app.listen(port, () => {
   console.log(`Signal Share server running on http://localhost:${port}`);
   if (isWindows && userId) {
-    console.log(`Supabase sync enabled for user: ${userId}`);
-    // Sync every 5 seconds
-    setInterval(syncToSupabase, 5000);
+    console.log(`Windows SMTC bridge active for user: ${userId}`);
+    setInterval(syncToSupabase, 2000);
+    subscribeToMediaActions();
     // Initial sync
     syncToSupabase();
   }

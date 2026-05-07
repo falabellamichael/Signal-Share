@@ -786,7 +786,15 @@ export function createHeroMediaPlayerController(options) {
 
   function performDesktopAction(action) {
     if (!canUseDesktopBridge()) return Promise.resolve(false);
+    
+    const isRemoteOrigin = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
+    if (isRemoteOrigin && state.currentUser?.id) {
+      return performSupabaseDesktopAction(action);
+    }
+
     const actionEndpoint = getDesktopActionEndpoint();
+    if (!actionEndpoint) return Promise.resolve(false);
+
     return window.fetch(actionEndpoint, withLocalNetworkFetchOptions(actionEndpoint, {
       method: "POST",
       credentials: "omit",
@@ -805,6 +813,23 @@ export function createHeroMediaPlayerController(options) {
         return Boolean(payload?.ok);
       })
       .catch(() => false);
+  }
+
+  async function performSupabaseDesktopAction(action) {
+    if (!state.supabase || !state.currentUser?.id) return false;
+    try {
+      const { error } = await state.supabase.from("system_media_actions").insert({
+        user_id: state.currentUser.id,
+        action: action,
+        app_package: desktopSnapshot?.appPackage || "",
+      });
+      if (error) throw error;
+      // We don't wait for the bridge to process it here; it will sync back the new state via Realtime/Polling.
+      return true;
+    } catch (error) {
+      console.error("Failed to send media action via Supabase:", error);
+      return false;
+    }
   }
 
   function handlePlayPause(forcePlay) {
