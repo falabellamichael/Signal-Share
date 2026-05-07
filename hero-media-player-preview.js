@@ -1,3 +1,6 @@
+/**
+ * Resolves the YouTube video ID from a post's various URL fields.
+ */
 function resolveYouTubePreviewId(post, parseYouTubeUrl) {
   if (!post) return "";
   const candidates = [
@@ -22,13 +25,26 @@ function resolveYouTubePreviewId(post, parseYouTubeUrl) {
   return "";
 }
 
+/**
+ * Resolves the artwork URL for a post. 
+ * Supports synchronous string returns (YouTube, images) and asynchronous Promises (Spotify).
+ */
 function resolveAppPreviewArtwork(post, options = {}) {
   if (!post) return "";
-  const { parseYouTubeUrl, resolveActivePlayerSource } = options;
+  const { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl } = options;
+  
   if (post.sourceKind === "youtube") {
     const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
     return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "";
   }
+  
+  if (post.sourceKind === "spotify") {
+    if (typeof getSpotifyPreviewImageUrl === "function") {
+      return getSpotifyPreviewImageUrl(post); // Returns a Promise
+    }
+    return "";
+  }
+  
   if (post.mediaKind === "image") {
     if (typeof resolveActivePlayerSource === "function") {
       const resolved = resolveActivePlayerSource(post);
@@ -40,19 +56,13 @@ function resolveAppPreviewArtwork(post, options = {}) {
   return "";
 }
 
+/**
+ * Constructs the DOM element for the preview card.
+ * Handles both synchronous image sources and asynchronous Promises.
+ */
 function createPreviewCard({ badge, title, meta, note, artworkUrl }) {
   const card = document.createElement("article");
   card.className = "hero-player-preview";
-
-  if (artworkUrl) {
-    const image = document.createElement("img");
-    image.className = "hero-player-preview-image";
-    image.src = artworkUrl;
-    image.alt = title ? `${title} preview` : "Playback preview";
-    image.loading = "lazy";
-    image.referrerPolicy = "strict-origin-when-cross-origin";
-    card.appendChild(image);
-  }
 
   const copy = document.createElement("div");
   copy.className = "hero-player-preview-copy";
@@ -83,6 +93,32 @@ function createPreviewCard({ badge, title, meta, note, artworkUrl }) {
     copy.appendChild(noteNode);
   }
 
+  // Support for both synchronous URLs and async Promises (for Spotify)
+  if (artworkUrl) {
+    const image = document.createElement("img");
+    image.className = "hero-player-preview-image";
+    image.alt = title ? `${title} preview` : "Playback preview";
+    image.loading = "lazy";
+    image.referrerPolicy = "strict-origin-when-cross-origin";
+
+    if (typeof artworkUrl === "string") {
+      image.src = artworkUrl;
+      card.appendChild(image);
+    } else if (typeof artworkUrl.then === "function") {
+      // It's a Promise: Inject when resolved.
+      artworkUrl.then((url) => {
+        if (url && typeof url === "string") {
+          image.src = url;
+          // Innovative Edge: Allows a CSS fade-in transition targeting `.is-loaded`
+          image.onload = () => image.classList.add('is-loaded');
+          card.insertBefore(image, copy);
+        }
+      }).catch(() => {
+        // Silent catch to prevent console errors on failed remote loads
+      });
+    }
+  }
+
   card.appendChild(copy);
   return card;
 }
@@ -94,7 +130,9 @@ function createPostStandbyPreview(post, options = {}) {
     formatKind,
     parseYouTubeUrl,
     resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
   } = options;
+  
   const creatorSummary = typeof getProfileSummaryForPost === "function" ? getProfileSummaryForPost(post) : null;
   const creatorName = creatorSummary?.displayName ?? post.creator ?? "Signal Share";
   const formatLabel = typeof formatKind === "function" ? formatKind(post.mediaKind) : "";
@@ -104,12 +142,13 @@ function createPostStandbyPreview(post, options = {}) {
       ? "Spotify"
       : "";
   const meta = [creatorName, formatLabel, providerLabel].filter(Boolean).join(" · ");
+  
   return createPreviewCard({
     badge: "Preview on load",
     title: post.title || "Next playable post",
     meta,
     note: "Press Play to load this item.",
-    artworkUrl: resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource }),
+    artworkUrl: resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl }),
   });
 }
 
@@ -130,6 +169,7 @@ export function renderHeroStagePreview(options = {}) {
     sanitizeSnapshotMeta,
     parseYouTubeUrl,
     resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
   } = options;
 
   if (!stage) return;
@@ -166,6 +206,7 @@ export function renderHeroStagePreview(options = {}) {
       formatKind,
       parseYouTubeUrl,
       resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
     });
     if (standbyCard) {
       stage.appendChild(standbyCard);
@@ -198,6 +239,7 @@ export function renderHeroStagePreview(options = {}) {
       formatKind,
       parseYouTubeUrl,
       resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
     });
     if (standbyCard) {
       stage.appendChild(standbyCard);
@@ -235,6 +277,7 @@ export function renderHeroStagePreview(options = {}) {
       formatKind,
       parseYouTubeUrl,
       resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
     });
     if (standbyCard) {
       stage.appendChild(standbyCard);
@@ -253,6 +296,6 @@ export function renderHeroStagePreview(options = {}) {
     badge: `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`,
     title: post.title || "Now playing",
     meta: `${creatorSummary?.displayName ?? post.creator ?? "Signal Share"} · ${formatTimestamp(post.createdAt)}`,
-    artworkUrl: resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource }),
+    artworkUrl: resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl }),
   }));
 }
