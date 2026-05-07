@@ -229,7 +229,47 @@ export function createHeroMediaPlayerController(options) {
     return deriveDesktopActionEndpoint(getDesktopSnapshotEndpoint());
   }
 
+  function escapeRegex(value = "") {
+    return `${value}`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function getAppPackageVariants(appPackage = "") {
+    const value = `${appPackage || ""}`.trim();
+    if (!value) return [];
+    const variants = new Set();
+    variants.add(value);
+    variants.add(value.replace(/!.*$/, ""));
+    variants.add(value.replace(/\.\d+$/, ""));
+    variants.add(value.replace(/\.exe$/i, ""));
+    variants.add(value.replace(/_[a-z0-9]+$/i, ""));
+    return Array.from(variants)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length);
+  }
+
+  function sanitizeSnapshotMeta(rawMeta = "", appPackage = "") {
+    let meta = `${rawMeta || ""}`.replace(/\s+/g, " ").trim();
+    if (!meta) return "";
+
+    for (const variant of getAppPackageVariants(appPackage)) {
+      const prefixPattern = new RegExp(`^${escapeRegex(variant)}\\s*(?:[-:|]\\s*)?`, "i");
+      const stripped = meta.replace(prefixPattern, "").trim();
+      if (stripped && stripped !== meta) {
+        meta = stripped;
+        break;
+      }
+    }
+
+    const genericPrefixPattern = /^(?:spotify[a-z0-9._!-]*|operasoftware\.[a-z0-9._!-]*|msedge(?:\.exe)?|chrome(?:\.exe)?|firefox(?:\.exe)?)\s*(?:[-:|]\s*)?/i;
+    const genericStripped = meta.replace(genericPrefixPattern, "").trim();
+    if (genericStripped) meta = genericStripped;
+
+    return meta;
+  }
+
   function normalizeDesktopSnapshot(raw = {}) {
+    const appPackage = typeof raw.appPackage === "string" ? raw.appPackage.trim() : "";
     const playbackState = normalizePlaybackState(raw.playbackState || (raw.active ? "playing" : "none"));
     return {
       source: `${raw.source || "windows-smtc"}`.trim(),
@@ -237,8 +277,8 @@ export function createHeroMediaPlayerController(options) {
       active: Boolean(raw.active),
       permissionRequired: false,
       title: typeof raw.title === "string" ? raw.title.trim() : "",
-      meta: typeof raw.meta === "string" ? raw.meta.trim() : "",
-      appPackage: typeof raw.appPackage === "string" ? raw.appPackage.trim() : "",
+      meta: sanitizeSnapshotMeta(raw.meta, appPackage),
+      appPackage,
       openUri: typeof raw.openUri === "string" ? raw.openUri.trim() : "",
       artworkUri: typeof raw.artworkUri === "string" ? raw.artworkUri.trim() : "",
       playbackState,
@@ -790,7 +830,8 @@ export function createHeroMediaPlayerController(options) {
     if (!post && fallbackMedia instanceof HTMLMediaElement) {
       const metadata = getBrowserMediaMetadata();
       const fallbackTitle = metadata?.title || fallbackMedia.getAttribute("title") || "Browser playback";
-      const fallbackMeta = [metadata?.artist, metadata?.album].filter(Boolean).join(" · ");
+      const fallbackMetaRaw = [metadata?.artist, metadata?.album].filter(Boolean).join(" · ");
+      const fallbackMeta = sanitizeSnapshotMeta(fallbackMetaRaw, "");
       stage.appendChild(createPreviewCard({
         badge: "Browser media",
         title: fallbackTitle,

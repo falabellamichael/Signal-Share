@@ -64,6 +64,45 @@ function inferArtworkMimeType(buffer) {
   return "";
 }
 
+function escapeRegex(value = "") {
+  return `${value}`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getSourceAppIdVariants(sourceAppId = "") {
+  const value = `${sourceAppId || ""}`.trim();
+  if (!value) return [];
+  const variants = new Set();
+  variants.add(value);
+  variants.add(value.replace(/!.*$/, ""));
+  variants.add(value.replace(/\.\d+$/, ""));
+  variants.add(value.replace(/\.exe$/i, ""));
+  variants.add(value.replace(/_[a-z0-9]+$/i, ""));
+  return Array.from(variants)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+}
+
+function sanitizeMediaMeta(rawMeta = "", sourceAppId = "") {
+  let meta = `${rawMeta || ""}`.replace(/\s+/g, " ").trim();
+  if (!meta) return "";
+
+  for (const variant of getSourceAppIdVariants(sourceAppId)) {
+    const prefixPattern = new RegExp(`^${escapeRegex(variant)}\\s*(?:[-:|]\\s*)?`, "i");
+    const stripped = meta.replace(prefixPattern, "").trim();
+    if (stripped && stripped !== meta) {
+      meta = stripped;
+      break;
+    }
+  }
+
+  const genericPrefixPattern = /^(?:spotify[a-z0-9._!-]*|operasoftware\.[a-z0-9._!-]*|msedge(?:\.exe)?|chrome(?:\.exe)?|firefox(?:\.exe)?)\s*(?:[-:|]\s*)?/i;
+  const genericStripped = meta.replace(genericPrefixPattern, "").trim();
+  if (genericStripped) meta = genericStripped;
+
+  return meta;
+}
+
 function getPlaybackPriority(playbackStatus) {
   switch (playbackStatus) {
     case PlaybackStatus.PLAYING:
@@ -157,10 +196,11 @@ function buildSnapshotPayload() {
   const session = selectPreferredMediaSession();
   if (!session) return base;
 
+  const sourceAppId = `${session.sourceAppId || ""}`.trim();
   const playbackState = mapPlaybackState(session.playback?.playbackStatus);
   const title = `${session.media?.title || ""}`.trim();
   const artist = `${session.media?.artist || session.media?.albumArtist || ""}`.trim();
-  const meta = artist;
+  const meta = sanitizeMediaMeta(artist, sourceAppId);
 
   let artworkUri = "";
   const thumbnail = session.media?.thumbnail;
@@ -177,7 +217,7 @@ function buildSnapshotPayload() {
     playbackState,
     title: title || "Now playing",
     meta,
-    appPackage: `${session.sourceAppId || ""}`.trim(),
+    appPackage: sourceAppId,
     artworkUri,
   };
 }
