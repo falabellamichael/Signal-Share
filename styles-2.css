@@ -1774,3 +1774,18 @@
 }
 
 .tag-pill {
+
+.hero-player-stage,
+.hero-player-active-stage,
+.hero-player-active-iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 220px;
+  max-height: min(56vh, 520px);
+}
+
+.hero-player-active-iframe {
+  display: block;
+  border: 0;
+  border-radius: 18px;
+}

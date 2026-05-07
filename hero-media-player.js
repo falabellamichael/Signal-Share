@@ -24,7 +24,10 @@ export function createHeroMediaPlayerController(options) {
     getSpotifyPreviewImageUrl,
     parseYouTubeUrl,
     resolveActivePlayerSource,
-
+    getHeroPost,
+    setHeroPost,
+    playHeroMedia,
+    resolveYouTubePreviewId,
   } = options;
 
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
@@ -51,7 +54,19 @@ export function createHeroMediaPlayerController(options) {
   const desktopArtworkFallbackCache = new Map();
 
   function initializeSdkHooks() {
-    // Hooks are already defined at top level for early script loading support.
+    // Spotify Web Playback SDK initialization
+    if (typeof window !== "undefined") {
+      window.onSpotifyWebPlaybackSDKReady = () => {
+        console.log("[Spotify] Web Playback SDK is ready.");
+        // If we have an active Spotify post, we could initialize a player here.
+        // For now, we just ensure the callback exists and is logged.
+      };
+
+      // YouTube IFrame API initialization
+      window.onYouTubeIframeAPIReady = () => {
+        console.log("[YouTube] IFrame API is ready.");
+      };
+    }
     console.log("[Hero] SDK hooks initialized.");
   }
 
@@ -759,54 +774,75 @@ export function createHeroMediaPlayerController(options) {
     try { navigator.mediaSession.setActionHandler(action, handler); } catch {}
   }
 
-  function syncMediaSession(post, mode, fallbackMedia) {
+  function syncMediaSession(dataOrPost, mode, fallbackMedia) {
     if (!("mediaSession" in navigator)) return;
     const session = navigator.mediaSession;
-    const playbackState = mode === "device"
-      ? normalizePlaybackState(nativeSnapshot?.playbackState)
-      : mode === "desktop"
-        ? normalizePlaybackState(desktopSnapshot?.playbackState)
-        : (post || fallbackMedia ? getLocalPlaybackState() : "none");
+
+    // Support both old (post, mode, fallbackMedia) and new ({ title, artist, artwork }) call signatures
+    let title = "";
+    let artist = "";
+    let album = "";
+    let artwork = [];
+    let playbackState = "none";
+
+    if (dataOrPost && typeof dataOrPost === "object" && !dataOrPost.id && (dataOrPost.title || dataOrPost.artist)) {
+      // New signature: syncMediaSession({ title, artist, artwork })
+      title = dataOrPost.title || "";
+      artist = dataOrPost.artist || "";
+      album = dataOrPost.album || "Signal Share";
+      if (dataOrPost.artwork) {
+        artwork = Array.isArray(dataOrPost.artwork) ? dataOrPost.artwork : [{ src: dataOrPost.artwork }];
+      }
+      playbackState = getLocalPlaybackState();
+    } else {
+      // Old signature: syncMediaSession(post, mode, fallbackMedia)
+      const post = dataOrPost;
+      playbackState = mode === "device"
+        ? normalizePlaybackState(nativeSnapshot?.playbackState)
+        : mode === "desktop"
+          ? normalizePlaybackState(desktopSnapshot?.playbackState)
+          : (post || fallbackMedia ? getLocalPlaybackState() : "none");
+
+      if (mode === "device" && nativeSnapshot) {
+        title = nativeSnapshot.title || "Device media";
+        artist = nativeSnapshot.meta || "Now playing on this device";
+        album = "Device playback";
+        if (nativeSnapshot.artworkUri) artwork = [{ src: nativeSnapshot.artworkUri }];
+      } else if (mode === "desktop" && desktopSnapshot) {
+        title = desktopSnapshot.title || "Desktop media";
+        artist = desktopSnapshot.meta || "Now playing on this PC";
+        album = "System media";
+        if (desktopSnapshot.artworkUri) artwork = [{ src: desktopSnapshot.artworkUri }];
+      } else if (post) {
+        const creatorSummary = getProfileSummaryForPost(post);
+        title = post.title || "Signal Share";
+        artist = creatorSummary?.displayName ?? post.creator ?? "";
+        album = `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`;
+        const resolvedArtwork = resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl });
+        if (resolvedArtwork) artwork = [{ src: resolvedArtwork }];
+      } else if (fallbackMedia instanceof HTMLMediaElement) {
+        const metadata = getBrowserMediaMetadata();
+        title = metadata?.title || fallbackMedia.getAttribute("title") || "Browser media";
+        artist = metadata?.artist || "";
+        album = metadata?.album || "This tab";
+        if (metadata?.artworkUrl) artwork = [{ src: metadata.artworkUrl }];
+      }
+    }
+
     try { session.playbackState = playbackState; } catch {}
 
     const MetadataCtor = typeof window !== "undefined" ? window.MediaMetadata : null;
-    if (typeof MetadataCtor !== "function") return;
-
-    try {
-      if (mode === "device" && nativeSnapshot) {
-        session.metadata = new MetadataCtor({
-          title: nativeSnapshot.title || "Device media",
-          artist: nativeSnapshot.meta || "Now playing on this device",
-          album: "Device playback",
-        });
-      } else if (mode === "desktop" && desktopSnapshot) {
-        session.metadata = new MetadataCtor({
-          title: desktopSnapshot.title || "Desktop media",
-          artist: desktopSnapshot.meta || "Now playing on this PC",
-          album: "System media",
-          artwork: desktopSnapshot.artworkUri ? [{ src: desktopSnapshot.artworkUri }] : [],
-        });
-      } else if (post) {
-        const creatorSummary = getProfileSummaryForPost(post);
-        session.metadata = new MetadataCtor({
-          title: post.title || "Signal Share",
-          artist: creatorSummary?.displayName ?? post.creator ?? "",
-          album: `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`,
-        });
-      } else if (fallbackMedia instanceof HTMLMediaElement) {
-        if (!session.metadata) {
-          const metadata = getBrowserMediaMetadata();
-          session.metadata = new MetadataCtor({
-            title: metadata?.title || fallbackMedia.getAttribute("title") || "Browser media",
-            artist: metadata?.artist || "",
-            album: metadata?.album || "This tab",
-            artwork: metadata?.artworkUrl ? [{ src: metadata.artworkUrl }] : [],
-          });
+    if (typeof MetadataCtor === "function") {
+      try {
+        if (title || artist) {
+          session.metadata = new MetadataCtor({ title, artist, album, artwork });
+        } else {
+          session.metadata = null;
         }
-      } else {
-        session.metadata = null;
+      } catch (err) {
+        console.warn("[Hero] Failed to update MediaSession metadata:", err);
       }
-    } catch {}
+    }
 
     setMediaSessionHandler("play", () => { handlePlayPause(true); });
     setMediaSessionHandler("pause", () => { handlePlayPause(false); });
@@ -853,9 +889,10 @@ export function createHeroMediaPlayerController(options) {
     }
 
     const post = getControllablePlayerPost();
-    if (post?.sourceKind === "youtube" && state.activePlayerElement instanceof HTMLIFrameElement) {
+    const activeMedia = getActivePlayerMediaElement();
+    if (post?.sourceKind === "youtube" && activeMedia instanceof HTMLIFrameElement) {
       const shouldPlay = typeof forcePlay === "boolean" ? forcePlay : getLocalPlaybackState() !== "playing";
-      postMessageToYouTubePlayer(state.activePlayerElement, shouldPlay ? "playVideo" : "pauseVideo");
+      postMessageToYouTubePlayer(activeMedia, shouldPlay ? "playVideo" : "pauseVideo");
       state.heroPlayerPlaybackState = shouldPlay ? "playing" : "paused";
       return true;
     }
@@ -1089,11 +1126,12 @@ export function createHeroMediaPlayerController(options) {
       stopDesktopSnapshotPolling();
     }
 
-    const post = getControllablePlayerPost();
+    const controllablePost = getControllablePlayerPost();
+    const mode = shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
+    const post = mode === "app" ? getHeroPost() : controllablePost;
     const mediaElement = getActivePlayerMediaElement();
     const fallbackMedia = getFallbackPageMediaElement();
     const browserMetadata = getBrowserMediaMetadata();
-    const mode = shouldUseNativeMode(post) ? "device" : (shouldUseDesktopMode(post) ? "desktop" : "app");
     const playbackState = mode === "device"
       ? normalizePlaybackState(nativeSnapshot?.playbackState)
       : mode === "desktop"
@@ -1179,15 +1217,18 @@ export function createHeroMediaPlayerController(options) {
     elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
     elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
 
-    renderHeroStagePreview(Object.assign({}, options, {
-      stage: elements.heroPlayerStage,
-      mode,
-      post,
-      fallbackMedia,
-      nativeSnapshot,
-      desktopSnapshot,
-      matchedPost
-    }));
+    const isHeroActive = state.heroPlayerPostId === post?.id && !!state.heroPlayerElement;
+    if (!isHeroActive) {
+      renderHeroStagePreview(Object.assign({}, options, {
+        stage: elements.heroPlayerStage,
+        mode,
+        post,
+        fallbackMedia,
+        nativeSnapshot,
+        desktopSnapshot,
+        matchedPost
+      }));
+    }
     syncMediaSession({
       title: elements.heroPlayerTitle.textContent,
       artist: elements.heroPlayerCaption.textContent,

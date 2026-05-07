@@ -176,7 +176,7 @@ const CURRENT_PRIVACY_VERSION = "2026-05-07";
 
 const EXTERNAL_PROVIDERS = Object.freeze(["youtube", "spotify"]);
 const DEFAULT_PLAYER_VOLUME = 0.8;
-const DEFAULT_AUTH_REDIRECT_URL = "http://localhost:3000";
+const DEFAULT_AUTH_REDIRECT_URL = "https://falabellamichael.github.io/Signal-Share/";
 
 const DEFAULT_BLOCKED_TERMS = Object.freeze([
   "scam", "spam", "fraud", "phish", "buy cheap", "guaranteed win",
@@ -322,6 +322,8 @@ if (!window[globalStateKey]) {
     returnFocusElement: null,
     profileReturnFocusElement: null,
     activeFeedPostId: null,
+    heroPlayerPostId: null,
+    heroPlayerElement: null,
   };
 }
 const state = window[globalStateKey];

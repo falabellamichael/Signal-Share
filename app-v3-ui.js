@@ -363,7 +363,10 @@ export function createAppUi(context) {
     postMessageToYouTubePlayer,
     getSpotifyPreviewImageUrl,
     parseYouTubeUrl,
-    resolveActivePlayerSource,
+    getHeroPost,
+    setHeroPost,
+    playHeroMedia,
+    resolveYouTubePreviewId,
   });
 
   function attachEventListeners() {
@@ -1453,13 +1456,127 @@ export function createAppUi(context) {
   function renderViewerAttachmentMedia(container, attachment) { if (!attachment?.url || !attachment?.kind) return; if (attachment.kind === "image") { const image = document.createElement("img"); image.className = "viewer-media"; image.loading = "eager"; image.alt = attachment.title || "Shared image"; image.src = attachment.url; container.appendChild(image); return; } const video = document.createElement("video"); video.className = "viewer-media"; video.controls = true; video.preload = "metadata"; video.playsInline = true; video.src = attachment.url; container.appendChild(video); }
 
   function renderMiniPlayerMedia(container, post) { mountPersistentPlayer(container, post, "mini"); }
+ 
+  const HERO_POST_KEY = "signal-share-hero-player-post-id";
+ 
+   function getHeroPost() {
+     const heroPostId = state.heroPlayerPostId || localStorage.getItem(HERO_POST_KEY);
+     const heroPost = heroPostId ? getPostById(heroPostId) : null;
+     if (heroPost && isPlayablePost(heroPost)) return heroPost;
+     const latestPlayable = getVisiblePosts().find((post) => isPlayablePost(post));
+     if (latestPlayable) {
+       state.heroPlayerPostId = latestPlayable.id;
+       localStorage.setItem(HERO_POST_KEY, latestPlayable.id);
+     }
+     return latestPlayable || null;
+   }
+ 
+   function setHeroPost(post) {
+     if (!post || !isPlayablePost(post)) return;
+     state.heroPlayerPostId = post.id;
+     localStorage.setItem(HERO_POST_KEY, post.id);
+     heroMediaPlayerController.render();
+   }
+ 
+   function mountHeroYouTube(post, options = {}) {
+     const { autoplay = false } = options;
+     const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
+     if (!videoId || !elements.heroPlayerStage) return;
+ 
+     const iframe = document.createElement("iframe");
+     iframe.className = "hero-player-active-iframe";
+     iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&playsinline=1&rel=0&modestbranding=1&autoplay=${autoplay ? 1 : 0}`;
+     iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+     iframe.allowFullscreen = true;
+     iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
+ 
+     elements.heroPlayerStage.replaceChildren(iframe);
+     state.heroPlayerElement = iframe;
+     state.heroPlayerPostId = post.id;
+   }
+ 
+   function mountHeroMedia(post, options = {}) {
+     if (!post || !elements.heroPlayerStage) return;
+     const { autoplay = false } = options;
+     
+     if (post.sourceKind === "youtube") {
+       mountHeroYouTube(post, options);
+       return;
+     }
+ 
+     // If we already have this post mounted in the hero element, just ensure it's playing if requested
+     if (state.heroPlayerPostId === post.id && state.heroPlayerElement) {
+       if (autoplay) {
+         const media = state.heroPlayerElement instanceof HTMLMediaElement 
+           ? state.heroPlayerElement 
+           : state.heroPlayerElement.querySelector("video, audio");
+         if (media instanceof HTMLMediaElement) media.play().catch(() => {});
+       }
+       return;
+     }
+ 
+     // If another post was playing, stop it
+     if (state.heroPlayerElement) {
+       const oldMedia = state.heroPlayerElement instanceof HTMLMediaElement 
+         ? state.heroPlayerElement 
+         : state.heroPlayerElement.querySelector("video, audio");
+       if (oldMedia instanceof HTMLMediaElement) oldMedia.pause();
+     }
+ 
+     state.heroPlayerPostId = post.id;
+     state.heroPlayerElement = createPersistentPlayer(post);
+     
+     if (autoplay) {
+       const media = state.heroPlayerElement instanceof HTMLMediaElement 
+         ? state.heroPlayerElement 
+         : state.heroPlayerElement.querySelector("video, audio");
+       if (media instanceof HTMLMediaElement) {
+         media.autoplay = true;
+         media.play().catch(() => {});
+       }
+     }
+ 
+     elements.heroPlayerStage.replaceChildren(state.heroPlayerElement);
+     applyPlayerVolumeToActiveElement();
+   }
+ 
+   function playHeroMedia() {
+     const post = getHeroPost();
+     if (!post) return;
+     
+     // If this post is already active in the hero, toggle its playback
+     if (state.heroPlayerPostId === post.id && state.heroPlayerElement) {
+       const media = state.heroPlayerElement instanceof HTMLMediaElement 
+         ? state.heroPlayerElement 
+         : (state.heroPlayerElement instanceof HTMLIFrameElement ? state.heroPlayerElement : state.heroPlayerElement.querySelector("video, audio"));
+       
+       if (media instanceof HTMLMediaElement) {
+         if (media.paused) media.play().catch(() => {});
+         else media.pause();
+         return;
+       } else if (media instanceof HTMLIFrameElement && post.sourceKind === "youtube") {
+         const isPlaying = state.heroPlayerPlaybackState === "playing";
+         postMessageToYouTubePlayer(media, isPlaying ? "pauseVideo" : "playVideo");
+         state.heroPlayerPlaybackState = isPlaying ? "paused" : "playing";
+         heroMediaPlayerController.render();
+         return;
+       }
+     }
+
+     setHeroPost(post);
+     mountHeroMedia(post, { autoplay: true });
+     state.heroPlayerPlaybackState = "playing";
+     heroMediaPlayerController.render();
+   }
+
 
   function getActivePlayerMediaElement() {
-    if (state.activePlayerElement instanceof HTMLElement) {
-      if (state.activePlayerElement instanceof HTMLMediaElement) return state.activePlayerElement;
-      const mediaElement = state.activePlayerElement.querySelector("video, audio");
+    const activeEl = state.activePlayerElement || state.heroPlayerElement;
+    if (activeEl instanceof HTMLElement) {
+      if (activeEl instanceof HTMLMediaElement) return activeEl;
+      const mediaElement = activeEl.querySelector("video, audio");
       if (mediaElement instanceof HTMLMediaElement) return mediaElement;
-      if (state.activePlayerElement instanceof HTMLIFrameElement) return state.activePlayerElement;
+      if (activeEl instanceof HTMLIFrameElement) return activeEl;
     }
     const heroStage = elements?.heroPlayerStage || document.querySelector("#heroPlayerStage");
     if (heroStage) {
