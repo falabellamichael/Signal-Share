@@ -855,7 +855,7 @@ export function createHeroMediaPlayerController(options) {
       return;
     }
 
-    if (standbyPreview || !post) {
+    if (!post) {
       return;
     }
 
