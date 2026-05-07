@@ -1656,6 +1656,7 @@ export function createAppUi(context) {
       const temp = new Image();
       temp.onload = () => {
         image.src = url;
+        stage.classList.add("has-image");
         if (cacheKey) externalPreviewCache.set(cacheKey, url);
       };
       temp.onerror = () => {
