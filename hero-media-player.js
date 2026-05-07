@@ -178,6 +178,44 @@ export function createHeroMediaPlayerController(options) {
     candidates.push(trimmed);
   }
 
+  function isLocalNetworkHostname(hostname = "") {
+    const value = `${hostname || ""}`.trim().toLowerCase();
+    if (!value) return false;
+    if (value === "localhost" || value.endsWith(".localhost") || value.endsWith(".local")) return true;
+    if (value === "::1" || value === "[::1]") return true;
+    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) {
+      const octets = value.split(".").map((entry) => Number.parseInt(entry, 10));
+      if (octets.some((entry) => Number.isNaN(entry) || entry < 0 || entry > 255)) return false;
+      const [a, b] = octets;
+      if (a === 10) return true;
+      if (a === 127) return true;
+      if (a === 169 && b === 254) return true;
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      if (a === 192 && b === 168) return true;
+      return false;
+    }
+    const bracketedIpv6 = value.match(/^\[([0-9a-f:.]+)\]$/i);
+    const ipv6 = (bracketedIpv6?.[1] || value).toLowerCase();
+    if (!ipv6.includes(":")) return false;
+    if (ipv6 === "::1") return true;
+    if (ipv6.startsWith("fe80:")) return true;
+    if (ipv6.startsWith("fc") || ipv6.startsWith("fd")) return true;
+    return false;
+  }
+
+  function withLocalNetworkFetchOptions(url, init = {}) {
+    try {
+      const resolved = new URL(url, window.location.href);
+      if (!isLocalNetworkHostname(resolved.hostname)) return init;
+      return {
+        ...init,
+        targetAddressSpace: "local",
+      };
+    } catch {
+      return init;
+    }
+  }
+
   function getDesktopSnapshotEndpoint() {
     if (desktopSnapshotEndpoint) return desktopSnapshotEndpoint;
     if (typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT === "string" && window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT.trim()) {
@@ -403,14 +441,14 @@ export function createHeroMediaPlayerController(options) {
     const endpoints = resolveDesktopSnapshotEndpoints();
     for (const endpoint of endpoints) {
       try {
-        const response = await window.fetch(endpoint, {
+        const response = await window.fetch(endpoint, withLocalNetworkFetchOptions(endpoint, {
           method: "GET",
           cache: "no-store",
           credentials: "omit",
           headers: {
             Accept: "application/json",
           },
-        });
+        }));
         if (!response.ok) throw new Error(`Desktop media endpoint returned ${response.status}.`);
         const payload = await response.json();
         desktopSnapshotEndpoint = endpoint;
@@ -642,7 +680,8 @@ export function createHeroMediaPlayerController(options) {
 
   function performDesktopAction(action) {
     if (!canUseDesktopBridge()) return Promise.resolve(false);
-    return window.fetch(getDesktopActionEndpoint(), {
+    const actionEndpoint = getDesktopActionEndpoint();
+    return window.fetch(actionEndpoint, withLocalNetworkFetchOptions(actionEndpoint, {
       method: "POST",
       credentials: "omit",
       headers: {
@@ -653,7 +692,7 @@ export function createHeroMediaPlayerController(options) {
         action,
         appPackage: desktopSnapshot?.appPackage || "",
       }),
-    })
+    }))
       .then((response) => response.ok ? response.json() : { ok: false })
       .then((payload) => {
         window.setTimeout(() => { refreshDesktopSnapshot(); }, 260);
