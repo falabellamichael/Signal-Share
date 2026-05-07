@@ -1157,6 +1157,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
     }
 
     const controllablePost = getControllablePlayerPost();
+    const playableCount = getPlayableVisiblePostIds().length;
     const mode = shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
     const post = mode === "app" ? getHeroPost() : controllablePost;
     const mediaElement = getActivePlayerMediaElement();
@@ -1178,7 +1179,6 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
       || post?.sourceKind === "youtube"
     );
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
-    const playableCount = getPlayableVisiblePostIds().length;
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
     const canBootstrapPlayback = !post
       && playableCount > 0
