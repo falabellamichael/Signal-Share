@@ -1704,6 +1704,7 @@ h1 {
 
 .hero-player-preview-video {
   background: #0f1720;
+  pointer-events: none;
 }
 
 .hero-player-preview-overlay {

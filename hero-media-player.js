@@ -544,6 +544,22 @@ export function createHeroMediaPlayerController(options) {
       return;
     }
 
+    // Hero card runs in preview-only mode for app video posts.
+    if (!shouldUseNativeMode(post) && !shouldUseDesktopMode(post) && post?.mediaKind === "video") {
+      state.heroPlayerPlaybackState = "paused";
+      render();
+      return;
+    }
+
+    if (!post) {
+      const standbyPost = getStandbyPreviewPost();
+      if (standbyPost?.mediaKind === "video") {
+        state.heroPlayerPlaybackState = "paused";
+        render();
+        return;
+      }
+    }
+
     const hadControllablePost = Boolean(post);
     if (!ensureControllablePost()) {
       render();
@@ -831,6 +847,10 @@ export function createHeroMediaPlayerController(options) {
         const previewVideo = document.createElement("video");
         previewVideo.className = "hero-player-preview-video";
         previewVideo.dataset.heroPreview = "true";
+        previewVideo.disablePictureInPicture = true;
+        previewVideo.disableRemotePlayback = true;
+        previewVideo.controlsList = "nodownload nofullscreen noremoteplayback";
+        previewVideo.tabIndex = -1;
         previewVideo.muted = true;
         previewVideo.loop = true;
         previewVideo.autoplay = true;
@@ -874,6 +894,10 @@ export function createHeroMediaPlayerController(options) {
         const video = document.createElement("video");
         video.className = "hero-player-preview-video";
         video.dataset.heroPreview = "true";
+        video.disablePictureInPicture = true;
+        video.disableRemotePlayback = true;
+        video.controlsList = "nodownload nofullscreen noremoteplayback";
+        video.tabIndex = -1;
         video.muted = true;
         video.loop = true;
         video.autoplay = true;
@@ -990,7 +1014,7 @@ export function createHeroMediaPlayerController(options) {
       ? hasNativeActionBridge()
       : mode === "desktop"
         ? Boolean(desktopSnapshot?.active)
-        : supportsLocalProgrammaticPlayback(post);
+        : (displayPost?.mediaKind === "video" ? false : supportsLocalProgrammaticPlayback(post));
     const supportsVolume = mode === "app" && (
       mediaElement instanceof HTMLMediaElement
       || fallbackMedia instanceof HTMLMediaElement
@@ -1000,6 +1024,7 @@ export function createHeroMediaPlayerController(options) {
     const playableCount = getPlayableVisiblePostIds().length;
     const canBootstrapPlayback = !post
       && playableCount > 0
+      && !(displayPost?.mediaKind === "video")
       && !(fallbackMedia instanceof HTMLMediaElement)
       && (
         mode === "app"
