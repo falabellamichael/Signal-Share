@@ -130,6 +130,7 @@ export function renderHeroStagePreview(options = {}) {
     sanitizeSnapshotMeta,
     parseYouTubeUrl,
     resolveActivePlayerSource,
+    activePlayerElement,
   } = options;
 
   if (!stage) return;
@@ -247,6 +248,15 @@ export function renderHeroStagePreview(options = {}) {
     }));
     return;
   }
+
+  // Functional Player: If we have an active player element for this post, show it instead of a preview card.
+  if (activePlayerElement instanceof HTMLElement) {
+    stage.classList.add("is-functional");
+    stage.appendChild(activePlayerElement);
+    return;
+  }
+  
+  stage.classList.remove("is-functional");
 
   const creatorSummary = typeof getProfileSummaryForPost === "function" ? getProfileSummaryForPost(post) : null;
   stage.appendChild(createPreviewCard({

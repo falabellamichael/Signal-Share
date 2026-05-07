@@ -370,7 +370,7 @@ export function createHeroMediaPlayerController(options) {
     return {
       source: `${raw.source || "windows-smtc"}`.trim(),
       available: Boolean(raw.available),
-      active: Boolean(raw.active),
+      active: Boolean(raw.active) || Boolean(raw.title && raw.title.trim()),
       permissionRequired: false,
       title: typeof raw.title === "string" ? raw.title.trim() : "",
       meta: sanitizeSnapshotMeta(raw.meta, appPackage),
@@ -502,7 +502,7 @@ export function createHeroMediaPlayerController(options) {
       return normalizeDesktopSnapshot({
         source: "supabase-sync",
         available: true,
-        active: data.playback_state === "playing",
+        active: Boolean(data.title),
         playbackState: data.playback_state,
         title: data.title,
         meta: data.meta,
@@ -865,9 +865,8 @@ export function createHeroMediaPlayerController(options) {
     if (typeof forcePlay === "boolean") {
       toggleLocalPlayback(forcePlay);
     } else {
-      // Hero Play opens/selects media, but startup remains paused until mini-player Play is pressed.
-      toggleLocalPlayback(false);
-      state.heroPlayerPlaybackState = "paused";
+      // Hero Play now starts playback immediately if a post is selected.
+      toggleLocalPlayback(true);
     }
     render();
   }
@@ -952,6 +951,7 @@ export function createHeroMediaPlayerController(options) {
       sanitizeSnapshotMeta,
       parseYouTubeUrl,
       resolveActivePlayerSource,
+      activePlayerElement: state.activePlayerElement,
     });
   }
 
