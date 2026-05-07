@@ -234,6 +234,9 @@ export function createAppUi(context) {
     ".viewer-dialog",
     ".profile-view-dialog",
     ".messenger-section",
+    ".messenger-sidebar",
+    ".conversation-list",
+    ".people-list",
     ".admin-ban-panel",
     ".mini-player",
     ".message-list",
@@ -1192,8 +1195,21 @@ export function createAppUi(context) {
     if (!(target instanceof Element)) return null;
     const overlayRoot = getOpenOverlayRoots().find((root) => root.contains(target));
     if (!overlayRoot) return null;
-    const scrollContainer = target.closest(OVERLAY_SCROLL_CONTAINER_SELECTOR);
-    if (scrollContainer && overlayRoot.contains(scrollContainer)) return scrollContainer;
+
+    let current = target;
+    while (current && overlayRoot.contains(current)) {
+      const container = current.closest(OVERLAY_SCROLL_CONTAINER_SELECTOR);
+      if (!container || !overlayRoot.contains(container)) break;
+
+      const maxScroll = container.scrollHeight - container.clientHeight;
+      const style = window.getComputedStyle(container);
+      const canScroll = maxScroll > 0 && (style.overflowY === "auto" || style.overflowY === "scroll");
+
+      if (canScroll) return container;
+      if (container === overlayRoot) break;
+      current = container.parentElement;
+    }
+
     return overlayRoot;
   }
 

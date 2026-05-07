@@ -1389,8 +1389,9 @@ button:disabled {
   .mini-player-actions .button,
   .mini-player-nav .button {
     width: 100%;
-    min-height: 42px;
-    padding: 0 12px;
+    min-height: 36px;
+    padding: 0 8px;
+    font-size: 0.82rem;
   }
 
   .mini-player-stage {
@@ -1498,22 +1499,29 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .card-actions,
-  .mini-player-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .card-actions {
+    grid-template-columns: 1fr;
   }
 
-  .mini-player-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .mini-player-head {
+    gap: 8px;
+  }
+
+  .mini-player-actions {
+    grid-template-columns: repeat(2, 1fr);
     gap: 6px;
   }
 
+  .mini-player-nav {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .mini-player-actions .button,
   .mini-player-nav .button {
-    width: 100%;
-    min-width: 0;
+    min-height: 34px;
     padding: 0 4px;
-    font-size: 0.72rem;
-    min-height: 32px;
+    font-size: 0.78rem;
   }
 
   .hero-player-controls {
@@ -1637,11 +1645,16 @@ button:disabled {
     grid-template-columns: minmax(140px, 0.56fr) minmax(0, 1.44fr);
     gap: 6px;
     padding-bottom: 0;
+    min-height: 0;
   }
 
   .messenger-sidebar {
     gap: 8px;
     padding-bottom: 6px;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
   }
 
   .messenger-section .messenger-profile {
