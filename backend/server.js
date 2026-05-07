@@ -64,11 +64,57 @@ function inferArtworkMimeType(buffer) {
   return "";
 }
 
-function normalizeSourceLabel(sourceAppId = "") {
-  if (!sourceAppId) return "";
-  const label = `${sourceAppId}`.trim();
-  if (!label) return "";
-  return label.replace(/\.exe$/i, "");
+function getPlaybackPriority(playbackStatus) {
+  switch (playbackStatus) {
+    case PlaybackStatus.PLAYING:
+      return 4;
+    case PlaybackStatus.PAUSED:
+      return 3;
+    case PlaybackStatus.OPENED:
+    case PlaybackStatus.CHANGING:
+      return 2;
+    case PlaybackStatus.STOPPED:
+    case PlaybackStatus.CLOSED:
+    default:
+      return 1;
+  }
+}
+
+function pickBestSession(sessions = []) {
+  if (!Array.isArray(sessions) || !sessions.length) return null;
+  return sessions.reduce((best, session) => {
+    if (!best) return session;
+    const bestPriority = getPlaybackPriority(best.playback?.playbackStatus);
+    const sessionPriority = getPlaybackPriority(session.playback?.playbackStatus);
+    if (sessionPriority !== bestPriority) return sessionPriority > bestPriority ? session : best;
+
+    const bestUpdated = Number(best.lastUpdatedTime || 0);
+    const sessionUpdated = Number(session.lastUpdatedTime || 0);
+    if (sessionUpdated !== bestUpdated) return sessionUpdated > bestUpdated ? session : best;
+
+    const bestHasTitle = Boolean(`${best.media?.title || ""}`.trim());
+    const sessionHasTitle = Boolean(`${session.media?.title || ""}`.trim());
+    if (sessionHasTitle !== bestHasTitle) return sessionHasTitle ? session : best;
+
+    return best;
+  }, null);
+}
+
+function selectPreferredMediaSession() {
+  const allSessions = SMTCMonitor.getMediaSessions();
+  const sessions = Array.isArray(allSessions) ? allSessions : [];
+  const withPlayback = sessions.filter((session) => mapPlaybackState(session.playback?.playbackStatus) !== "none");
+  const spotifySessions = withPlayback.filter((session) => `${session?.sourceAppId || ""}`.toLowerCase().includes("spotify"));
+  const preferredSpotify = pickBestSession(spotifySessions);
+  if (preferredSpotify) return preferredSpotify;
+
+  const current = SMTCMonitor.getCurrentMediaSession();
+  if (current) return current;
+
+  const activeSession = pickBestSession(withPlayback);
+  if (activeSession) return activeSession;
+
+  return pickBestSession(sessions);
 }
 
 function buildSnapshotPayload() {
@@ -92,14 +138,13 @@ function buildSnapshotPayload() {
     };
   }
 
-  const session = SMTCMonitor.getCurrentMediaSession();
+  const session = selectPreferredMediaSession();
   if (!session) return base;
 
   const playbackState = mapPlaybackState(session.playback?.playbackStatus);
-  const sourceLabel = normalizeSourceLabel(session.sourceAppId);
   const title = `${session.media?.title || ""}`.trim();
   const artist = `${session.media?.artist || session.media?.albumArtist || ""}`.trim();
-  const meta = [sourceLabel, artist].filter(Boolean).join(" - ");
+  const meta = artist;
 
   let artworkUri = "";
   const thumbnail = session.media?.thumbnail;
