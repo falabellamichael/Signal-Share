@@ -210,11 +210,11 @@ export function createHeroMediaPlayerController(options) {
   function withLocalNetworkFetchOptions(url, init = {}) {
     try {
       const resolved = new URL(url, window.location.href);
-      const targetAddressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
-      if (!targetAddressSpace) return init;
+      const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
+      if (addressSpace !== "local" && addressSpace !== "loopback") return init;
       return {
         ...init,
-        targetAddressSpace,
+        targetAddressSpace: "local",
       };
     } catch {
       return init;
