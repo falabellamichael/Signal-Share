@@ -28,6 +28,7 @@ export function createHeroMediaPlayerController(options) {
     setHeroPost,
     playHeroMedia,
     stepHeroPlayer,
+    getHeroPlayablePosts,
     resolveYouTubePreviewId,
   } = options;
 
@@ -1145,8 +1146,19 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
     }
   }
 
+
   function render() {
     if (!hasUi()) return;
+    const heroPost = getHeroPost();
+    const playablePosts = getHeroPlayablePosts();
+    const playableCount = playablePosts.length;
+    const canStep = playableCount > 1;
+    const hasPost = Boolean(heroPost);
+
+    elements.heroPlayerPrevButton.disabled = !canStep;
+    elements.heroPlayerNextButton.disabled = !canStep;
+    elements.heroPlayerPlayPauseButton.disabled = !hasPost;
+
     if (!hasNativeSnapshotBridge()) {
       nativeSnapshot = null;
       stopNativeSnapshotPolling();
@@ -1157,7 +1169,6 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
     }
 
     const controllablePost = getControllablePlayerPost();
-    const playableCount = getPlayableVisiblePostIds().length;
     const mode = shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
     const post = mode === "app" ? getHeroPost() : controllablePost;
     const mediaElement = getActivePlayerMediaElement();
@@ -1187,11 +1198,6 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
         mode === "app"
         || (mode === "desktop" && !desktopSnapshot?.active)
       );
-    const canStep = mode === "device"
-      ? hasNativeActionBridge()
-      : mode === "desktop"
-        ? Boolean(desktopSnapshot?.available)
-        : (playableCount > 1);
 
     if (mode === "device") {
       if (nativeSnapshot?.permissionRequired) {
@@ -1235,13 +1241,10 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
     }
 
     elements.heroPlayerPlayPauseButton.textContent = playbackState === "playing" ? "Pause" : "Play";
-    elements.heroPlayerPlayPauseButton.disabled = !(supportsPlayback || canBootstrapPlayback);
-    elements.heroPlayerPlayPauseButton.title = supportsPlayback || canBootstrapPlayback
+    // We already set the disabled state at the top based on hasPost
+    elements.heroPlayerPlayPauseButton.title = hasPost || canBootstrapPlayback
       ? ""
       : "No controllable playback session found.";
-
-    elements.heroPlayerPrevButton.disabled = !canStep;
-    elements.heroPlayerNextButton.disabled = !canStep;
 
     elements.heroPlayerVolumeSlider.disabled = !supportsVolume;
     elements.heroPlayerVolumeSlider.value = `${volumePercent}`;

@@ -367,6 +367,7 @@ export function createAppUi(context) {
     setHeroPost,
     playHeroMedia,
     stepHeroPlayer,
+    getHeroPlayablePosts,
     resolveYouTubePreviewId,
   });
 
@@ -1570,16 +1571,52 @@ export function createAppUi(context) {
      heroMediaPlayerController.render();
    }
  
+  function getHeroPlayablePosts() {
+    const visibleIds =
+      typeof getPlayableVisiblePostIds === "function"
+        ? getPlayableVisiblePostIds()
+        : [];
+    const visiblePosts = visibleIds
+      .map((id) => (typeof getPostById === "function" ? getPostById(id) : null))
+      .filter(Boolean)
+      .filter((post) => {
+        return (
+          post.mediaKind === "video" ||
+          post.mediaKind === "audio" ||
+          post.sourceKind === "youtube" ||
+          post.sourceKind === "spotify"
+        );
+      });
+    if (visiblePosts.length) return visiblePosts;
+    const allPosts =
+      typeof getAllPosts === "function"
+        ? getAllPosts()
+        : [];
+    return allPosts.filter((post) => {
+      return (
+        post &&
+        (
+          post.mediaKind === "video" ||
+          post.mediaKind === "audio" ||
+          post.sourceKind === "youtube" ||
+          post.sourceKind === "spotify"
+        )
+      );
+    });
+  }
+
   function stepHeroPlayer(direction) {
-    const playableIds = getPlayableVisiblePostIds();
-    if (playableIds.length < 2) return;
-    const currentHeroPost = getHeroPost();
-    const currentIndex = currentHeroPost ? playableIds.indexOf(currentHeroPost.id) : -1;
-    let nextIndex = currentIndex + direction;
-    if (nextIndex < 0) nextIndex = playableIds.length - 1;
-    if (nextIndex >= playableIds.length) nextIndex = 0;
-    const nextPost = getPostById(playableIds[nextIndex]);
-    if (nextPost) setHeroPost(nextPost);
+    const playablePosts = getHeroPlayablePosts();
+    const playableCount = playablePosts.length;
+    if (playableCount === 0) return;
+    const currentPost = getHeroPost();
+    const currentIndex = Math.max(
+      0,
+      playablePosts.findIndex((post) => post.id === currentPost?.id)
+    );
+    const nextIndex =
+      (currentIndex + direction + playableCount) % playableCount;
+    setHeroPost(playablePosts[nextIndex]);
   }
 
 
