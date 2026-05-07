@@ -1650,7 +1650,10 @@ h1 {
 
 .hero-player-volume-slider {
   width: 100%;
+  height: 24px;
   accent-color: var(--accent);
+  cursor: pointer;
+  touch-action: pan-x;
 }
 
 .hero-player-volume-slider:disabled {

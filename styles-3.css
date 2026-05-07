@@ -531,10 +531,11 @@ body[data-theme="midnight"] .feed-page-button:hover:not(:disabled) {
 
 .mini-player-volume-slider {
   width: 100%;
-  height: 20px;
+  height: 24px;
   margin: 0;
   accent-color: var(--accent);
   cursor: pointer;
+  touch-action: pan-x;
 }
 
 .mini-player-volume-slider:disabled {
