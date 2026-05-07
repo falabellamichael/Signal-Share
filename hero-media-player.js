@@ -916,14 +916,9 @@ export function createHeroMediaPlayerController(options) {
 
     if (mode === "desktop") {
       if (desktopSnapshot?.active) {
-        const snapshotArtworkKey = getDesktopSnapshotArtworkKey(desktopSnapshot);
-        if (desktopSnapshot.artworkUri && snapshotArtworkKey) {
-          desktopArtworkFallbackCache.set(snapshotArtworkKey, desktopSnapshot.artworkUri);
-        }
-        if (!desktopSnapshot.artworkUri) {
-          void hydrateDesktopSpotifyArtwork(desktopSnapshot, post);
-        }
-        const resolvedArtwork = desktopSnapshot.artworkUri || (snapshotArtworkKey ? desktopArtworkFallbackCache.get(snapshotArtworkKey) || "" : "");
+        // Strict policy: avoid guessed fallback artwork for desktop sessions.
+        // If the session artwork is unreliable, show no preview image instead of a wrong one.
+        const resolvedArtwork = "";
         stage.appendChild(createPreviewCard({
           badge: "PC system media",
           title: desktopSnapshot.title || "Now playing",
