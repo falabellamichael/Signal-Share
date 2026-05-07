@@ -557,9 +557,21 @@ final class PhoneNowPlayingHelper {
                     && uri.getHost() != null
                     && uri.getHost().toLowerCase().contains("spotify.com")) {
                 List<String> segments = uri.getPathSegments();
-                if (segments != null && segments.size() >= 2) {
-                    String type = segments.get(0);
-                    String id = segments.get(1);
+                if (segments != null && !segments.isEmpty()) {
+                    int segmentIndex = 0;
+                    if (segments.size() > segmentIndex && segments.get(segmentIndex).matches("(?i)intl-[a-z]{2,5}")) {
+                        segmentIndex++;
+                    }
+                    if (segments.size() > segmentIndex && "embed".equalsIgnoreCase(segments.get(segmentIndex))) {
+                        segmentIndex++;
+                    }
+
+                    if (segments.size() <= segmentIndex + 1) {
+                        return "";
+                    }
+
+                    String type = segments.get(segmentIndex).toLowerCase();
+                    String id = segments.get(segmentIndex + 1);
                     for (String playableType : playableTypes) {
                         if (playableType.equals(type) && !TextUtils.isEmpty(id)) {
                             return "spotify:" + type + ":" + id;

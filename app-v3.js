@@ -1875,11 +1875,51 @@ function healPosts(posts) {
 // parseYouTubeUrl is now imported from api-v3.js to ensure consistency across the app
 
 function parseSpotifyUrl(raw) {
-  let url; try { url = new URL(raw); } catch { return null; }
-  const host = url.hostname.replace(/^open\./, "").replace(/^play\./, ""); if (host !== "spotify.com") return null;
-  const segments = url.pathname.split("/").filter(Boolean); const allowed = ["track", "album", "playlist", "artist", "episode", "show"]; const [type, id] = segments;
+  if (!raw || typeof raw !== "string") return null;
+  const value = raw.trim();
+  if (!value) return null;
+
+  const spotifyUriMatch = value.match(/^spotify:(track|album|playlist|artist|episode|show):([A-Za-z0-9]+)$/i);
+  if (spotifyUriMatch) {
+    const type = spotifyUriMatch[1].toLowerCase();
+    const externalId = spotifyUriMatch[2];
+    return {
+      provider: "spotify",
+      mediaKind: "audio",
+      externalId,
+      embedUrl: `https://open.spotify.com/embed/${type}/${externalId}?utm_source=generator`,
+      originalUrl: raw,
+      label: `Spotify ${type}`,
+    };
+  }
+
+  let url;
+  try { url = new URL(value.includes("://") ? value : `https://${value}`); } catch { return null; }
+
+  const host = url.hostname
+    .replace(/^www\./i, "")
+    .replace(/^open\./i, "")
+    .replace(/^play\./i, "")
+    .toLowerCase();
+  if (host !== "spotify.com") return null;
+
+  const segments = url.pathname.split("/").filter(Boolean);
+  if (segments[0] && /^intl-[a-z]{2,5}$/i.test(segments[0])) segments.shift();
+  if (segments[0] === "embed") segments.shift();
+
+  const allowed = ["track", "album", "playlist", "artist", "episode", "show"];
+  const type = `${segments[0] || ""}`.toLowerCase();
+  const id = `${segments[1] || ""}`.trim().replace(/[/?#].*$/, "");
   if (!allowed.includes(type) || !id) return null;
-  return { provider: "spotify", mediaKind: "audio", externalId: id, embedUrl: `https://open.spotify.com/embed/${type}/${id}?utm_source=generator`, originalUrl: raw, label: `Spotify ${type}` };
+
+  return {
+    provider: "spotify",
+    mediaKind: "audio",
+    externalId: id,
+    embedUrl: `https://open.spotify.com/embed/${type}/${id}?utm_source=generator`,
+    originalUrl: raw,
+    label: `Spotify ${type}`,
+  };
 }
 
 function formatProviderName(p) { return p.charAt(0).toUpperCase() + p.slice(1); }
@@ -1998,4 +2038,3 @@ if (!window.__SIGNAL_SHARE_INITIALIZED__) {
 window.onSpotifyWebPlaybackSDKReady = () => {
   console.log("Spotify Web Playback SDK is ready.");
 };
-

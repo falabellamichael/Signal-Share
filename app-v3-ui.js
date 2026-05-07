@@ -1412,6 +1412,18 @@ export function createAppUi(context) {
     return "";
   }
 
+  function resolveNativeYouTubePackage(post) {
+    const candidates = [post?.externalUrl, post?.originalUrl, post?.embedUrl, post?.mediaUrl, post?.src, post?.label, post?.caption, post?.title];
+    for (const candidate of candidates) {
+      if (typeof candidate !== "string" || !candidate.trim()) continue;
+      const value = candidate.trim().toLowerCase();
+      if (value.includes("music.youtube.com") || value.includes("youtube music")) {
+        return "com.google.android.apps.youtube.music";
+      }
+    }
+    return "com.google.android.youtube";
+  }
+
   function resolveNativeSpotifyOpenUri(post) {
     const candidates = [post?.externalUrl, post?.originalUrl, post?.embedUrl, post?.externalId, post?.mediaUrl, post?.src, post?.label, post?.caption, post?.title];
     for (const rawCandidate of candidates) {
@@ -1458,7 +1470,7 @@ export function createAppUi(context) {
     let packageName = "";
     let openUri = "";
     if (post.sourceKind === "youtube") {
-      packageName = "com.google.android.youtube";
+      packageName = resolveNativeYouTubePackage(post);
       openUri = resolveNativeYouTubeOpenUri(post);
     } else if (post.sourceKind === "spotify") {
       packageName = "com.spotify.music";
@@ -1551,7 +1563,7 @@ export function createAppUi(context) {
       && (post.sourceKind === "youtube" || post.sourceKind === "spotify");
     if (isNativeAndroidExternal && (variant === "viewer" || variant === "mini")) {
       const note = post.sourceKind === "youtube"
-        ? "Tap preview to open in the YouTube app."
+        ? "Tap preview to open in YouTube or YouTube Music."
         : "Tap preview to open in the Spotify app.";
       const stage = createExternalPreviewStage({
         provider: post.sourceKind,

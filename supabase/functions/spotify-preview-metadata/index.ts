@@ -210,30 +210,44 @@ function normalizeSpotifyPreviewMetadata(type: SpotifyResource["type"], payload:
 }
 
 function parseSpotifyUrl(rawUrl: string): SpotifyResource | null {
-  let url: URL;
+  const value = `${rawUrl || ""}`.trim();
+  if (!value) {
+    return null;
+  }
+
+  const spotifyUriMatch = value.match(/^spotify:(track|album|artist|playlist|episode|show):([A-Za-z0-9]+)$/i);
+  if (spotifyUriMatch) {
+    return {
+      type: spotifyUriMatch[1].toLowerCase() as SpotifyResource["type"],
+      id: spotifyUriMatch[2],
+    };
+  }
 
   try {
-    url = new URL(rawUrl);
+    const parsed = new URL(value.includes("://") ? value : `https://${value}`);
+    const host = parsed.hostname.replace(/^www\./i, "").replace(/^open\./i, "").replace(/^play\./i, "").toLowerCase();
+    if (host !== "spotify.com") {
+      return null;
+    }
+
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    if (segments[0] && /^intl-[a-z]{2,5}$/i.test(segments[0])) segments.shift();
+    if (segments[0] === "embed") segments.shift();
+
+    const allowedTypes = new Set(["track", "album", "artist", "playlist", "episode", "show"]);
+    const type = `${segments[0] || ""}`.trim().toLowerCase();
+    const id = `${segments[1] || ""}`.trim().replace(/[/?#].*$/, "");
+    if (!type || !id || !allowedTypes.has(type)) {
+      return null;
+    }
+
+    return {
+      type: type as SpotifyResource["type"],
+      id,
+    };
   } catch {
     return null;
   }
-
-  const host = url.hostname.replace(/^open\./, "").replace(/^play\./, "");
-  if (host !== "spotify.com") {
-    return null;
-  }
-
-  const segments = url.pathname.split("/").filter(Boolean);
-  const allowedTypes = new Set(["track", "album", "artist", "playlist", "episode", "show"]);
-  const [type, id] = segments;
-  if (!type || !id || !allowedTypes.has(type)) {
-    return null;
-  }
-
-  return {
-    type: type as SpotifyResource["type"],
-    id,
-  };
 }
 
 function normalizeMarket(value: string | null | undefined) {
