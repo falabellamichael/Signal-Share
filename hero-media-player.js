@@ -5,6 +5,7 @@ export function createHeroMediaPlayerController(options) {
     getControllablePlayerPost,
     getActivePlayerMediaElement,
     getPlayableVisiblePostIds,
+    getPostById,
     getProfileSummaryForPost,
     formatKind,
     getSignalLabel,
@@ -454,6 +455,7 @@ export function createHeroMediaPlayerController(options) {
   function getStandbyPreviewPost() {
     const playableIds = getPlayableVisiblePostIds();
     if (!playableIds.length) return null;
+    if (typeof getPostById !== "function") return null;
     return getPostById(playableIds[0]);
   }
 

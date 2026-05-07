@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=9";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=10";
 
 export function createAppUi(context) {
   const {
@@ -247,6 +247,7 @@ export function createAppUi(context) {
     getControllablePlayerPost,
     getActivePlayerMediaElement,
     getPlayableVisiblePostIds,
+    getPostById,
     getProfileSummaryForPost,
     formatKind,
     getSignalLabel,
