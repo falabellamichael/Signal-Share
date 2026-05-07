@@ -222,7 +222,7 @@ function buildSnapshotPayload() {
   };
 }
 
-function sendSystemMediaKey(action) {
+function sendSystemMediaKey(action, targetAppPackage = "") {
   const vkCode = MEDIA_KEY_CODES[action];
   const appCommand = APP_COMMAND_CODES[action];
   const winrtMethodName = WINRT_ACTION_METHODS[action];
@@ -233,6 +233,28 @@ $ErrorActionPreference = "Stop"
 
 # Prefer direct SMTC control first. This is more reliable for apps like Spotify/Opera.
 $winRtSuccess = $false
+$targetApp = [string]$env:SIGNAL_SHARE_TARGET_APP
+if ($null -eq $targetApp) { $targetApp = "" }
+$targetApp = $targetApp.Trim()
+
+function Normalize-AppId([string]$value) {
+  if ([string]::IsNullOrWhiteSpace($value)) { return "" }
+  $normalized = $value.Trim().ToLowerInvariant()
+  $normalized = [regex]::Replace($normalized, "!.*$", "")
+  $normalized = [regex]::Replace($normalized, "\.[0-9]+$", "")
+  return $normalized
+}
+
+function Matches-AppId([string]$candidate, [string]$target) {
+  $candidateNorm = Normalize-AppId $candidate
+  $targetNorm = Normalize-AppId $target
+  if ([string]::IsNullOrWhiteSpace($candidateNorm) -or [string]::IsNullOrWhiteSpace($targetNorm)) { return $false }
+  if ($candidateNorm -eq $targetNorm) { return $true }
+  if ($candidateNorm.StartsWith($targetNorm)) { return $true }
+  if ($targetNorm.StartsWith($candidateNorm)) { return $true }
+  return $false
+}
+
 try {
   Add-Type -AssemblyName System.Runtime.WindowsRuntime
   $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime]
@@ -244,7 +266,23 @@ try {
     $managerOp = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
     $managerTask = $asTaskMethod.MakeGenericMethod(@([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])).Invoke($null, @($managerOp))
     $manager = $managerTask.Result
-    $session = if ($manager -ne $null) { $manager.GetCurrentSession() } else { $null }
+    $session = $null
+
+    if ($manager -ne $null -and -not [string]::IsNullOrWhiteSpace($targetApp)) {
+      try {
+        foreach ($candidate in $manager.GetSessions()) {
+          if ($null -eq $candidate) { continue }
+          if (Matches-AppId $candidate.SourceAppUserModelId $targetApp) {
+            $session = $candidate
+            break
+          }
+        }
+      } catch {}
+    }
+
+    if ($session -eq $null -and $manager -ne $null) {
+      $session = $manager.GetCurrentSession()
+    }
 
     if ($session -ne $null) {
       $actionMethod = $session.GetType().GetMethod('${winrtMethodName}', [Type[]]@())
@@ -311,7 +349,13 @@ Write-Output "ok"
     const child = spawn(
       "powershell.exe",
       ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
-      { windowsHide: true }
+      {
+        windowsHide: true,
+        env: {
+          ...process.env,
+          SIGNAL_SHARE_TARGET_APP: targetAppPackage,
+        },
+      }
     );
 
     let stdout = "";
@@ -356,6 +400,7 @@ app.get("/api/system-media/current", (req, res) => {
 
 app.post("/api/system-media/action", async (req, res) => {
   const action = `${req.body?.action || ""}`.trim().toLowerCase();
+  const appPackage = `${req.body?.appPackage || ""}`.trim();
   if (!Object.prototype.hasOwnProperty.call(MEDIA_KEY_CODES, action)) {
     res.status(400).json({ ok: false, error: "Invalid action. Use play_pause, next, or previous." });
     return;
@@ -365,7 +410,7 @@ app.post("/api/system-media/action", async (req, res) => {
     return;
   }
 
-  const ok = await sendSystemMediaKey(action);
+  const ok = await sendSystemMediaKey(action, appPackage);
   res.json({ ok });
 });
 

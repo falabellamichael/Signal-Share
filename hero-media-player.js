@@ -645,7 +645,10 @@ export function createHeroMediaPlayerController(options) {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({
+        action,
+        appPackage: desktopSnapshot?.appPackage || "",
+      }),
     })
       .then((response) => response.ok ? response.json() : { ok: false })
       .then((payload) => {
