@@ -443,12 +443,18 @@ export function createHeroMediaPlayerController(options) {
 
   function ensureControllablePost() {
     if (state.playerPostId && getControllablePlayerPost()) return true;
-    const playableIds = getPlayableVisiblePostIds();
-    if (!playableIds.length) return false;
-    state.playerPostId = playableIds[0];
+    const previewPost = getStandbyPreviewPost();
+    if (!previewPost) return false;
+    state.playerPostId = previewPost.id;
     state.heroPlayerPlaybackState = "paused";
     renderMiniPlayer();
     return true;
+  }
+
+  function getStandbyPreviewPost() {
+    const playableIds = getPlayableVisiblePostIds();
+    if (!playableIds.length) return null;
+    return getPostById(playableIds[0]);
   }
 
   function toggleLocalPlayback(forcePlay) {
@@ -535,7 +541,7 @@ export function createHeroMediaPlayerController(options) {
       return;
     }
     if (!hadControllablePost) {
-      state.miniPlayerExpanded = true;
+      state.miniPlayerExpanded = false;
       renderMiniPlayer();
     }
     if (typeof forcePlay === "boolean") {
@@ -762,8 +768,8 @@ export function createHeroMediaPlayerController(options) {
       elements.heroPlayerStage.appendChild(
         createPreviewCard({
           badge: "App media",
-          title: "",
-          meta: "",
+          title: "Ready to play",
+          meta: "Latest feed preview will appear here.",
         })
       );
       return;
@@ -871,6 +877,8 @@ export function createHeroMediaPlayerController(options) {
     const fallbackMedia = getFallbackPageMediaElement();
     const browserMetadata = getBrowserMediaMetadata();
     const mode = shouldUseNativeMode(post) ? "device" : (shouldUseDesktopMode(post) ? "desktop" : "app");
+    const standbyPreviewPost = mode === "app" && !(fallbackMedia instanceof HTMLMediaElement) ? getStandbyPreviewPost() : null;
+    const displayPost = post || standbyPreviewPost;
     const playbackState = mode === "device"
       ? normalizePlaybackState(nativeSnapshot?.playbackState)
       : mode === "desktop"
@@ -931,15 +939,15 @@ export function createHeroMediaPlayerController(options) {
       elements.heroPlayerTitle.textContent = fallbackTitle;
       elements.heroPlayerCaption.textContent = fallbackMeta || "Active browser media session";
       elements.heroPlayerStatus.textContent = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
-    } else if (!post) {
+    } else if (!displayPost) {
       elements.heroPlayerTitle.textContent = "Ready to play";
       elements.heroPlayerCaption.textContent = "";
       elements.heroPlayerStatus.textContent = "App media standby";
     } else {
-      const creatorSummary = getProfileSummaryForPost(post);
-      elements.heroPlayerTitle.textContent = post.title;
-      elements.heroPlayerCaption.textContent = `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`;
-      elements.heroPlayerStatus.textContent = `${creatorSummary?.displayName ?? post.creator} · ${formatTimestamp(post.createdAt)}`;
+      const creatorSummary = getProfileSummaryForPost(displayPost);
+      elements.heroPlayerTitle.textContent = displayPost.title;
+      elements.heroPlayerCaption.textContent = `${formatKind(displayPost.mediaKind)} / ${getSignalLabel(displayPost)}`;
+      elements.heroPlayerStatus.textContent = `${creatorSummary?.displayName ?? displayPost.creator} · ${formatTimestamp(displayPost.createdAt)}`;
     }
 
     elements.heroPlayerPlayPauseButton.textContent = playbackState === "playing" ? "Pause" : "Play";
@@ -955,7 +963,7 @@ export function createHeroMediaPlayerController(options) {
     elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
     elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
 
-    renderStagePreview(mode, post, fallbackMedia);
+    renderStagePreview(mode, displayPost, fallbackMedia);
     syncMediaSession(post, mode, fallbackMedia);
   }
 
