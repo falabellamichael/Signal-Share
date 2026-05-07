@@ -27,6 +27,7 @@ export function createHeroMediaPlayerController(options) {
     getHeroPost,
     setHeroPost,
     playHeroMedia,
+    stepHeroPlayer,
     resolveYouTubePreviewId,
   } = options;
 
@@ -1020,7 +1021,11 @@ export function createHeroMediaPlayerController(options) {
       render();
       return;
     }
-    stepMiniPlayer(-1);
+    if (mode === "app") {
+      stepHeroPlayer(-1);
+    } else {
+      stepMiniPlayer(-1);
+    }
     state.heroPlayerPlaybackState = "paused";
   }
 
@@ -1044,7 +1049,11 @@ export function createHeroMediaPlayerController(options) {
       render();
       return;
     }
-    stepMiniPlayer(1);
+    if (mode === "app") {
+      stepHeroPlayer(1);
+    } else {
+      stepMiniPlayer(1);
+    }
     state.heroPlayerPlaybackState = "paused";
   }
 
