@@ -767,6 +767,20 @@ button:disabled {
     min-height: 168px;
   }
 
+  .hero-player-preview-copy {
+    padding: 10px;
+    gap: 4px;
+  }
+
+  .hero-player-preview-title {
+    font-size: 0.9rem;
+  }
+
+  .hero-player-preview-meta,
+  .hero-player-preview-note {
+    font-size: 0.68rem;
+  }
+
   .hero-visual {
     width: 146px;
     height: 146px;

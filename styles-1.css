@@ -1621,6 +1621,80 @@ h1 {
   font-size: 0.9rem;
 }
 
+.hero-player-preview {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+  align-self: stretch;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    radial-gradient(circle at 22% 18%, rgba(255, 180, 128, 0.18), rgba(255, 180, 128, 0) 45%),
+    linear-gradient(145deg, rgba(20, 14, 20, 0.82), rgba(44, 16, 16, 0.72));
+}
+
+.hero-player-preview-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-player-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(6, 4, 8, 0.08), rgba(6, 4, 8, 0.84) 72%),
+    linear-gradient(120deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.34));
+  pointer-events: none;
+}
+
+.hero-player-preview-copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 12px;
+}
+
+.hero-player-preview-badge,
+.hero-player-preview-title,
+.hero-player-preview-meta,
+.hero-player-preview-note {
+  margin: 0;
+}
+
+.hero-player-preview-badge {
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 68%, white 32%);
+}
+
+.hero-player-preview-title {
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.22;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+.hero-player-preview-meta {
+  font-size: 0.76rem;
+  color: color-mix(in srgb, var(--text) 84%, transparent);
+}
+
+.hero-player-preview-note {
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--muted) 80%, white 20%);
+}
+
 .hero-player-controls {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
