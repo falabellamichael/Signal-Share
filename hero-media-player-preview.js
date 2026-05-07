@@ -19,7 +19,7 @@ function resolveYouTubePreviewId(post, parseYouTubeUrl) {
       const parsed = parseYouTubeUrl(value);
       if (parsed?.externalId) return parsed.externalId;
     }
-    const match = value.match(/(?:v=|embed\/|youtu\.be\/|shorts\/)([a-zA-Z0-9_-]{6,})/);
+    const match = value.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/i);
     if (match?.[1]) return match[1];
   }
   return "";
@@ -29,7 +29,7 @@ function resolveYouTubePreviewId(post, parseYouTubeUrl) {
  * Resolves the artwork URL for a post. 
  * Supports synchronous string returns (YouTube, images) and asynchronous Promises (Spotify).
  */
-function resolveAppPreviewArtwork(post, options = {}) {
+export function resolveAppPreviewArtwork(post, options = {}) {
   if (!post) return "";
   const { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl } = options;
   
@@ -293,6 +293,38 @@ export function renderHeroStagePreview(options = {}) {
   }
 
   const creatorSummary = typeof getProfileSummaryForPost === "function" ? getProfileSummaryForPost(post) : null;
+  console.log("[HeroPreview] Rendering app mode for post:", post.id, "source:", post.sourceKind);
+
+  // Dynamic Edge: If it's an active app post, render the REAL player in the Hero stage.
+  if (post.sourceKind === "youtube" || post.sourceKind === "spotify") {
+    const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
+    const spotifyId = post.sourceKind === "spotify" ? (post.externalId || post.src?.match(/track\/([a-zA-Z0-9]+)/)?.[1]) : "";
+    
+    console.log("[HeroPreview] Resolved IDs - videoId:", videoId, "spotifyId:", spotifyId);
+    
+    if (videoId || spotifyId) {
+      const container = document.createElement("div");
+      container.className = "hero-player-active-stage";
+      container.style.cssText = "width: 100%; height: 100%; position: relative; border-radius: 12px; overflow: hidden; background: #000;";
+      
+      const iframe = document.createElement("iframe");
+      iframe.style.cssText = "width: 100%; height: 100%; border: none;";
+      iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+      
+      if (post.sourceKind === "youtube") {
+        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1`;
+        iframe.title = "YouTube player";
+      } else {
+        iframe.src = `https://open.spotify.com/embed/track/${spotifyId}?utm_source=generator&theme=0`;
+        iframe.title = "Spotify player";
+      }
+      
+      container.appendChild(iframe);
+      stage.appendChild(container);
+      return;
+    }
+  }
+
   stage.appendChild(createPreviewCard({
     badge: `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`,
     title: post.title || "Now playing",

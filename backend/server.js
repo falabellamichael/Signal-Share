@@ -33,7 +33,7 @@ const WINRT_ACTION_METHODS = {
   next: "TrySkipNextAsync",
   previous: "TrySkipPreviousAsync",
 };
-const MAX_ARTWORK_BYTES = 1200000;
+const MAX_ARTWORK_BYTES = 500000;
 
 const supabase = createClient(
   process.env.SUPABASE_URL || "",
@@ -42,15 +42,13 @@ const supabase = createClient(
 
 app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {
-  const requestedHeaders = typeof req.headers["access-control-request-headers"] === "string"
-    ? req.headers["access-control-request-headers"].trim()
-    : "";
+  const requestedHeaders = req.headers["access-control-request-headers"];
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", requestedHeaders || "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", requestedHeaders || "Content-Type, target-address-space");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
   if (req.method === "OPTIONS") {
-    res.status(204).end();
+    res.sendStatus(204);
     return;
   }
   next();
@@ -213,6 +211,7 @@ function buildSnapshotPayload() {
     artworkUri: "",
   };
 
+
   if (!isWindows) {
     return {
       ...base,
@@ -220,33 +219,42 @@ function buildSnapshotPayload() {
     };
   }
 
-  const session = selectPreferredMediaSession();
-  if (!session) return base;
+  try {
+    const session = selectPreferredMediaSession();
+    if (!session) return base;
 
-  const sourceAppId = `${session.sourceAppId || ""}`.trim();
-  const playbackState = mapPlaybackState(session.playback?.playbackStatus);
-  const title = `${session.media?.title || ""}`.trim();
-  const artist = `${session.media?.artist || session.media?.albumArtist || ""}`.trim();
-  const meta = sanitizeMediaMeta(artist, sourceAppId);
+    const sourceAppId = `${session.sourceAppUserModelId || session.sourceAppId || ""}`.trim();
+    const playbackState = mapPlaybackState(session.playback?.playbackStatus);
+    const title = `${session.media?.title || ""}`.trim();
+    const artist = `${session.media?.artist || session.media?.albumArtist || ""}`.trim();
+    const meta = sanitizeMediaMeta(artist, sourceAppId);
 
-  let artworkUri = "";
-  const thumbnail = session.media?.thumbnail;
-  if (Buffer.isBuffer(thumbnail) && thumbnail.length > 0 && thumbnail.length <= MAX_ARTWORK_BYTES) {
-    const mimeType = inferArtworkMimeType(thumbnail);
-    if (mimeType) {
-      artworkUri = `data:${mimeType};base64,${thumbnail.toString("base64")}`;
+    let artworkUri = "";
+    const thumbnail = session.media?.thumbnail;
+    if (Buffer.isBuffer(thumbnail) && thumbnail.length > 0 && thumbnail.length <= MAX_ARTWORK_BYTES) {
+      try {
+        const mimeType = inferArtworkMimeType(thumbnail);
+        if (mimeType) {
+          artworkUri = `data:${mimeType};base64,${thumbnail.toString("base64")}`;
+        }
+      } catch (e) {
+        console.warn("[Bridge] Failed to encode artwork:", e.message);
+      }
     }
-  }
 
-  return {
-    ...base,
-    active: playbackState !== "none",
-    playbackState,
-    title: title || "Now playing",
-    meta,
-    appPackage: sourceAppId,
-    artworkUri,
-  };
+    return {
+      ...base,
+      active: playbackState !== "none",
+      playbackState,
+      title: title || "Now playing",
+      meta,
+      appPackage: sourceAppId,
+      artworkUri,
+    };
+  } catch (error) {
+    console.error("[Bridge] Critical error in buildSnapshotPayload:", error);
+    return base;
+  }
 }
 
 function sendSystemMediaKey(action, targetAppPackage = "") {
@@ -377,7 +385,14 @@ app.get("/api/system-media/current", (req, res) => {
   try {
     res.json(buildSnapshotPayload());
   } catch (error) {
-    res.status(500).json({ source: "windows-smtc", available: isWindows, active: false, playbackState: "none" });
+    console.error("[Bridge] Error fetching current media session:", error);
+    res.status(500).json({ 
+      source: "windows-smtc", 
+      available: isWindows, 
+      active: false, 
+      playbackState: "none",
+      error: error.message 
+    });
   }
 });
 
@@ -420,7 +435,7 @@ function subscribeToMediaActions() {
   }).subscribe();
 }
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
   console.log(`[Bridge] Server on http://localhost:${port}`);
   if (isWindows && userId) {
     console.log(`[Bridge] User verified: ${userId}`);

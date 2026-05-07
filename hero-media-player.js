@@ -1,4 +1,4 @@
-import { renderHeroStagePreview } from "./hero-media-player-preview.js?v=1";
+import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js?v=1";
 
 
 
@@ -985,26 +985,15 @@ export function createHeroMediaPlayerController(options) {
   }
 
   function renderStagePreview(mode, post, fallbackMedia) {
-    renderHeroStagePreview({
+    renderHeroStagePreview(Object.assign({}, options, {
       stage: elements.heroPlayerStage,
       mode,
       post,
       fallbackMedia,
       nativeSnapshot,
-      desktopSnapshot,
-      getStandbyPreviewPost,
-      getProfileSummaryForPost,
-      formatKind,
-      getSignalLabel,
-      formatTimestamp,
-      getBrowserMediaMetadata,
-      sanitizeSnapshotMeta,
-      parseYouTubeUrl,
-      resolveActivePlayerSource,
-      getSpotifyPreviewImageUrl,
-    });
+      desktopSnapshot
+    }));
   }
-
   function attachEventListeners() {
     if (listenersAttached || !hasUi()) return;
     listenersAttached = true;
@@ -1147,7 +1136,14 @@ export function createHeroMediaPlayerController(options) {
     elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
     elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
 
-    renderHeroStagePreview(Object.assign({}, options, { mode, post, fallbackMedia, nativeSnapshot, desktopSnapshot }));
+    renderHeroStagePreview(Object.assign({}, options, {
+      stage: elements.heroPlayerStage,
+      mode,
+      post,
+      fallbackMedia,
+      nativeSnapshot,
+      desktopSnapshot
+    }));
     syncMediaSession({
       title: elements.heroPlayerTitle.textContent,
       artist: elements.heroPlayerCaption.textContent,
