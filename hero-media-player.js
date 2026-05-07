@@ -483,8 +483,51 @@ export function createHeroMediaPlayerController(options) {
     pendingDesktopArtworkKey = "";
   }
 
+  async function readDesktopSnapshotFromSupabase() {
+    if (!state.supabase || !state.currentUser?.id) return null;
+    try {
+      const { data, error } = await state.supabase
+        .from("system_media")
+        .select("*")
+        .eq("user_id", state.currentUser.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return null;
+
+      // If the data is more than 30 seconds old, consider it stale
+      const updatedAt = new Date(data.updated_at).getTime();
+      if (Date.now() - updatedAt > 30000) return null;
+
+      return normalizeDesktopSnapshot({
+        source: "supabase-sync",
+        available: true,
+        active: data.playback_state === "playing",
+        playbackState: data.playback_state,
+        title: data.title,
+        meta: data.meta,
+        artworkUri: data.artwork_uri,
+      });
+    } catch (error) {
+      console.error("Failed to read desktop snapshot from Supabase:", error);
+      return null;
+    }
+  }
+
   async function readDesktopSnapshot() {
     if (!canUseDesktopBridge()) return null;
+
+    // If on a remote origin, prioritize Supabase sync to avoid PNA/CORS issues with localhost.
+    const isRemoteOrigin = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
+    if (isRemoteOrigin && state.currentUser?.id) {
+      const supabaseSnapshot = await readDesktopSnapshotFromSupabase();
+      if (supabaseSnapshot) {
+        desktopSnapshotEndpoint = "supabase-sync";
+        desktopActionEndpoint = ""; // Remote actions not yet supported via Supabase
+        return supabaseSnapshot;
+      }
+    }
+
     let lastError = null;
     const endpoints = resolveDesktopSnapshotEndpoints();
     for (const endpoint of endpoints) {
@@ -506,6 +549,13 @@ export function createHeroMediaPlayerController(options) {
         lastError = error;
       }
     }
+
+    // Fallback to Supabase if local polling failed and we haven't tried it yet
+    if (!isRemoteOrigin && state.currentUser?.id) {
+      const supabaseSnapshot = await readDesktopSnapshotFromSupabase();
+      if (supabaseSnapshot) return supabaseSnapshot;
+    }
+
     const permissionPromptEndpoint = endpoints.find((candidate) => {
       const addressSpace = getEndpointAddressSpace(candidate);
       return addressSpace === "local" || addressSpace === "private" || addressSpace === "loopback";

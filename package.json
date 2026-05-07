@@ -18,6 +18,8 @@
     "@capacitor/app": "^8.1.0",
     "@capacitor/push-notifications": "^8.0.3",
     "@coooookies/windows-smtc-monitor": "^1.0.12",
+    "@supabase/supabase-js": "^2.105.3",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1"
   },
   "main": "app.js",

@@ -3,6 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { SMTCMonitor, PlaybackStatus } from "@coooookies/windows-smtc-monitor";
+import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
+
+dotenv.config({ path: path.resolve(process.cwd(), "backend/.env") });
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -28,6 +32,12 @@ const WINRT_ACTION_METHODS = {
   previous: "TrySkipPreviousAsync",
 };
 const MAX_ARTWORK_BYTES = 1200000;
+
+const supabase = createClient(
+  process.env.SUPABASE_URL || "",
+  process.env.SUPABASE_ANON_KEY || ""
+);
+const userId = process.env.SIGNAL_SHARE_USER_ID;
 
 app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {
@@ -437,6 +447,36 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(projectRoot, "index.html"));
 });
 
+async function syncToSupabase() {
+  if (!isWindows || !userId) return;
+  try {
+    const payload = buildSnapshotPayload();
+    const { error } = await supabase
+      .from("system_media")
+      .upsert({
+        user_id: userId,
+        playback_state: payload.playbackState,
+        title: payload.title,
+        meta: payload.meta,
+        artwork_uri: payload.artworkUri,
+        updated_at: new Date().toISOString(),
+      });
+
+    if (error) {
+      console.error("Error syncing to Supabase:", error.message);
+    }
+  } catch (error) {
+    console.error("Unexpected error in Supabase sync:", error);
+  }
+}
+
 app.listen(port, () => {
   console.log(`Signal Share server running on http://localhost:${port}`);
+  if (isWindows && userId) {
+    console.log(`Supabase sync enabled for user: ${userId}`);
+    // Sync every 5 seconds
+    setInterval(syncToSupabase, 5000);
+    // Initial sync
+    syncToSupabase();
+  }
 });
