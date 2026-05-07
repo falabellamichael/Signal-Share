@@ -11,12 +11,12 @@ import { createAppUi } from './app-v3-ui.js?v=131';
  * @returns {boolean} True if user is banned, false otherwise
  */
 function isCurrentUserBanned(state) {
-  try {
-    return state.currentUserBanned || false;
-  } catch (error) {
-    console.error("Error in isCurrentUserBanned:", error);
-    return false;
-  }
+    try {
+        return state.currentUserBanned || false;
+    } catch (error) {
+        console.error("Error in isCurrentUserBanned:", error);
+        return false;
+    }
 }
 
 /**
@@ -26,15 +26,15 @@ function isCurrentUserBanned(state) {
  * @returns {boolean} True if user is banned, false otherwise
  */
 function isUserBanned(state, userId) {
-  try {
-    if (!Array.isArray(state.bannedUserIds)) {
-      return false;
+    try {
+        if (!Array.isArray(state.bannedUserIds)) {
+            return false;
+        }
+        return state.bannedUserIds.includes(userId);
+    } catch (error) {
+        console.error("Error in isUserBanned:", error);
+        return false;
     }
-    return state.bannedUserIds.includes(userId);
-  } catch (error) {
-    console.error("Error in isUserBanned:", error);
-    return false;
-  }
 }
 
 /**
@@ -43,7 +43,7 @@ function isUserBanned(state, userId) {
  * @returns {boolean} True if messaging is enabled, false otherwise
  */
 function isMessagingEnabled(state) {
-  return state.backendMode === "supabase" && Boolean(state.currentUser);
+    return state.backendMode === "supabase" && Boolean(state.currentUser);
 }
 
 /**
@@ -52,7 +52,7 @@ function isMessagingEnabled(state) {
  * @returns {boolean} True if user can publish, false otherwise
  */
 function canPublishToLiveFeed(state) {
-  return Boolean(state.currentUser) && !isCurrentUserBanned(state);
+    return Boolean(state.currentUser) && !isCurrentUserBanned(state);
 }
 
 /**
@@ -71,7 +71,7 @@ function isUserBlocked(state, userId) {
  * @returns {boolean} True if user has admin privileges
  */
 function canAccessAdminBanPanel(state) {
-  return Boolean(state.currentUser) && isCurrentUserAdmin();
+    return Boolean(state.currentUser) && isCurrentUserAdmin();
 }
 
 const DEMO_POSTS = [
@@ -338,7 +338,7 @@ function trimNotificationText(value, maxLength = 120) {
 
 function maybeRequestMessageNotificationPermission() {
   if (!canUseBrowserNotifications() || Notification.permission !== "default") return;
-  void Notification.requestPermission().catch(() => { });
+  void Notification.requestPermission().catch(() => {});
 }
 
 function base64UrlToUint8Array(value) {
@@ -550,7 +550,7 @@ async function initializeNativePushNotifications() {
   if (!supportsNativePushNotifications() || !push || nativePushListenersAttached) return;
   try {
     await push.createChannel?.({ id: "messages_alerts", name: "Messages", description: "Direct Messenger notifications", importance: 5, visibility: 1, sound: "default" });
-  } catch (_error) { }
+  } catch (_error) {}
   try {
     await push.addListener("registration", (token) => {
       nativePushToken = token.value ?? "";
@@ -592,7 +592,7 @@ async function initializeNativePushNotifications() {
   try {
     const permission = await push.checkPermissions();
     if (permission.receive === "granted") await push.register();
-  } catch (_error) { }
+  } catch (_error) {}
 }
 
 async function safelyInitializeNativePushNotifications() {
@@ -841,9 +841,9 @@ async function handleAuthStateChange(event, session) {
     render();
     return;
   }
-  if (event === "SIGNED_IN") {
-    state.pendingActivationEmail = "";
-    showAuthFeedback("Signed in successfully.");
+  if (event === "SIGNED_IN") { 
+    state.pendingActivationEmail = ""; 
+    showAuthFeedback("Signed in successfully."); 
     if (window.notifications && state.currentUser) {
       void window.notifications.syncWithSupabase(state.supabase, state.currentUser.id);
     }
@@ -964,11 +964,11 @@ async function handleFormSubmit(event) {
   try {
     let post;
     if (parsedExternal) post = buildExternalPost(basePost, parsedExternal); else post = buildUploadPost(basePost, state.selectedFile);
-    if (state.backendMode === "supabase") {
+    if (state.backendMode === "supabase") { 
       const insertedPost = await publishPostToSupabase(post, (percentage) => {
         showFeedback(`Uploading: ${percentage}%...`);
-      });
-      state.userPosts = [insertedPost, ...state.userPosts];
+      }); 
+      state.userPosts = [insertedPost, ...state.userPosts]; 
     }
     else if (state.db) { await savePostToDatabase(post); state.userPosts = await loadPostsFromDatabase(); }
     else { state.userPosts = [post, ...state.userPosts]; }
@@ -992,7 +992,7 @@ async function handleFormSubmit(event) {
 
 function clearMessengerState() {
   unsubscribeMessagingChannels();
-  state.profileRecord = null; state.availableProfiles = []; state.blockedUserIds = []; state.bannedUserIds = []; state.blockingAvailable = true; state.banningAvailable = true; state.peopleSearch = ""; state.adminBanSearch = ""; state.conversationSearch = ""; state.directThreads = []; state.activeThreadId = null; state.activeMessages = []; state.pendingBlockUserId = ""; state.pendingBanUserId = ""; state.pendingDeleteThreadId = ""; state.adminBanPanelOpen = false; state.adminBanBusy = false; state.adminBanFeedback = ""; state.adminBanFeedbackIsError = false; state.messengerBusy = 0; state.messengerError = "";
+  state.profileRecord = null; state.availableProfiles = []; state.blockedUserIds = []; state.bannedUserIds = []; state.blockingAvailable = true; state.banningAvailable = true; state.peopleSearch = ""; state.adminBanSearch = ""; state.conversationSearch = ""; state.directThreads = []; state.activeThreadId = null; state.activeMessages = []; state.pendingBlockUserId = ""; state.pendingBanUserId = ""; state.pendingDeleteThreadId = ""; state.adminBanPanelOpen = false; state.adminBanBusy = false; state.adminBanFeedback = ""; state.adminBanFeedbackIsError = false;  state.messengerBusy = 0; state.messengerError = "";
   state.listenersAttached = false;
   state.lastMessageSubmitTime = 0;
   clearMessageAttachmentSelection({ preserveFeedback: true });
@@ -1068,11 +1068,11 @@ function getDefaultProfileName() {
 }
 function formatDisplayNameFromEmail(email = "") { const localPart = String(email ?? "").trim().split("@")[0] ?? ""; const prettyName = localPart.replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "); return prettyName ? prettyName.slice(0, 40) : ""; }
 function resolveMemberDisplayName(profile, fallback = "Member") { if (!profile || typeof profile !== "object") return fallback; const displayName = String(profile.displayName ?? "").trim(); if (displayName && !normalizeEmailForMatch(displayName).includes("@")) return displayName.slice(0, 40); const prettyEmailName = formatDisplayNameFromEmail(profile.email); return prettyEmailName || (displayName ? displayName.slice(0, 40) : fallback); }
-function normalizeProfile(row) {
-  return {
-    id: row.id,
-    email: row.email,
-    displayName: row.display_name,
+function normalizeProfile(row) { 
+  return { 
+    id: row.id, 
+    email: row.email, 
+    displayName: row.display_name, 
     theme: typeof row.theme === "string" ? row.theme : "",
     density: typeof row.density === "string" ? row.density : "",
     motion: typeof row.motion === "string" ? row.motion : "",
@@ -1080,9 +1080,9 @@ function normalizeProfile(row) {
     notificationHideSender: Boolean(row.notification_hide_sender),
     notificationHideBody: Boolean(row.notification_hide_body),
     showEmail: typeof row.show_email === "boolean" ? row.show_email : null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
+    createdAt: row.created_at, 
+    updatedAt: row.updated_at 
+  }; 
 }
 function normalizeUserBlock(row) { return { blockerId: row.blocker_id, blockedId: row.blocked_id, createdAt: row.created_at }; }
 function normalizeUserBan(row) { return { bannedId: row.banned_id, bannedBy: row.banned_by, reason: row.reason ?? "", createdAt: row.created_at }; }
@@ -1104,14 +1104,14 @@ function canonicalizeThreadPair(l, r) { return [l, r].sort((a, b) => a.localeCom
 async function syncCurrentProfileToSupabase(displayNameOverride = "") {
   const rawDisplayName = (displayNameOverride || state.profileRecord?.displayName || getDefaultProfileName()).trim().slice(0, 40);
   if (rawDisplayName.length < 2) throw new Error("Use a display name with at least 2 characters.");
-
+  
   // Prepare payload
-  const payload = {
-    id: state.currentUser.id,
-    email: getCurrentUserEmail(),
+  const payload = { 
+    id: state.currentUser.id, 
+    email: getCurrentUserEmail(), 
     display_name: rawDisplayName
   };
-
+  
   // Only add privacy columns if they are likely to exist or we want to try
   // We'll use a try-catch for the specific columns if they fail
   try {
@@ -1124,10 +1124,10 @@ async function syncCurrentProfileToSupabase(displayNameOverride = "") {
     if (error) {
       // If error suggests missing columns, fallback to basic payload
       if (error.message?.includes("column") || error.code === "PGRST204" || error.code === "42703") {
-        console.warn("[Profiles] Privacy columns missing, falling back to basic sync");
-        const { data: fallbackData, error: fallbackError } = await state.supabase.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
-        if (fallbackError) throw fallbackError;
-        return finalizeProfileSync(fallbackData);
+         console.warn("[Profiles] Privacy columns missing, falling back to basic sync");
+         const { data: fallbackData, error: fallbackError } = await state.supabase.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
+         if (fallbackError) throw fallbackError;
+         return finalizeProfileSync(fallbackData);
       }
       throw error;
     }
@@ -1138,10 +1138,10 @@ async function syncCurrentProfileToSupabase(displayNameOverride = "") {
 }
 
 function finalizeProfileSync(data) {
-  const profile = normalizeProfile(data);
-  state.profileRecord = profile;
-  rememberCreator(profile.displayName);
-  if (elements.creatorInput) elements.creatorInput.value = profile.displayName;
+  const profile = normalizeProfile(data); 
+  state.profileRecord = profile; 
+  rememberCreator(profile.displayName); 
+  if (elements.creatorInput) elements.creatorInput.value = profile.displayName; 
   return profile;
 }
 
@@ -1186,7 +1186,7 @@ async function refreshMessengerState(options = {}) {
   state.messengerBusy++;
   try {
     let ownProfile = await loadOwnProfileFromSupabase(); if (!ownProfile) ownProfile = await syncCurrentProfileToSupabase(getDefaultProfileName());
-    const allSettled = Promise.allSettled ? Promise.allSettled.bind(Promise) : function (promises) { return Promise.all(promises.map(p => p.then(value => ({ status: 'fulfilled', value }), reason => ({ status: 'rejected', reason })))); };
+    const allSettled = Promise.allSettled ? Promise.allSettled.bind(Promise) : function(promises) { return Promise.all(promises.map(p => p.then(value => ({status: 'fulfilled', value}), reason => ({status: 'rejected', reason})))); };
     const [profilesResult, threadsResult, blocksResult, bansResult] = await allSettled([loadProfilesFromSupabase(), loadDirectThreadsFromSupabase(), loadBlockedUsersFromSupabase(), loadUserBansFromSupabase()]);
     if (profilesResult.status !== "fulfilled") throw profilesResult.reason; if (threadsResult.status !== "fulfilled") throw threadsResult.reason;
     let blocks = [], blockingAvailable = true; if (blocksResult.status === "fulfilled") blocks = blocksResult.value; else if (isBlockingBackendUnavailable(blocksResult.reason)) blockingAvailable = false; else throw blocksResult.reason;
@@ -1223,13 +1223,13 @@ async function subscribeMessagingChannels(options = {}) {
   try {
     isMessagingSubscribing = true;
     if (force) unsubscribeMessagingChannels();
-
+    
     // Initialize the new dedicated Realtime system
     if (!messengerRealtime) {
       messengerRealtime = new MessengerRealtime(state);
     }
     messengerRealtime.init();
-
+    
     // Explicitly set the reference so the rest of the app knows we're live
     if (messengerRealtime.channel) state.messagesChannel = messengerRealtime.channel;
     console.log("[Messenger] Realtime system initialized.");
@@ -1238,16 +1238,16 @@ async function subscribeMessagingChannels(options = {}) {
     state.threadsChannel = state.supabase.channel(`direct-threads-${state.currentUser.id}-${sessionHash}`);
     state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "direct_threads" }, () => void refreshMessengerState({ preserveActiveThread: true }))
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => void refreshMessengerState({ preserveActiveThread: true }));
-
+    
     if (state.blockingAvailable) {
       state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_blocks" }, () => void refreshMessengerState({ preserveActiveThread: true }));
     }
-
+    
     if (state.banningAvailable) {
-      state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState().then(() => {
-        if (canAccessAdminBanPanel(state)) void refreshAdminBanState();
-        if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true });
-        else { clearMessengerState(); render(); }
+      state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState().then(() => { 
+        if (canAccessAdminBanPanel(state)) void refreshAdminBanState(); 
+        if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true }); 
+        else { clearMessengerState(); render(); } 
       }));
     }
     state.threadsChannel.subscribe();
@@ -1261,8 +1261,8 @@ async function subscribeMessagingChannels(options = {}) {
         // Prevent spam by using a stable composite ID (one notification per person per post)
         const notificationId = `like-${like.post_id}-${like.user_id}`;
         const message = `Someone liked your post: ${likedPost.title || "Untitled"}`;
-
-        window.notifications.success(message, "New Like!", {
+        
+        window.notifications.success(message, "New Like!", { 
           id: notificationId,
           silent: isMobile // On mobile, add to history silently (no banner)
         });
@@ -1287,12 +1287,12 @@ function playIncomingMessageSound() {
   const AudioContextCtor = window.AudioContext || window.webkitAudioContext; if (!AudioContextCtor) return;
   try {
     if (!messageChimeAudioContext) messageChimeAudioContext = new AudioContextCtor();
-    const ctx = messageChimeAudioContext; if (ctx.state === "suspended") void ctx.resume().catch(() => { });
+    const ctx = messageChimeAudioContext; if (ctx.state === "suspended") void ctx.resume().catch(() => {});
     const startAt = ctx.currentTime + 0.01; const oscillator = ctx.createOscillator(); const gainNode = ctx.createGain();
     oscillator.type = "sine"; oscillator.frequency.setValueAtTime(740, startAt); oscillator.frequency.exponentialRampToValueAtTime(980, startAt + 0.08);
     gainNode.gain.setValueAtTime(0.0001, startAt); gainNode.gain.exponentialRampToValueAtTime(0.12, startAt + 0.02); gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.18);
     oscillator.connect(gainNode); gainNode.connect(ctx.destination); oscillator.start(startAt); oscillator.stop(startAt + 0.2);
-  } catch (_error) { }
+  } catch (_error) {}
 }
 
 async function handleProfileSave() {
@@ -1369,8 +1369,8 @@ async function deleteConversation(threadId) {
     renderMessenger();
   } finally {
     if (state.messengerBusy > 0) {
-      state.messengerBusy = Math.max(0, state.messengerBusy - 1);
-      renderMessenger();
+       state.messengerBusy = Math.max(0, state.messengerBusy - 1);
+       renderMessenger();
     }
   }
 }
@@ -1418,7 +1418,7 @@ async function handleMessageSubmit(event) {
     event.preventDefault();
     event.stopPropagation();
   }
-
+  
   // 1. Synchronous state lock
   if (state.messengerBusy || !isMessagingEnabled(state) || !state.activeThreadId) return;
 
@@ -1451,9 +1451,9 @@ async function handleMessageSubmit(event) {
   window.__SIGNAL_LAST_SUBMITTED_AT__ = now;
   state.lastMessageSubmitTime = now;
   state.messengerBusy++;
-
+  
   // Disable UI immediately
-  elements.messageInput.value = "";
+  elements.messageInput.value = ""; 
   elements.messageInput.disabled = true;
   elements.sendMessageButton.disabled = true;
   renderMessenger();
@@ -1471,7 +1471,7 @@ async function handleMessageSubmit(event) {
 
   try {
     const messageId = crypto.randomUUID();
-
+    
     // 6. PRE-FLIGHT OPTIMISTIC UI: Merge and render immediately before network requests
     // This makes the UI respond instantly. The subsequent insert and Realtime echos
     // will update this message in place because they share the same messageId.
@@ -1513,23 +1513,21 @@ async function handleMessageSubmit(event) {
     if (state.messagesChannel) {
       const recipientId = getThreadPartnerId(state.directThreads.find(t => t.id === state.activeThreadId));
       const targetChannelName = `messenger_live_${recipientId.slice(0, 8)}`;
-
+      
       const tempChannel = state.supabase.channel(targetChannelName);
       tempChannel.subscribe((status) => {
         if (status === "SUBSCRIBED") {
           tempChannel.send({
             type: "broadcast",
             event: "new-message",
-            payload: {
-              payload: {
-                id: messageId,
-                thread_id: state.activeThreadId,
-                sender_id: state.currentUser.id,
-                body: body || null,
-                created_at: new Date().toISOString(),
-                ...attachmentPayload
-              }
-            }
+            payload: { payload: {
+              id: messageId,
+              thread_id: state.activeThreadId,
+              sender_id: state.currentUser.id,
+              body: body || null,
+              created_at: new Date().toISOString(),
+              ...attachmentPayload
+            }}
           }).then(() => {
             // Cleanup the temporary sending channel
             setTimeout(() => tempChannel.unsubscribe(), 5000);
@@ -1564,7 +1562,7 @@ async function handleMessageSubmit(event) {
 
     const activeThread = getActiveThread();
     if (activeThread) mergeThread({ ...activeThread, updatedAt: new Date().toISOString() });
-
+    
     clearMessageAttachmentSelection({ preserveFeedback: true });
     showMessengerFeedback("");
   } catch (error) {
@@ -1597,17 +1595,17 @@ function normalizeUserPreferences(raw = {}) {
   return { theme, density, motion, statusBarStrip, notificationHideSender, notificationHideBody, showEmail };
 }
 
-function saveUserPreferences() { try { localStorage.setItem(USER_PREFERENCES_KEY, JSON.stringify(state.preferences)); } catch { } }
+function saveUserPreferences() { try { localStorage.setItem(USER_PREFERENCES_KEY, JSON.stringify(state.preferences)); } catch {} }
 
 
 
 
 
 
-function updateUserPreferences(nextPreferences) {
-  state.preferences = normalizeUserPreferences(nextPreferences);
-  applyUserPreferences(state.preferences);
-  saveUserPreferences();
+function updateUserPreferences(nextPreferences) { 
+  state.preferences = normalizeUserPreferences(nextPreferences); 
+  applyUserPreferences(state.preferences); 
+  saveUserPreferences(); 
   if (state.supabase && state.currentUser) {
     void syncCurrentProfileToSupabase().catch(err => {
       console.error("[Preferences] Sync failed:", err);
@@ -1616,7 +1614,7 @@ function updateUserPreferences(nextPreferences) {
       }
     });
   }
-  renderSettingsPanel();
+  renderSettingsPanel(); 
 }
 
 function isCurrentUserActivated() { if (!state.currentUser) return false; return Boolean(state.currentUser.email_confirmed_at || state.currentUser.confirmed_at); }
@@ -1646,7 +1644,7 @@ function getPersonalStateScope() { return state.currentUser?.id ? `user:${state.
 function getScopedStorageKey(baseKey, scope = getPersonalStateScope()) { return `${baseKey}:${scope}`; }
 function parseStoredPostIds(rawValue) { try { const parsed = JSON.parse(rawValue ?? "[]"); return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string" && v.trim()) : []; } catch { return []; } }
 function loadScopedPostIds(baseKey, scope = getPersonalStateScope()) { const scoped = parseStoredPostIds(localStorage.getItem(getScopedStorageKey(baseKey, scope))); if (scoped.length || scope !== "guest") return scoped; return parseStoredPostIds(localStorage.getItem(baseKey)); }
-function persistScopedPostIds(baseKey, ids, scope = getPersonalStateScope()) { const normalizedIds = Array.isArray(ids) ? ids.filter((v) => typeof v === "string" && v.trim()) : []; try { localStorage.setItem(getScopedStorageKey(baseKey, scope), JSON.stringify(normalizedIds)); if (scope === "guest") localStorage.removeItem(baseKey); } catch { } }
+function persistScopedPostIds(baseKey, ids, scope = getPersonalStateScope()) { const normalizedIds = Array.isArray(ids) ? ids.filter((v) => typeof v === "string" && v.trim()) : []; try { localStorage.setItem(getScopedStorageKey(baseKey, scope), JSON.stringify(normalizedIds)); if (scope === "guest") localStorage.removeItem(baseKey); } catch {} }
 
 async function refreshLikedPostsState() {
   if (state.supabase && state.backendMode === "supabase" && state.currentUser) { try { state.likedPosts = await loadLikedPostsFromSupabase(); return; } catch (error) { console.error("Like state could not be loaded from Supabase", error); } }
@@ -1680,8 +1678,8 @@ function loadPlayerPosition() {
 
 function normalizePlayerVolume(value, fallback = DEFAULT_PLAYER_VOLUME) { const numeric = Number(value); if (!Number.isFinite(numeric)) return fallback; return Math.min(1, Math.max(0, numeric)); }
 function loadPlayerVolume() { try { const raw = localStorage.getItem(PLAYER_VOLUME_KEY); if (!raw) return DEFAULT_PLAYER_VOLUME; return normalizePlayerVolume(raw); } catch { return DEFAULT_PLAYER_VOLUME; } }
-function savePlayerVolume(volume) { try { localStorage.setItem(PLAYER_VOLUME_KEY, `${normalizePlayerVolume(volume)}`); } catch { } }
-function savePlayerPosition(position) { try { if (!position) { localStorage.removeItem(PLAYER_POSITION_KEY); return; } localStorage.setItem(PLAYER_POSITION_KEY, JSON.stringify({ x: Math.round(position.x), y: Math.round(position.y) })); } catch { } }
+function savePlayerVolume(volume) { try { localStorage.setItem(PLAYER_VOLUME_KEY, `${normalizePlayerVolume(volume)}`); } catch {} }
+function savePlayerPosition(position) { try { if (!position) { localStorage.removeItem(PLAYER_POSITION_KEY); return; } localStorage.setItem(PLAYER_POSITION_KEY, JSON.stringify({ x: Math.round(position.x), y: Math.round(position.y) })); } catch {} }
 function getPlayerViewportPadding() { return window.innerWidth <= 760 ? 12 : 20; }
 function clampPlayerPosition(position) { if (!position) return null; const padding = getPlayerViewportPadding(); const width = elements.miniPlayer.offsetWidth || Math.min(360, Math.max(240, window.innerWidth - padding * 2)); const height = elements.miniPlayer.offsetHeight || 280; const maxX = Math.max(padding, window.innerWidth - width - padding); const maxY = Math.max(padding, window.innerHeight - height - padding); return { x: Math.min(maxX, Math.max(padding, Math.round(position.x))), y: Math.min(maxY, Math.max(padding, Math.round(position.y))) }; }
 
@@ -1695,17 +1693,17 @@ async function handleAdminSettingsSubmit(event) { event.preventDefault(); if (st
 
 
 function getAllPosts() { if (state.backendMode === "local" && state.userPosts.length === 0) return [...DEMO_POSTS]; return [...state.userPosts]; }
-function getVisiblePosts() {
-  const query = state.search;
+function getVisiblePosts() { 
+  const query = state.search; 
   const all = healPosts(getAllPosts());
-  const posts = all.filter((post) => {
-    const matchesFilter = state.filter === "all" || state.filter === post.mediaKind || (state.filter === "saved" && isPostSaved(post.id));
-    if (!matchesFilter) return false;
-    if (!query) return true;
-    const haystack = [post.title, post.caption, post.creator, post.tags.join(" ")].join(" ").toLowerCase();
-    return haystack.includes(query);
-  });
-  return sortPosts(posts);
+  const posts = all.filter((post) => { 
+    const matchesFilter = state.filter === "all" || state.filter === post.mediaKind || (state.filter === "saved" && isPostSaved(post.id)); 
+    if (!matchesFilter) return false; 
+    if (!query) return true; 
+    const haystack = [post.title, post.caption, post.creator, post.tags.join(" ")].join(" ").toLowerCase(); 
+    return haystack.includes(query); 
+  }); 
+  return sortPosts(posts); 
 }
 
 
@@ -1846,10 +1844,10 @@ function healPosts(posts) {
     // Aggressive YouTube detection: check ALL fields for a hint of YouTube (Syncing logic from MainActivity)
     const fields = [post.externalUrl, post.embedUrl, post.externalId, post.mediaUrl, post.src, post.label, post.caption, post.title].join(" ");
     const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("youtu") || fields.toLowerCase().includes("vnd.youtube");
-
+    
     // Check if embedUrl is actually valid for YouTube
     const hasValidEmbed = typeof post.embedUrl === "string" && post.embedUrl.includes("youtube.com/embed/");
-
+    
     if (isYouTubeHint && (!post.externalId || !hasValidEmbed)) {
       const repairCandidates = [post.externalUrl, post.embedUrl, post.externalId, post.src, post.mediaUrl, post.label, post.caption, post.title];
       let repaired = null;
@@ -2040,625 +2038,3 @@ if (!window.__SIGNAL_SHARE_INITIALIZED__) {
 window.onSpotifyWebPlaybackSDKReady = () => {
   console.log("Spotify Web Playback SDK is ready.");
 };
-
-// Hero-only playback runtime layer.
-// Keeps the mini-player available as the hidden playback engine while preventing it
-// from popping open on page load. The hero media player remains the visible control surface.
-(function installHeroOnlyPlaybackRuntime() {
-  if (window.__SIGNAL_SHARE_HERO_ONLY_PLAYBACK_RUNTIME__) return;
-  window.__SIGNAL_SHARE_HERO_ONLY_PLAYBACK_RUNTIME__ = true;
-
-  const HERO_AUTOPLAY_KEY = "signal-share-hero-player-autoplay";
-  const HERO_LAST_POST_KEY = "signal-share-hero-player-last-post-id";
-  const HERO_DOCK_HIDDEN_KEY = "signal-share-hero-player-dock-hidden";
-
-  const safeStorageGet = (key, fallback = "") => {
-    try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
-  };
-  const safeStorageSet = (key, value) => {
-    try { localStorage.setItem(key, value); } catch { }
-  };
-
-  const getDock = () => elements?.miniPlayer || document.querySelector("#miniPlayer");
-  const getHeroControls = () => document.querySelector(".hero-player-controls");
-  const setImportantStyle = (node, property, value) => {
-    if (!node) return;
-    if (node.style.getPropertyValue(property) === value && node.style.getPropertyPriority(property) === "important") return;
-    node.style.setProperty(property, value, "important");
-  };
-  const removeInlineStyle = (node, property) => {
-    if (!node || !node.style.getPropertyValue(property)) return;
-    node.style.removeProperty(property);
-  };
-  const isAutoplayEnabled = () => safeStorageGet(HERO_AUTOPLAY_KEY, "false") === "true";
-  const isDockHidden = () => safeStorageGet(HERO_DOCK_HIDDEN_KEY, "true") !== "false";
-
-  function setAutoplayEnabled(enabled) {
-    safeStorageSet(HERO_AUTOPLAY_KEY, enabled ? "true" : "false");
-    syncHeroRuntimeControls();
-  }
-
-  function rememberCurrentPlayerPost() {
-    const postId = state?.playerPostId || state?.activePlayerPostId || "";
-    if (postId) safeStorageSet(HERO_LAST_POST_KEY, postId);
-  }
-
-  function findFirstPlayablePostId() {
-    try {
-      const visibleIds = typeof getPlayableVisiblePostIds === "function" ? getPlayableVisiblePostIds() : [];
-      if (Array.isArray(visibleIds) && visibleIds.length) return visibleIds[0];
-    } catch { }
-
-    try {
-      const posts = typeof getAllPosts === "function" ? getAllPosts() : [];
-      const playable = posts.find((post) => post && typeof isPlayablePost === "function" && isPlayablePost(post));
-      if (playable?.id) return playable.id;
-    } catch { }
-
-    return "";
-  }
-
-  function getStartupPostId() {
-    const savedPostId = safeStorageGet(HERO_LAST_POST_KEY, "");
-    if (savedPostId) {
-      try {
-        const savedPost = typeof getPostById === "function" ? getPostById(savedPostId) : null;
-        if (savedPost && typeof isPlayablePost === "function" && isPlayablePost(savedPost)) return savedPostId;
-      } catch { }
-    }
-    return findFirstPlayablePostId();
-  }
-
-  function setDockHidden(hidden, options = {}) {
-    const { persist = true } = options;
-    if (persist) safeStorageSet(HERO_DOCK_HIDDEN_KEY, hidden ? "true" : "false");
-    syncMiniDockVisibility();
-    syncHeroRuntimeControls();
-  }
-
-  function syncMiniDockVisibility() {
-    const dock = getDock();
-    if (!dock) return;
-
-    if (isDockHidden()) {
-      if (dock.dataset.heroDockHidden !== "true") dock.dataset.heroDockHidden = "true";
-      // Keep .is-open so embedded iframe/audio/video players are not torn down by CSS,
-      // but move the dock completely out of sight.
-      if (state?.playerPostId) dock.classList.add("is-open");
-      if (dock.classList.contains("is-expanded") || dock.classList.contains("is-dragging")) dock.classList.remove("is-expanded", "is-dragging");
-      if (dock.getAttribute("aria-hidden") !== "true") dock.setAttribute("aria-hidden", "true");
-      setImportantStyle(dock, "opacity", "0");
-      setImportantStyle(dock, "pointer-events", "none");
-      setImportantStyle(dock, "visibility", "hidden");
-      setImportantStyle(dock, "left", "-10000px");
-      setImportantStyle(dock, "top", "-10000px");
-      setImportantStyle(dock, "right", "auto");
-      setImportantStyle(dock, "bottom", "auto");
-      if (elements?.miniPlayerVolume) elements.miniPlayerVolume.hidden = true;
-      return;
-    }
-
-    delete dock.dataset.heroDockHidden;
-    removeInlineStyle(dock, "opacity");
-    removeInlineStyle(dock, "pointer-events");
-    removeInlineStyle(dock, "visibility");
-    removeInlineStyle(dock, "left");
-    removeInlineStyle(dock, "top");
-    removeInlineStyle(dock, "right");
-    removeInlineStyle(dock, "bottom");
-    if (state?.playerPostId) {
-      dock.classList.add("is-open");
-      if (dock.getAttribute("aria-hidden") !== "false") dock.setAttribute("aria-hidden", "false");
-      try { if (typeof renderMiniPlayer === "function") renderMiniPlayer(); } catch { }
-    }
-  }
-
-  function ensureHeroRuntimeControls() {
-    const controls = getHeroControls();
-    if (!controls || document.querySelector("#heroPlayerAutoplayToggle")) return;
-
-    const makeButton = (id, text) => {
-      const button = document.createElement("button");
-      button.id = id;
-      button.type = "button";
-      button.className = "button button-secondary";
-      button.textContent = text;
-      return button;
-    };
-
-    const autoplayButton = makeButton("heroPlayerAutoplayToggle", "Autoplay: Off");
-    autoplayButton.addEventListener("click", () => {
-      const next = !isAutoplayEnabled();
-      setAutoplayEnabled(next);
-      if (next) attemptHeroStartupPlayback({ force: true });
-    });
-
-    const dockButton = makeButton("heroPlayerDockToggle", "Show Player");
-    dockButton.addEventListener("click", () => setDockHidden(!isDockHidden()));
-
-    const openMediaButton = makeButton("heroPlayerOpenMediaButton", "Open Media");
-    openMediaButton.addEventListener("click", () => openHeroCurrentMedia({ autoplay: false }));
-
-    controls.append(autoplayButton, dockButton, openMediaButton);
-  }
-
-  function syncHeroRuntimeControls() {
-    ensureHeroRuntimeControls();
-
-    const autoplayButton = document.querySelector("#heroPlayerAutoplayToggle");
-    if (autoplayButton) {
-      const enabled = isAutoplayEnabled();
-      autoplayButton.textContent = enabled ? "Autoplay: On" : "Autoplay: Off";
-      autoplayButton.setAttribute("aria-pressed", enabled ? "true" : "false");
-      autoplayButton.title = enabled
-        ? "Hero player will try to resume playback on page load."
-        : "Hero player will wait until you press Play.";
-    }
-
-    const dockButton = document.querySelector("#heroPlayerDockToggle");
-    if (dockButton) {
-      const hidden = isDockHidden();
-      dockButton.textContent = hidden ? "Show Player" : "Hide Player";
-      dockButton.setAttribute("aria-pressed", hidden ? "false" : "true");
-      dockButton.title = hidden
-        ? "Show the floating mini-player for feed playback."
-        : "Hide the floating mini-player while keeping playback alive.";
-    }
-
-    const openMediaButton = document.querySelector("#heroPlayerOpenMediaButton");
-    if (openMediaButton) {
-      const hasTarget = Boolean(getHeroTargetPostId());
-      openMediaButton.disabled = !hasTarget;
-      openMediaButton.title = hasTarget
-        ? "Load the current or waiting media into the hero player without opening the mini-player."
-        : "No playable media is ready yet.";
-    }
-  }
-
-  function getActiveHtmlMediaElement() {
-    try {
-      const active = typeof getActivePlayerMediaElement === "function" ? getActivePlayerMediaElement() : null;
-      return active instanceof HTMLMediaElement ? active : null;
-    } catch {
-      return null;
-    }
-  }
-
-  function getPlayablePostById(postId) {
-    if (!postId || typeof getPostById !== "function") return null;
-    try {
-      const post = getPostById(postId);
-      if (!post) return null;
-      if (typeof isPlayablePost === "function" && !isPlayablePost(post)) return null;
-      return post;
-    } catch {
-      return null;
-    }
-  }
-
-  function getHeroTargetPostId() {
-    const candidates = [
-      state?.playerPostId,
-      state?.activePlayerPostId,
-      state?.activeFeedPostId,
-      safeStorageGet(HERO_LAST_POST_KEY, ""),
-      getStartupPostId(),
-    ];
-
-    for (const candidate of candidates) {
-      const postId = `${candidate || ""}`.trim();
-      if (postId && getPlayablePostById(postId)) return postId;
-    }
-
-    return "";
-  }
-
-  function setHeroPlaybackButtonState(playing) {
-    const button = elements?.heroPlayerPlayPauseButton || document.querySelector("#heroPlayerPlayPauseButton");
-    if (!button) return;
-    button.textContent = playing ? "Pause" : "Play";
-    button.setAttribute("aria-label", playing ? "Pause hero media" : "Play hero media");
-    button.setAttribute("aria-pressed", playing ? "true" : "false");
-  }
-
-  function syncHeroCopyForPost(post) {
-    if (!post) return;
-    if (elements?.heroPlayerTitle) elements.heroPlayerTitle.textContent = post.title || "Now playing";
-    if (elements?.heroPlayerCaption) elements.heroPlayerCaption.textContent = post.caption || "Hero media player";
-    if (elements?.heroPlayerStatus) {
-      const kind = typeof formatKind === "function" ? formatKind(post.mediaKind || "media") : `${post.mediaKind || "Media"} post`;
-      const label = typeof getSignalLabel === "function" ? getSignalLabel(post) : "Live on feed";
-      elements.heroPlayerStatus.textContent = [kind, label].filter(Boolean).join(" / ");
-    }
-  }
-
-  function resolveHeroYouTubeId(post) {
-    if (!post) return "";
-    const values = [post.externalId, post.embedUrl, post.externalUrl, post.src, post.mediaUrl, post.label, post.caption, post.title]
-      .map((value) => `${value || ""}`.trim())
-      .filter(Boolean);
-
-    for (const value of values) {
-      if (/^[a-zA-Z0-9_-]{11}$/.test(value)) return value;
-      try {
-        const parsed = typeof parseYouTubeUrl === "function" ? parseYouTubeUrl(value) : null;
-        if (parsed?.externalId && /^[a-zA-Z0-9_-]{11}$/.test(parsed.externalId)) return parsed.externalId;
-      } catch { }
-      const match = value.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/i);
-      if (match?.[1]) return match[1];
-    }
-
-    return "";
-  }
-
-  function resolveHeroSpotify(post) {
-    if (!post) return null;
-    const label = `${post.label || ""}`.toLowerCase();
-    const knownTypes = ["track", "album", "playlist", "artist", "episode", "show"];
-    const labelType = knownTypes.find((type) => label.includes(type));
-    const externalId = `${post.externalId || ""}`.trim();
-    if (externalId) return { type: labelType || "track", id: externalId };
-
-    const values = [post.externalId, post.embedUrl, post.externalUrl, post.src, post.mediaUrl, post.label]
-      .map((value) => `${value || ""}`.trim())
-      .filter(Boolean);
-
-    for (const value of values) {
-      const uriMatch = value.match(/^spotify:(track|album|playlist|artist|episode|show):([A-Za-z0-9]+)$/i);
-      if (uriMatch) return { type: uriMatch[1].toLowerCase(), id: uriMatch[2] };
-      const urlMatch = value.match(/open\.spotify\.com\/(?:intl-[a-z0-9-]+\/)?(?:embed\/)?(track|album|playlist|artist|episode|show)\/([A-Za-z0-9]+)/i);
-      if (urlMatch) return { type: urlMatch[1].toLowerCase(), id: urlMatch[2] };
-    }
-
-    return null;
-  }
-
-  function buildHeroYouTubeSrc(videoId, autoplay = false) {
-    if (!videoId) return "";
-    const params = new URLSearchParams({
-      autoplay: autoplay ? "1" : "0",
-      controls: "1",
-      playsinline: "1",
-      rel: "0",
-      modestbranding: "1",
-      enablejsapi: "1",
-      origin: window.location.origin,
-    });
-    return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
-  }
-
-  function buildHeroSpotifySrc(spotify, autoplay = false) {
-    if (!spotify?.id) return "";
-    const allowed = new Set(["track", "album", "playlist", "artist", "episode", "show"]);
-    const type = allowed.has(spotify.type) ? spotify.type : "track";
-    const params = new URLSearchParams({ utm_source: "generator", theme: "0" });
-    if (autoplay) params.set("autoplay", "1");
-    return `https://open.spotify.com/embed/${type}/${spotify.id}?${params.toString()}`;
-  }
-
-  function resolveHeroUploadSource(post) {
-    try {
-      if (typeof resolveActivePlayerSource === "function") {
-        const resolved = resolveActivePlayerSource(post);
-        if (resolved) return resolved;
-      }
-    } catch { }
-    return `${post?.src || post?.mediaUrl || ""}`.trim();
-  }
-
-  function postMessageToHeroYouTube(command) {
-    const frame = elements?.heroPlayerStage?.querySelector?.("iframe[data-hero-provider='youtube']")
-      || document.querySelector("#heroPlayerStage iframe[data-hero-provider='youtube']");
-    if (!frame?.contentWindow) return false;
-    try {
-      frame.contentWindow.postMessage(JSON.stringify({ event: "command", func: command, args: [] }), "*");
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  function getHeroStandaloneMediaElement() {
-    const stage = elements?.heroPlayerStage || document.querySelector("#heroPlayerStage");
-    const media = stage?.querySelector?.("video[data-hero-provider='upload'], audio[data-hero-provider='upload']");
-    return media instanceof HTMLMediaElement ? media : null;
-  }
-
-  function setHeroStandaloneGlobals(post, autoplay = false) {
-    window.__SIGNAL_SHARE_HERO_STANDALONE_POST__ = post || null;
-    window.__SIGNAL_SHARE_HERO_STANDALONE_AUTOPLAY__ = autoplay ? "true" : "false";
-  }
-
-  function mountHeroStandalonePlayer(postId, options = {}) {
-    const { autoplay = false, preserveExisting = true } = options;
-    const post = getPlayablePostById(postId);
-    const stage = elements?.heroPlayerStage || document.querySelector("#heroPlayerStage");
-    if (!post || !stage) return false;
-
-    let provider = "upload";
-    let src = "";
-    let node = null;
-
-    if (post.sourceKind === "youtube") {
-      provider = "youtube";
-      src = buildHeroYouTubeSrc(resolveHeroYouTubeId(post), autoplay);
-      if (!src) return false;
-    } else if (post.sourceKind === "spotify") {
-      provider = "spotify";
-      src = buildHeroSpotifySrc(resolveHeroSpotify(post), autoplay);
-      if (!src) return false;
-    } else if (post.mediaKind === "video" || post.mediaKind === "audio") {
-      provider = "upload";
-      src = resolveHeroUploadSource(post);
-      if (!src) return false;
-    } else {
-      return false;
-    }
-
-    const key = `hero-standalone|${provider}|${post.id}|${src}`;
-    setHeroStandaloneGlobals(post, autoplay);
-    state.playerPostId = post.id;
-    state.activePlayerPostId = post.id;
-    rememberCurrentPlayerPost();
-    syncHeroCopyForPost(post);
-
-    if (preserveExisting && stage.dataset.heroStandaloneKey === key && stage.firstElementChild) {
-      state.heroPlayerPlaybackState = autoplay ? "playing" : (state.heroPlayerPlaybackState || "paused");
-      setHeroPlaybackButtonState(state.heroPlayerPlaybackState === "playing");
-      return true;
-    }
-
-    if (provider === "youtube" || provider === "spotify") {
-      const shell = document.createElement("div");
-      shell.className = "hero-player-active-stage";
-      shell.dataset.provider = provider;
-      shell.style.cssText = "width:100%;height:100%;position:relative;border-radius:12px;overflow:hidden;background:#000;";
-
-      const iframe = document.createElement("iframe");
-      iframe.className = "hero-player-active-frame";
-      iframe.dataset.heroProvider = provider;
-      iframe.src = src;
-      iframe.title = provider === "youtube" ? "YouTube player" : "Spotify player";
-      iframe.loading = "eager";
-      iframe.referrerPolicy = "strict-origin-when-cross-origin";
-      iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-      iframe.allowFullscreen = true;
-      iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
-      shell.appendChild(iframe);
-      node = shell;
-    } else {
-      const media = document.createElement(post.mediaKind === "audio" ? "audio" : "video");
-      media.dataset.heroProvider = "upload";
-      media.src = src;
-      media.controls = true;
-      media.autoplay = Boolean(autoplay);
-      media.playsInline = true;
-      media.style.cssText = "width:100%;height:100%;display:block;border-radius:12px;background:#000;object-fit:contain;";
-      media.volume = Math.max(0, Math.min(1, Number(state?.playerVolume ?? 1)));
-      media.addEventListener("play", () => { state.heroPlayerPlaybackState = "playing"; setHeroPlaybackButtonState(true); });
-      media.addEventListener("pause", () => { state.heroPlayerPlaybackState = "paused"; setHeroPlaybackButtonState(false); });
-      node = media;
-    }
-
-    stage.dataset.heroStandaloneKey = key;
-    stage.dataset.heroPreviewKey = key;
-    stage.replaceChildren(node);
-    state.heroPlayerPlaybackState = autoplay ? "playing" : "paused";
-    setHeroPlaybackButtonState(autoplay);
-    syncMiniDockVisibility();
-
-    if (autoplay && node instanceof HTMLMediaElement) {
-      const playResult = node.play();
-      if (playResult && typeof playResult.catch === "function") playResult.catch(() => { });
-    }
-
-    return true;
-  }
-
-  function resumeHeroStandalonePlayer() {
-    const post = window.__SIGNAL_SHARE_HERO_STANDALONE_POST__;
-    if (!post) return false;
-
-    const media = getHeroStandaloneMediaElement();
-    if (media) {
-      media.volume = Math.max(0, Math.min(1, Number(state?.playerVolume ?? 1)));
-      const playResult = media.play();
-      if (playResult && typeof playResult.catch === "function") playResult.catch(() => { });
-      state.heroPlayerPlaybackState = "playing";
-      setHeroPlaybackButtonState(true);
-      return true;
-    }
-
-    if (post.sourceKind === "youtube") {
-      if (!postMessageToHeroYouTube("playVideo")) {
-        mountHeroStandalonePlayer(post.id, { autoplay: true, preserveExisting: false });
-      }
-      state.heroPlayerPlaybackState = "playing";
-      window.__SIGNAL_SHARE_HERO_STANDALONE_AUTOPLAY__ = "true";
-      setHeroPlaybackButtonState(true);
-      return true;
-    }
-
-    if (post.sourceKind === "spotify") {
-      mountHeroStandalonePlayer(post.id, { autoplay: true, preserveExisting: true });
-      state.heroPlayerPlaybackState = "playing";
-      setHeroPlaybackButtonState(true);
-      return true;
-    }
-
-    return false;
-  }
-
-  function pauseHeroStandalonePlayer() {
-    const post = window.__SIGNAL_SHARE_HERO_STANDALONE_POST__;
-    if (!post) return false;
-
-    const media = getHeroStandaloneMediaElement();
-    if (media) media.pause();
-    else if (post.sourceKind === "youtube") postMessageToHeroYouTube("pauseVideo");
-
-    state.heroPlayerPlaybackState = "paused";
-    window.__SIGNAL_SHARE_HERO_STANDALONE_AUTOPLAY__ = "false";
-    setHeroPlaybackButtonState(false);
-    return true;
-  }
-
-  function openHeroCurrentMedia(options = {}) {
-    const { autoplay = false } = options;
-    const targetPostId = getHeroTargetPostId();
-    if (!targetPostId) return false;
-
-    const mounted = mountHeroStandalonePlayer(targetPostId, {
-      autoplay: Boolean(autoplay),
-      preserveExisting: true,
-    });
-    if (!mounted) return false;
-
-    rememberCurrentPlayerPost();
-    setDockHidden(true, { persist: true });
-    setTimeout(syncMiniDockVisibility, 50);
-    syncHeroRuntimeControls();
-    return true;
-  }
-
-  function toggleHeroStandalonePlayer(postId = "") {
-    const targetPostId = postId || getHeroTargetPostId();
-    const currentPost = window.__SIGNAL_SHARE_HERO_STANDALONE_POST__;
-    const currentId = `${currentPost?.id || ""}`.trim();
-
-    if (!targetPostId) return false;
-
-    if (currentId === targetPostId) {
-      if (state.heroPlayerPlaybackState === "playing") return pauseHeroStandalonePlayer();
-      return resumeHeroStandalonePlayer();
-    }
-
-    return mountHeroStandalonePlayer(targetPostId, { autoplay: true, preserveExisting: false });
-  }
-
-  function playActiveEngine() {
-    if (resumeHeroStandalonePlayer()) return;
-
-    const postId = getHeroTargetPostId();
-    if (postId && mountHeroStandalonePlayer(postId, { autoplay: true, preserveExisting: false })) return;
-
-    const media = getActiveHtmlMediaElement();
-    if (media) {
-      media.volume = Math.max(0, Math.min(1, Number(state?.playerVolume ?? 1)));
-      const playResult = media.play();
-      if (playResult && typeof playResult.catch === "function") playResult.catch(() => { });
-      state.heroPlayerPlaybackState = "playing";
-      return;
-    }
-  }
-
-  function prepareHiddenPlaybackEngine(postId) {
-    if (!postId) return false;
-    try {
-      const mounted = mountHeroStandalonePlayer(postId, { autoplay: false, preserveExisting: true });
-      if (!mounted) return false;
-      rememberCurrentPlayerPost();
-      setDockHidden(true, { persist: true });
-      return true;
-    } catch (error) {
-      console.warn("[HeroRuntime] Could not prepare hero playback engine", error);
-      return false;
-    }
-  }
-
-  function attemptHeroStartupPlayback(options = {}) {
-    const { force = false } = options;
-    if (!force && window.__SIGNAL_SHARE_HERO_AUTOPLAY_ATTEMPTED__) return;
-    if (!isAutoplayEnabled()) return;
-
-    const postId = getStartupPostId();
-    if (!postId) return;
-
-    window.__SIGNAL_SHARE_HERO_AUTOPLAY_ATTEMPTED__ = true;
-    setDockHidden(true, { persist: true });
-    mountHeroStandalonePlayer(postId, { autoplay: true, preserveExisting: false });
-  }
-
-  function handleHeroPlayCapture(event) {
-    const button = event.target?.closest?.("#heroPlayerPlayPauseButton");
-    if (!button) return;
-
-    const postId = getHeroTargetPostId();
-    if (!postId) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-
-    toggleHeroStandalonePlayer(postId);
-    rememberCurrentPlayerPost();
-    setDockHidden(true, { persist: true });
-    setTimeout(syncMiniDockVisibility, 50);
-    setTimeout(() => {
-      const post = getPlayablePostById(postId);
-      if (post) setHeroStandaloneGlobals(post, state.heroPlayerPlaybackState === "playing");
-    }, 100);
-  }
-
-  function handleMiniCloseCapture(event) {
-    const closeButton = event.target?.closest?.("#miniCloseButton");
-    if (!closeButton) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    rememberCurrentPlayerPost();
-    setDockHidden(true, { persist: true });
-  }
-
-  function handlePlaybackMemoryCapture(event) {
-    const playTrigger = event.target?.closest?.("#miniPlayPauseButton, [data-action='play'], [data-action='open-player']");
-    if (!playTrigger) return;
-
-    // Feed/list/player buttons should use the normal site behavior: open the floating mini-player.
-    // Only the hero Play button and hero Open Media button use the hero-only playback path.
-    if (playTrigger.closest?.("#heroPlayerStage, .hero-player-controls")) return;
-
-    window.requestAnimationFrame(() => {
-      rememberCurrentPlayerPost();
-      setDockHidden(false, { persist: true });
-      try { if (typeof renderMiniPlayer === "function") renderMiniPlayer(); } catch { }
-      syncMiniDockVisibility();
-    });
-  }
-
-  function startRuntimeLoop() {
-    ensureHeroRuntimeControls();
-    syncHeroRuntimeControls();
-    syncMiniDockVisibility();
-
-    // Do not let the floating mini-player appear immediately on page load.
-    setDockHidden(true, { persist: true });
-
-    setTimeout(() => attemptHeroStartupPlayback(), 600);
-    setTimeout(syncMiniDockVisibility, 900);
-    setTimeout(syncMiniDockVisibility, 1600);
-
-    const dock = getDock();
-    if (dock && window.MutationObserver) {
-      const observer = new MutationObserver(() => syncMiniDockVisibility());
-      observer.observe(dock, { attributes: true, attributeFilter: ["class", "style", "aria-hidden"] });
-    }
-
-    setInterval(() => {
-      rememberCurrentPlayerPost();
-      syncHeroRuntimeControls();
-      syncMiniDockVisibility();
-    }, 1000);
-  }
-
-  document.addEventListener("click", handleHeroPlayCapture, true);
-  document.addEventListener("click", handleMiniCloseCapture, true);
-  document.addEventListener("click", handlePlaybackMemoryCapture, true);
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", startRuntimeLoop, { once: true });
-  } else {
-    startRuntimeLoop();
-  }
-})();

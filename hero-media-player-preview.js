@@ -32,19 +32,19 @@ function resolveYouTubePreviewId(post, parseYouTubeUrl) {
 export function resolveAppPreviewArtwork(post, options = {}) {
   if (!post) return "";
   const { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl } = options;
-
+  
   if (post.sourceKind === "youtube") {
     const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
     return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "";
   }
-
+  
   if (post.sourceKind === "spotify") {
     if (typeof getSpotifyPreviewImageUrl === "function") {
       return getSpotifyPreviewImageUrl(post); // Returns a Promise
     }
     return "";
   }
-
+  
   if (post.mediaKind === "image") {
     if (typeof resolveActivePlayerSource === "function") {
       const resolved = resolveActivePlayerSource(post);
@@ -135,7 +135,8 @@ function renderActivePlayerStage(post, parseYouTubeUrl) {
 
     const iframe = document.createElement("iframe");
     iframe.style.cssText = "width: 100%; height: 100%; border: none;";
-    iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+    iframe.allowFullscreen = true;
 
     if (post.sourceKind === "youtube") {
       iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1`;
@@ -160,7 +161,7 @@ function createPostStandbyPreview(post, options = {}) {
     resolveActivePlayerSource,
     getSpotifyPreviewImageUrl,
   } = options;
-
+  
   const creatorSummary = typeof getProfileSummaryForPost === "function" ? getProfileSummaryForPost(post) : null;
   const creatorName = creatorSummary?.displayName ?? post.creator ?? "Signal Share";
   const formatLabel = typeof formatKind === "function" ? formatKind(post.mediaKind) : "";
@@ -170,7 +171,7 @@ function createPostStandbyPreview(post, options = {}) {
       ? "Spotify"
       : "";
   const meta = [creatorName, formatLabel, providerLabel].filter(Boolean).join(" · ");
-
+  
   return createPreviewCard({
     badge: `Up Next · ${providerLabel || "App Media"}`,
     title: post.title || "Next playable post",
