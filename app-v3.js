@@ -272,6 +272,8 @@ if (!window[globalStateKey]) {
 const state = window[globalStateKey];
 window.state = state; // Also expose as window.state for backward compatibility and cross-module access
 
+registerSiteServiceWorker();
+
 function canUseBrowserNotifications() {
   return "Notification" in window && window.isSecureContext;
 }
@@ -283,14 +285,20 @@ function isNativeCapacitorApp() {
   return false;
 }
 
-window.addEventListener("load", () => {
-  serviceWorkerRegistrationPromise = navigator.serviceWorker
-    .register("./service-worker.js")
-    .catch((error) => {
-      console.error("Service worker registration failed", error);
-      return null;
-    });
-});
+function registerSiteServiceWorker() {
+  if (!("serviceWorker" in navigator) || !window.isSecureContext || isNativeCapacitorApp()) {
+    return;
+  }
+
+  window.addEventListener("load", () => {
+    serviceWorkerRegistrationPromise = navigator.serviceWorker
+      .register("./service-worker.js")
+      .catch((error) => {
+        console.error("Service worker registration failed", error);
+        return null;
+      });
+  });
+}
 
 function getCapacitorPlatform() {
   return window.Capacitor?.getPlatform?.() ?? "web";
