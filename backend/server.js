@@ -27,6 +27,7 @@ const WINRT_ACTION_METHODS = {
   next: "TrySkipNextAsync",
   previous: "TrySkipPreviousAsync",
 };
+const MAX_ARTWORK_BYTES = 1200000;
 
 app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {
@@ -61,6 +62,17 @@ function inferArtworkMimeType(buffer) {
   if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return "image/png";
   if (buffer[0] === 0xff && buffer[1] === 0xd8) return "image/jpeg";
   if (buffer[0] === 0x42 && buffer[1] === 0x4d) return "image/bmp";
+  if (
+    buffer.length >= 12
+    && buffer[0] === 0x52
+    && buffer[1] === 0x49
+    && buffer[2] === 0x46
+    && buffer[3] === 0x46
+    && buffer[8] === 0x57
+    && buffer[9] === 0x45
+    && buffer[10] === 0x42
+    && buffer[11] === 0x50
+  ) return "image/webp";
   return "";
 }
 
@@ -207,7 +219,7 @@ function buildSnapshotPayload() {
 
   let artworkUri = "";
   const thumbnail = session.media?.thumbnail;
-  if (Buffer.isBuffer(thumbnail) && thumbnail.length > 0 && thumbnail.length <= 140000) {
+  if (Buffer.isBuffer(thumbnail) && thumbnail.length > 0 && thumbnail.length <= MAX_ARTWORK_BYTES) {
     const mimeType = inferArtworkMimeType(thumbnail);
     if (mimeType) {
       artworkUri = `data:${mimeType};base64,${thumbnail.toString("base64")}`;
