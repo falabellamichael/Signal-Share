@@ -1993,3 +1993,9 @@ if (!window.__SIGNAL_SHARE_INITIALIZED__) {
     showFeedback("The site could not start correctly. Reload and try again.", true);
   });
 }
+
+// Spotify Web Playback SDK Callback
+window.onSpotifyWebPlaybackSDKReady = () => {
+  console.log("Spotify Web Playback SDK is ready.");
+};
+
