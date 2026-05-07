@@ -51,6 +51,40 @@ export function createAppUi(context) {
     parseExternalMediaUrl, healPosts, parseSpotifyUrl, formatProviderName, isHostedPostingEnabled,
     getAppConfig, updatePostLikeCount, createDemoGraphic,
   } = context;
+  
+  async function getSpotifyPreviewImageUrl(source) { const metadata = await getSpotifyPreviewMetadata(source); return typeof metadata?.thumbnailUrl === "string" ? metadata.thumbnailUrl : ""; }
+
+  async function getSpotifyPreviewMetadata(sourceUrl) { 
+    if (!sourceUrl) return { error: "No URL" }; 
+    const cached = externalPreviewCache.get(sourceUrl); 
+    if (cached) return cached; 
+    const data = await fetchSpotifyPreviewCatalogMetadata(sourceUrl); 
+    if (data && !data.error) { 
+      externalPreviewCache.set(sourceUrl, data); 
+      return data; 
+    } 
+    return data || { error: "Fetch failed" }; 
+  }
+
+  async function fetchSpotifyPreviewCatalogMetadata(sourceUrl) { 
+    try { 
+      const supabase = createSupabaseClient(APP_CONFIG.supabaseUrl, APP_CONFIG.supabaseAnonKey); 
+      const { data, error } = await supabase.functions.invoke(APP_CONFIG.spotifyEdgeFunctionUrl || "spotify-preview-metadata", { body: { url: sourceUrl } }); 
+      if (error) { 
+        console.error("[Spotify] Edge Function Error:", error); 
+        let msg = "API Error"; 
+        if (error instanceof Error) msg = error.message; 
+        else if (typeof error === "object" && error.message) msg = error.message; 
+        return { error: msg }; 
+      } 
+      if (!data || data.error) return { error: data?.error || "Empty Response" }; 
+      return { title: typeof data.title === "string" ? data.title.trim() : "", creator: typeof data.creator === "string" ? data.creator.trim() : "", thumbnailUrl: typeof data.thumbnailUrl === "string" ? data.thumbnailUrl.trim() : "" }; 
+    } catch (err) { return { error: "Network Error" }; } 
+  }
+
+  async function fetchSpotifyPreviewOEmbedMetadata(sourceUrl) { 
+    return null; 
+  }
 
   const elements = {
     siteHeader: document.querySelector(".site-header"),
@@ -1420,7 +1454,20 @@ export function createAppUi(context) {
 
   function renderMiniPlayerMedia(container, post) { mountPersistentPlayer(container, post, "mini"); }
 
-  function getActivePlayerMediaElement() { if (!(state.activePlayerElement instanceof HTMLElement)) return null; if (state.activePlayerElement instanceof HTMLMediaElement) return state.activePlayerElement; const mediaElement = state.activePlayerElement.querySelector("video, audio"); return mediaElement instanceof HTMLMediaElement ? mediaElement : null; }
+  function getActivePlayerMediaElement() {
+    if (state.activePlayerElement instanceof HTMLElement) {
+      if (state.activePlayerElement instanceof HTMLMediaElement) return state.activePlayerElement;
+      const mediaElement = state.activePlayerElement.querySelector("video, audio");
+      if (mediaElement instanceof HTMLMediaElement) return mediaElement;
+      if (state.activePlayerElement instanceof HTMLIFrameElement) return state.activePlayerElement;
+    }
+    const heroStage = elements?.heroPlayerStage || document.querySelector("#heroPlayerStage");
+    if (heroStage) {
+      const media = heroStage.querySelector("video, audio, iframe");
+      if (media instanceof HTMLElement) return media;
+    }
+    return null;
+  }
 
   function getControllablePlayerPost() { return getPostById(state.activePlayerPostId || state.playerPostId); }
 
@@ -1775,11 +1822,6 @@ export function createAppUi(context) {
     } catch (err) { return { error: "Network Error" }; } 
   }
 
-  async function fetchSpotifyPreviewOEmbedMetadata(sourceUrl) { 
-    return null; 
-  }
-
-  async function getSpotifyPreviewImageUrl(source) { const metadata = await getSpotifyPreviewMetadata(source); return typeof metadata?.thumbnailUrl === "string" ? metadata.thumbnailUrl : ""; }
 
   function getSpotifyPreviewMarket() { const locale = (Array.isArray(navigator.languages) && navigator.languages[0]) || navigator.language || navigator.userLanguage || ""; const match = `${locale}`.trim().match(/[-_]([A-Za-z]{2})$/); return match ? match[1].toUpperCase() : "US"; }
 

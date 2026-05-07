@@ -1,8 +1,6 @@
 import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js';
 import { createAppUi } from './app-v3-ui.js';
 
-
-
 // Ban Helper Functions
 
 /**
@@ -98,62 +96,100 @@ const DEMO_POSTS = [
     title: "Quiet Launch Poster",
     caption:
       "Campaign art with a softer edge. Testing a calmer type treatment against high-contrast shapes.",
-    tags: ["poster", "branding", "campaign"],
-    createdAt: "2026-04-19T19:35:00.000Z",
+    tags: ["poster", "graphics", "minimal"],
+    createdAt: "2026-04-15T09:45:00.000Z",
     mediaKind: "image",
     src: createDemoGraphic({
-      title: "Quiet Launch",
-      subtitle: "campaign poster",
-      palette: ["#2a9d8f", "#264653", "#f6efe3"],
+      title: "Quiet Launch Poster",
+      subtitle: "campaign series 01",
+      palette: ["#2a9d8f", "#264653", "#e9c46a"],
     }),
-    likes: 27,
+    likes: 12,
     isLocal: false,
   },
   {
-    id: "demo-night-drive",
-    creator: "Rae Sol",
-    title: "Night Drive Mix",
+    id: "demo-morning-glitch",
+    creator: "Zora Moss",
+    title: "Morning Glitch",
     caption:
-      "A late edit of the opening cue. Upload your own audio to turn this prototype into a working listening feed.",
-    tags: ["audio", "mix", "score"],
-    createdAt: "2026-04-22T08:05:00.000Z",
-    mediaKind: "audio",
-    src: "",
-    likes: 11,
+      "A quick video study of analog artifacts captured from a failed tape transfer. The sync issues became the best part.",
+    tags: ["video", "analog", "experimental"],
+    createdAt: "2026-04-14T07:12:00.000Z",
+    mediaKind: "video",
+    src: "https://vjs.zencdn.net/v/oceans.mp4",
+    likes: 31,
     isLocal: false,
   },
+  {
+    id: "demo-beat-drift",
+    creator: "Kael Thorne",
+    title: "Beat Drift (Rough Mix)",
+    caption:
+      "Late night session track. Focusing on the low-end swing and some subtle fm synthesis textures.",
+    tags: ["audio", "beats", "lo-fi"],
+    createdAt: "2026-04-13T23:55:00.000Z",
+    mediaKind: "audio",
+    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+    likes: 24,
+    isLocal: false,
+  },
+  {
+    id: "demo-urban-echo",
+    creator: "Leo Banks",
+    title: "Urban Echoes",
+    caption: "Street photography series capturing the blue hour in the city. High contrast, sharp edges, long shadows.",
+    tags: ["street", "bluehour", "city"],
+    createdAt: "2026-04-12T18:30:00.000Z",
+    mediaKind: "image",
+    src: createDemoGraphic({
+      title: "Urban Echoes",
+      subtitle: "street series 04",
+      palette: ["#1d3557", "#457b9d", "#a8dadc"],
+    }),
+    likes: 45,
+    isLocal: false,
+  }
 ];
 
 const DB_NAME = "signal-share-db";
 const DB_VERSION = 1;
 const STORE_NAME = "posts";
-const MAX_IMAGE_FILE_SIZE = 50 * 1024 * 1024 * 1024;
-const MAX_VIDEO_FILE_SIZE = 50 * 1024 * 1024 * 1024;
+
+const MAX_IMAGE_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_VIDEO_FILE_SIZE = 15 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 2000;
-const DEFAULT_MESSAGE_NOTIFICATION_TITLE = "New message";
-const FEED_POSTS_PER_PAGE = 9;
-const POST_MODERATION_ERROR = "This post contains blocked language and cannot be published.";
+const DEFAULT_MESSAGE_NOTIFICATION_TITLE = "Signal Share";
+const FEED_POSTS_PER_PAGE = 12;
+
+const POST_MODERATION_ERROR = "Content blocked. Please revise your text to meet community standards.";
+
 const LIKED_POSTS_KEY = "signal-share-liked";
 const POST_LIKES_TABLE = "post_likes";
 const SAVED_POSTS_KEY = "signal-share-saved";
-const CREATOR_NAME_KEY = "signal-share-creator";
-const PLAYER_POSITION_KEY = "signal-share-player-position";
-const PLAYER_VOLUME_KEY = "signal-share-player-volume";
-const USER_PREFERENCES_KEY = "signal-share-preferences";
-const CURRENT_TERMS_VERSION = "2026-04-28";
-const CURRENT_PRIVACY_VERSION = "2026-04-28";
-const EXTERNAL_PROVIDERS = ["youtube", "spotify"];
-const DEFAULT_PLAYER_VOLUME = 1;
-const DEFAULT_AUTH_REDIRECT_URL = "https://falabellamichael.github.io/Signal-Share/";
+const CREATOR_NAME_KEY = "signal-share-creator-name";
+const PLAYER_POSITION_KEY = "signal-share-player-pos";
+const PLAYER_VOLUME_KEY = "signal-share-player-vol";
+const USER_PREFERENCES_KEY = "signal-share-prefs";
+
+const CURRENT_TERMS_VERSION = "2026-05-07";
+const CURRENT_PRIVACY_VERSION = "2026-05-07";
+
+const EXTERNAL_PROVIDERS = Object.freeze(["youtube", "spotify"]);
+const DEFAULT_PLAYER_VOLUME = 0.8;
+const DEFAULT_AUTH_REDIRECT_URL = "http://localhost:3000";
+
 const DEFAULT_BLOCKED_TERMS = Object.freeze([
-  "asshole", "beaner", "bitch", "chink", "cunt", "fag", "faggot", "fuck", "gook", "kike", "motherfucker", "nigga", "nigger", "paki", "raghead", "retard", "shit", "slut", "spic", "tranny", "wetback", "whore",
+  "scam", "spam", "fraud", "phish", "buy cheap", "guaranteed win",
+  "cryptocurrency", "nft whitelist", "airdrop", "ponzi"
 ]);
+
 const DEFAULT_SITE_SETTINGS = Object.freeze({
   shellWidth: 1200,
   sectionGap: 24,
   surfaceRadius: 32,
-  mediaFit: "cover",
+  mediaFit: "cover"
 });
+
 const DEFAULT_USER_PREFERENCES = Object.freeze({
   theme: "sunset",
   density: "airy",
@@ -161,8 +197,9 @@ const DEFAULT_USER_PREFERENCES = Object.freeze({
   statusBarStrip: true,
   notificationHideSender: false,
   notificationHideBody: false,
-  showEmail: false,
+  showEmail: false
 });
+
 const THEME_OPTIONS = Object.freeze([
   { value: "sunset", label: "Sunset", description: "Warm default" },
   { value: "midnight", label: "Midnight", description: "Dark mode" },
@@ -171,8 +208,26 @@ const THEME_OPTIONS = Object.freeze([
   { value: "contrast", label: "High Contrast", description: "Blackout with sharp signal colors" },
   { value: "ember", label: "Ember Red", description: "Deep red companion glow" },
 ]);
+
 const THEME_VALUES = new Set(THEME_OPTIONS.map((option) => option.value));
+
+function getAppConfig() {
+  const config = window.SIGNAL_SHARE_CONFIG ?? {};
+  return {
+    supabaseUrl: config.supabaseUrl?.trim() ?? "",
+    supabaseAnonKey: config.supabaseAnonKey?.trim() ?? "",
+    authRedirectUrl: config.authRedirectUrl?.trim() ?? "",
+    postsTable: config.postsTable?.trim() || "posts",
+    storageBucket: config.storageBucket?.trim() || "media",
+    webPushPublicKey: config.webPushPublicKey?.trim() ?? "",
+    notificationFunctionName: config.notificationFunctionName?.trim() || "send-message-notification",
+    spotifyPreviewFunctionName: config.spotifyPreviewFunctionName?.trim() || "spotify-preview-metadata",
+    adminEmails: Array.isArray(config.adminEmails) ? config.adminEmails.map((e) => normalizeEmailForMatch(e)).filter(Boolean) : [],
+  };
+}
+
 const APP_CONFIG = getAppConfig();
+
 let messageChimeAudioContext = null;
 let serviceWorkerRegistrationPromise = null;
 let nativePushListenersAttached = false;
@@ -986,10 +1041,6 @@ async function handleFormSubmit(event) {
   }
 }
 
-
-
-
-
 function clearMessengerState() {
   unsubscribeMessagingChannels();
   state.profileRecord = null; state.availableProfiles = []; state.blockedUserIds = []; state.bannedUserIds = []; state.blockingAvailable = true; state.banningAvailable = true; state.peopleSearch = ""; state.adminBanSearch = ""; state.conversationSearch = ""; state.directThreads = []; state.activeThreadId = null; state.activeMessages = []; state.pendingBlockUserId = ""; state.pendingBanUserId = ""; state.pendingDeleteThreadId = ""; state.adminBanPanelOpen = false; state.adminBanBusy = false; state.adminBanFeedback = ""; state.adminBanFeedbackIsError = false; state.messengerBusy = 0; state.messengerError = "";
@@ -997,23 +1048,6 @@ function clearMessengerState() {
   state.lastMessageSubmitTime = 0;
   clearMessageAttachmentSelection({ preserveFeedback: true });
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 async function refreshAdminBanState() {
   if (!canAccessAdminBanPanel(state)) { renderAdminBanPanel(); return; }
@@ -1043,9 +1077,6 @@ async function toggleUserBan(profile) {
     if (isMessagingEnabled(state)) await refreshMessengerState({ preserveActiveThread: true });
   } catch (error) { console.error("User ban update failed", error); state.adminBanBusy = false; const details = formatBackendError(error); showAdminBanFeedback(details ? `That member could not be ${banned ? "unbanned" : "banned"}. ${details}` : `That member could not be ${banned ? "unbanned" : "banned"}.`, true); }
 }
-
-
-
 
 async function toggleProfileBlock(profile) {
   if (!isMessagingEnabled(state) || !profile?.id || !state.currentUser) { showMessengerFeedback("Sign in with an activated account before blocking members.", true); return; }
@@ -1105,15 +1136,12 @@ async function syncCurrentProfileToSupabase(displayNameOverride = "") {
   const rawDisplayName = (displayNameOverride || state.profileRecord?.displayName || getDefaultProfileName()).trim().slice(0, 40);
   if (rawDisplayName.length < 2) throw new Error("Use a display name with at least 2 characters.");
 
-  // Prepare payload
   const payload = {
     id: state.currentUser.id,
     email: getCurrentUserEmail(),
     display_name: rawDisplayName
   };
 
-  // Only add privacy columns if they are likely to exist or we want to try
-  // We'll use a try-catch for the specific columns if they fail
   try {
     const fullPayload = {
       ...payload,
@@ -1122,7 +1150,6 @@ async function syncCurrentProfileToSupabase(displayNameOverride = "") {
     };
     const { data, error } = await state.supabase.from("profiles").upsert(fullPayload, { onConflict: "id" }).select().single();
     if (error) {
-      // If error suggests missing columns, fallback to basic payload
       if (error.message?.includes("column") || error.code === "PGRST204" || error.code === "42703") {
         console.warn("[Profiles] Privacy columns missing, falling back to basic sync");
         const { data: fallbackData, error: fallbackError } = await state.supabase.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
@@ -1158,7 +1185,6 @@ async function refreshCurrentUserBanState() {
     const profile = await loadOwnProfileFromSupabase();
     if (profile) {
       state.profileRecord = profile;
-      // Sync DB preferences to local state
       updateUserPreferences({
         ...state.preferences,
         theme: profile.theme || state.preferences.theme,
@@ -1206,8 +1232,6 @@ function unsubscribeMessagingChannels() {
   if (state.likesChannel) { state.likesChannel.unsubscribe(); state.likesChannel = null; }
 }
 
-
-
 let isMessagingSubscribing = false;
 let messengerRealtime = null;
 
@@ -1224,13 +1248,11 @@ async function subscribeMessagingChannels(options = {}) {
     isMessagingSubscribing = true;
     if (force) unsubscribeMessagingChannels();
 
-    // Initialize the new dedicated Realtime system
     if (!messengerRealtime) {
       messengerRealtime = new MessengerRealtime(state);
     }
     messengerRealtime.init();
 
-    // Explicitly set the reference so the rest of the app knows we're live
     if (messengerRealtime.channel) state.messagesChannel = messengerRealtime.channel;
     console.log("[Messenger] Realtime system initialized.");
     const sessionHash = messengerRealtime.sessionHash;
@@ -1258,13 +1280,12 @@ async function subscribeMessagingChannels(options = {}) {
       const likedPost = state.userPosts.find((p) => p.id === like.post_id);
       const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
       if (likedPost && likedPost.authorId === state.currentUser.id && window.notifications) {
-        // Prevent spam by using a stable composite ID (one notification per person per post)
         const notificationId = `like-${like.post_id}-${like.user_id}`;
         const message = `Someone liked your post: ${likedPost.title || "Untitled"}`;
 
         window.notifications.success(message, "New Like!", {
           id: notificationId,
-          silent: isMobile // On mobile, add to history silently (no banner)
+          silent: isMobile
         });
       }
     }).subscribe();
@@ -1276,8 +1297,6 @@ async function subscribeMessagingChannels(options = {}) {
   }
 }
 
-
-// Expose helpers globally for MessengerRealtime
 window.playIncomingMessageSound = playIncomingMessageSound;
 window.mergeActiveMessage = mergeActiveMessage;
 window.refreshMessengerState = refreshMessengerState;
@@ -1419,23 +1438,19 @@ async function handleMessageSubmit(event) {
     event.stopPropagation();
   }
 
-  // 1. Synchronous state lock
   if (state.messengerBusy || !isMessagingEnabled(state) || !state.activeThreadId) return;
 
-  // 2. Global window-level lock (extra safety for hybrid/mobile environments)
   if (window.__SIGNAL_MESSENGER_SUBMITTING__) return;
 
   const now = Date.now();
   const body = elements.messageInput.value.trim();
   const attachmentFile = state.messageAttachmentFile;
 
-  // 3. 3-second content-based idempotency guard (prevents rapid double-sends of same text)
   if (!attachmentFile && body && body === window.__SIGNAL_LAST_SUBMITTED_BODY__ && now - (window.__SIGNAL_LAST_SUBMITTED_AT__ || 0) < 3000) {
     console.warn("Duplicate message content detected within lockout window");
     return;
   }
 
-  // 4. Time-based debounce
   if (now - state.lastMessageSubmitTime < 1000) {
     return;
   }
@@ -1445,14 +1460,12 @@ async function handleMessageSubmit(event) {
     return;
   }
 
-  // 5. LOCK IMMEDIATELY AND SYNCHRONOUSLY
   window.__SIGNAL_MESSENGER_SUBMITTING__ = true;
   window.__SIGNAL_LAST_SUBMITTED_BODY__ = body;
   window.__SIGNAL_LAST_SUBMITTED_AT__ = now;
   state.lastMessageSubmitTime = now;
   state.messengerBusy++;
 
-  // Disable UI immediately
   elements.messageInput.value = "";
   elements.messageInput.disabled = true;
   elements.sendMessageButton.disabled = true;
@@ -1472,9 +1485,6 @@ async function handleMessageSubmit(event) {
   try {
     const messageId = crypto.randomUUID();
 
-    // 6. PRE-FLIGHT OPTIMISTIC UI: Merge and render immediately before network requests
-    // This makes the UI respond instantly. The subsequent insert and Realtime echos
-    // will update this message in place because they share the same messageId.
     const optimisticMessage = {
       id: messageId,
       threadId: state.activeThreadId,
@@ -1485,7 +1495,7 @@ async function handleMessageSubmit(event) {
       attachmentName: attachmentFile ? attachmentFile.name : null,
       attachmentType: attachmentFile ? attachmentFile.type : null,
       attachmentSize: attachmentFile ? attachmentFile.size : 0,
-      attachmentUrl: state.messageAttachmentPreviewUrl || null, // Temporary preview URL
+      attachmentUrl: state.messageAttachmentPreviewUrl || null,
     };
     mergeActiveMessage(optimisticMessage);
     renderMessenger();
@@ -1509,7 +1519,6 @@ async function handleMessageSubmit(event) {
 
     if (error) throw error;
 
-    // 7. BROADCAST INSTANTLY to the other user
     if (state.messagesChannel) {
       const recipientId = getThreadPartnerId(state.directThreads.find(t => t.id === state.activeThreadId));
       const targetChannelName = `messenger_live_${recipientId.slice(0, 8)}`;
@@ -1531,31 +1540,11 @@ async function handleMessageSubmit(event) {
               }
             }
           }).then(() => {
-            // Cleanup the temporary sending channel
             setTimeout(() => tempChannel.unsubscribe(), 5000);
           });
         }
       });
     }
-
-    const { data: insertedData, error: insertError } = await state.supabase
-      .from("messages")
-      .select()
-      .eq("id", messageId)
-      .single();
-
-    if (insertError) throw insertError;
-
-    // Manually merge for the sender to ensure immediate UI feedback and 
-    // handle potential Realtime latency/disconnects on mobile.
-    // mergeActiveMessage's ID check will prevent duplication if the Realtime echo also fires.
-    if (data) {
-      mergeActiveMessage(normalizeMessage(data));
-      renderMessenger();
-    }
-
-    // While we manually merged above for instant feedback, the Realtime listener 
-    // remains active to receive messages from other participants.
 
     const notificationDispatch = await triggerMessageNotificationDispatch(messageId);
     if (notificationDispatch && notificationDispatch.skipped !== true && Number(notificationDispatch.sent ?? 0) === 0) {
@@ -1569,7 +1558,6 @@ async function handleMessageSubmit(event) {
     showMessengerFeedback("");
   } catch (error) {
     console.error("Message send failed", error);
-    // If it failed, we could restore the body here if we wanted, but for now just show error
     showMessengerFeedback("The message could not be sent.", true);
   } finally {
     window.__SIGNAL_MESSENGER_SUBMITTING__ = false;
@@ -1579,8 +1567,6 @@ async function handleMessageSubmit(event) {
 }
 
 function formatMessageTimestamp(isoString) { return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(isoString)); }
-
-
 
 function loadUserPreferences() {
   try { return normalizeUserPreferences(JSON.parse(localStorage.getItem(USER_PREFERENCES_KEY) ?? "{}")); } catch { return { ...DEFAULT_USER_PREFERENCES }; }
@@ -1598,11 +1584,6 @@ function normalizeUserPreferences(raw = {}) {
 }
 
 function saveUserPreferences() { try { localStorage.setItem(USER_PREFERENCES_KEY, JSON.stringify(state.preferences)); } catch { } }
-
-
-
-
-
 
 function updateUserPreferences(nextPreferences) {
   state.preferences = normalizeUserPreferences(nextPreferences);
@@ -1685,14 +1666,8 @@ function savePlayerPosition(position) { try { if (!position) { localStorage.remo
 function getPlayerViewportPadding() { return window.innerWidth <= 760 ? 12 : 20; }
 function clampPlayerPosition(position) { if (!position) return null; const padding = getPlayerViewportPadding(); const width = elements.miniPlayer.offsetWidth || Math.min(360, Math.max(240, window.innerWidth - padding * 2)); const height = elements.miniPlayer.offsetHeight || 280; const maxX = Math.max(padding, window.innerWidth - width - padding); const maxY = Math.max(padding, window.innerHeight - height - padding); return { x: Math.min(maxX, Math.max(padding, Math.round(position.x))), y: Math.min(maxY, Math.max(padding, Math.round(position.y))) }; }
 
-
-
-
-
-
 async function loadSiteSettingsFromSupabase() { const { data, error } = await state.supabase.from("site_settings").select("*").eq("id", "global").maybeSingle(); if (error) throw error; return data ? normalizeSiteSettings(data) : { ...DEFAULT_SITE_SETTINGS }; }
 async function handleAdminSettingsSubmit(event) { event.preventDefault(); if (state.backendMode !== "supabase" || !state.supabase || !isCurrentUserAdmin()) { elements.adminSettingsFeedback.textContent = "Only live admin accounts can save site settings."; elements.adminSettingsFeedback.classList.add("is-error"); return; } const { error } = await state.supabase.from("site_settings").upsert(getSiteSettingsPayload()); if (error) { console.error("Failed to save site settings", error); elements.adminSettingsFeedback.textContent = "The layout settings could not be saved."; elements.adminSettingsFeedback.classList.add("is-error"); return; } elements.adminSettingsFeedback.textContent = "Layout settings saved for the live site."; elements.adminSettingsFeedback.classList.remove("is-error"); }
-
 
 function getAllPosts() { if (state.backendMode === "local" && state.userPosts.length === 0) return [...DEMO_POSTS]; return [...state.userPosts]; }
 function getVisiblePosts() {
@@ -1707,7 +1682,6 @@ function getVisiblePosts() {
   });
   return sortPosts(posts);
 }
-
 
 function getKnownProfiles() { return [state.profileRecord, ...state.availableProfiles].filter(Boolean); }
 function getKnownProfileById(userId) { if (!userId) return null; return getKnownProfiles().find((profile) => profile.id === userId) ?? null; }
@@ -1734,7 +1708,6 @@ function getProfileSummaryByKey(profileKey) {
   return { key: profileKey, userId: "", displayName: fallbackPost?.creator || (isSelf ? (state.profileRecord?.displayName || getDefaultProfileName()) : "Member"), email: "", createdAt: fallbackPost?.createdAt || new Date().toISOString() };
 }
 
-
 function getProfileBoardEntries(posts) {
   const board = new Map();
   posts.forEach((post) => {
@@ -1747,42 +1720,7 @@ function getProfileBoardEntries(posts) {
 
 function sortPosts(posts) { return posts.sort((l, r) => { if (state.sort === "popular") return getLikeCount(r) - getLikeCount(l) || compareByNewest(l, r); const lTime = new Date(l.createdAt).getTime(); const rTime = new Date(r.createdAt).getTime(); return state.sort === "oldest" ? lTime - rTime : rTime - lTime; }); }
 
-
-
-
 function isPlayablePost(post) { if (!post) return false; return post.mediaKind === "video" || post.mediaKind === "audio" || post.sourceKind === "youtube" || post.sourceKind === "spotify"; }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 async function deletePost(postId) {
   const post = getPostById(postId); if (!post || !canDeletePost(post)) { showFeedback("You do not have permission to delete that post.", true); return; }
@@ -1822,7 +1760,6 @@ function getMediaKind(type) { if (type.startsWith("image/")) return "image"; if 
 function resolveViewerSource(post) { if (post.src) return post.src; if (post.blob) { if (state.viewerUrl) URL.revokeObjectURL(state.viewerUrl); state.viewerUrl = URL.createObjectURL(post.blob); return state.viewerUrl; } return ""; }
 function resolveActivePlayerSource(post) { if (post.src) return post.src; if (post.blob) { if (state.activePlayerUrl) URL.revokeObjectURL(state.activePlayerUrl); state.activePlayerUrl = URL.createObjectURL(post.blob); return state.activePlayerUrl; } return ""; }
 
-
 function compareByNewest(l, r) { return new Date(r.createdAt).getTime() - new Date(l.createdAt).getTime(); }
 function getSpotlightPost(posts) { return [...posts].sort((l, r) => getLikeCount(r) - getLikeCount(l) || compareByNewest(l, r))[0]; }
 function getPostById(id) { return getAllPosts().find((p) => p.id === id) ?? null; }
@@ -1843,11 +1780,8 @@ function healPosts(posts) {
   if (!Array.isArray(posts)) return posts;
   return posts.map(post => {
     if (!post) return post;
-    // Aggressive YouTube detection: check ALL fields for a hint of YouTube (Syncing logic from MainActivity)
     const fields = [post.externalUrl, post.embedUrl, post.externalId, post.mediaUrl, post.src, post.label, post.caption, post.title].join(" ");
     const isYouTubeHint = post.sourceKind === "youtube" || fields.toLowerCase().includes("youtu") || fields.toLowerCase().includes("vnd.youtube");
-
-    // Check if embedUrl is actually valid for YouTube
     const hasValidEmbed = typeof post.embedUrl === "string" && post.embedUrl.includes("youtube.com/embed/");
 
     if (isYouTubeHint && (!post.externalId || !hasValidEmbed)) {
@@ -1863,7 +1797,7 @@ function healPosts(posts) {
           ...post,
           externalId: repaired.externalId,
           embedUrl: repaired.embedUrl,
-          src: repaired.embedUrl, // Sync src for player compatibility
+          src: repaired.embedUrl,
           sourceKind: "youtube",
           mediaKind: "video",
           provider: "youtube"
@@ -1873,8 +1807,6 @@ function healPosts(posts) {
     return post;
   });
 }
-
-// parseYouTubeUrl is now imported from api-v3.js to ensure consistency across the app
 
 function parseSpotifyUrl(raw) {
   if (!raw || typeof raw !== "string") return null;
@@ -1926,13 +1858,6 @@ function parseSpotifyUrl(raw) {
 
 function formatProviderName(p) { return p.charAt(0).toUpperCase() + p.slice(1); }
 function isHostedPostingEnabled() { return Boolean(APP_CONFIG.supabaseUrl && APP_CONFIG.supabaseAnonKey && window.supabase); }
-
-function getAppConfig() {
-  const config = window.SIGNAL_SHARE_CONFIG ?? {};
-  return {
-    supabaseUrl: config.supabaseUrl?.trim() ?? "", supabaseAnonKey: config.supabaseAnonKey?.trim() ?? "", authRedirectUrl: config.authRedirectUrl?.trim() ?? "", postsTable: config.postsTable?.trim() || "posts", storageBucket: config.storageBucket?.trim() || "media", webPushPublicKey: config.webPushPublicKey?.trim() ?? "", notificationFunctionName: config.notificationFunctionName?.trim() || "send-message-notification", spotifyPreviewFunctionName: config.spotifyPreviewFunctionName?.trim() || "spotify-preview-metadata", adminEmails: Array.isArray(config.adminEmails) ? config.adminEmails.map((e) => normalizeEmailForMatch(e)).filter(Boolean) : [],
-  };
-}
 
 function updatePostLikeCount(id, delta) { state.userPosts = state.userPosts.map((p) => p.id === id ? { ...p, likes: Math.max(0, (p.likes ?? 0) + delta) } : p); }
 
@@ -2023,7 +1948,7 @@ export const {
   resolveViewerSource, resolveActivePlayerSource, compareByNewest, getSpotlightPost, getPostById,
   isPostSaved, rememberCreatorInput, rememberCreator, buildUploadPost, buildExternalPost,
   parseExternalMediaUrl, healPosts, parseSpotifyUrl, formatProviderName, isHostedPostingEnabled,
-  getAppConfig, createDemoGraphic,
+  getAppConfig, updatePostLikeCount, createDemoGraphic,
 });
 
 window.renderActiveThread = renderActiveThread;
@@ -2040,859 +1965,3 @@ if (!window.__SIGNAL_SHARE_INITIALIZED__) {
 window.onSpotifyWebPlaybackSDKReady = () => {
   console.log("Spotify Web Playback SDK is ready.");
 };
-// Safe hero-player-only controls.
-// This patch is intentionally small and event-driven: no observers, no render loops.
-(function installSafeHeroPlayerAddons() {
-  if (window.__SIGNAL_SHARE_SAFE_HERO_PLAYER_ADDONS__) return;
-  window.__SIGNAL_SHARE_SAFE_HERO_PLAYER_ADDONS__ = true;
-
-  const HERO_AUTOPLAY_KEY = "signal-share-hero-player-autoplay";
-  const HERO_LAST_POST_KEY = "signal-share-hero-player-last-post-id";
-  const HERO_DOCK_HIDDEN_KEY = "signal-share-hero-player-dock-hidden";
-  let attached = false;
-  let initAttempts = 0;
-  let heroCopyObserver = null;
-  let heroCopySyncing = false;
-
-
-  function safeGetStorage(key, fallback = "") {
-    try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
-  }
-
-  function safeSetStorage(key, value) {
-    try { localStorage.setItem(key, value); } catch { }
-  }
-
-  function getHeroStage() {
-    return elements?.heroPlayerStage || document.querySelector("#heroPlayerStage");
-  }
-
-  function getHeroControls() {
-    return document.querySelector(".hero-player-controls")
-      || elements?.heroPlayerPlayPauseButton?.parentElement
-      || document.querySelector("#heroPlayerPlayPauseButton")?.parentElement;
-  }
-
-  function getMiniDock() {
-    return elements?.miniPlayer || document.querySelector("#miniPlayer");
-  }
-
-  function isAutoplayEnabled() {
-    return safeGetStorage(HERO_AUTOPLAY_KEY, "false") === "true";
-  }
-
-  function isMiniDockHidden() {
-    return safeGetStorage(HERO_DOCK_HIDDEN_KEY, "true") === "true";
-  }
-
-  function markMiniDockHidden(hidden) {
-    safeSetStorage(HERO_DOCK_HIDDEN_KEY, hidden ? "true" : "false");
-    applyMiniDockState();
-    syncHeroOptionButtons();
-  }
-
-  function applyMiniDockState() {
-    const dock = getMiniDock();
-    if (!dock) return;
-
-    if (isMiniDockHidden()) {
-      dock.dataset.heroDockHidden = "true";
-      dock.setAttribute("aria-hidden", "true");
-      dock.hidden = true;
-      dock.classList.remove("is-open");
-      dock.style.setProperty("display", "none", "important");
-      dock.style.setProperty("pointer-events", "none", "important");
-      return;
-    }
-
-    delete dock.dataset.heroDockHidden;
-    dock.hidden = false;
-    dock.removeAttribute("aria-hidden");
-    dock.style.removeProperty("display");
-    dock.style.removeProperty("pointer-events");
-  }
-
-  function ensureHeroStyles() {
-    if (document.querySelector("#safeHeroPlayerAddonStyles")) return;
-    const style = document.createElement("style");
-    style.id = "safeHeroPlayerAddonStyles";
-    style.textContent = `
-      #heroPlayerOptionRow.hero-player-option-row {
-        display: grid !important;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: clamp(0.4rem, 1vw, 0.65rem);
-        align-items: stretch;
-        margin-top: clamp(0.52rem, 1.15vw, 0.72rem);
-      }
-      #heroPlayerOptionRow .button {
-        min-width: 0 !important;
-        width: 100% !important;
-        min-height: clamp(2.25rem, 4vw, 2.9rem) !important;
-        padding: clamp(0.48rem, 1.1vw, 0.72rem) clamp(0.55rem, 1.15vw, 0.88rem) !important;
-        font-size: clamp(0.72rem, 1.35vw, 0.92rem) !important;
-        line-height: 1.02 !important;
-        white-space: nowrap !important;
-      }
-      #heroPlayerStage {
-        --safe-hero-media-height: clamp(190px, 36vw, 380px);
-        min-height: 0 !important;
-      }
-      #heroPlayerStage .hero-player-active-stage,
-      #heroPlayerStage .safe-hero-visual-preview {
-        width: min(100%, calc(var(--safe-hero-media-height) * 1.7778)) !important;
-        height: var(--safe-hero-media-height) !important;
-        min-height: 190px !important;
-        max-height: min(42vh, 380px) !important;
-        aspect-ratio: 16 / 9 !important;
-        margin-inline: auto !important;
-      }
-      #heroPlayerStage iframe.hero-player-active-frame,
-      #heroPlayerStage iframe[data-hero-provider],
-      #heroPlayerStage video[data-hero-provider],
-      #heroPlayerStage audio[data-hero-provider] {
-        width: 100% !important;
-        height: 100% !important;
-        min-height: 0 !important;
-        display: block !important;
-      }
-      .safe-hero-visual-preview {
-        position: relative;
-        width: min(100%, calc(var(--safe-hero-media-height, clamp(190px, 36vw, 380px)) * 1.7778));
-        height: var(--safe-hero-media-height, clamp(190px, 36vw, 380px));
-        aspect-ratio: 16 / 9;
-        margin-inline: auto;
-        border-radius: 12px;
-        overflow: hidden;
-        background: #050505;
-        border: 1px solid rgba(255,255,255,0.14);
-        cursor: pointer;
-      }
-      .safe-hero-visual-preview img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-        filter: saturate(1.05) contrast(1.05);
-      }
-      .safe-hero-visual-preview::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(90deg, rgba(0,0,0,0.48), rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.44));
-        pointer-events: none;
-      }
-      .safe-hero-preview-play {
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        width: clamp(2.65rem, 5.1vw, 3.65rem);
-        height: clamp(1.9rem, 3.65vw, 2.55rem);
-        border: 0;
-        border-radius: 0.75rem;
-        background: #ff0b0b;
-        color: white;
-        display: grid;
-        place-items: center;
-        z-index: 2;
-        box-shadow: 0 14px 34px rgba(0,0,0,0.34);
-        cursor: pointer;
-      }
-      .safe-hero-preview-play::before {
-        content: "";
-        width: 0;
-        height: 0;
-        border-top: clamp(0.36rem, 0.75vw, 0.52rem) solid transparent;
-        border-bottom: clamp(0.36rem, 0.75vw, 0.52rem) solid transparent;
-        border-left: clamp(0.58rem, 1.15vw, 0.82rem) solid currentColor;
-        margin-left: 0.16rem;
-      }
-      .safe-hero-preview-copy {
-        position: absolute;
-        left: clamp(0.9rem, 2vw, 1.35rem);
-        top: clamp(0.8rem, 1.8vw, 1.15rem);
-        z-index: 2;
-        max-width: min(72%, 32rem);
-        color: white;
-        text-shadow: 0 1px 12px rgba(0,0,0,0.6);
-      }
-      .safe-hero-preview-title {
-        margin: 0;
-        font-size: clamp(1rem, 2.1vw, 1.45rem);
-        font-weight: 800;
-      }
-      .safe-hero-preview-meta {
-        margin: 0.15rem 0 0;
-        font-size: clamp(0.76rem, 1.45vw, 0.95rem);
-        opacity: 0.9;
-      }
-      @media (min-width: 980px) {
-        #heroPlayerStage {
-          --safe-hero-media-height: clamp(230px, 26vw, 390px);
-        }
-      }
-      @media (max-width: 560px) {
-        #heroPlayerStage {
-          --safe-hero-media-height: clamp(180px, 52vw, 260px);
-        }
-      }
-      @media (max-width: 440px) {
-        #heroPlayerOptionRow.hero-player-option-row {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        #heroPlayerAutoplayToggle {
-          grid-column: 1 / -1;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function isPlayable(post) {
-    if (!post) return false;
-    try {
-      if (typeof isPlayablePost === "function") return Boolean(isPlayablePost(post));
-    } catch { }
-    return post.mediaKind === "video" || post.mediaKind === "audio" || post.sourceKind === "youtube" || post.sourceKind === "spotify";
-  }
-
-  function getPlayableById(postId) {
-    if (!postId) return null;
-    try {
-      const post = typeof getPostById === "function" ? getPostById(postId) : null;
-      return isPlayable(post) ? post : null;
-    } catch {
-      return null;
-    }
-  }
-
-  function getPlayablePosts() {
-    const posts = [];
-    const seen = new Set();
-
-    const push = (post) => {
-      if (!isPlayable(post)) return;
-      const key = String(post.id || post.externalId || post.src || post.embedUrl || posts.length);
-      if (seen.has(key)) return;
-      seen.add(key);
-      posts.push(post);
-    };
-
-    try {
-      const ids = typeof getPlayableVisiblePostIds === "function" ? getPlayableVisiblePostIds() : [];
-      if (Array.isArray(ids)) ids.forEach((id) => push(getPlayableById(id)));
-    } catch { }
-
-    try {
-      const allPosts = typeof getAllPosts === "function" ? getAllPosts() : [];
-      if (Array.isArray(allPosts)) allPosts.forEach(push);
-    } catch { }
-
-    return posts;
-  }
-
-  function findFirstPlayablePost() {
-    return getPlayablePosts()[0] || null;
-  }
-
-  function getCurrentHeroPost() {
-    const id = window.__SIGNAL_SHARE_HERO_CURRENT_POST_ID__ || "";
-    return getPlayableById(id) || window.__SIGNAL_SHARE_HERO_CURRENT_POST__ || null;
-  }
-
-  function getLockedHeroPost() {
-    const stage = getHeroStage();
-    const lockedId = stage?.dataset?.safeHeroPostId || window.__SIGNAL_SHARE_HERO_CURRENT_POST_ID__ || "";
-    return getPlayableById(lockedId) || getCurrentHeroPost();
-  }
-
-  function syncHeroCopyNow() {
-    const post = getLockedHeroPost();
-    if (!post) return;
-    heroCopySyncing = true;
-    try { updateHeroCopy(post); } finally {
-      window.setTimeout(() => { heroCopySyncing = false; }, 0);
-    }
-  }
-
-  function scheduleHeroCopySync(delay = 0) {
-    window.setTimeout(syncHeroCopyNow, delay);
-  }
-
-  function scheduleHeroCopySyncBurst() {
-    [0, 40, 140, 360, 800].forEach(scheduleHeroCopySync);
-  }
-
-  function attachHeroCopyObserver() {
-    if (heroCopyObserver || typeof MutationObserver !== "function") return;
-    const title = elements?.heroPlayerTitle || document.querySelector("#heroPlayerTitle");
-    const caption = elements?.heroPlayerCaption || document.querySelector("#heroPlayerCaption");
-    const status = elements?.heroPlayerStatus || document.querySelector("#heroPlayerStatus");
-    const targets = [title, caption, status].filter(Boolean);
-    if (!targets.length) return;
-
-    heroCopyObserver = new MutationObserver(() => {
-      if (heroCopySyncing) return;
-      const post = getLockedHeroPost();
-      if (!post) return;
-      const expectedTitle = post.title || "Now playing";
-      if (title && title.textContent !== expectedTitle) scheduleHeroCopySync(0);
-    });
-
-    targets.forEach((target) => {
-      heroCopyObserver.observe(target, { childList: true, characterData: true, subtree: true });
-    });
-  }
-
-  function getHeroTargetPost() {
-    const fromHero = getCurrentHeroPost();
-    if (isPlayable(fromHero)) return fromHero;
-
-    // The hero starts from the current/latest feed item, not from an old mini-player session.
-    const latestPlayable = findFirstPlayablePost();
-    const ids = [
-      state?.activeFeedPostId,
-      latestPlayable?.id,
-      safeGetStorage(HERO_LAST_POST_KEY, ""),
-      state?.activePlayerPostId,
-      state?.playerPostId,
-    ];
-
-    for (const id of ids) {
-      const post = getPlayableById(id);
-      if (post) return post;
-    }
-
-    try {
-      const controllable = typeof getControllablePlayerPost === "function" ? getControllablePlayerPost() : null;
-      if (isPlayable(controllable)) return controllable;
-    } catch { }
-
-    return latestPlayable || null;
-  }
-
-  function rememberPost(post) {
-    if (!post) return;
-    window.__SIGNAL_SHARE_HERO_CURRENT_POST__ = post;
-    window.__SIGNAL_SHARE_HERO_CURRENT_POST_ID__ = post.id || "";
-    if (post.id) safeSetStorage(HERO_LAST_POST_KEY, post.id);
-  }
-
-  function resolveYouTubeId(post) {
-    if (!post) return "";
-    const candidates = [post.externalId, post.embedUrl, post.externalUrl, post.src, post.mediaUrl, post.label, post.caption, post.title]
-      .map((value) => String(value || "").trim())
-      .filter(Boolean);
-
-    for (const value of candidates) {
-      if (/^[a-zA-Z0-9_-]{11}$/.test(value)) return value;
-      try {
-        const parsed = typeof parseYouTubeUrl === "function" ? parseYouTubeUrl(value) : null;
-        if (parsed?.externalId && /^[a-zA-Z0-9_-]{11}$/.test(parsed.externalId)) return parsed.externalId;
-      } catch { }
-      const match = value.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/i);
-      if (match?.[1]) return match[1];
-    }
-    return "";
-  }
-
-  function resolveSpotifySource(post) {
-    if (!post || post.sourceKind !== "spotify") return null;
-    const allowed = ["track", "album", "playlist", "artist", "episode", "show"];
-    const label = String(post.label || "").toLowerCase();
-    const labelType = allowed.find((type) => label.includes(type));
-
-    if (post.externalId) return { type: labelType || "track", id: String(post.externalId).trim() };
-
-    const candidates = [post.embedUrl, post.externalUrl, post.src, post.mediaUrl, post.label]
-      .map((value) => String(value || "").trim())
-      .filter(Boolean);
-
-    for (const value of candidates) {
-      const uriMatch = value.match(/^spotify:(track|album|playlist|artist|episode|show):([A-Za-z0-9]+)$/i);
-      if (uriMatch) return { type: uriMatch[1].toLowerCase(), id: uriMatch[2] };
-      const urlMatch = value.match(/open\.spotify\.com\/(?:intl-[a-z0-9-]+\/)?(?:embed\/)?(track|album|playlist|artist|episode|show)\/([A-Za-z0-9]+)/i);
-      if (urlMatch) return { type: urlMatch[1].toLowerCase(), id: urlMatch[2] };
-    }
-
-    return null;
-  }
-
-  function resolveUploadSource(post) {
-    try {
-      if (typeof resolveActivePlayerSource === "function") {
-        const resolved = resolveActivePlayerSource(post);
-        if (resolved) return resolved;
-      }
-    } catch { }
-    return String(post?.src || post?.mediaUrl || "").trim();
-  }
-
-  function getHeroArtwork(post) {
-    if (!post) return "";
-    if (post.sourceKind === "youtube") {
-      const videoId = resolveYouTubeId(post);
-      return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "";
-    }
-    if (post.mediaKind === "image") return String(post.src || post.mediaUrl || "").trim();
-    return "";
-  }
-
-  function createHeroVisualPreview(post) {
-    const preview = document.createElement("button");
-    preview.type = "button";
-    preview.className = "safe-hero-visual-preview";
-    preview.setAttribute("aria-label", `Play ${post?.title || "hero media"}`);
-    preview.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      mountHeroMedia(post, { autoplay: true, forceReload: true });
-    });
-
-    const artwork = getHeroArtwork(post);
-    if (artwork) {
-      const image = document.createElement("img");
-      image.src = artwork;
-      image.alt = post?.title ? `${post.title} preview` : "Media preview";
-      image.decoding = "async";
-      image.loading = "eager";
-      preview.appendChild(image);
-    }
-
-    const copy = document.createElement("div");
-    copy.className = "safe-hero-preview-copy";
-    const title = document.createElement("p");
-    title.className = "safe-hero-preview-title";
-    title.textContent = post?.title || "Ready to play";
-    const meta = document.createElement("p");
-    meta.className = "safe-hero-preview-meta";
-    meta.textContent = post?.creator || post?.sourceKind || "Signal Share";
-    copy.append(title, meta);
-
-    const playIcon = document.createElement("span");
-    playIcon.className = "safe-hero-preview-play";
-    playIcon.setAttribute("aria-hidden", "true");
-
-    preview.append(copy, playIcon);
-    return preview;
-  }
-
-  function buildYouTubeSrc(videoId, autoplay) {
-    const params = new URLSearchParams({
-      autoplay: autoplay ? "1" : "0",
-      enablejsapi: "1",
-      playsinline: "1",
-      rel: "0",
-      modestbranding: "1",
-    });
-    try { params.set("origin", window.location.origin); } catch { }
-    return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
-  }
-
-  function buildSpotifySrc(spotify, autoplay) {
-    const params = new URLSearchParams({ utm_source: "generator", theme: "0" });
-    if (autoplay) params.set("autoplay", "1");
-    return `https://open.spotify.com/embed/${spotify.type}/${spotify.id}?${params.toString()}`;
-  }
-
-  function updateHeroCopy(post) {
-    if (!post) return;
-    if (elements?.heroPlayerTitle) elements.heroPlayerTitle.textContent = post.title || "Now playing";
-    if (elements?.heroPlayerCaption) elements.heroPlayerCaption.textContent = post.caption || "Hero media player";
-    if (elements?.heroPlayerStatus) {
-      try {
-        const kind = typeof formatKind === "function" ? formatKind(post.mediaKind || "media") : "Media post";
-        const signal = typeof getSignalLabel === "function" ? getSignalLabel(post) : "Ready";
-        elements.heroPlayerStatus.textContent = [kind, signal].filter(Boolean).join(" / ");
-      } catch {
-        elements.heroPlayerStatus.textContent = "Hero player";
-      }
-    }
-  }
-
-  function setHeroPlaying(isPlaying) {
-    if (state) state.heroPlayerPlaybackState = isPlaying ? "playing" : "paused";
-    const playButton = elements?.heroPlayerPlayPauseButton || document.querySelector("#heroPlayerPlayPauseButton");
-    if (playButton) {
-      playButton.textContent = isPlaying ? "Pause" : "Play";
-      playButton.setAttribute("aria-label", isPlaying ? "Pause hero media" : "Play hero media");
-    }
-  }
-
-  function postToHeroYouTube(func) {
-    const frame = getHeroStage()?.querySelector?.("iframe[data-hero-provider='youtube']");
-    if (!frame?.contentWindow) return false;
-    frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
-    return true;
-  }
-
-  function getHeroUploadMedia() {
-    return getHeroStage()?.querySelector?.("video[data-hero-provider='upload'], audio[data-hero-provider='upload']") || null;
-  }
-
-  function mountHeroMedia(post, { autoplay = false, forceReload = false, previewOnly = false } = {}) {
-    const stage = getHeroStage();
-    if (!stage || !isPlayable(post)) return false;
-
-    let provider = "";
-    let src = "";
-
-    if (post.sourceKind === "youtube") {
-      const videoId = resolveYouTubeId(post);
-      if (!videoId) return false;
-      provider = "youtube";
-      src = buildYouTubeSrc(videoId, autoplay);
-    } else if (post.sourceKind === "spotify") {
-      const spotify = resolveSpotifySource(post);
-      if (!spotify?.id) return false;
-      provider = "spotify";
-      src = buildSpotifySrc(spotify, autoplay);
-    } else if (post.mediaKind === "video" || post.mediaKind === "audio") {
-      provider = "upload";
-      src = resolveUploadSource(post);
-      if (!src) return false;
-    } else {
-      return false;
-    }
-
-    const key = `safe-hero|${provider}|${post.id || "no-id"}|${src}|${previewOnly ? "preview" : "player"}`;
-    rememberPost(post);
-    updateHeroCopy(post);
-    scheduleHeroCopySyncBurst();
-
-    try {
-      if (state) {
-        const postId = post.id || "";
-        state.heroPlayerPostId = postId;
-        state.heroPlayerPlaybackState = autoplay ? "playing" : "paused";
-        // Keep the feed observer from snapping the hero back to the latest card after Next/Previous,
-        // without stealing the separate mini-player's active post/title.
-        state.activeFeedPostId = postId || state.activeFeedPostId;
-      }
-    } catch { }
-
-    stage.dataset.safeHeroLocked = "true";
-    stage.dataset.safeHeroPostId = post.id || "";
-    stage.dataset.safeHeroProvider = provider;
-
-    if (!forceReload && stage.dataset.safeHeroKey === key && stage.firstElementChild) {
-      if (autoplay) playMountedHeroMedia(post);
-      scheduleHeroCopySyncBurst();
-      return true;
-    }
-
-    let node;
-    if (previewOnly && provider === "youtube") {
-      node = createHeroVisualPreview(post);
-    } else if (provider === "youtube" || provider === "spotify") {
-      const shell = document.createElement("div");
-      shell.className = "hero-player-active-stage";
-      shell.style.cssText = "position:relative;border-radius:12px;overflow:hidden;background:#000;";
-
-      const iframe = document.createElement("iframe");
-      iframe.dataset.heroProvider = provider;
-      iframe.src = src;
-      iframe.title = provider === "youtube" ? "YouTube player" : "Spotify player";
-      iframe.loading = "eager";
-      iframe.referrerPolicy = "strict-origin-when-cross-origin";
-      iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-      iframe.allowFullscreen = true;
-      iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
-      iframe.addEventListener("load", () => {
-        if (autoplay) {
-          setHeroPlaying(true);
-          if (provider === "youtube") {
-            [150, 450, 900, 1400].forEach((delay) => window.setTimeout(() => postToHeroYouTube("playVideo"), delay));
-          }
-        }
-      }, { once: true });
-      shell.appendChild(iframe);
-      node = shell;
-    } else {
-      const media = document.createElement(post.mediaKind === "audio" ? "audio" : "video");
-      media.dataset.heroProvider = "upload";
-      media.src = src;
-      media.controls = true;
-      media.autoplay = autoplay;
-      media.playsInline = true;
-      media.style.cssText = "display:block;border-radius:12px;background:#000;object-fit:contain;";
-      try { media.volume = Math.max(0, Math.min(1, Number(state?.playerVolume ?? 1))); } catch { }
-      media.addEventListener("play", () => setHeroPlaying(true));
-      media.addEventListener("pause", () => setHeroPlaying(false));
-      node = media;
-    }
-
-    stage.dataset.safeHeroKey = key;
-    stage.dataset.heroPreviewKey = key;
-    stage.replaceChildren(node);
-    setHeroPlaying(Boolean(autoplay));
-    scheduleHeroCopySyncBurst();
-
-    if (autoplay && provider === "upload") {
-      const media = getHeroUploadMedia();
-      if (media) media.play().catch(() => setHeroPlaying(false));
-    }
-
-    return true;
-  }
-
-  function playMountedHeroMedia(post) {
-    const media = getHeroUploadMedia();
-    if (media) {
-      media.play().then(() => setHeroPlaying(true)).catch(() => setHeroPlaying(false));
-      return true;
-    }
-
-    if (post?.sourceKind === "youtube") {
-      const frame = getHeroStage()?.querySelector?.("iframe[data-hero-provider='youtube']");
-      if (!frame || !String(frame.src || "").includes("autoplay=1")) {
-        return mountHeroMedia(post, { autoplay: true, forceReload: true });
-      }
-      const ok = postToHeroYouTube("playVideo");
-      [250, 650, 1100].forEach((delay) => window.setTimeout(() => postToHeroYouTube("playVideo"), delay));
-      setHeroPlaying(true);
-      return ok;
-    }
-
-    if (post?.sourceKind === "spotify") {
-      return mountHeroMedia(post, { autoplay: true });
-    }
-
-    return false;
-  }
-
-  function pauseMountedHeroMedia(post) {
-    const media = getHeroUploadMedia();
-    if (media) {
-      media.pause();
-      setHeroPlaying(false);
-      return true;
-    }
-
-    if (post?.sourceKind === "youtube") {
-      postToHeroYouTube("pauseVideo");
-      setHeroPlaying(false);
-      return true;
-    }
-
-    setHeroPlaying(false);
-    return false;
-  }
-
-  function toggleHeroPlayback() {
-    const post = getHeroTargetPost();
-    if (!post) return;
-
-    const current = getCurrentHeroPost();
-    const samePost = current?.id && post.id && current.id === post.id;
-    if (!samePost || !getHeroStage()?.firstElementChild || !getHeroStage()?.dataset.safeHeroKey) {
-      mountHeroMedia(post, { autoplay: true });
-      return;
-    }
-
-    if (state?.heroPlayerPlaybackState === "playing") pauseMountedHeroMedia(post);
-    else playMountedHeroMedia(post);
-  }
-
-  function openMediaInHero() {
-    const post = getHeroTargetPost();
-    if (!post) return;
-    // Open the real media player in the hero stage, but do not autoplay.
-    mountHeroMedia(post, { autoplay: false, previewOnly: false, forceReload: true });
-  }
-
-  function stepHeroMedia(delta) {
-    const posts = getPlayablePosts();
-    if (!posts.length) return;
-
-    const current = getCurrentHeroPost() || getHeroTargetPost();
-    const currentId = current?.id || "";
-    let index = posts.findIndex((post) => post.id && post.id === currentId);
-    if (index < 0) index = 0;
-    const next = posts[(index + delta + posts.length) % posts.length];
-    if (next) mountHeroMedia(next, { autoplay: true, forceReload: true });
-  }
-
-  function showMiniPlayerForCurrentMedia() {
-    const post = getHeroTargetPost();
-    if (post?.id && state && !state.playerPostId) state.playerPostId = post.id;
-    safeSetStorage(HERO_DOCK_HIDDEN_KEY, "false");
-    applyMiniDockState();
-
-    try {
-      if (post?.id && typeof openMiniPlayer === "function") openMiniPlayer(post.id);
-      else if (typeof renderMiniPlayer === "function") renderMiniPlayer();
-    } catch { }
-
-    window.setTimeout(() => {
-      safeSetStorage(HERO_DOCK_HIDDEN_KEY, "false");
-      applyMiniDockState();
-      syncHeroOptionButtons();
-    }, 60);
-  }
-
-  function buildHeroOptionButton(id, label) {
-    const button = document.createElement("button");
-    button.id = id;
-    button.type = "button";
-    button.className = "button button-secondary";
-    button.textContent = label;
-    return button;
-  }
-
-  function ensureHeroOptionButtons() {
-    ensureHeroStyles();
-    if (document.querySelector("#heroPlayerOptionRow")) return true;
-    const controls = getHeroControls();
-    if (!controls) return false;
-
-    const row = document.createElement("div");
-    row.id = "heroPlayerOptionRow";
-    row.className = "hero-player-option-row";
-
-    const showButton = buildHeroOptionButton("heroPlayerDockToggle", "Show Player");
-    showButton.addEventListener("click", () => {
-      if (isMiniDockHidden()) showMiniPlayerForCurrentMedia();
-      else markMiniDockHidden(true);
-    });
-
-    const openButton = buildHeroOptionButton("heroPlayerOpenMediaButton", "Open Media");
-    openButton.addEventListener("click", openMediaInHero);
-
-    const autoplayButton = buildHeroOptionButton("heroPlayerAutoplayToggle", "Autoplay: Off");
-    autoplayButton.addEventListener("click", () => {
-      const nextValue = !isAutoplayEnabled();
-      safeSetStorage(HERO_AUTOPLAY_KEY, nextValue ? "true" : "false");
-      syncHeroOptionButtons();
-      if (nextValue) {
-        const post = getHeroTargetPost();
-        if (post) mountHeroMedia(post, { autoplay: true });
-      }
-    });
-
-    row.append(showButton, openButton, autoplayButton);
-    controls.insertAdjacentElement("afterend", row);
-    syncHeroOptionButtons();
-    return true;
-  }
-
-  function syncHeroOptionButtons() {
-    const showButton = document.querySelector("#heroPlayerDockToggle");
-    if (showButton) {
-      const hidden = isMiniDockHidden();
-      showButton.textContent = hidden ? "Show Player" : "Hide Player";
-      showButton.setAttribute("aria-pressed", hidden ? "false" : "true");
-    }
-
-    const autoplayButton = document.querySelector("#heroPlayerAutoplayToggle");
-    if (autoplayButton) {
-      const enabled = isAutoplayEnabled();
-      autoplayButton.textContent = enabled ? "Autoplay: On" : "Autoplay: Off";
-      autoplayButton.setAttribute("aria-pressed", enabled ? "true" : "false");
-    }
-  }
-
-  function interceptHeroButton(button, handler) {
-    if (!button || button.dataset.safeHeroIntercepted === "true") return;
-    button.dataset.safeHeroIntercepted = "true";
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      handler(event);
-    }, true);
-  }
-
-  function attachHeroButtonInterceptors() {
-    interceptHeroButton(elements?.heroPlayerPlayPauseButton || document.querySelector("#heroPlayerPlayPauseButton"), toggleHeroPlayback);
-    interceptHeroButton(elements?.heroPlayerPrevButton || document.querySelector("#heroPlayerPrevButton"), () => stepHeroMedia(-1));
-    interceptHeroButton(elements?.heroPlayerNextButton || document.querySelector("#heroPlayerNextButton"), () => stepHeroMedia(1));
-  }
-
-  function attachHeroStageClick() {
-    const stage = getHeroStage();
-    if (!stage || stage.dataset.safeHeroStageClick === "true") return;
-    stage.dataset.safeHeroStageClick = "true";
-    stage.addEventListener("click", (event) => {
-      if (event.target?.closest?.("iframe, video, audio, button, a")) return;
-      const post = getHeroTargetPost();
-      if (post) mountHeroMedia(post, { autoplay: true, forceReload: true });
-    }, true);
-  }
-
-  function attachMiniCloseInterceptor() {
-    const closeButton = elements?.miniCloseButton || document.querySelector("#miniCloseButton");
-    if (!closeButton || closeButton.dataset.safeHideOnly === "true") return;
-    closeButton.dataset.safeHideOnly = "true";
-    closeButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      markMiniDockHidden(true);
-    }, true);
-  }
-
-  function attachFeedPlayUnhide() {
-    if (window.__SIGNAL_SHARE_FEED_PLAY_UNHIDE_ATTACHED__) return;
-    window.__SIGNAL_SHARE_FEED_PLAY_UNHIDE_ATTACHED__ = true;
-    document.addEventListener("click", (event) => {
-      const trigger = event.target?.closest?.("[data-action='play'], [data-action='open-player'], .feed-card button, .spotlight-card button");
-      if (!trigger) return;
-      if (trigger.closest?.("#heroPlayerStage, .hero-player-controls, #heroPlayerOptionRow")) return;
-      safeSetStorage(HERO_DOCK_HIDDEN_KEY, "false");
-      const dock = getMiniDock();
-      if (dock) {
-        dock.hidden = false;
-        dock.style.removeProperty("display");
-        dock.style.removeProperty("pointer-events");
-        dock.removeAttribute("aria-hidden");
-      }
-      window.setTimeout(() => {
-        safeSetStorage(HERO_DOCK_HIDDEN_KEY, "false");
-        applyMiniDockState();
-        syncHeroOptionButtons();
-      }, 80);
-    }, true);
-  }
-
-  function initializeHeroAddons() {
-    initAttempts += 1;
-    const ready = Boolean(getHeroControls() && (elements?.heroPlayerPlayPauseButton || document.querySelector("#heroPlayerPlayPauseButton")));
-    if (!ready) {
-      if (initAttempts < 30) window.setTimeout(initializeHeroAddons, 250);
-      return;
-    }
-
-    ensureHeroStyles();
-    ensureHeroOptionButtons();
-    attachHeroButtonInterceptors();
-    attachHeroStageClick();
-    attachMiniCloseInterceptor();
-    attachFeedPlayUnhide();
-    attachHeroCopyObserver();
-    syncHeroOptionButtons();
-    scheduleHeroCopySyncBurst();
-
-    if (!attached) {
-      attached = true;
-      window.addEventListener("resize", syncHeroOptionButtons, { passive: true });
-    }
-
-    if (isMiniDockHidden()) applyMiniDockState();
-
-    if (isAutoplayEnabled() && !window.__SIGNAL_SHARE_HERO_AUTOPLAY_ATTEMPTED__) {
-      window.__SIGNAL_SHARE_HERO_AUTOPLAY_ATTEMPTED__ = true;
-      window.setTimeout(() => {
-        if (document.hidden) return;
-        const post = getHeroTargetPost();
-        if (post) mountHeroMedia(post, { autoplay: true });
-      }, 1200);
-    }
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initializeHeroAddons, { once: true });
-  } else {
-    window.setTimeout(initializeHeroAddons, 0);
-  }
-})();

@@ -276,20 +276,40 @@ export function createActivePlayerStage(descriptor) {
   return container;
 }
 
-function commitActivePlayer(stage, post, parseYouTubeUrl) {
+function commitActivePlayer(stage, post, options) {
+  const { parseYouTubeUrl, resolveActivePlayerSource } = options;
   const descriptor = createActivePlayerDescriptor(post, parseYouTubeUrl);
-  if (!descriptor) return false;
 
-  const key = `active-player|${descriptor.provider}|${descriptor.src}`;
-  if (stage.dataset.heroPreviewKey === key && stage.querySelector(".hero-player-active-frame")) {
+  if (descriptor) {
+    const key = `active-player|${descriptor.provider}|${descriptor.src}`;
+    if (stage.dataset.heroPreviewKey === key && stage.querySelector(".hero-player-active-frame")) {
+      return true;
+    }
+    const activeStage = createActivePlayerStage(descriptor);
+    if (!activeStage) return false;
+    setStageContent(stage, activeStage, key);
     return true;
   }
 
-  const activeStage = createActivePlayerStage(descriptor);
-  if (!activeStage) return false;
+  if (post && (post.mediaKind === "video" || post.mediaKind === "audio")) {
+    const src = safeCall(resolveActivePlayerSource, "", post);
+    if (!src) return false;
 
-  setStageContent(stage, activeStage, key);
-  return true;
+    const key = `active-player|upload|${post.id || "no-id"}|${src}`;
+    if (stage.dataset.heroPreviewKey === key && stage.querySelector("video, audio")) {
+      return true;
+    }
+
+    const node = document.createElement(post.mediaKind === "audio" ? "audio" : "video");
+    node.src = src;
+    node.controls = true;
+    node.playsInline = true;
+    node.style.cssText = "display:block;border-radius:12px;background:#000;object-fit:contain;width:100%;height:100%;";
+    setStageContent(stage, node, key);
+    return true;
+  }
+
+  return false;
 }
 
 function createPostStandbyPreview(post, options = {}) {
@@ -428,7 +448,7 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     if (nativeSnapshot?.active) {
-      if (matchedPost && commitActivePlayer(stage, matchedPost, parseYouTubeUrl)) return;
+      if (matchedPost && commitActivePlayer(stage, matchedPost, previewOptions)) return;
 
       commitCard(stage, {
         badge: "Device media",
@@ -450,7 +470,7 @@ export function renderHeroStagePreview(options = {}) {
 
   if (mode === "desktop") {
     if (desktopSnapshot?.active) {
-      if (matchedPost && commitActivePlayer(stage, matchedPost, parseYouTubeUrl)) return;
+      if (matchedPost && commitActivePlayer(stage, matchedPost, previewOptions)) return;
 
       commitCard(stage, {
         badge: "PC system media",
@@ -498,7 +518,7 @@ export function renderHeroStagePreview(options = {}) {
     return;
   }
 
-  if (commitActivePlayer(stage, post, parseYouTubeUrl)) return;
+  if (commitActivePlayer(stage, post, previewOptions)) return;
 
   const creatorSummary = safeCall(getProfileSummaryForPost, null, post);
   const artworkUrl = resolveAppPreviewArtwork(post, {
