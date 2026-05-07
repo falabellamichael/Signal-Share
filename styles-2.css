@@ -1775,8 +1775,8 @@
 
 .hero-player-stage,
 .hero-player-active-stage {
-  width: min(100%, calc(clamp(200px, 42vw, 480px) * 1.7778));
-  height: clamp(200px, 42vw, 480px);
+  width: min(100%, calc(clamp(160px, 30vw, 320px) * 1.7778));
+  height: clamp(160px, 30vw, 320px);
   aspect-ratio: 16 / 9;
   background: #000;
   border-radius: 18px;

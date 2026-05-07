@@ -260,7 +260,7 @@ export function createActivePlayerStage(descriptor) {
   const container = document.createElement("div");
   container.className = "hero-player-active-stage";
   container.dataset.provider = descriptor.provider || "external";
-  container.style.cssText = "width:min(100%, calc(clamp(200px, 42vw, 480px) * 1.7778));height:clamp(200px, 42vw, 480px);aspect-ratio:16/9;margin-inline:auto;position:relative;border-radius:18px;overflow:hidden;background:#000;box-shadow:0 10px 30px rgba(0,0,0,0.4);";
+  container.style.cssText = "width:min(100%, calc(clamp(160px, 30vw, 320px) * 1.7778));height:clamp(160px, 30vw, 320px);aspect-ratio:16/9;margin-inline:auto;position:relative;border-radius:18px;overflow:hidden;background:#000;box-shadow:0 10px 30px rgba(0,0,0,0.4);";
 
   const iframe = document.createElement("iframe");
   iframe.className = "hero-player-active-frame";
