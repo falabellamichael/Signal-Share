@@ -1275,7 +1275,8 @@ export function createAppUi(context) {
     pagePosts.forEach((post) => {
       const card = createFeedCard(post);
       elements.feedGrid.appendChild(card);
-      if (feedScrollObserver) feedScrollObserver.observe(card);
+      const appendedCard = elements.feedGrid.lastElementChild;
+      if (feedScrollObserver && appendedCard instanceof Element) feedScrollObserver.observe(appendedCard);
     });
     
     elements.emptyState.hidden = posts.length !== 0;
