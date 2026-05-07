@@ -1,5 +1,10 @@
 import { renderHeroStagePreview } from "./hero-media-player-preview.js?v=1";
 
+// SDK placeholders for early script loading
+window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || (() => console.log("[Spotify] Ready (default)"));
+window.onYouTubeIframeAPIReady = window.onYouTubeIframeAPIReady || (() => console.log("[YouTube] Ready (default)"));
+
+
 export function createHeroMediaPlayerController(options) {
   const {
     state,
@@ -25,7 +30,7 @@ export function createHeroMediaPlayerController(options) {
     getFallbackPageMediaElement,
     getBrowserMediaMetadata,
     getStandbyPreviewPost,
-    sanitizeSnapshotMeta,
+
   } = options;
 
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
@@ -52,15 +57,12 @@ export function createHeroMediaPlayerController(options) {
   const desktopArtworkFallbackCache = new Map();
 
   function initializeSdkHooks() {
-    window.onSpotifyWebPlaybackSDKReady = () => {
-      console.log("[Spotify] Web Playback SDK is ready.");
-      // Note: Full player initialization requires a premium token.
-      // We can hook this into our auth state in the future.
-    };
+    // Hooks are already defined at top level for early script loading support.
+    console.log("[Hero] SDK hooks initialized.");
+  }
 
-    window.onYouTubeIframeAPIReady = () => {
-      console.log("[YouTube] Iframe API is ready.");
-    };
+  function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   function syncMediaSession(meta) {
@@ -1187,7 +1189,7 @@ export function createHeroMediaPlayerController(options) {
     elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
     elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
 
-    renderStagePreview(mode, post, fallbackMedia);
+    renderHeroStagePreview(Object.assign({}, options, { mode, post, fallbackMedia, nativeSnapshot, desktopSnapshot }));
     syncMediaSession({
       title: elements.heroPlayerTitle.textContent,
       artist: elements.heroPlayerCaption.textContent,
