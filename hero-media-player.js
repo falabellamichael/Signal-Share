@@ -471,8 +471,20 @@ export function createHeroMediaPlayerController(options) {
 
     const post = getControllablePlayerPost();
     if (post?.sourceKind === "youtube" && state.activePlayerElement instanceof HTMLIFrameElement) {
+      const frame = state.activePlayerElement;
+      const expectedPostId = post.id;
       const shouldPlay = typeof forcePlay === "boolean" ? forcePlay : getLocalPlaybackState() !== "playing";
-      postMessageToYouTubePlayer(state.activePlayerElement, shouldPlay ? "playVideo" : "pauseVideo");
+      postMessageToYouTubePlayer(frame, shouldPlay ? "playVideo" : "pauseVideo");
+      if (shouldPlay && frame.dataset?.playerReady !== "true") {
+        const retryPlay = () => {
+          if (state.activePlayerElement !== frame) return;
+          const activePost = getControllablePlayerPost();
+          if (!activePost || activePost.id !== expectedPostId) return;
+          postMessageToYouTubePlayer(frame, "playVideo");
+        };
+        window.setTimeout(retryPlay, 320);
+        window.setTimeout(retryPlay, 920);
+      }
       state.heroPlayerPlaybackState = shouldPlay ? "playing" : "paused";
       return true;
     }
@@ -660,6 +672,7 @@ export function createHeroMediaPlayerController(options) {
     }
     image.alt = title ? `${title} artwork` : "Now playing artwork";
     image.src = nextArtwork;
+    card.classList.add("has-artwork");
     return true;
   }
 
@@ -966,13 +979,13 @@ export function createHeroMediaPlayerController(options) {
       : mode === "desktop"
         ? normalizePlaybackState(desktopSnapshot?.playbackState)
         : getLocalPlaybackState();
+    const activeVideoElement = mediaElement instanceof HTMLVideoElement
+      ? mediaElement
+      : (fallbackMedia instanceof HTMLVideoElement ? fallbackMedia : null);
     const shouldExpandStage = mode === "app"
       && playbackState === "playing"
-      && (
-        mediaElement instanceof HTMLVideoElement
-        || fallbackMedia instanceof HTMLVideoElement
-        || displayPost?.mediaKind === "video"
-      );
+      && activeVideoElement instanceof HTMLVideoElement
+      && !activeVideoElement.paused;
     const supportsPlayback = mode === "device"
       ? hasNativeActionBridge()
       : mode === "desktop"
