@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=13";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=9";
 
 export function createAppUi(context) {
   const {
@@ -234,9 +234,6 @@ export function createAppUi(context) {
     ".viewer-dialog",
     ".profile-view-dialog",
     ".messenger-section",
-    ".messenger-sidebar",
-    ".conversation-list",
-    ".people-list",
     ".admin-ban-panel",
     ".mini-player",
     ".message-list",
@@ -262,9 +259,6 @@ export function createAppUi(context) {
     postMessageToYouTubePlayer,
     parseYouTubeUrl,
     resolveActivePlayerSource,
-    getSpotifyPreviewMetadata,
-    getPostById,
-    getVisiblePosts,
   });
 
   function attachEventListeners() {
@@ -1196,30 +1190,13 @@ export function createAppUi(context) {
     if (!(target instanceof Element)) return null;
     const overlayRoot = getOpenOverlayRoots().find((root) => root.contains(target));
     if (!overlayRoot) return null;
-
-    let current = target;
-    while (current && overlayRoot.contains(current)) {
-      const container = current.closest(OVERLAY_SCROLL_CONTAINER_SELECTOR);
-      if (!container || !overlayRoot.contains(container)) break;
-
-      const maxScroll = container.scrollHeight - container.clientHeight;
-      const style = window.getComputedStyle(container);
-      const canScroll = maxScroll > 0 && (style.overflowY === "auto" || style.overflowY === "scroll");
-
-      if (canScroll) return container;
-      if (container === overlayRoot) break;
-      current = container.parentElement;
-    }
-
+    const scrollContainer = target.closest(OVERLAY_SCROLL_CONTAINER_SELECTOR);
+    if (scrollContainer && overlayRoot.contains(scrollContainer)) return scrollContainer;
     return overlayRoot;
   }
 
   function handleOverlayTouchStart(event) {
     const touch = event.touches?.[0];
-    if (event.target instanceof HTMLInputElement && event.target.type === "range") {
-      activeOverlayScrollContainer = null;
-      return;
-    }
     activeOverlayScrollContainer = getOverlayScrollContainer(event.target);
     if (!touch || !activeOverlayScrollContainer) return;
     activeOverlayTouchY = touch.clientY;
@@ -1379,8 +1356,8 @@ export function createAppUi(context) {
       const url = new URL(source);
       url.searchParams.set("enablejsapi", "1");
       url.searchParams.set("playsinline", "1");
-      url.searchParams.set("autoplay", "1");
-      url.searchParams.set("mute", "1");
+      // Keep embeds paused until the user explicitly presses Play.
+      url.searchParams.set("autoplay", "0");
 
       if (window.location.protocol.startsWith("http") && window.location.origin && window.location.origin !== "null") {
         url.searchParams.set("origin", window.location.origin);
@@ -1392,7 +1369,7 @@ export function createAppUi(context) {
     }
     catch {
       const separator = source.includes("?") ? "&" : "?";
-      return `${source}${separator}enablejsapi=1&playsinline=1&autoplay=1&mute=1`;
+      return `${source}${separator}enablejsapi=1&playsinline=1&autoplay=0`;
     }
   }
 
@@ -1417,7 +1394,7 @@ export function createAppUi(context) {
 
   function createPersistentPlayer(post) {
     if (post.sourceKind === "youtube" || post.sourceKind === "spotify") {
-      const frame = document.createElement("iframe"); frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "eager"; frame.width = "100%"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; frame.setAttribute("allowfullscreen", ""); frame.dataset.playerReady = "false"; frame.addEventListener("load", () => { if (state.activePlayerElement !== frame) return; frame.dataset.playerReady = "true"; applyPlayerVolumeToActiveElement(); if (post.sourceKind === "youtube" && state.heroPlayerPlaybackState === "playing") postMessageToYouTubePlayer(frame, "playVideo"); }); return frame;
+      const frame = document.createElement("iframe"); frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; frame.setAttribute("allowfullscreen", ""); frame.addEventListener("load", () => { if (state.activePlayerElement === frame) applyPlayerVolumeToActiveElement(); }); return frame;
     }
     if (post.mediaKind === "video") { const video = document.createElement("video"); video.controls = true; video.preload = "metadata"; video.playsInline = true; video.src = resolveActivePlayerSource(post); attachPersistentPlayerMediaListeners(video); return video; }
     const shell = document.createElement("div"); const audioStage = document.createElement("div"); audioStage.dataset.audioStage = "true"; const label = document.createElement("span"); label.textContent = "Audio drop"; const title = document.createElement("strong"); title.textContent = post.title; const audio = document.createElement("audio"); audio.dataset.audioPlayer = "true"; audio.controls = true; audio.preload = "metadata"; audio.src = resolveActivePlayerSource(post); attachPersistentPlayerMediaListeners(audio); audioStage.append(label, title); shell.append(audioStage, audio); return shell;
@@ -1612,10 +1589,10 @@ export function createAppUi(context) {
     const externalId = resolveYouTubePreviewExternalId(source);
     if (!externalId) return [];
     return [
-      `https://img.youtube.com/vi/${externalId}/0.jpg`,
+      `https://i.ytimg.com/vi/${externalId}/mqdefault.jpg`,
       `https://i.ytimg.com/vi/${externalId}/hqdefault.jpg`,
       `https://i.ytimg.com/vi/${externalId}/sddefault.jpg`,
-      `https://i.ytimg.com/vi/${externalId}/default.jpg`,
+      `https://img.youtube.com/vi/${externalId}/0.jpg`,
       `https://i.ytimg.com/vi/${externalId}/maxresdefault.jpg`
     ];
   }
@@ -1816,18 +1793,7 @@ export function createAppUi(context) {
 
   function handleMiniPlayerStageClick(event) { if (!event.target.closest("iframe, video, audio") && !state.miniPlayerExpanded) expandMiniPlayer(); }
 
-  function handleMiniPlayerVolumeInput(event) {
-    state.playerVolume = normalizePlayerVolume(Number(event.target.value) / 100, state.playerVolume);
-    savePlayerVolume(state.playerVolume);
-    applyPlayerVolumeToActiveElement();
-
-    const volumePercent = Math.round(state.playerVolume * 100);
-    if (elements.miniPlayerVolumeValue) elements.miniPlayerVolumeValue.textContent = `${volumePercent}%`;
-    if (elements.heroPlayerVolumeValue) elements.heroPlayerVolumeValue.textContent = `${volumePercent}%`;
-    if (elements.heroPlayerVolumeSlider) elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
-
-    heroMediaPlayerController.render();
-  }
+  function handleMiniPlayerVolumeInput(event) { state.playerVolume = normalizePlayerVolume(Number(event.target.value) / 100, state.playerVolume); savePlayerVolume(state.playerVolume); applyPlayerVolumeToActiveElement(); renderMiniPlayerVolumeControl(); }
 
   function getPlayableVisiblePostIds() { return state.visiblePostIds.filter((id) => isPlayablePost(getPostById(id))); }
 
