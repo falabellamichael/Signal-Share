@@ -260,7 +260,7 @@ function createActivePlayerStage(descriptor) {
   const container = document.createElement("div");
   container.className = "hero-player-active-stage";
   container.dataset.provider = descriptor.provider || "external";
-  container.style.cssText = "width:100%;aspect-ratio:16/9;min-height:clamp(220px,44vw,460px);height:auto;position:relative;border-radius:12px;overflow:hidden;background:#000;";
+  container.style.cssText = "width:min(100%, calc(clamp(190px, 36vw, 380px) * 1.7778));height:clamp(190px, 36vw, 380px);aspect-ratio:16/9;margin-inline:auto;position:relative;border-radius:12px;overflow:hidden;background:#000;";
 
   const iframe = document.createElement("iframe");
   iframe.className = "hero-player-active-frame";
@@ -270,7 +270,7 @@ function createActivePlayerStage(descriptor) {
   iframe.referrerPolicy = "strict-origin-when-cross-origin";
   iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
   iframe.allowFullscreen = true;
-  iframe.style.cssText = "width:100%;height:100%;min-height:inherit;border:0;display:block;";
+  iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
 
   container.appendChild(iframe);
   return container;
