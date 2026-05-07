@@ -5,6 +5,8 @@ $dist = Join-Path $root "dist"
 
 $files = @(
   "index.html",
+  "terms.html",
+  "privacy.html",
   "styles.css",
   "styles-1.css",
   "styles-2.css",
@@ -15,6 +17,7 @@ $files = @(
   "app-v3.js",
   "app-v3-ui.js",
   "hero-media-player.js",
+  "hero-media-player-preview.js",
   "notifications.js",
   "profiles.js",
   "messenger-realtime.js",

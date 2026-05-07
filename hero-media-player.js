@@ -72,6 +72,42 @@ export function createHeroMediaPlayerController(options) {
     return `${value || ""}`.trim().toLowerCase();
   }
 
+  function isPreferredNowPlayingAppPackage(value = "") {
+    const normalized = normalizeText(value);
+    if (!normalized) return false;
+    return normalized.includes("spotify")
+      || normalized.includes("youtube")
+      || normalized.includes("ytmusic")
+      || normalized.includes("youtube.music");
+  }
+
+  function isPreferredNowPlayingUri(value = "") {
+    const normalized = normalizeText(value);
+    if (!normalized) return false;
+    return normalized.startsWith("spotify:")
+      || normalized.includes("open.spotify.com")
+      || normalized.startsWith("vnd.youtube:")
+      || normalized.includes("youtube.com")
+      || normalized.includes("music.youtube.com")
+      || normalized.includes("youtu.be/");
+  }
+
+  function isPreferredNowPlayingSnapshot(snapshot = null) {
+    if (!snapshot) return false;
+    return isPreferredNowPlayingAppPackage(snapshot.appPackage)
+      || isPreferredNowPlayingUri(snapshot.openUri);
+  }
+
+  function hasSnapshotPlaybackContext(snapshot = null) {
+    if (!snapshot) return false;
+    if (snapshot.active) return true;
+    if (normalizePlaybackState(snapshot.playbackState) !== "none") return true;
+    if (typeof snapshot.title === "string" && snapshot.title.trim()) return true;
+    if (typeof snapshot.meta === "string" && snapshot.meta.trim()) return true;
+    if (typeof snapshot.openUri === "string" && snapshot.openUri.trim()) return true;
+    return false;
+  }
+
   function getNativeBridge() {
     return window.NativeBridge && typeof window.NativeBridge === "object" ? window.NativeBridge : null;
   }
@@ -146,6 +182,8 @@ export function createHeroMediaPlayerController(options) {
 
   function shouldUseNativeMode(post) {
     if (!nativeSnapshot) return false;
+    const preferredNativeSnapshot = isPreferredNowPlayingSnapshot(nativeSnapshot);
+    if (preferredNativeSnapshot && hasSnapshotPlaybackContext(nativeSnapshot)) return true;
     const hasAppPlaybackSession = Boolean(post)
       || getActivePlayerMediaElement() instanceof HTMLMediaElement
       || getFallbackPageMediaElement() instanceof HTMLMediaElement;
@@ -604,6 +642,8 @@ export function createHeroMediaPlayerController(options) {
 
   function shouldUseDesktopMode(post) {
     if (!desktopSnapshot) return false;
+    const preferredDesktopSnapshot = isPreferredNowPlayingSnapshot(desktopSnapshot);
+    if (preferredDesktopSnapshot && hasSnapshotPlaybackContext(desktopSnapshot)) return true;
     if (desktopSnapshot.active) return true;
     if (!post && desktopSnapshot.available) return true;
     return false;
