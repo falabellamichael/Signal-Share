@@ -1444,6 +1444,15 @@
     linear-gradient(135deg, #161f29, #0f1720 72%);
 }
 
+.external-preview-launchable {
+  cursor: pointer;
+}
+
+.external-preview-launchable:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 78%, white 22%);
+  outline-offset: 2px;
+}
+
 .external-preview-card-card {
   min-height: 220px;
 }

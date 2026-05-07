@@ -1400,6 +1400,78 @@ export function createAppUi(context) {
     return post.embedUrl || post.src || post.mediaUrl || "";
   }
 
+  function resolveNativeYouTubeOpenUri(post) {
+    const candidates = [post?.externalUrl, post?.embedUrl, post?.externalId, post?.mediaUrl, post?.src, post?.label, post?.caption, post?.title];
+    for (const candidate of candidates) {
+      if (typeof candidate !== "string" || !candidate.trim()) continue;
+      const parsed = parseYouTubeUrl(candidate);
+      const externalId = typeof parsed?.externalId === "string" ? parsed.externalId.trim() : "";
+      if (/^[a-zA-Z0-9_-]{11}$/.test(externalId)) return `vnd.youtube:${externalId}`;
+    }
+    return "";
+  }
+
+  function resolveNativeSpotifyOpenUri(post) {
+    const candidates = [post?.externalUrl, post?.originalUrl, post?.embedUrl, post?.externalId, post?.mediaUrl, post?.src, post?.label, post?.caption, post?.title];
+    for (const rawCandidate of candidates) {
+      if (typeof rawCandidate !== "string" || !rawCandidate.trim()) continue;
+      const candidate = rawCandidate.trim();
+
+      const spotifyUri = parseSpotifyUri(candidate);
+      if (spotifyUri) return `spotify:${spotifyUri.type}:${spotifyUri.externalId}`;
+
+      const parsed = parseSpotifyUrl(candidate);
+      if (parsed?.externalId) {
+        const inferredType = inferSpotifyTypeFromSource({
+          embedUrl: parsed.embedUrl,
+          externalUrl: parsed.originalUrl,
+          originalUrl: parsed.originalUrl,
+          externalId: parsed.externalId,
+          label: parsed.label,
+          caption: post?.caption ?? "",
+          title: post?.title ?? "",
+        });
+        if (isSpotifyEntityType(inferredType)) return `spotify:${inferredType}:${parsed.externalId}`;
+      }
+
+      try {
+        const candidateUrl = new URL(candidate);
+        const host = candidateUrl.hostname.replace(/^www\./i, "").replace(/^open\./i, "").replace(/^play\./i, "");
+        if (host !== "spotify.com") continue;
+        const segments = candidateUrl.pathname.split("/").filter(Boolean);
+        if (segments[0] && /^intl-[a-z]{2,5}$/i.test(segments[0])) segments.shift();
+        if (segments[0] === "embed") segments.shift();
+        const type = `${segments[0] || ""}`.trim().toLowerCase();
+        const externalId = `${segments[1] || ""}`.trim();
+        if (isSpotifyEntityType(type) && externalId) return `spotify:${type}:${externalId}`;
+      } catch {}
+    }
+    return "spotify:";
+  }
+
+  function launchNativeExternalMediaApp(post) {
+    if (!post || !isNativeCapacitorApp() || getCapacitorPlatform() !== "android") return false;
+    if (post.sourceKind !== "youtube" && post.sourceKind !== "spotify") return false;
+    if (!window.NativeBridge || typeof window.NativeBridge.openNowPlayingMediaApp !== "function") return false;
+
+    let packageName = "";
+    let openUri = "";
+    if (post.sourceKind === "youtube") {
+      packageName = "com.google.android.youtube";
+      openUri = resolveNativeYouTubeOpenUri(post);
+    } else if (post.sourceKind === "spotify") {
+      packageName = "com.spotify.music";
+      openUri = resolveNativeSpotifyOpenUri(post);
+    }
+
+    try {
+      window.NativeBridge.openNowPlayingMediaApp(packageName, openUri, true);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function buildPersistentPlayerSource(post) {
     let source = resolveExternalEmbedSource(post);
     if (post?.sourceKind !== "youtube" || !source) return source;
@@ -1473,6 +1545,37 @@ export function createAppUi(context) {
   }
 
   function renderExternalMedia(container, post, variant) {
+    const isNativeAndroidExternal = isNativeCapacitorApp()
+      && getCapacitorPlatform() === "android"
+      && (post.sourceKind === "youtube" || post.sourceKind === "spotify");
+    if (isNativeAndroidExternal && (variant === "viewer" || variant === "mini")) {
+      const note = post.sourceKind === "youtube"
+        ? "Tap preview to open in the YouTube app."
+        : "Tap preview to open in the Spotify app.";
+      const stage = createExternalPreviewStage({
+        provider: post.sourceKind,
+        title: post.title,
+        creator: post.creator,
+        externalId: post.externalId ?? "",
+        externalUrl: post.externalUrl ?? "",
+        embedUrl: post.embedUrl ?? "",
+        label: post.label ?? "",
+        caption: post.caption ?? "",
+      }, { variant, note });
+      stage.classList.add("external-preview-launchable");
+      stage.setAttribute("role", "button");
+      stage.setAttribute("tabindex", "0");
+      const launchNativeExternal = () => { void Promise.resolve(launchNativeExternalMediaApp(post)); };
+      stage.addEventListener("click", launchNativeExternal);
+      stage.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        launchNativeExternal();
+      });
+      container.appendChild(stage);
+      return;
+    }
+
     if (variant === "viewer") { const frame = document.createElement("iframe"); frame.className = post.sourceKind === "youtube" ? "viewer-embed viewer-youtube" : "viewer-embed viewer-spotify"; frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.height = post.sourceKind === "youtube" ? "100%" : "440"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; container.appendChild(frame); return; }
     if (variant === "mini") { const frame = document.createElement("iframe"); frame.className = post.sourceKind === "youtube" ? "mini-player-embed mini-youtube" : "mini-player-embed mini-spotify"; frame.src = buildPersistentPlayerSource(post); frame.title = `${post.title} player`; frame.loading = "lazy"; frame.width = "100%"; frame.height = post.sourceKind === "youtube" ? "192" : "152"; frame.allow = post.sourceKind === "youtube" ? "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share" : "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"; frame.referrerPolicy = "strict-origin-when-cross-origin"; container.appendChild(frame); return; }
     container.appendChild(createExternalPreviewStage({ provider: post.sourceKind, title: post.title, creator: post.creator, externalId: post.externalId ?? "", externalUrl: post.externalUrl ?? "", embedUrl: post.embedUrl ?? "", label: post.label ?? "", caption: post.caption ?? "" }, { variant, note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player." }));
@@ -1899,22 +2002,72 @@ export function createAppUi(context) {
 
   function closeProfile(options = {}) { const { restoreFocus = true } = options; if (!state.activeProfileKey) return; state.activeProfileKey = ""; elements.profileView.classList.remove("is-open"); elements.profileView.setAttribute("aria-hidden", "true"); syncOverlayBodyState(); if (restoreFocus && state.profileReturnFocusElement instanceof HTMLElement) state.profileReturnFocusElement.focus(); state.profileReturnFocusElement = null; }
 
-  function openViewer(postId, returnFocusElement) { if (state.activeProfileKey) closeProfile({ restoreFocus: false }); if (isPlayablePost(getPostById(postId))) { state.playerPostId = postId; state.miniPlayerExpanded = true; state.returnFocusElement = returnFocusElement ?? document.activeElement; renderMiniPlayer(); elements.miniExpandButton.focus(); return; } state.viewerAttachment = null; state.viewerPostId = postId; state.returnFocusElement = returnFocusElement ?? document.activeElement; renderViewer(); elements.viewerCloseButton.focus(); }
+  function openViewer(postId, returnFocusElement) {
+    if (state.activeProfileKey) closeProfile({ restoreFocus: false });
+    if (isPlayablePost(getPostById(postId))) {
+      state.playerPostId = postId;
+      state.miniPlayerExpanded = true;
+      state.returnFocusElement = returnFocusElement ?? document.activeElement;
+      renderMiniPlayer();
+      elements.miniExpandButton.focus();
+      return;
+    }
+    state.viewerAttachment = null;
+    state.viewerPostId = postId;
+    state.returnFocusElement = returnFocusElement ?? document.activeElement;
+    renderViewer();
+    elements.viewerCloseButton.focus();
+  }
 
   function closeViewer(options = {}) { const { restoreFocus = true } = options; if (!state.viewerPostId && !state.viewerAttachment) return; state.viewerPostId = null; state.viewerAttachment = null; elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); syncOverlayBodyState(); if (restoreFocus && state.returnFocusElement instanceof HTMLElement) state.returnFocusElement.focus(); state.returnFocusElement = null; renderMiniPlayer(); }
 
   function stepViewer(delta) {
     if (state.visiblePostIds.length <= 1 || !state.viewerPostId) return;
-    const currentIndex = state.visiblePostIds.indexOf(state.viewerPostId); const nextIndex = currentIndex === -1 ? 0 : (currentIndex + delta + state.visiblePostIds.length) % state.visiblePostIds.length;
-    const nextPostId = state.visiblePostIds[nextIndex]; if (isPlayablePost(getPostById(nextPostId))) { state.viewerPostId = null; state.playerPostId = nextPostId; state.miniPlayerExpanded = true; elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); syncOverlayBodyState(); renderMiniPlayer(); return; }
-    state.viewerPostId = nextPostId; renderViewer();
+    const currentIndex = state.visiblePostIds.indexOf(state.viewerPostId);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + delta + state.visiblePostIds.length) % state.visiblePostIds.length;
+    const nextPostId = state.visiblePostIds[nextIndex];
+    if (isPlayablePost(getPostById(nextPostId))) {
+      state.viewerPostId = null;
+      state.playerPostId = nextPostId;
+      state.miniPlayerExpanded = true;
+      elements.viewer.classList.remove("is-open");
+      elements.viewer.setAttribute("aria-hidden", "true");
+      clearViewerMedia();
+      syncOverlayBodyState();
+      renderMiniPlayer();
+      return;
+    }
+    state.viewerPostId = nextPostId;
+    renderViewer();
   }
 
-  function openMiniPlayer(postId, returnFocusElement) { const post = getPostById(postId); if (!post) return; if (state.activeProfileKey) closeProfile({ restoreFocus: false }); if (!isPlayablePost(post)) { openViewer(postId, returnFocusElement); return; } state.playerPostId = postId; state.miniPlayerExpanded = false; state.returnFocusElement = returnFocusElement ?? document.activeElement; renderMiniPlayer(); }
+  function openMiniPlayer(postId, returnFocusElement) {
+    const post = getPostById(postId);
+    if (!post) return;
+    if (state.activeProfileKey) closeProfile({ restoreFocus: false });
+    if (!isPlayablePost(post)) {
+      openViewer(postId, returnFocusElement);
+      return;
+    }
+    state.playerPostId = postId;
+    state.miniPlayerExpanded = false;
+    state.returnFocusElement = returnFocusElement ?? document.activeElement;
+    renderMiniPlayer();
+  }
 
   function expandMiniPlayer() { if (state.playerPostId) { state.miniPlayerExpanded = !state.miniPlayerExpanded; renderMiniPlayer(); } }
 
-  function collapseViewerToPlayer() { if (!state.viewerPostId) return; state.playerPostId = state.viewerPostId; state.miniPlayerExpanded = false; state.viewerPostId = null; elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); syncOverlayBodyState(); renderMiniPlayer(); }
+  function collapseViewerToPlayer() {
+    if (!state.viewerPostId) return;
+    state.playerPostId = state.viewerPostId;
+    state.miniPlayerExpanded = false;
+    state.viewerPostId = null;
+    elements.viewer.classList.remove("is-open");
+    elements.viewer.setAttribute("aria-hidden", "true");
+    clearViewerMedia();
+    syncOverlayBodyState();
+    renderMiniPlayer();
+  }
 
   function closeMiniPlayer() { moveFocusOutOfMiniPlayer(); state.playerPostId = null; state.miniPlayerExpanded = false; state.playerDrag = null; state.heroPlayerPlaybackState = "none"; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; renderMiniPlayerPlaybackButton(null); clearMiniPlayerMedia(); destroyActivePlayer(); syncOverlayBodyState(); heroMediaPlayerController.render(); state.returnFocusElement = null; }
 
