@@ -272,6 +272,15 @@ if (!window[globalStateKey]) {
 const state = window[globalStateKey];
 window.state = state; // Also expose as window.state for backward compatibility and cross-module access
 
+setApiContext({
+  state,
+  APP_CONFIG,
+  POST_LIKES_TABLE,
+  DB_NAME,
+  DB_VERSION,
+  STORE_NAME,
+});
+
 registerSiteServiceWorker();
 
 function canUseBrowserNotifications() {
@@ -1975,4 +1984,10 @@ export const {
 
 window.renderActiveThread = renderActiveThread;
 
-initialize();
+if (!window.__SIGNAL_SHARE_INITIALIZED__) {
+  window.__SIGNAL_SHARE_INITIALIZED__ = true;
+  initialize().catch((error) => {
+    console.error("App initialization failed:", error);
+    showFeedback("The site could not start correctly. Reload and try again.", true);
+  });
+}
