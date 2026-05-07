@@ -1,22 +1,22 @@
-const CACHE_NAME = "signal-share-shell-v104";
+const CACHE_NAME = "signal-share-shell-v105";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=116",
-  "./styles-1.css?v=1",
-  "./styles-2.css?v=3",
-  "./styles-3.css?v=4",
+  "./styles.css",
+  "./styles-1.css",
+  "./styles-2.css",
+  "./styles-3.css",
   "./config.js",
-  "./api-v3.js?v=92",
-  "./app-v3.js?v=97",
-  "./app-v3-ui.js?v=96",
+  "./api-v3.js",
+  "./app-v3.js",
+  "./app-v3-ui.js",
   "./terms.html",
   "./privacy.html",
   "./site.webmanifest",
-  "./icons/icon-192.png?v=2",
-  "./icons/icon-512.png?v=2",
-  "./icons/icon-maskable-512.png?v=2",
-  "./icons/apple-touch-icon-180.png?v=2",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/icon-maskable-512.png",
+  "./icons/apple-touch-icon-180.png",
 ];
 
 self.addEventListener("install", (event) => {

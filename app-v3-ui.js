@@ -1682,6 +1682,119 @@ export function createAppUi(context) {
     return [creator, timestamp].filter(Boolean).join(" · ");
   }
 
+  function formatExternalPreviewBadge(provider, creator = "") {
+    const providerName = formatProviderName(provider);
+    const cleanCreator = typeof creator === "string" ? creator.trim() : "";
+    return cleanCreator && cleanCreator !== providerName ? `${cleanCreator} / ${providerName}` : providerName;
+  }
+
+  function deriveSpotifyCreatorFromSourceTitle(source) {
+    if (source?.provider !== "spotify") return "";
+    const sourceTitle = typeof source.title === "string" ? source.title.trim() : "";
+    if (!sourceTitle) return "";
+    const match = sourceTitle.match(/^(.{1,80}?)\s+-\s+(.+)$/);
+    if (!match) return "";
+    const candidate = match[1].trim();
+    const remainder = match[2].trim();
+    if (!candidate || !remainder || isGenericSpotifyCreatorFallback(candidate)) return "";
+    return candidate;
+  }
+
+  function isGenericSpotifyCreatorFallback(value) {
+    return /^(audio|music|post|song|spotify|track|untitled)$/i.test(String(value ?? "").trim());
+  }
+
+  function loadPreviewImageCandidates(stage, image, candidates, options = {}) {
+    const { cacheKey = "" } = options;
+    const urls = candidates.filter(Boolean);
+    if (!urls.length) return;
+
+    let index = 0;
+    const tryNext = () => {
+      if (index >= urls.length) return;
+      const url = urls[index];
+      index += 1;
+
+      const temp = new Image();
+      temp.onload = () => {
+        image.src = url;
+        stage.classList.add("has-image");
+        if (cacheKey) externalPreviewCache.set(cacheKey, url);
+      };
+      temp.onerror = () => {
+        tryNext();
+      };
+      temp.src = url;
+    };
+
+    tryNext();
+  }
+
+  async function loadSpotifyPreviewImage(stage, image, source) { const thumbnailUrl = await getSpotifyPreviewImageUrl(source); if (!stage.isConnected || !thumbnailUrl) return; loadPreviewImageCandidates(stage, image, [thumbnailUrl]); }
+
+  async function getExternalPreviewMetadata(source) { if (source.provider === "spotify") return getSpotifyPreviewMetadata(source); if (source.provider === "youtube") return getYouTubePreviewMetadata(source); return null; }
+
+  async function getSpotifyPreviewMetadata(source) {
+    const sourceUrl = resolveSpotifyPreviewSourceUrl(source); if (!sourceUrl) return null;
+    const cacheKey = `spotify:preview:v10:${sourceUrl}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
+    const request = Promise.all([fetchSpotifyPreviewCatalogMetadata(source, sourceUrl), fetchSpotifyPreviewOEmbedMetadata(sourceUrl)]).then(([cat, oem]) => { 
+      const fallbackCreator = deriveSpotifyCreatorFromSourceTitle(source, cat?.title || oem?.title || "");
+      const metadata = {
+        title: cat?.title || oem?.title || "",
+        creator: cat?.creator || oem?.creator || fallbackCreator || "",
+        thumbnailUrl: cat?.thumbnailUrl || oem?.thumbnailUrl || "",
+        error: cat?.error && !oem?.title ? cat.error : null 
+      }; 
+      const hasMetadata = Boolean(metadata.title || metadata.creator || metadata.thumbnailUrl); 
+      return hasMetadata ? metadata : (metadata.error ? metadata : null); 
+    }).then(result => {
+      externalPreviewCache.set(cacheKey, result);
+      return result;
+    }).catch(() => { 
+      externalPreviewCache.set(cacheKey, null); 
+      return null; 
+    });
+    externalPreviewCache.set(cacheKey, request); return request;
+  }
+
+  async function fetchSpotifyPreviewCatalogMetadata(source, sourceUrl) { 
+    if (!state.supabase || state.backendMode !== "supabase" || !state.currentUser) return { error: "Not Signed In" }; 
+    const functionName = getSpotifyPreviewFunctionName(); 
+    if (!functionName) return { error: "Config Missing" }; 
+    try { 
+      const { data, error } = await state.supabase.functions.invoke(functionName, { body: { url: sourceUrl, market: getSpotifyPreviewMarket() } }); 
+      if (error) {
+        console.error("[Spotify] Edge Function Error:", error);
+        let msg = "API Error";
+        if (error instanceof Error) msg = error.message;
+        else if (typeof error === "object" && error.message) msg = error.message;
+        return { error: msg };
+      }
+      if (!data || data.error) return { error: data?.error || "Empty Response" }; 
+      return { title: typeof data.title === "string" ? data.title.trim() : "", creator: typeof data.creator === "string" ? data.creator.trim() : "", thumbnailUrl: typeof data.thumbnailUrl === "string" ? data.thumbnailUrl.trim() : "" }; 
+    } catch (err) { return { error: "Network Error" }; } 
+  }
+
+  async function fetchSpotifyPreviewOEmbedMetadata(sourceUrl) { 
+    return null; 
+  }
+
+  async function getSpotifyPreviewImageUrl(source) { const metadata = await getSpotifyPreviewMetadata(source); return typeof metadata?.thumbnailUrl === "string" ? metadata.thumbnailUrl : ""; }
+
+  function getSpotifyPreviewMarket() { const locale = (Array.isArray(navigator.languages) && navigator.languages[0]) || navigator.language || navigator.userLanguage || ""; const match = `${locale}`.trim().match(/[-_]([A-Za-z]{2})$/); return match ? match[1].toUpperCase() : "US"; }
+
+  function resolveYouTubePreviewCandidates(source) {
+    const externalId = resolveYouTubePreviewId(source, parseYouTubeUrl);
+    if (!externalId) return [];
+    return [
+      `https://img.youtube.com/vi/${externalId}/0.jpg`,
+      `https://i.ytimg.com/vi/${externalId}/hqdefault.jpg`,
+      `https://i.ytimg.com/vi/${externalId}/mqdefault.jpg`,
+      `https://i.ytimg.com/vi/${externalId}/sddefault.jpg`,
+      `https://i.ytimg.com/vi/${externalId}/maxresdefault.jpg`
+    ];
+  }
+
   async function getYouTubePreviewMetadata(source) {
     const externalId = resolveYouTubePreviewId(source, parseYouTubeUrl); if (!externalId) return null;
     const cacheKey = `youtube:preview:${externalId}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
@@ -1774,6 +1887,10 @@ export function createAppUi(context) {
     }
     return "";
   }
+
+  function createExternalPreviewStage() { return document.createElement("div"); }
+  function applyExternalPreviewMetadata() {}
+
 
   function renderMiniPlayerVolumeControl() {
     const post = getPostById(state.playerPostId); const mediaElement = getActivePlayerMediaElement(); const hasNativeVolumeControl = mediaElement instanceof HTMLMediaElement; const supportsCustomVolume = hasNativeVolumeControl || post?.sourceKind === "youtube";
