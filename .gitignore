@@ -1,31 +1,29 @@
-# Dependencies
 node_modules/
-.npm-cache/
-.gradle-cache/
-.tmp-wear/
-
-# Build outputs
+.gradle/
+build/
+*/build/
 dist/
-android/app/build/
-android/.gradle/
-android/local.properties
 
-# Supabase
-supabase/.temp/
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/shelf/
+*.iml
 
-# IDEs and OS files
-.vscode/
-.idea/
+local.properties
 .DS_Store
 Thumbs.db
+*.log
 
-# Android/Capacitor
-.android-home/
-.android-user-home/
-.sandbox-home/
-local.properties
+*.jks
+*.keystore
 
-# Misc
-.aider.tags.cache.v4/
-scratch/
-System.Drawing.Drawing2D.GraphicsPath
+.env
+.env.*
+
+supabase/.temp/
+.supabase/.temp/

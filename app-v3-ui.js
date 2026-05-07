@@ -1499,9 +1499,7 @@ export function createAppUi(context) {
   }
 
   function launchNativeExternalMediaApp(post) {
-    if (!post || !isNativeCapacitorApp() || getCapacitorPlatform() !== "android") return false;
-    if (post.sourceKind !== "youtube" && post.sourceKind !== "spotify") return false;
-    if (!window.NativeBridge || typeof window.NativeBridge.openNowPlayingMediaApp !== "function") return false;
+    if (!post) return false;
 
     let packageName = "";
     let openUri = "";
@@ -1512,6 +1510,15 @@ export function createAppUi(context) {
       packageName = "com.spotify.music";
       openUri = resolveNativeSpotifyOpenUri(post);
     }
+
+    if (heroMediaPlayerController && typeof heroMediaPlayerController.openNowPlayingMediaApp === "function") {
+      const handled = heroMediaPlayerController.openNowPlayingMediaApp(packageName, openUri);
+      if (handled) return true;
+    }
+
+    if (!isNativeCapacitorApp() || getCapacitorPlatform() !== "android") return false;
+    if (post.sourceKind !== "youtube" && post.sourceKind !== "spotify") return false;
+    if (!window.NativeBridge || typeof window.NativeBridge.openNowPlayingMediaApp !== "function") return false;
 
     try {
       window.NativeBridge.openNowPlayingMediaApp(packageName, openUri, true);
@@ -1597,10 +1604,16 @@ export function createAppUi(context) {
     const isNativeAndroidExternal = isNativeCapacitorApp()
       && getCapacitorPlatform() === "android"
       && (post.sourceKind === "youtube" || post.sourceKind === "spotify");
-    if (isNativeAndroidExternal && (variant === "viewer" || variant === "mini")) {
+
+    // PC Extension: If the desktop bridge is available and active, we can also use the launchable preview.
+    const isDesktopExternal = !isNativeCapacitorApp()
+      && (post.sourceKind === "youtube" || post.sourceKind === "spotify")
+      && state.heroPlayerPlaybackState !== "none"; // Roughly check if bridge is alive
+
+    if ((isNativeAndroidExternal || isDesktopExternal) && (variant === "viewer" || variant === "mini")) {
       const note = post.sourceKind === "youtube"
-        ? "Tap preview to open in YouTube or YouTube Music."
-        : "Tap preview to open in the Spotify app.";
+        ? (isDesktopExternal ? "Click preview to open in YouTube Desktop." : "Tap preview to open in YouTube or YouTube Music.")
+        : (isDesktopExternal ? "Click preview to open in Spotify Desktop." : "Tap preview to open in the Spotify app.");
       const stage = createExternalPreviewStage({
         provider: post.sourceKind,
         title: post.title,

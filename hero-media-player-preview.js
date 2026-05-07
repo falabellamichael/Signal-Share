@@ -123,6 +123,34 @@ function createPreviewCard({ badge, title, meta, note, artworkUrl }) {
   return card;
 }
 
+function renderActivePlayerStage(post, parseYouTubeUrl) {
+  if (!post) return null;
+  const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
+  const spotifyId = post.sourceKind === "spotify" ? (post.externalId || post.src?.match(/track\/([a-zA-Z0-9]+)/)?.[1]) : "";
+
+  if (videoId || spotifyId) {
+    const container = document.createElement("div");
+    container.className = "hero-player-active-stage";
+    container.style.cssText = "width: 100%; height: 100%; position: relative; border-radius: 12px; overflow: hidden; background: #000;";
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "width: 100%; height: 100%; border: none;";
+    iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+
+    if (post.sourceKind === "youtube") {
+      iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1`;
+      iframe.title = "YouTube player";
+    } else {
+      iframe.src = `https://open.spotify.com/embed/track/${spotifyId}?utm_source=generator&theme=0`;
+      iframe.title = "Spotify player";
+    }
+
+    container.appendChild(iframe);
+    return container;
+  }
+  return null;
+}
+
 function createPostStandbyPreview(post, options = {}) {
   if (!post) return null;
   const {
@@ -170,6 +198,7 @@ export function renderHeroStagePreview(options = {}) {
     parseYouTubeUrl,
     resolveActivePlayerSource,
     getSpotifyPreviewImageUrl,
+    matchedPost,
   } = options;
 
   if (!stage) return;
@@ -191,6 +220,14 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     if (nativeSnapshot?.active) {
+      if (matchedPost && (matchedPost.sourceKind === "youtube" || matchedPost.sourceKind === "spotify")) {
+        const activeStage = renderActivePlayerStage(matchedPost, parseYouTubeUrl);
+        if (activeStage) {
+          stage.appendChild(activeStage);
+          return;
+        }
+      }
+
       stage.appendChild(createPreviewCard({
         badge: "Device media",
         title: nativeSnapshot.title || "Now playing",
@@ -223,6 +260,14 @@ export function renderHeroStagePreview(options = {}) {
 
   if (mode === "desktop") {
     if (desktopSnapshot?.active) {
+      if (matchedPost && (matchedPost.sourceKind === "youtube" || matchedPost.sourceKind === "spotify")) {
+        const activeStage = renderActivePlayerStage(matchedPost, parseYouTubeUrl);
+        if (activeStage) {
+          stage.appendChild(activeStage);
+          return;
+        }
+      }
+
       const resolvedArtwork = desktopSnapshot.artworkUri || "";
       stage.appendChild(createPreviewCard({
         badge: "PC system media",
@@ -297,30 +342,9 @@ export function renderHeroStagePreview(options = {}) {
 
   // Dynamic Edge: If it's an active app post, render the REAL player in the Hero stage.
   if (post.sourceKind === "youtube" || post.sourceKind === "spotify") {
-    const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
-    const spotifyId = post.sourceKind === "spotify" ? (post.externalId || post.src?.match(/track\/([a-zA-Z0-9]+)/)?.[1]) : "";
-    
-    console.log("[HeroPreview] Resolved IDs - videoId:", videoId, "spotifyId:", spotifyId);
-    
-    if (videoId || spotifyId) {
-      const container = document.createElement("div");
-      container.className = "hero-player-active-stage";
-      container.style.cssText = "width: 100%; height: 100%; position: relative; border-radius: 12px; overflow: hidden; background: #000;";
-      
-      const iframe = document.createElement("iframe");
-      iframe.style.cssText = "width: 100%; height: 100%; border: none;";
-      iframe.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
-      
-      if (post.sourceKind === "youtube") {
-        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0&modestbranding=1`;
-        iframe.title = "YouTube player";
-      } else {
-        iframe.src = `https://open.spotify.com/embed/track/${spotifyId}?utm_source=generator&theme=0`;
-        iframe.title = "Spotify player";
-      }
-      
-      container.appendChild(iframe);
-      stage.appendChild(container);
+    const activeStage = renderActivePlayerStage(post, parseYouTubeUrl);
+    if (activeStage) {
+      stage.appendChild(activeStage);
       return;
     }
   }

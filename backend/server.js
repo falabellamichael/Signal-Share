@@ -20,16 +20,22 @@ const userId = process.env.SIGNAL_SHARE_USER_ID;
 
 const MEDIA_KEY_CODES = {
   play_pause: 0xb3,
+  play: 0xfa, // VK_MEDIA_PLAY
+  pause: 0xfb, // VK_MEDIA_PAUSE
   next: 0xb0,
   previous: 0xb1,
 };
 const APP_COMMAND_CODES = {
   play_pause: 14, // APPCOMMAND_MEDIA_PLAY_PAUSE
+  play: 46, // APPCOMMAND_MEDIA_PLAY
+  pause: 47, // APPCOMMAND_MEDIA_PAUSE
   next: 11, // APPCOMMAND_MEDIA_NEXTTRACK
   previous: 12, // APPCOMMAND_MEDIA_PREVIOUSTRACK
 };
 const WINRT_ACTION_METHODS = {
   play_pause: "TryTogglePlayPauseAsync",
+  play: "TryPlayAsync",
+  pause: "TryPauseAsync",
   next: "TrySkipNextAsync",
   previous: "TrySkipPreviousAsync",
 };
@@ -128,73 +134,89 @@ function sanitizeMediaMeta(rawMeta = "", sourceAppId = "") {
   return meta;
 }
 
-function getPlaybackPriority(playbackStatus) {
-  switch (playbackStatus) {
+function extractYoutubeVideoId(value) {
+  if (!value) return "";
+  const ytMatch = value.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/|.*embed\/|.*shorts\/))([a-zA-Z0-9_-]{11})/i);
+  if (ytMatch) return ytMatch[1];
+  const directIdMatch = value.match(/[a-zA-Z0-9_-]{11}/);
+  return directIdMatch ? directIdMatch[0] : "";
+}
+
+function isPreferredApp(sourceAppId = "") {
+  const normalized = `${sourceAppId || ""}`.trim().toLowerCase();
+  return normalized.includes("spotify")
+    || normalized.includes("youtube")
+    || normalized.includes("ytmusic")
+    || normalized.includes("chrome")
+    || normalized.includes("edge")
+    || normalized.includes("signalshare");
+}
+
+function getPlaybackPriority(status) {
+  switch (status) {
     case PlaybackStatus.PLAYING:
       return 4;
-    case PlaybackStatus.PAUSED:
+    case PlaybackStatus.BUFFERING:
       return 3;
-    case PlaybackStatus.OPENED:
-    case PlaybackStatus.CHANGING:
+    case PlaybackStatus.PAUSED:
       return 2;
-    case PlaybackStatus.STOPPED:
-    case PlaybackStatus.CLOSED:
     default:
       return 1;
   }
+}
+
+function scoreSession(session) {
+  let score = 0;
+  const status = session.playback?.playbackStatus;
+  const priority = getPlaybackPriority(status);
+
+  score += priority * 100;
+
+  const sourceAppId = `${session.sourceAppUserModelId || session.sourceAppId || ""}`.trim();
+  if (isPreferredApp(sourceAppId)) {
+    score += 400;
+  }
+
+  if (session.media?.title && session.media?.title.trim()) {
+    score += 100;
+  }
+
+  const updated = Number(session.lastUpdatedTime || 0);
+  score += (updated % 10000); // Small boost for recent updates
+
+  return score;
 }
 
 function pickBestSession(sessions = []) {
   if (!Array.isArray(sessions) || !sessions.length) return null;
   return sessions.reduce((best, session) => {
     if (!best) return session;
-    const bestPriority = getPlaybackPriority(best.playback?.playbackStatus);
-    const sessionPriority = getPlaybackPriority(session.playback?.playbackStatus);
-    if (sessionPriority !== bestPriority) return sessionPriority > bestPriority ? session : best;
-
-    const bestUpdated = Number(best.lastUpdatedTime || 0);
-    const sessionUpdated = Number(session.lastUpdatedTime || 0);
-    if (sessionUpdated !== bestUpdated) return sessionUpdated > bestUpdated ? session : best;
-
-    const bestHasTitle = Boolean(`${best.media?.title || ""}`.trim());
-    const sessionHasTitle = Boolean(`${session.media?.title || ""}`.trim());
-    if (sessionHasTitle !== bestHasTitle) return sessionHasTitle ? session : best;
-
-    return best;
+    return scoreSession(session) > scoreSession(best) ? session : best;
   }, null);
 }
 
 function selectPreferredMediaSession() {
   const allSessions = SMTCMonitor.getMediaSessions();
   const sessions = Array.isArray(allSessions) ? allSessions : [];
-  const withPlayback = sessions.filter((session) => mapPlaybackState(session.playback?.playbackStatus) !== "none");
-  const current = SMTCMonitor.getCurrentMediaSession();
-  const currentState = mapPlaybackState(current?.playback?.playbackStatus);
-  const currentHasMetadata = Boolean(
-    `${current?.media?.title || ""}`.trim()
-    || `${current?.media?.artist || current?.media?.albumArtist || ""}`.trim()
-  );
-
-  const activelyPlaying = withPlayback.filter(
-    (session) => mapPlaybackState(session.playback?.playbackStatus) === "playing"
-  );
-
-  const bestPlayingSession = pickBestSession(activelyPlaying);
-  if (bestPlayingSession) return bestPlayingSession;
-
-  if (current && currentState !== "none" && currentHasMetadata) return current;
-
-  const spotifyFallback = pickBestSession(
-    withPlayback.filter((session) => `${session?.sourceAppId || ""}`.toLowerCase().includes("spotify"))
-  );
-  if (spotifyFallback) return spotifyFallback;
-
-  const activeSession = pickBestSession(withPlayback);
-  if (activeSession) return activeSession;
-
-  if (current) return current;
-
   return pickBestSession(sessions);
+}
+
+function resolveMediaAppLabel(sourceAppId = "") {
+  if (!sourceAppId) return "";
+  const normalized = sourceAppId.toLowerCase();
+  if (normalized.includes("spotify")) return "Spotify";
+  if (normalized.includes("youtube")) return "YouTube";
+  if (normalized.includes("chrome")) return "Chrome";
+  if (normalized.includes("msedge")) return "Edge";
+  if (normalized.includes("firefox")) return "Firefox";
+  if (normalized.includes("vlc")) return "VLC";
+  if (normalized.includes("wmplayer")) return "Windows Media Player";
+
+  const lastDot = sourceAppId.lastIndexOf('.');
+  if (lastDot >= 0 && lastDot + 1 < sourceAppId.length) {
+    return sourceAppId.substring(lastDot + 1);
+  }
+  return sourceAppId;
 }
 
 function buildSnapshotPayload() {
@@ -224,10 +246,16 @@ function buildSnapshotPayload() {
     if (!session) return base;
 
     const sourceAppId = `${session.sourceAppUserModelId || session.sourceAppId || ""}`.trim();
+    const appLabel = resolveMediaAppLabel(sourceAppId);
     const playbackState = mapPlaybackState(session.playback?.playbackStatus);
     const title = `${session.media?.title || ""}`.trim();
     const artist = `${session.media?.artist || session.media?.albumArtist || ""}`.trim();
-    const meta = sanitizeMediaMeta(artist, sourceAppId);
+    const sanitizedMeta = sanitizeMediaMeta(artist, sourceAppId);
+
+    // Android-like meta construction: App Name - Artist
+    const meta = (appLabel && sanitizedMeta && appLabel.toLowerCase() !== sanitizedMeta.toLowerCase())
+      ? `${appLabel} - ${sanitizedMeta}`
+      : (sanitizedMeta || appLabel);
 
     let artworkUri = "";
     const thumbnail = session.media?.thumbnail;
@@ -242,6 +270,18 @@ function buildSnapshotPayload() {
       }
     }
 
+    let openUri = "";
+    // Snapshot "Healing" for YouTube (like Android MainActivity/PhoneNowPlayingHelper)
+    if (sourceAppId.toLowerCase().includes("youtube") || title.toLowerCase().includes("youtube")) {
+      const videoId = extractYoutubeVideoId(title) || extractYoutubeVideoId(session.media?.albumTitle);
+      if (videoId) {
+        openUri = `https://www.youtube.com/watch?v=${videoId}`;
+        if (!artworkUri) {
+          artworkUri = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+        }
+      }
+    }
+
     return {
       ...base,
       active: playbackState !== "none",
@@ -250,6 +290,7 @@ function buildSnapshotPayload() {
       meta,
       appPackage: sourceAppId,
       artworkUri,
+      openUri,
     };
   } catch (error) {
     console.error("[Bridge] Critical error in buildSnapshotPayload:", error);
@@ -399,6 +440,13 @@ app.get("/api/system-media/current", (req, res) => {
 app.post("/api/system-media/action", async (req, res) => {
   const action = `${req.body?.action || ""}`.trim().toLowerCase();
   const appPackage = `${req.body?.appPackage || ""}`.trim();
+  if (action === "open_uri") {
+    const uri = `${req.body?.uri || ""}`.trim();
+    if (!uri) return res.status(400).json({ ok: false });
+    // Use PowerShell to start the URI
+    spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
+    return res.json({ ok: true });
+  }
   if (!MEDIA_KEY_CODES[action]) return res.status(400).json({ ok: false });
   const ok = await sendSystemMediaKey(action, appPackage);
   res.json({ ok });
@@ -416,6 +464,7 @@ async function syncToSupabase() {
       title: payload.title,
       meta: payload.meta,
       artwork_uri: payload.artworkUri,
+      open_uri: payload.openUri,
       updated_at: new Date().toISOString(),
     });
     if (error) console.error("Sync error:", error.message);
@@ -428,9 +477,15 @@ function subscribeToMediaActions() {
   supabase.channel('media_actions').on('postgres_changes', {
     event: 'INSERT', schema: 'public', table: 'system_media_actions', filter: `user_id=eq.${userId}`
   }, async (payload) => {
-    const { action, app_package } = payload.new;
+    const { action, app_package, uri } = payload.new;
     console.log(`[Bridge] Remote action: ${action}`);
-    await sendSystemMediaKey(action, app_package);
+    if (action === "open_uri") {
+      if (uri) {
+        spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
+      }
+    } else {
+      await sendSystemMediaKey(action, app_package);
+    }
     await syncToSupabase();
   }).subscribe();
 }
