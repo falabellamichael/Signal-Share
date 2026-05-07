@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=28";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=29";
 
 export function createAppUi(context) {
   const {
@@ -1644,7 +1644,28 @@ export function createAppUi(context) {
 
   function loadPreviewImageCandidates(stage, image, candidates, options = {}) {
     const { cacheKey = "" } = options;
-    const urls = candidates.filter(Boolean); if (!urls.length) return;
+    const urls = candidates.filter(Boolean);
+    if (!urls.length) return;
+
+    let index = 0;
+    const tryNext = () => {
+      if (index >= urls.length) return;
+      const url = urls[index];
+      index += 1;
+
+      const temp = new Image();
+      temp.onload = () => {
+        if (!stage.isConnected) return;
+        image.src = url;
+        if (cacheKey) externalPreviewCache.set(cacheKey, url);
+      };
+      temp.onerror = () => {
+        if (!stage.isConnected) return;
+        tryNext();
+      };
+      temp.src = url;
+    };
+
     tryNext();
   }
 
