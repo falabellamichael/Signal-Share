@@ -17,6 +17,16 @@ const MEDIA_KEY_CODES = {
   next: 0xb0,
   previous: 0xb1,
 };
+const APP_COMMAND_CODES = {
+  play_pause: 14, // APPCOMMAND_MEDIA_PLAY_PAUSE
+  next: 11, // APPCOMMAND_MEDIA_NEXTTRACK
+  previous: 12, // APPCOMMAND_MEDIA_PREVIOUSTRACK
+};
+const WINRT_ACTION_METHODS = {
+  play_pause: "TryTogglePlayPauseAsync",
+  next: "TrySkipNextAsync",
+  previous: "TrySkipPreviousAsync",
+};
 
 app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {
@@ -113,20 +123,86 @@ function buildSnapshotPayload() {
 
 function sendSystemMediaKey(action) {
   const vkCode = MEDIA_KEY_CODES[action];
-  if (!vkCode) return Promise.resolve(false);
+  const appCommand = APP_COMMAND_CODES[action];
+  const winrtMethodName = WINRT_ACTION_METHODS[action];
+  if (!vkCode || !appCommand || !winrtMethodName) return Promise.resolve(false);
 
   const script = `
+$ErrorActionPreference = "Stop"
+
+# Prefer direct SMTC control first. This is more reliable for apps like Spotify/Opera.
+$winRtSuccess = $false
+try {
+  Add-Type -AssemblyName System.Runtime.WindowsRuntime
+  $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime]
+  $asTaskMethod = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+    $_.ToString() -eq 'System.Threading.Tasks.Task\`1[TResult] AsTask[TResult](Windows.Foundation.IAsyncOperation\`1[TResult])'
+  } | Select-Object -First 1
+
+  if ($asTaskMethod -ne $null) {
+    $managerOp = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
+    $managerTask = $asTaskMethod.MakeGenericMethod(@([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])).Invoke($null, @($managerOp))
+    $manager = $managerTask.Result
+    $session = if ($manager -ne $null) { $manager.GetCurrentSession() } else { $null }
+
+    if ($session -ne $null) {
+      $actionMethod = $session.GetType().GetMethod('${winrtMethodName}', [Type[]]@())
+      if ($actionMethod -ne $null) {
+        $actionOp = $actionMethod.Invoke($session, @())
+        $resultTask = $asTaskMethod.MakeGenericMethod(@([bool])).Invoke($null, @($actionOp))
+        $winRtSuccess = [bool]$resultTask.Result
+      }
+    }
+  }
+} catch {}
+
+if ($winRtSuccess) {
+  Write-Output "ok"
+  exit 0
+}
+
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
 public static class MediaKeySender {
   [DllImport("user32.dll", SetLastError=true)]
+  public static extern IntPtr SendMessageTimeout(
+    IntPtr hWnd,
+    uint Msg,
+    IntPtr wParam,
+    IntPtr lParam,
+    uint fuFlags,
+    uint uTimeout,
+    out UIntPtr lpdwResult
+  );
+  [DllImport("user32.dll", SetLastError=true)]
+  public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll", SetLastError=true)]
   public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 }
 "@
-[MediaKeySender]::keybd_event(${vkCode}, 0, 0, [UIntPtr]::Zero)
+
+$WM_APPCOMMAND = 0x0319
+$SMTO_ABORTIFHUNG = 0x0002
+$HWND_BROADCAST = [IntPtr]0xffff
+$KEYEVENTF_EXTENDEDKEY = 0x0001
+$KEYEVENTF_KEYUP = 0x0002
+$result = [UIntPtr]::Zero
+$lParam = [IntPtr](${appCommand} -shl 16)
+
+# 1) Broadcast app command (works better for some Chromium-based browsers).
+[void][MediaKeySender]::SendMessageTimeout($HWND_BROADCAST, $WM_APPCOMMAND, [IntPtr]::Zero, $lParam, $SMTO_ABORTIFHUNG, 180, [ref]$result)
+
+# 2) Send app command to foreground window as an additional targeted attempt.
+$foreground = [MediaKeySender]::GetForegroundWindow()
+if ($foreground -ne [IntPtr]::Zero) {
+  [void][MediaKeySender]::SendMessageTimeout($foreground, $WM_APPCOMMAND, $foreground, $lParam, $SMTO_ABORTIFHUNG, 180, [ref]$result)
+}
+
+# 3) Legacy media key event fallback.
+[MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
 Start-Sleep -Milliseconds 30
-[MediaKeySender]::keybd_event(${vkCode}, 0, 2, [UIntPtr]::Zero)
+[MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
 Write-Output "ok"
   `.trim();
 
