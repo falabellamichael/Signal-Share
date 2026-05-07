@@ -239,6 +239,7 @@ export function createAppUi(context) {
     ".message-list",
     "#notificationsList",
   ].join(",");
+
   let activeOverlayScrollContainer = null;
   let activeOverlayTouchY = 0;
   let feedScrollObserver = null;
@@ -1202,7 +1203,7 @@ export function createAppUi(context) {
     root.style.setProperty("--viewport-offset-top", `${offsetTop}px`); root.style.setProperty("--viewport-offset-bottom", `${offsetBottom}px`); root.style.setProperty("--viewport-visible-height", `${visibleHeight}px`);
   }
 
-  function setMobileHeaderHidden(hidden) { state.mobileHeaderHidden = hidden; elements.siteHeader.classList.toggle("is-hidden", hidden); }
+  function setMobileHeaderHidden(hidden) { state.mobileHeaderHidden = hidden; if (elements.siteHeader) elements.siteHeader.classList.toggle("is-hidden", hidden); }
 
   function syncMobileHeaderVisibility() { if (!isMobileHeaderViewport()) { setMobileHeaderHidden(false); state.lastScrollY = window.scrollY; return; } if (state.settingsPanelOpen || window.scrollY <= 24) setMobileHeaderHidden(false); state.lastScrollY = window.scrollY; }
 
