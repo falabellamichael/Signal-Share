@@ -963,7 +963,15 @@ export function createHeroMediaPlayerController(options) {
   }
 
   function handlePlayPause(forcePlay) {
-    const post = getControllablePlayerPost();
+    const controllablePost = getControllablePlayerPost();
+    const mode = shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
+
+    if (mode === "app") {
+      playHeroMedia();
+      return;
+    }
+
+    const post = controllablePost;
     if (shouldUseNativeMode(post)) {
       if (nativeSnapshot?.permissionRequired && hasNativeSettingsBridge()) {
         try { getNativeBridge().openNowPlayingAccessSettings(); } catch {}
@@ -995,14 +1003,21 @@ export function createHeroMediaPlayerController(options) {
     if (typeof forcePlay === "boolean") {
       toggleLocalPlayback(forcePlay);
     } else {
-      // Hero Play now starts playback immediately if a post is selected.
       toggleLocalPlayback(true);
     }
     render();
   }
 
   function handlePrevious() {
-    const post = getControllablePlayerPost();
+    const controllablePost = getControllablePlayerPost();
+    const mode = shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
+
+    if (mode === "app") {
+      stepHeroPlayer(-1);
+      return;
+    }
+
+    const post = controllablePost;
     if (shouldUseNativeMode(post)) {
       performNativeAction(NATIVE_ACTION_PREVIOUS);
       return;
@@ -1021,16 +1036,22 @@ export function createHeroMediaPlayerController(options) {
       render();
       return;
     }
-    if (mode === "app") {
-      stepHeroPlayer(-1);
-    } else {
-      stepMiniPlayer(-1);
-    }
+    stepMiniPlayer(-1);
     state.heroPlayerPlaybackState = "paused";
   }
 
   function handleNext() {
-    const post = getControllablePlayerPost();
+    const controllablePost = getControllablePlayerPost();
+    const mode = shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
+
+    if (mode === "app") {
+      stepHeroPlayer(1);
+      state.heroPlayerPlaybackState = "paused";
+      render();
+      return;
+    }
+
+    const post = controllablePost;
     if (shouldUseNativeMode(post)) {
       performNativeAction(NATIVE_ACTION_NEXT);
       return;
