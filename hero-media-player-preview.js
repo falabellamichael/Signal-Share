@@ -212,7 +212,7 @@ function attachArtwork(card, title, artworkUrl) {
         if (card.dataset.artworkRequestToken !== requestToken) return;
         addImage(url);
       })
-      .catch(() => {});
+      .catch(() => { });
   }
 }
 
