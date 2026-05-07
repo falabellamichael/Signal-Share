@@ -2028,13 +2028,300 @@ window.renderActiveThread = renderActiveThread;
 
 if (!window.__SIGNAL_SHARE_INITIALIZED__) {
   window.__SIGNAL_SHARE_INITIALIZED__ = true;
-  initialize().catch((error) => {
-    console.error("App initialization failed:", error);
-    showFeedback("The site could not start correctly. Reload and try again.", true);
-  });
+  initialize()
+    .then(() => installHeroPlayerPersistenceRuntime())
+    .catch((error) => {
+      console.error("App initialization failed:", error);
+      showFeedback("The site could not start correctly. Reload and try again.", true);
+    });
+} else {
+  window.queueMicrotask(() => installHeroPlayerPersistenceRuntime());
 }
 
 // Spotify Web Playback SDK Callback
 window.onSpotifyWebPlaybackSDKReady = () => {
   console.log("Spotify Web Playback SDK is ready.");
 };
+
+// Hero player persistence + optional autoplay layer.
+// This keeps the real playback element alive when the mini dock is hidden,
+// and adds a saved autoplay toggle for page load.
+const HERO_PLAYER_AUTOPLAY_KEY = "signal-share-hero-player-autoplay";
+const HERO_PLAYER_LAST_POST_KEY = "signal-share-hero-player-last-post";
+const HERO_PLAYER_BOOT_ATTEMPTS = 28;
+const HERO_PLAYER_BOOT_INTERVAL_MS = 350;
+
+function readHeroPlayerAutoplayPreference() {
+  try {
+    return localStorage.getItem(HERO_PLAYER_AUTOPLAY_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeHeroPlayerAutoplayPreference(enabled) {
+  try {
+    localStorage.setItem(HERO_PLAYER_AUTOPLAY_KEY, enabled ? "true" : "false");
+  } catch {}
+}
+
+function readHeroPlayerLastPostId() {
+  try {
+    return localStorage.getItem(HERO_PLAYER_LAST_POST_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function writeHeroPlayerLastPostId(postId = "") {
+  try {
+    if (postId) localStorage.setItem(HERO_PLAYER_LAST_POST_KEY, postId);
+  } catch {}
+}
+
+function getHeroPlayerAutoplayPost() {
+  const allPosts = typeof getAllPosts === "function" ? getAllPosts() : [];
+  const visibleIds = Array.isArray(state.visiblePostIds) ? state.visiblePostIds : [];
+  const visiblePlayable = visibleIds
+    .map((id) => getPostById(id))
+    .filter((post) => post && isPlayablePost(post));
+  const fallbackPlayable = allPosts.filter((post) => post && isPlayablePost(post));
+  const candidates = visiblePlayable.length ? visiblePlayable : fallbackPlayable;
+  if (!candidates.length) return null;
+  const rememberedId = readHeroPlayerLastPostId();
+  return candidates.find((post) => post.id === rememberedId) || candidates[0] || null;
+}
+
+function getHeroPlayerDockElement() {
+  return elements?.miniPlayer || document.querySelector("#miniPlayer");
+}
+
+function getHeroPlayerDockShowButton() {
+  return document.querySelector("#heroPlayerDockShowButton");
+}
+
+function setHeroPlayerDockHiddenStyles(hidden) {
+  const miniPlayer = getHeroPlayerDockElement();
+  if (!miniPlayer) return;
+
+  if (hidden) {
+    miniPlayer.dataset.heroDockHidden = "true";
+    miniPlayer.classList.add("is-open");
+    miniPlayer.classList.remove("is-expanded", "is-dragging");
+    miniPlayer.setAttribute("aria-hidden", "true");
+    miniPlayer.style.setProperty("opacity", "0", "important");
+    miniPlayer.style.setProperty("pointer-events", "none", "important");
+    miniPlayer.style.setProperty("left", "-10000px", "important");
+    miniPlayer.style.setProperty("top", "-10000px", "important");
+    miniPlayer.style.setProperty("right", "auto", "important");
+    miniPlayer.style.setProperty("bottom", "auto", "important");
+    miniPlayer.style.setProperty("visibility", "hidden", "important");
+    if (elements?.miniPlayerVolume) elements.miniPlayerVolume.hidden = true;
+    return;
+  }
+
+  delete miniPlayer.dataset.heroDockHidden;
+  miniPlayer.style.removeProperty("opacity");
+  miniPlayer.style.removeProperty("pointer-events");
+  miniPlayer.style.removeProperty("left");
+  miniPlayer.style.removeProperty("top");
+  miniPlayer.style.removeProperty("right");
+  miniPlayer.style.removeProperty("bottom");
+  miniPlayer.style.removeProperty("visibility");
+}
+
+function updateHeroPlayerRuntimeButtons() {
+  const autoplayButton = document.querySelector("#heroPlayerAutoplayToggle");
+  if (autoplayButton) {
+    const enabled = readHeroPlayerAutoplayPreference();
+    autoplayButton.textContent = enabled ? "Autoplay: On" : "Autoplay: Off";
+    autoplayButton.setAttribute("aria-pressed", enabled ? "true" : "false");
+    autoplayButton.title = enabled
+      ? "Autoplay on page load is enabled. Browser rules may still require one manual tap."
+      : "Autoplay on page load is disabled.";
+  }
+
+  const dockButton = getHeroPlayerDockShowButton();
+  if (dockButton) {
+    const hidden = Boolean(state.heroPlayerDockHidden);
+    dockButton.hidden = !state.playerPostId && !state.activePlayerPostId;
+    dockButton.textContent = hidden ? "Show dock" : "Hide dock";
+    dockButton.setAttribute("aria-pressed", hidden ? "true" : "false");
+  }
+}
+
+function hideHeroPlayerDockWithoutStoppingPlayback() {
+  if (!state.playerPostId && !state.activePlayerPostId && !(state.activePlayerElement instanceof HTMLElement)) {
+    return false;
+  }
+
+  state.heroPlayerDockHidden = true;
+  state.miniPlayerExpanded = false;
+  state.playerDrag = null;
+  setHeroPlayerDockHiddenStyles(true);
+  if (typeof syncOverlayBodyState === "function") syncOverlayBodyState();
+  updateHeroPlayerRuntimeButtons();
+  return true;
+}
+
+function showHeroPlayerDock() {
+  state.heroPlayerDockHidden = false;
+  setHeroPlayerDockHiddenStyles(false);
+  if (state.playerPostId && typeof renderMiniPlayer === "function") renderMiniPlayer();
+  if (typeof syncOverlayBodyState === "function") syncOverlayBodyState();
+  updateHeroPlayerRuntimeButtons();
+}
+
+function ensureHeroPlayerRuntimeButtons() {
+  const controlsRow = elements?.heroPlayerNextButton?.parentElement
+    || elements?.heroPlayerPlayPauseButton?.parentElement
+    || elements?.heroPlayerStatus?.parentElement;
+  if (!controlsRow || document.querySelector("#heroPlayerAutoplayToggle")) return;
+
+  const makeButton = (id, text) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.id = id;
+    button.className = "hero-player-runtime-button";
+    button.textContent = text;
+    button.style.cssText = [
+      "border:1px solid rgba(255,255,255,.34)",
+      "border-radius:999px",
+      "background:rgba(0,0,0,.35)",
+      "color:inherit",
+      "font:inherit",
+      "font-size:.78rem",
+      "line-height:1",
+      "padding:.58rem .82rem",
+      "cursor:pointer",
+      "white-space:nowrap",
+      "min-height:34px",
+    ].join(";");
+    return button;
+  };
+
+  const autoplayButton = makeButton("heroPlayerAutoplayToggle", "Autoplay: Off");
+  autoplayButton.addEventListener("click", () => {
+    const enabled = !readHeroPlayerAutoplayPreference();
+    writeHeroPlayerAutoplayPreference(enabled);
+    updateHeroPlayerRuntimeButtons();
+    if (enabled) void tryHeroPlayerAutoplayOnLoad({ force: true });
+  });
+
+  const dockButton = makeButton("heroPlayerDockShowButton", "Hide dock");
+  dockButton.addEventListener("click", () => {
+    if (state.heroPlayerDockHidden) showHeroPlayerDock();
+    else hideHeroPlayerDockWithoutStoppingPlayback();
+  });
+
+  controlsRow.append(autoplayButton, dockButton);
+  updateHeroPlayerRuntimeButtons();
+}
+
+function tryPlayActiveHeroMediaElement() {
+  const media = typeof getActivePlayerMediaElement === "function" ? getActivePlayerMediaElement() : null;
+  if (!(media instanceof HTMLMediaElement)) return false;
+  media.volume = normalizePlayerVolume(state.playerVolume, DEFAULT_PLAYER_VOLUME);
+  const playResult = media.play();
+  if (playResult && typeof playResult.catch === "function") {
+    playResult.catch(() => {
+      state.heroPlayerPlaybackState = "paused";
+      elements.heroPlayerStatus.textContent = "Autoplay is ready. Press Play once to allow browser playback.";
+    });
+  }
+  return true;
+}
+
+async function tryHeroPlayerAutoplayOnLoad(options = {}) {
+  const { force = false } = options;
+  if (!force && state.heroPlayerAutoplayAttempted) return;
+  if (!force && !readHeroPlayerAutoplayPreference()) return;
+  state.heroPlayerAutoplayAttempted = true;
+
+  let attempts = 0;
+  const timer = window.setInterval(() => {
+    attempts += 1;
+    const post = getHeroPlayerAutoplayPost();
+    if (!post) {
+      if (attempts >= HERO_PLAYER_BOOT_ATTEMPTS) window.clearInterval(timer);
+      return;
+    }
+
+    window.clearInterval(timer);
+    writeHeroPlayerLastPostId(post.id);
+
+    if (typeof openMiniPlayer === "function") {
+      openMiniPlayer(post.id, elements.heroPlayerPlayPauseButton || document.activeElement);
+    } else {
+      state.playerPostId = post.id;
+      state.activePlayerPostId = post.id;
+      if (typeof renderMiniPlayer === "function") renderMiniPlayer();
+    }
+
+    window.requestAnimationFrame(() => {
+      const beforeState = state.heroPlayerPlaybackState;
+      if (!tryPlayActiveHeroMediaElement() && elements.heroPlayerPlayPauseButton && beforeState !== "playing") {
+        elements.heroPlayerPlayPauseButton.click();
+      }
+      updateHeroPlayerRuntimeButtons();
+    });
+  }, HERO_PLAYER_BOOT_INTERVAL_MS);
+}
+
+function installHeroPlayerPersistenceRuntime() {
+  if (window.__SIGNAL_SHARE_HERO_PLAYER_RUNTIME__) return;
+  window.__SIGNAL_SHARE_HERO_PLAYER_RUNTIME__ = true;
+
+  state.heroPlayerDockHidden = Boolean(state.heroPlayerDockHidden);
+  state.heroPlayerAutoplayAttempted = false;
+
+  ensureHeroPlayerRuntimeButtons();
+
+  document.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    if (target.closest("#miniCloseButton")) {
+      if (hideHeroPlayerDockWithoutStoppingPlayback()) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
+      return;
+    }
+
+    const opensPlayer = target.closest("#viewerCollapseButton, [data-open-player], [data-player-post], [data-player-id]");
+    if (opensPlayer) {
+      window.requestAnimationFrame(() => showHeroPlayerDock());
+    }
+  }, true);
+
+  elements.heroPlayerPlayPauseButton?.addEventListener("click", () => {
+    const post = typeof getControllablePlayerPost === "function" ? getControllablePlayerPost() : null;
+    if (post?.id) writeHeroPlayerLastPostId(post.id);
+    window.requestAnimationFrame(updateHeroPlayerRuntimeButtons);
+  });
+
+  elements.heroPlayerPrevButton?.addEventListener("click", () => window.requestAnimationFrame(() => {
+    const post = typeof getControllablePlayerPost === "function" ? getControllablePlayerPost() : null;
+    if (post?.id) writeHeroPlayerLastPostId(post.id);
+  }));
+
+  elements.heroPlayerNextButton?.addEventListener("click", () => window.requestAnimationFrame(() => {
+    const post = typeof getControllablePlayerPost === "function" ? getControllablePlayerPost() : null;
+    if (post?.id) writeHeroPlayerLastPostId(post.id);
+  }));
+
+  window.addEventListener("beforeunload", () => {
+    const post = typeof getControllablePlayerPost === "function" ? getControllablePlayerPost() : null;
+    if (post?.id) writeHeroPlayerLastPostId(post.id);
+  });
+
+  window.setInterval(() => {
+    ensureHeroPlayerRuntimeButtons();
+    if (state.heroPlayerDockHidden) setHeroPlayerDockHiddenStyles(true);
+    updateHeroPlayerRuntimeButtons();
+  }, 1200);
+
+  void tryHeroPlayerAutoplayOnLoad();
+}
