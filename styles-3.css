@@ -1211,12 +1211,11 @@ button:disabled {
   }
 
   .settings-dialog {
-    top: calc(12px + var(--status-bar-safe-space));
-    right: 12px;
-    left: 12px;
-    width: auto;
-    max-height: calc(var(--viewport-visible-height) - var(--status-bar-safe-space) - 24px);
-    overflow: auto;
+    width: min(calc(100vw - 16px), 480px);
+    max-height: calc(var(--viewport-visible-height) - 32px);
+    padding: 24px;
+    border-radius: 28px;
+    gap: 16px;
   }
 
   .settings-fields {
@@ -1560,18 +1559,10 @@ button:disabled {
   }
 
   #notificationsPanel .settings-dialog {
-    top: calc(max(var(--viewport-offset-top), env(safe-area-inset-top, 0px)) + 10px);
-    right: 8px;
-    left: auto;
-    width: min(420px, calc(100vw - 16px));
-    max-width: min(420px, calc(100vw - 16px));
-    max-height: calc(
-      var(--viewport-visible-height) -
-      max(var(--viewport-offset-top), env(safe-area-inset-top, 0px)) -
-      max(var(--viewport-offset-bottom), env(safe-area-inset-bottom, 0px)) -
-      18px
-    );
-    overflow-y: auto;
+    width: min(calc(100vw - 16px), 480px);
+    max-height: calc(var(--viewport-visible-height) - 32px);
+    padding: 24px;
+    border-radius: 28px;
   }
 
   .messenger-section,
@@ -1847,21 +1838,64 @@ button:disabled {
 /* FORCE BLACK PROFILE BACKGROUND AT END OF FILE */
 body[data-theme='contrast'] .profile-view-dialog { background: #000000 !important; border-color: rgba(255, 255, 255, 0.5) !important; }
 body[data-theme='contrast'] .profile-view { background: #000000 !important; }
-/* Theme Picker Refinement - Hide Writing */
-.theme-option-copy { display: none !important; }
-.theme-option-tile { grid-template-columns: 1fr !important; justify-items: center !important; padding: 12px !important; min-height: 0 !important; }
-.theme-preview { width: 100% !important; max-width: 120px !important; height: 80px !important; }
-.theme-picker-menu { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
-@media (min-width: 761px) { .theme-picker-menu { grid-template-columns: repeat(3, 1fr) !important; } }
-/* Unified Equalized Settings Spacing */
-.settings-dialog { padding: 32px 32px 24px !important; gap: 14px !important; }
-.settings-head { margin: 0 !important; gap: 14px !important; }
-.settings-fields { gap: 14px !important; margin-top: 10px !important; }
-.settings-field { gap: 14px !important; }
-.settings-actions { gap: 14px !important; margin-top: 14px !important; }
-.settings-toggle-field { gap: 14px !important; }
-.settings-field-copy { margin: 0 !important; }
-.auth-actions { margin-top: 20px !important; }
+/* Theme Picker Refinement */
+.theme-option-tile {
+  grid-template-columns: 72px 1fr !important;
+  align-items: center !important;
+  padding: 12px !important;
+  min-height: 80px !important;
+  text-align: left !important;
+}
+.theme-option-copy {
+  display: grid !important;
+  gap: 4px !important;
+}
+.theme-preview {
+  width: 72px !important;
+  height: 60px !important;
+  border-radius: 12px !important;
+}
+.theme-picker-menu {
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+  padding: 12px !important;
+}
+@media (min-width: 600px) {
+  .theme-picker-menu {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Settings Dialog Polish */
+.settings-dialog {
+  padding: 24px !important;
+  gap: 20px !important;
+  border-radius: 28px !important;
+}
+.settings-head {
+  margin-bottom: 8px !important;
+  gap: 10px !important;
+}
+.settings-fields {
+  gap: 16px !important;
+  margin-top: 12px !important;
+}
+.settings-field {
+  gap: 8px !important;
+}
+.settings-actions {
+  gap: 12px !important;
+  margin-top: 16px !important;
+}
+.settings-toggle-field {
+  gap: 10px !important;
+}
+.settings-field-copy {
+  margin: 0 !important;
+  font-size: 0.82rem !important;
+  opacity: 0.8 !important;
+}
+
 /* Ember Red Profile Background */
 body[data-theme='ember'] .profile-view-dialog { 
   background: radial-gradient(circle at top left, rgba(255, 68, 56, 0.22), transparent 30%), 

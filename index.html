@@ -124,7 +124,11 @@
                     <strong id="themePickerLabel">Sunset</strong>
                     <span id="themePickerDescription">Warm default</span>
                   </span>
-                  <span class="theme-picker-chevron" aria-hidden="true">v</span>
+                  <span class="theme-picker-chevron" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m6 9 6 6 6-9"/>
+                    </svg>
+                  </span>
                 </button>
 
                 <div class="theme-picker-menu" id="themePickerMenu" role="listbox" aria-label="Theme" hidden>
@@ -249,10 +253,9 @@
                 Reset preferences
               </button>
               <button
-                class="button button-secondary"
+                class="button button-secondary button-full"
                 id="keyboardShortcutsButton"
                 type="button"
-                style="margin-top: 10px; width: 100%;"
                 onclick="window.showSettingsPage && window.showSettingsPage('shortcuts')"
               >
                 Keyboard shortcuts
@@ -1270,23 +1273,23 @@
     <script type="module" src="./keyboard-bindings-v3.js"></script>
     <script type="module" src="./notification-keyboard-integration.js"></script>
     <!-- Global Overlay Panels -->
-    <section class="settings-panel" id="notificationsPanel" aria-hidden="true" hidden style="z-index: 10000 !important;">
+    <section class="settings-panel" id="notificationsPanel" aria-hidden="true" hidden>
       <div class="settings-backdrop" id="notificationsBackdrop"></div>
-      <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle" style="max-width: 480px;">
+      <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle">
         <button class="settings-close" id="notificationsCloseButton" type="button" aria-label="Close notifications">Close</button>
         <div class="settings-head">
           <p class="eyebrow">Activity</p>
           <h2 id="notificationsTitle">Notifications</h2>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-            <p style="margin: 0;">Recent messages and likes</p>
-            <button id="clearNotificationsButton" onclick="if(window.notifications){window.notifications.clearHistory(); if(window.renderNotificationsHistory)window.renderNotificationsHistory();}" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: var(--color-primary, #3b82f6); cursor: pointer; text-decoration: none; font-size: 0.85rem; padding: 8px 16px; border-radius: 6px; min-width: 80px; min-height: 44px;">Clear All</button>
+          <div class="notifications-head-tools">
+            <p>Recent messages and likes</p>
+            <button id="clearNotificationsButton" class="button-clear-all" onclick="if(window.notifications){window.notifications.clearHistory(); if(window.renderNotificationsHistory)window.renderNotificationsHistory();}">Clear All</button>
           </div>
         </div>
-        <div class="settings-section" style="padding-top: 0;">
-          <ul id="notificationsList" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto;">
+        <div class="settings-section">
+          <ul id="notificationsList">
             <!-- Notifications will be injected here -->
           </ul>
-          <p id="notificationsEmptyState" style="text-align: center; color: var(--text-muted, #94a3b8); padding: 20px 0;">No new notifications</p>
+          <p id="notificationsEmptyState">No new notifications</p>
         </div>
       </div>
     </section>

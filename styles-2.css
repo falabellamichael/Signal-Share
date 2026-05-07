@@ -1008,6 +1008,55 @@
   transition: transform 220ms ease, opacity 180ms ease, box-shadow 220ms ease;
 }
 
+.notifications-head-tools {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.notifications-head-tools p {
+  margin: 0;
+}
+
+.button-clear-all {
+  background: rgba(19, 33, 43, 0.06);
+  border: 1px solid var(--line);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  transition: background 180ms ease;
+}
+
+.button-clear-all:hover {
+  background: rgba(19, 33, 43, 0.1);
+}
+
+#notificationsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 60vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+#notificationsList::-webkit-scrollbar {
+  display: none;
+}
+
+#notificationsEmptyState {
+  text-align: center;
+  color: var(--muted);
+  padding: 32px 0;
+}
+
 .messenger-launcher:hover,
 .messenger-launcher:focus-visible {
   transform: translateY(-2px);
