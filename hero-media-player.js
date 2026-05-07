@@ -519,13 +519,16 @@ export function createHeroMediaPlayerController(options) {
 
     // If on a remote origin, prioritize Supabase sync to avoid PNA/CORS issues with localhost.
     const isRemoteOrigin = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
-    if (isRemoteOrigin && state.currentUser?.id) {
+    if (isRemoteOrigin) {
       const supabaseSnapshot = await readDesktopSnapshotFromSupabase();
       if (supabaseSnapshot) {
         desktopSnapshotEndpoint = "supabase-sync";
-        desktopActionEndpoint = ""; // Remote actions not yet supported via Supabase
+        desktopActionEndpoint = "";
         return supabaseSnapshot;
       }
+      // On a remote origin, if Supabase sync is not yet available, we do NOT poll local endpoints
+      // to avoid triggering PNA/CORS security warnings in the console.
+      return null;
     }
 
     let lastError = null;
@@ -560,7 +563,7 @@ export function createHeroMediaPlayerController(options) {
       const addressSpace = getEndpointAddressSpace(candidate);
       return addressSpace === "local" || addressSpace === "private" || addressSpace === "loopback";
     });
-    if (permissionPromptEndpoint) maybeTriggerLocalNetworkAccessPrompt(permissionPromptEndpoint);
+    if (permissionPromptEndpoint && !isRemoteOrigin) maybeTriggerLocalNetworkAccessPrompt(permissionPromptEndpoint);
     throw lastError || new Error("Desktop media endpoint is unavailable.");
   }
 
