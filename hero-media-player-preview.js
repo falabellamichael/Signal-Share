@@ -314,7 +314,7 @@ export function createCompanionCard(options = {}) {
   const securitySeparator = document.createTextNode(" or ");
 
   const viewSecurity = document.createElement("a");
-  viewSecurity.href = "/security.html";
+  viewSecurity.href = "security.html";
   viewSecurity.target = "_blank";
   viewSecurity.style.textDecoration = "underline";
   viewSecurity.style.color = "inherit";
