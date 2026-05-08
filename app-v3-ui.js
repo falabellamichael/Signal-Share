@@ -1948,6 +1948,9 @@ export function createAppUi(context) {
       && (post.sourceKind === "youtube" || post.sourceKind === "spotify")
       && state.heroPlayerPlaybackState !== "none"; // Roughly check if bridge is alive
 
+    // Fetch external metadata (YouTube/Spotify title and artist)
+    const externalMetadata = getExternalPreviewMetadata(post);
+    
     if ((isNativeAndroidExternal || isDesktopExternal) && (variant === "viewer" || variant === "mini")) {
       const note = post.sourceKind === "youtube"
         ? (isDesktopExternal ? "Click preview to open in YouTube Desktop." : "Tap preview to open in YouTube or YouTube Music.")
@@ -1955,25 +1958,44 @@ export function createAppUi(context) {
       
       const creatorSummary = getProfileSummaryForPost(post);
       const artworkUrl = resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl });
-      const stage = createPreviewCard({
-        badge: formatPostBadge(post, formatKind, getSignalLabel),
-        title: post.title || "Now playing",
-        meta: formatPostMeta(post, creatorSummary, formatTimestamp),
-        note,
-        artworkUrl
-      });
+      
+      // Helper to create and append the launchable preview card
+      const createLaunchableCard = (metadata) => {
+        const stage = createPreviewCard({
+          badge: formatPostBadge(post, formatKind, getSignalLabel),
+          title: metadata?.title || post.title || "Now playing",
+          meta: metadata?.creator ? `${metadata.creator} · ${formatPostMeta(post, creatorSummary, formatTimestamp).split(" · ").slice(1).join(" · ")}` : formatPostMeta(post, creatorSummary, formatTimestamp),
+          note,
+          artworkUrl: metadata?.artworkUrl || artworkUrl
+        });
 
-      stage.classList.add("external-preview-launchable");
-      stage.setAttribute("role", "button");
-      stage.setAttribute("tabindex", "0");
-      const launchNativeExternal = () => { void launchNativeExternalMediaApp(post); };
-      stage.addEventListener("click", launchNativeExternal);
-      stage.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        launchNativeExternal();
-      });
-      container.appendChild(stage);
+        stage.classList.add("external-preview-launchable");
+        stage.setAttribute("role", "button");
+        stage.setAttribute("tabindex", "0");
+        const launchNativeExternal = () => { void launchNativeExternalMediaApp(post); };
+        stage.addEventListener("click", launchNativeExternal);
+        stage.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          launchNativeExternal();
+        });
+        return stage;
+      };
+
+      if (externalMetadata instanceof Promise) {
+        // Render initial card and update when metadata arrives
+        const card = createLaunchableCard(null);
+        container.appendChild(card);
+        externalMetadata.then(metadata => {
+          if (metadata) {
+            container.replaceChild(createLaunchableCard(metadata), card);
+          }
+        }).catch(() => {
+          // Silently ignore errors, card already rendered with fallback
+        });
+      } else {
+        container.appendChild(createLaunchableCard(externalMetadata));
+      }
       return;
     }
 
@@ -1991,15 +2013,34 @@ export function createAppUi(context) {
       }
     }
 
+    // Fallback preview card with external metadata
     const creatorSummary = getProfileSummaryForPost(post);
     const artworkUrl = resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl });
-    container.appendChild(createPreviewCard({
-      badge: formatPostBadge(post, formatKind, getSignalLabel),
-      title: post.title || "Now playing",
-      meta: formatPostMeta(post, creatorSummary, formatTimestamp),
-      note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player.",
-      artworkUrl
-    }));
+    
+    const createFallbackCard = (metadata) => {
+      return createPreviewCard({
+        badge: formatPostBadge(post, formatKind, getSignalLabel),
+        title: metadata?.title || post.title || "Now playing",
+        meta: metadata?.creator ? `${metadata.creator} · (Live on feed)` : formatPostMeta(post, creatorSummary, formatTimestamp),
+        note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player.",
+        artworkUrl: metadata?.artworkUrl || artworkUrl
+      });
+    };
+
+    if (externalMetadata instanceof Promise) {
+      // Render initial card and update when metadata arrives
+      const card = createFallbackCard(null);
+      container.appendChild(card);
+      externalMetadata.then(metadata => {
+        if (metadata) {
+          container.replaceChild(createFallbackCard(metadata), card);
+        }
+      }).catch(() => {
+        // Silently ignore errors, card already rendered with fallback
+      });
+    } else {
+      container.appendChild(createFallbackCard(externalMetadata));
+    }
   }
 
   function formatPostBadge(post, formatKind, getSignalLabel) {
