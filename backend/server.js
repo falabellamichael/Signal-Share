@@ -40,6 +40,15 @@ const WINRT_ACTION_METHODS = {
   previous: "TrySkipPreviousAsync",
 };
 const MAX_ARTWORK_BYTES = 500000;
+const SMTC_ERROR_LOG_COOLDOWN_MS = 30000;
+const LAST_GOOD_SNAPSHOT_MAX_AGE_MS = 15000;
+
+let lastGoodSnapshot = null;
+let lastGoodSnapshotAt = 0;
+let smtcFailureCount = 0;
+let lastSmtcErrorMessage = "";
+let lastSmtcErrorLoggedAt = 0;
+let lastSupabaseSyncKey = "";
 
 const supabase = createClient(
   process.env.SUPABASE_URL || "",
@@ -195,10 +204,31 @@ function pickBestSession(sessions = []) {
   }, null);
 }
 
+function logSmtcError(error) {
+  const message = error instanceof Error ? error.message : String(error || "Unknown SMTC error");
+  lastSmtcErrorMessage = message;
+  const now = Date.now();
+  if (now - lastSmtcErrorLoggedAt < SMTC_ERROR_LOG_COOLDOWN_MS) return;
+  lastSmtcErrorLoggedAt = now;
+  console.warn(`[Bridge] Windows media snapshot unavailable (${message}). Actions can still work; snapshot polling will retry.`);
+}
+
+function safeGetMediaSessions() {
+  if (!isWindows) return [];
+  try {
+    const allSessions = SMTCMonitor.getMediaSessions();
+    smtcFailureCount = 0;
+    lastSmtcErrorMessage = "";
+    return Array.isArray(allSessions) ? allSessions.filter(Boolean) : [];
+  } catch (error) {
+    smtcFailureCount += 1;
+    logSmtcError(error);
+    return [];
+  }
+}
+
 function selectPreferredMediaSession() {
-  const allSessions = SMTCMonitor.getMediaSessions();
-  const sessions = Array.isArray(allSessions) ? allSessions : [];
-  return pickBestSession(sessions);
+  return pickBestSession(safeGetMediaSessions());
 }
 
 function resolveMediaAppLabel(sourceAppId = "") {
@@ -219,8 +249,8 @@ function resolveMediaAppLabel(sourceAppId = "") {
   return sourceAppId;
 }
 
-function buildSnapshotPayload() {
-  const base = {
+function getBaseSnapshot(extra = {}) {
+  return {
     source: "windows-smtc",
     available: isWindows,
     active: false,
@@ -231,20 +261,42 @@ function buildSnapshotPayload() {
     appPackage: "",
     openUri: "",
     artworkUri: "",
+    ...extra,
   };
+}
 
+function getRecentGoodSnapshotFallback() {
+  if (!lastGoodSnapshot) return null;
+  if (Date.now() - lastGoodSnapshotAt > LAST_GOOD_SNAPSHOT_MAX_AGE_MS) return null;
+  return {
+    ...lastGoodSnapshot,
+    stale: true,
+    staleReason: "Windows SMTC temporarily failed; using the most recent working snapshot.",
+  };
+}
+
+function buildSnapshotPayload() {
+  const base = getBaseSnapshot();
 
   if (!isWindows) {
-    return {
-      ...base,
+    return getBaseSnapshot({
       unavailableReason: "This endpoint is only available on Windows.",
-    };
+    });
+  }
+
+  const session = selectPreferredMediaSession();
+  if (!session) {
+    const fallback = getRecentGoodSnapshotFallback();
+    if (fallback) return fallback;
+
+    return getBaseSnapshot({
+      smtcHealthy: smtcFailureCount === 0,
+      smtcFailureCount,
+      smtcError: smtcFailureCount > 0 ? lastSmtcErrorMessage : "",
+    });
   }
 
   try {
-    const session = selectPreferredMediaSession();
-    if (!session) return base;
-
     const sourceAppId = `${session.sourceAppUserModelId || session.sourceAppId || ""}`.trim();
     const appLabel = resolveMediaAppLabel(sourceAppId);
     const playbackState = mapPlaybackState(session.playback?.playbackStatus);
@@ -252,7 +304,6 @@ function buildSnapshotPayload() {
     const artist = `${session.media?.artist || session.media?.albumArtist || ""}`.trim();
     const sanitizedMeta = sanitizeMediaMeta(artist, sourceAppId);
 
-    // Android-like meta construction: App Name - Artist
     const meta = (appLabel && sanitizedMeta && appLabel.toLowerCase() !== sanitizedMeta.toLowerCase())
       ? `${appLabel} - ${sanitizedMeta}`
       : (sanitizedMeta || appLabel);
@@ -262,39 +313,43 @@ function buildSnapshotPayload() {
     if (Buffer.isBuffer(thumbnail) && thumbnail.length > 0 && thumbnail.length <= MAX_ARTWORK_BYTES) {
       try {
         const mimeType = inferArtworkMimeType(thumbnail);
-        if (mimeType) {
-          artworkUri = `data:${mimeType};base64,${thumbnail.toString("base64")}`;
-        }
-      } catch (e) {
-        console.warn("[Bridge] Failed to encode artwork:", e.message);
+        if (mimeType) artworkUri = `data:${mimeType};base64,${thumbnail.toString("base64")}`;
+      } catch (error) {
+        console.warn("[Bridge] Failed to encode artwork:", error instanceof Error ? error.message : error);
       }
     }
 
     let openUri = "";
-    // Snapshot "Healing" for YouTube (like Android MainActivity/PhoneNowPlayingHelper)
     if (sourceAppId.toLowerCase().includes("youtube") || title.toLowerCase().includes("youtube")) {
       const videoId = extractYoutubeVideoId(title) || extractYoutubeVideoId(session.media?.albumTitle);
       if (videoId) {
         openUri = `https://www.youtube.com/watch?v=${videoId}`;
-        if (!artworkUri) {
-          artworkUri = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-        }
+        if (!artworkUri) artworkUri = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
       }
     }
 
-    return {
+    const payload = {
       ...base,
-      active: playbackState !== "none",
+      active: playbackState !== "none" || Boolean(title),
       playbackState,
       title: title || "Now playing",
       meta,
       appPackage: sourceAppId,
       artworkUri,
       openUri,
+      smtcHealthy: true,
+      smtcFailureCount: 0,
+      smtcError: "",
     };
+
+    lastGoodSnapshot = payload;
+    lastGoodSnapshotAt = Date.now();
+    return payload;
   } catch (error) {
-    console.error("[Bridge] Critical error in buildSnapshotPayload:", error);
-    return base;
+    const message = error instanceof Error ? error.message : String(error || "Unknown snapshot parse error");
+    console.warn(`[Bridge] Failed to build media snapshot from current session (${message}).`);
+    const fallback = getRecentGoodSnapshotFallback();
+    return fallback || getBaseSnapshot({ smtcHealthy: false, smtcError: message });
   }
 }
 
@@ -426,22 +481,15 @@ app.get("/api/system-media/current", (req, res) => {
   try {
     res.json(buildSnapshotPayload());
   } catch (error) {
-    console.error("[Bridge] Error fetching current media session:", error);
-    res.status(500).json({
-      source: "windows-smtc",
-      available: isWindows,
-      active: false,
-      playbackState: "none",
-      error: error.message
-    });
+    const message = error instanceof Error ? error.message : String(error || "Unknown bridge error");
+    console.warn("[Bridge] Snapshot request failed safely:", message);
+    res.json(getBaseSnapshot({ smtcHealthy: false, smtcError: message }));
   }
 });
 
 app.post("/api/system-media/action", async (req, res) => {
   const action = `${req.body?.action || ""}`.trim().toLowerCase();
   const appPackage = `${req.body?.appPackage || ""}`.trim();
-  console.log(`[Bridge] Local action request: ${action} (${appPackage || 'no package'})`);
-  
   if (action === "open_uri") {
     const uri = `${req.body?.uri || ""}`.trim();
     if (!uri) return res.status(400).json({ ok: false });
@@ -457,9 +505,21 @@ app.post("/api/system-media/action", async (req, res) => {
 app.get("/", (req, res) => { res.sendFile(path.join(projectRoot, "index.html")); });
 
 async function syncToSupabase() {
-  if (!isWindows || !userId) return;
+  if (!isWindows || !userId || !supabase) return;
   try {
     const payload = buildSnapshotPayload();
+    const syncKey = [
+      payload.playbackState,
+      payload.title,
+      payload.meta,
+      payload.artworkUri ? "art" : "no-art",
+      payload.openUri,
+      payload.appPackage,
+      payload.smtcHealthy === false ? "smtc-error" : "smtc-ok",
+    ].join("|");
+
+    if (syncKey === lastSupabaseSyncKey) return;
+
     const { error } = await supabase.from("system_media").upsert({
       user_id: userId,
       playback_state: payload.playbackState,
@@ -467,10 +527,21 @@ async function syncToSupabase() {
       meta: payload.meta,
       artwork_uri: payload.artworkUri,
       open_uri: payload.openUri,
+      app_package: payload.appPackage,
+      device_name: "Desktop PC",
       updated_at: new Date().toISOString(),
     });
-    if (error) console.error("Sync error:", error.message);
-  } catch (err) { console.error("Sync crash:", err); }
+
+    if (error) {
+      console.error("[Bridge] Supabase sync error:", error.message);
+      return;
+    }
+
+    lastSupabaseSyncKey = syncKey;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || "Unknown sync error");
+    console.warn("[Bridge] Supabase sync skipped:", message);
+  }
 }
 
 function subscribeToMediaActions() {
@@ -496,7 +567,7 @@ app.listen(port, "0.0.0.0", () => {
   console.log(`[Bridge] Server on http://localhost:${port}`);
   if (isWindows && userId) {
     console.log(`[Bridge] User verified: ${userId}`);
-    setInterval(syncToSupabase, 2000);
+    setInterval(syncToSupabase, 5000);
     subscribeToMediaActions();
     syncToSupabase();
   } else if (!userId) {

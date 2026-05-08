@@ -1905,6 +1905,7 @@ export const {
   renderPreview, renderExternalPreview, clearPreviewOnly, updateSourceHelp, updateActiveFilterChip,
   showFeedback, resetComposer, clearSelectedMedia, clearViewerMedia, clearMiniPlayerMedia,
   destroyActivePlayer, hydrateRememberedCreator, ensureOverlay, showOverlay, hideOverlay,
+  heroMediaPlayerController,
 } = createAppUi({
   state, createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase,
   compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost,
@@ -1956,6 +1957,8 @@ export const {
 });
 
 window.renderActiveThread = renderActiveThread;
+
+window.heroMediaPlayerController = heroMediaPlayerController;
 
 if (!window.__SIGNAL_SHARE_INITIALIZED__) {
   window.__SIGNAL_SHARE_INITIALIZED__ = true;

@@ -84,10 +84,10 @@ function resolveSpotifyPreview(post) {
   return null;
 }
 
-function createYouTubeEmbedSource(videoId) {
+function createYouTubeEmbedSource(videoId, options = {}) {
   if (!videoId) return "";
   const params = new URLSearchParams({
-    autoplay: "0",
+    autoplay: options.autoplay ? "1" : "0",
     controls: "1",
     playsinline: "1",
     rel: "0",
@@ -98,24 +98,25 @@ function createYouTubeEmbedSource(videoId) {
   return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
 }
 
-function createSpotifyEmbedSource(spotifyPreview) {
+function createSpotifyEmbedSource(spotifyPreview, options = {}) {
   if (!spotifyPreview?.id) return "";
   const type = SPOTIFY_TYPES.has(spotifyPreview.type) ? spotifyPreview.type : "track";
-  return `https://open.spotify.com/embed/${type}/${spotifyPreview.id}?utm_source=generator&theme=0`;
+  const autoplay = options.autoplay ? "&autoplay=1" : "";
+  return `https://open.spotify.com/embed/${type}/${spotifyPreview.id}?utm_source=generator&theme=0${autoplay}`;
 }
 
-export function createActivePlayerDescriptor(post, parseYouTubeUrl) {
+export function createActivePlayerDescriptor(post, parseYouTubeUrl, options = {}) {
   if (!post) return null;
 
   if (post.sourceKind === "youtube") {
     const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
-    const src = createYouTubeEmbedSource(videoId);
+    const src = createYouTubeEmbedSource(videoId, options);
     return src ? { provider: "youtube", src, title: "YouTube player" } : null;
   }
 
   if (post.sourceKind === "spotify") {
     const spotifyPreview = resolveSpotifyPreview(post);
-    const src = createSpotifyEmbedSource(spotifyPreview);
+    const src = createSpotifyEmbedSource(spotifyPreview, options);
     return src ? { provider: "spotify", src, title: "Spotify player" } : null;
   }
 
@@ -282,8 +283,8 @@ export function createActivePlayerStage(descriptor) {
 }
 
 function commitActivePlayer(stage, post, options) {
-  const { parseYouTubeUrl, resolveActivePlayerSource } = options;
-  const descriptor = createActivePlayerDescriptor(post, parseYouTubeUrl);
+  const { parseYouTubeUrl, resolveActivePlayerSource, autoplay } = options;
+  const descriptor = createActivePlayerDescriptor(post, parseYouTubeUrl, { autoplay });
 
   if (descriptor) {
     const key = `active-player|${descriptor.provider}|${descriptor.src}`;

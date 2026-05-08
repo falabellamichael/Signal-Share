@@ -198,21 +198,32 @@ class KeyboardBindings {
     // Media player shortcuts
     this.registerShortcut('Space', () => {
       // Toggle play/pause for media player
+      if (window.heroMediaPlayerController) {
+        window.heroMediaPlayerController.handlePlayPause();
+        return;
+      }
       const miniPlayer = document.getElementById('miniPlayer');
       if (miniPlayer && !miniPlayer.classList.contains('hidden')) {
-        // Toggle play/pause logic would go here
         console.log('Toggle play/pause');
       }
     }, 'Toggle play/pause');
 
     this.registerShortcut('ArrowLeft', () => {
       // Previous media
+      if (window.heroMediaPlayerController) {
+        window.heroMediaPlayerController.handlePrevious();
+        return;
+      }
       const prevButton = document.getElementById('miniPrevButton');
       if (prevButton) prevButton.click();
     }, 'Previous media');
 
     this.registerShortcut('ArrowRight', () => {
       // Next media
+      if (window.heroMediaPlayerController) {
+        window.heroMediaPlayerController.handleNext();
+        return;
+      }
       const nextButton = document.getElementById('miniNextButton');
       if (nextButton) nextButton.click();
     }, 'Next media');

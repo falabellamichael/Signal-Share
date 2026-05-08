@@ -36,11 +36,11 @@ export function createHeroMediaPlayerController(options) {
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
   const NATIVE_ACTION_NEXT = "next";
   const NATIVE_ACTION_PREVIOUS = "previous";
-  const NATIVE_POLL_INTERVAL_MS = 3000;
+  const NATIVE_POLL_INTERVAL_MS = 2000;
   const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
-  const DESKTOP_POLL_INTERVAL_MS = 3000;
+  const DESKTOP_POLL_INTERVAL_MS = 2000;
   const LOCAL_NETWORK_PROMPT_COOLDOWN_MS = 30000;
 
   let listenersAttached = false;
@@ -1022,8 +1022,14 @@ export function createHeroMediaPlayerController(options) {
     if (!hasNativeActionBridge()) return false;
     const bridge = getNativeBridge();
     try {
+      // Optimistic update
+      if (action === NATIVE_ACTION_PLAY_PAUSE && nativeSnapshot) {
+        nativeSnapshot.playbackState = (nativeSnapshot.playbackState === "playing") ? "paused" : "playing";
+        render();
+      }
+
       const success = bridge.performNowPlayingAction(action);
-      window.setTimeout(() => { refreshNativeSnapshot(); }, 220);
+      window.setTimeout(() => { refreshNativeSnapshot(); }, 400);
       return Boolean(success);
     } catch {
       return false;
@@ -1062,14 +1068,20 @@ export function createHeroMediaPlayerController(options) {
       .then((payload) => {
         if (payload?.ok) {
           lastDesktopActionAt = Date.now();
-          if (action === "play_pause" && desktopSnapshot) {
-            desktopSnapshot.playbackState = (desktopSnapshot.playbackState === "playing") ? "paused" : "playing";
+          if (desktopSnapshot) {
+            if (action === "play_pause") {
+              desktopSnapshot.playbackState = (desktopSnapshot.playbackState === "playing") ? "paused" : "playing";
+            } else if (action === "next" || action === "previous") {
+              // Show a loading/transition state
+              desktopSnapshot.title = "Switching track...";
+              desktopSnapshot.playbackState = "playing";
+            }
             render();
           }
         }
         window.setTimeout(() => { 
           refreshDesktopSnapshot(); 
-        }, 1200);
+        }, 800);
         return Boolean(payload?.ok);
       })
       .catch(() => false);
@@ -1155,7 +1167,10 @@ export function createHeroMediaPlayerController(options) {
     const mode = getEffectiveHeroMode(controllablePost);
 
     if (mode === "app") {
+      const wasPlaying = getLocalPlaybackState() === "playing";
       stepHeroPlayer(-1);
+      if (wasPlaying) state.heroPlayerPlaybackState = "playing";
+      render();
       return;
     }
 
@@ -1185,8 +1200,9 @@ export function createHeroMediaPlayerController(options) {
     const mode = getEffectiveHeroMode(controllablePost);
 
     if (mode === "app") {
+      const wasPlaying = getLocalPlaybackState() === "playing";
       stepHeroPlayer(1);
-      state.heroPlayerPlaybackState = "paused";
+      if (wasPlaying) state.heroPlayerPlaybackState = "playing";
       render();
       return;
     }

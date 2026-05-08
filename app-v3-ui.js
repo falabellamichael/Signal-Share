@@ -1533,7 +1533,7 @@ export function createAppUi(context) {
      }
 
      state.heroPlayerPostId = post.id;
-     state.heroPlayerElement = createPersistentPlayer(post);
+     state.heroPlayerElement = createPersistentPlayer(post, { autoplay });
      
      if (autoplay) {
        const media = state.heroPlayerElement instanceof HTMLMediaElement 
@@ -1558,7 +1558,9 @@ export function createAppUi(context) {
      if (state.heroPlayerPostId === post.id && state.heroPlayerElement) {
        const media = state.heroPlayerElement instanceof HTMLMediaElement 
          ? state.heroPlayerElement 
-         : (state.heroPlayerElement instanceof HTMLIFrameElement ? state.heroPlayerElement : state.heroPlayerElement.querySelector("video, audio"));
+         : (state.heroPlayerElement instanceof HTMLIFrameElement
+           ? state.heroPlayerElement
+           : state.heroPlayerElement.querySelector("video, audio, iframe"));
        
        if (media instanceof HTMLMediaElement) {
          if (media.paused) media.play().catch(() => {});
@@ -1843,13 +1845,21 @@ export function createAppUi(context) {
     return handled;
   }
 
-  function mountPersistentPlayer(container, post, variant) {
-    if (state.activePlayerPostId !== post.id || !state.activePlayerElement) { destroyActivePlayer(); state.activePlayerElement = createPersistentPlayer(post); state.activePlayerPostId = post.id; }
-    applyPersistentPlayerVariant(post, variant); applyPlayerVolumeToActiveElement(); if (container.firstElementChild !== state.activePlayerElement) container.replaceChildren(state.activePlayerElement);
+  function mountPersistentPlayer(container, post, variant, options = {}) {
+    const { autoplay = false } = options;
+    if (state.activePlayerPostId !== post.id || !state.activePlayerElement) {
+      destroyActivePlayer();
+      state.activePlayerElement = createPersistentPlayer(post, { autoplay });
+      state.activePlayerPostId = post.id;
+    }
+    applyPersistentPlayerVariant(post, variant);
+    applyPlayerVolumeToActiveElement();
+    if (container.firstElementChild !== state.activePlayerElement) container.replaceChildren(state.activePlayerElement);
   }
 
-  function createPersistentPlayer(post) {
-    const descriptor = createActivePlayerDescriptor(post, parseYouTubeUrl);
+  function createPersistentPlayer(post, options = {}) {
+    const { autoplay = false } = options;
+    const descriptor = createActivePlayerDescriptor(post, parseYouTubeUrl, { autoplay });
     if (descriptor) {
       const stage = createActivePlayerStage(descriptor);
       if (stage) {
@@ -2558,5 +2568,6 @@ export function createAppUi(context) {
     renderPreview, renderExternalPreview, clearPreviewOnly, updateSourceHelp, updateActiveFilterChip,
     showFeedback, resetComposer, clearSelectedMedia, clearViewerMedia, clearMiniPlayerMedia,
     destroyActivePlayer, hydrateRememberedCreator, ensureOverlay, showOverlay, hideOverlay,
+    heroMediaPlayerController,
   };
 }
