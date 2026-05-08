@@ -1947,21 +1947,6 @@ The companion bridge is designed with several security layers to keep your PC sa
     const playablePosts = getHeroPlayablePosts();
     const playableCount = playablePosts.length;
     const canStep = playableCount > 1;
-    const hasPost = Boolean(heroPost);
-
-    // Toggle Button Highlighting - Only update if changed
-    if (elements.heroModeFeed) {
-      const isFeedActive = state.heroControlMode === "feed";
-      if (elements.heroModeFeed.classList.contains("is-active") !== isFeedActive) {
-        elements.heroModeFeed.classList.toggle("is-active", isFeedActive);
-      }
-    }
-    if (elements.heroModeMedia) {
-      const isMediaActive = state.heroControlMode === "media";
-      if (elements.heroModeMedia.classList.contains("is-active") !== isMediaActive) {
-        elements.heroModeMedia.classList.toggle("is-active", isMediaActive);
-      }
-    }
 
     if (elements.heroPlayerPrevButton.disabled !== !canStep) {
       elements.heroPlayerPrevButton.disabled = !canStep;

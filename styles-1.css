@@ -1852,10 +1852,17 @@ body[data-theme="ember"] #heroPlayerOpenMiniButton {
 }
 
 .hero-player-source-toggle.is-dimmed {
-  opacity: 0.45;
-  filter: grayscale(0.85);
-  background: rgba(0, 0, 0, 0.04);
+  opacity: 0.35;
+  filter: grayscale(1);
   pointer-events: none;
+  background: rgba(19, 33, 43, 0.04);
+  border-color: transparent;
+}
+
+.hero-player-source-toggle.is-dimmed .source-toggle-button {
+  background: transparent !important;
+  color: var(--muted) !important;
+  box-shadow: none !important;
 }
 
 .source-toggle-button.is-disabled {
