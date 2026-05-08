@@ -108,26 +108,26 @@ app.use((req, res, next) => {
     }
   }
 
-  // Simple Rate Limiting for Actions
-  if (req.method === "POST" && req.path.endsWith("/action")) {
-    const now = Date.now();
-    const state = actionCounts.get(req.ip) || { count: 0, resetAt: now + 60000 };
-    
-    if (now > state.resetAt) {
-      state.count = 0;
-      state.resetAt = now + 60000;
-    }
-    
-    state.count++;
-    actionCounts.set(req.ip, state);
-    
-    if (state.count > MAX_ACTIONS_PER_MINUTE) {
-      return res.status(429).json({ error: "Too many actions. Please slow down." });
-    }
-  }
-
   next();
 });
+
+const rateLimitSystemMediaAction = (req, res, next) => {
+  const now = Date.now();
+  const state = actionCounts.get(req.ip) || { count: 0, resetAt: now + 60000 };
+  
+  if (now > state.resetAt) {
+    state.count = 0;
+    state.resetAt = now + 60000;
+  }
+  
+  state.count++;
+  actionCounts.set(req.ip, state);
+  
+  if (state.count > MAX_ACTIONS_PER_MINUTE) {
+    return res.status(429).json({ error: "Too many actions. Please slow down." });
+  }
+  next();
+};
 
 app.use(express.static(projectRoot));
 
