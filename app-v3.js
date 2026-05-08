@@ -319,6 +319,7 @@ if (!window[globalStateKey]) {
     viewerAttachment: null,
     miniPlayerUrl: "",
     heroControlMode: "feed",
+    desktopBridgeSuspended: false,
     viewerUrl: "",
     returnFocusElement: null,
     profileReturnFocusElement: null,

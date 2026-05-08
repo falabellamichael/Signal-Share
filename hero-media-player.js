@@ -361,7 +361,14 @@ export function createHeroMediaPlayerController(options) {
 
     // Only try localhost/loopback if we are actually local OR if we have reason to believe a bridge is there.
     // GitHub Pages / Remote Origins should not poll relative /api paths as they are guaranteed 404s.
-    const isLocalOrigin = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const isRemoteOrigin = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
+
+    // GitHub Pages / Remote Origins should not poll relative /api paths as they are guaranteed 404s.
+    // We only try localhost/loopback if we have reason to believe a bridge is there or if in Media mode.
+    if (isRemoteOrigin && desktopPollFailureCount > 3 && state.heroControlMode !== "media") {
+       // On remote, if it's failing, don't even try loopback unless user is looking for it
+       return candidates;
+    }
 
     pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
     pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
@@ -663,21 +670,44 @@ export function createHeroMediaPlayerController(options) {
     throw lastError || new Error("Desktop media endpoint is unavailable.");
   }
 
+  let lastDesktopPollTime = 0;
+
   function refreshDesktopSnapshot({ renderAfter = true } = {}) {
     if (!canUseDesktopBridge()) {
       desktopSnapshot = null;
       return Promise.resolve(null);
     }
 
-    // If we've failed too many times, only poll occasionally (e.g. every 5th call)
-    if (desktopPollFailureCount > 10 && (Date.now() % 5 !== 0)) {
+    const now = Date.now();
+    const isMediaMode = state.heroControlMode === "media";
+
+    // If suspended due to too many failures, only retry every 60 seconds unless in Media mode
+    if (state.desktopBridgeSuspended && !isMediaMode) {
+      if (now - lastDesktopPollTime < 60000) {
+        return Promise.resolve(desktopSnapshot);
+      }
+    }
+
+    // Exponential back-off for failures
+    let waitTime = DESKTOP_POLL_INTERVAL_MS;
+    if (desktopPollFailureCount > 0) {
+      waitTime = Math.min(30000, DESKTOP_POLL_INTERVAL_MS * Math.pow(1.5, Math.min(8, desktopPollFailureCount)));
+    }
+
+    // In Media mode, we poll at least every 10 seconds to detect the bridge coming online
+    if (isMediaMode) waitTime = Math.min(10000, waitTime);
+
+    if (now - lastDesktopPollTime < waitTime) {
       return Promise.resolve(desktopSnapshot);
     }
+
+    lastDesktopPollTime = now;
 
     return readDesktopSnapshot()
       .then((snapshot) => {
         desktopSnapshot = snapshot;
         desktopPollFailureCount = 0;
+        state.desktopBridgeSuspended = false;
         if (snapshot && snapshot.active && !snapshot.artworkUri) {
           hydrateDesktopSpotifyArtwork(snapshot, getControllablePlayerPost());
         }
@@ -685,13 +715,18 @@ export function createHeroMediaPlayerController(options) {
         return desktopSnapshot;
       })
       .catch((error) => {
-        // Log errors only occasionally to keep console clean
-        if (desktopPollFailureCount % 5 === 0) {
-           console.warn("[Hero] Desktop media polling issue:", error.message || error);
-        }
-
         desktopSnapshot = null;
         desktopPollFailureCount += 1;
+
+        // Suspend frequent polling after 5 consecutive failures
+        if (desktopPollFailureCount >= 5) {
+          state.desktopBridgeSuspended = true;
+        }
+
+        if (desktopPollFailureCount % 10 === 1) {
+           console.warn("[Hero] Desktop media bridge not detected. Ensure the companion app is running.");
+        }
+
         if (renderAfter) render();
         return null;
       });

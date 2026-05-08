@@ -465,7 +465,10 @@ export function createAppUi(context) {
       if (postId) openMiniPlayer(postId, elements.heroPlayerOpenMiniButton);
     });
     elements.heroModeFeed?.addEventListener("click", () => setHeroControlMode("feed"));
-    elements.heroModeMedia?.addEventListener("click", () => setHeroControlMode("media"));
+    elements.heroModeMedia?.addEventListener("click", () => {
+      state.desktopBridgeSuspended = false;
+      setHeroControlMode("media");
+    });
     elements.miniPlayerHead.addEventListener("pointerdown", beginMiniPlayerDrag);
     heroMediaPlayerController.attachEventListeners();
     initializeFeedScrollObserver();
