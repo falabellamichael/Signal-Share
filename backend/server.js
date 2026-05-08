@@ -289,7 +289,21 @@ function scoreSession(session) {
 
 function pickBestSession(sessions = [], preferredSource = "") {
   if (!Array.isArray(sessions) || !sessions.length) return null;
-  return sessions.reduce((best, session) => {
+
+  // If a specific source is preferred, we MUST filter to only sessions that match that source
+  let candidates = sessions;
+  if (preferredSource && preferredSource !== "all") {
+    candidates = sessions.filter(s => {
+      s._preferredSource = preferredSource;
+      const sourceAppId = `${s.sourceAppUserModelId || s.sourceAppId || ""}`.trim();
+      return isPreferredApp(sourceAppId, preferredSource);
+    });
+    
+    // If no sessions match the preferred source, return null instead of falling back to something else
+    if (candidates.length === 0) return null;
+  }
+
+  return candidates.reduce((best, session) => {
     session._preferredSource = preferredSource;
     if (!best) return session;
     return scoreSession(session) > scoreSession(best) ? session : best;
