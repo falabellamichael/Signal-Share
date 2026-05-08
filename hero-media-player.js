@@ -622,7 +622,8 @@ The companion bridge is designed with several security layers to keep your PC sa
   function normalizeDesktopSnapshot(raw = {}) {
     const appPackage = typeof raw.appPackage === "string" ? raw.appPackage.trim() : "";
     const playbackState = normalizePlaybackState(raw.playbackState || (raw.active ? "playing" : "none"));
-    return {
+    
+    const snapshot = {
       source: `${raw.source || "windows-smtc"}`.trim(),
       available: Boolean(raw.available),
       active: Boolean(raw.active) || Boolean(raw.title && raw.title.trim()),
@@ -634,6 +635,21 @@ The companion bridge is designed with several security layers to keep your PC sa
       artworkUri: typeof raw.artworkUri === "string" ? raw.artworkUri.trim() : "",
       playbackState,
     };
+
+    // Enforce source filter: if a source is selected, only allow that source through
+    if (state.heroControlSource && state.heroControlSource !== "all") {
+      if (!isPreferredNowPlayingSnapshot(snapshot)) {
+        return {
+          ...snapshot,
+          active: false,
+          title: "",
+          meta: "",
+          playbackState: "none"
+        };
+      }
+    }
+
+    return snapshot;
   }
 
   function getDesktopSnapshotArtworkKey(snapshot = {}) {
