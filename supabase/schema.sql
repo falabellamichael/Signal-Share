@@ -30,6 +30,8 @@ create table if not exists public.site_admins (
   check (email = lower(email))
 );
 
+alter table public.site_admins enable row level security;
+
 create table if not exists public.site_settings (
   id text primary key,
   shell_width integer not null default 1200,
@@ -1103,3 +1105,61 @@ begin
   end;
 end;
 $$;
+
+-- System Media
+create table if not exists public.system_media (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  playback_state text,
+  title text,
+  meta text,
+  artwork_uri text,
+  open_uri text,
+  app_package text,
+  device_name text,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.system_media_actions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  action text not null,
+  app_package text,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.system_media enable row level security;
+alter table public.system_media_actions enable row level security;
+
+grant select, insert, update on table public.system_media to authenticated;
+grant select, insert, delete on table public.system_media_actions to authenticated;
+
+drop policy if exists "Users can manage their own system media" on public.system_media;
+create policy "Users can manage their own system media"
+  on public.system_media for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their own media actions" on public.system_media_actions;
+create policy "Users can manage their own media actions"
+  on public.system_media_actions for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop trigger if exists set_system_media_updated_at on public.system_media;
+create trigger set_system_media_updated_at
+  before update on public.system_media
+  for each row
+  execute function public.set_updated_at();
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables 
+    where pubname = 'supabase_realtime' 
+    and schemaname = 'public' 
+    and tablename = 'system_media_actions'
+  ) then
+    alter publication supabase_realtime add table public.system_media_actions;
+  end if;
+end $$;
