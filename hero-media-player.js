@@ -40,7 +40,7 @@ export function createHeroMediaPlayerController(options) {
   const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
-  const DESKTOP_POLL_INTERVAL_MS = 3000;
+  const DESKTOP_POLL_INTERVAL_MS = 2000;
   const LOCAL_NETWORK_PROMPT_COOLDOWN_MS = 30000;
 
   let listenersAttached = false;
@@ -1053,7 +1053,14 @@ export function createHeroMediaPlayerController(options) {
     }))
       .then((response) => response.ok ? response.json() : { ok: false })
       .then((payload) => {
-        window.setTimeout(() => { refreshDesktopSnapshot(); }, 260);
+        if (payload?.ok && action === "play_pause" && desktopSnapshot) {
+          desktopSnapshot.playbackState = (desktopSnapshot.playbackState === "playing") ? "paused" : "playing";
+          render();
+        }
+        window.setTimeout(() => { 
+          lastDesktopPollTime = 0; // Force immediate refresh
+          refreshDesktopSnapshot(); 
+        }, 500);
         return Boolean(payload?.ok);
       })
       .catch(() => false);
