@@ -64,6 +64,63 @@ export function createHeroMediaPlayerController(options) {
   let lastDesktopActionKey = "";
   let companionPromptDismissed = localStorage.getItem("ss_companion_dismissed") === "true";
   const DESKTOP_ACTION_COOLDOWN_MS = 1200;
+  const COMPANION_SETUP_SCRIPT = `@echo off
+setlocal
+title Signal Share Companion Setup
+color 0B
+echo.
+echo  --------------------------------------------------------
+echo    SIGNAL SHARE COMPANION
+echo    Desktop Media Bridge Setup
+echo  --------------------------------------------------------
+echo.
+echo  This tool will prepare your PC to sync YouTube, Spotify,
+echo  and other system media with the Signal Share player.
+echo.
+node -v >nul 2>&1
+if %errorlevel% neq 0 (
+    color 0C
+    echo  [!] ERROR: Node.js was not found.
+    echo.
+    echo  The companion requires Node.js to run. 
+    echo  Please download it from: https://nodejs.org/
+    echo.
+    pause
+    exit /b 1
+)
+echo  [STEP 1] Installing core components...
+echo  (This may take a minute on the first run)
+echo.
+call npm install --no-audit --no-fund --quiet
+if %errorlevel% neq 0 (
+    color 0C
+    echo  [!] ERROR: Failed to install components.
+    echo  Check your internet connection and try again.
+    echo.
+    pause
+    exit /b 1
+)
+echo.
+echo  [STEP 2] Launching the Media Bridge...
+echo.
+echo  --------------------------------------------------------
+echo    SUCCESS! The bridge is now active.
+echo.
+echo    WHAT IS HAPPENING?
+echo    We are running 'npm start', which triggers a local
+echo    web server on your PC. This server securely bridges
+echo    the Signal Share website to your Windows media keys.
+echo.
+echo    IMPORTANT: Keep this window open!
+echo    If you close it, the Media Player won't be able
+echo    to control your PC playback.
+echo  --------------------------------------------------------
+echo.
+npm start
+echo.
+echo  The bridge has stopped.
+pause`.trim();
+
   const desktopArtworkFallbackCache = new Map();
   const resolvedArtworkMap = new Map();
 
@@ -1617,8 +1674,16 @@ export function createHeroMediaPlayerController(options) {
   }
 
   function downloadCompanion() {
-    const downloadUrl = `https://raw.githubusercontent.com/falabellamichael/Signal-Share/main/setup-companion.bat?t=${Date.now()}`;
-    window.open(downloadUrl, "_blank");
+    const blob = new Blob([COMPANION_SETUP_SCRIPT], { type: "application/x-bat" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "setup-companion.bat";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
     companionPromptDismissed = true;
     localStorage.setItem("ss_companion_dismissed", "true");
     render();
