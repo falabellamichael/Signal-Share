@@ -623,7 +623,11 @@ export function createHeroMediaPlayerController(options) {
   async function readDesktopSnapshot() {
     if (!canUseDesktopBridge()) return null;
 
-    // Prioritize Supabase sync if configured and signed in
+    // Try local endpoints first for instant response
+    const localSnapshot = await readDesktopSnapshotFromLocal();
+    if (localSnapshot) return localSnapshot;
+
+    // Fallback to Supabase sync for remote control
     if (state.supabase && state.currentUser?.id) {
       const supabaseSnapshot = await readDesktopSnapshotFromSupabase();
       if (supabaseSnapshot) {
@@ -632,7 +636,10 @@ export function createHeroMediaPlayerController(options) {
         return supabaseSnapshot;
       }
     }
+    return null;
+  }
 
+  async function readDesktopSnapshotFromLocal() {
     let lastError = null;
     const endpoints = resolveDesktopSnapshotEndpoints();
     for (const endpoint of endpoints) {
@@ -657,13 +664,6 @@ export function createHeroMediaPlayerController(options) {
       }
     }
 
-    // If local polling failed and we haven't tried Supabase yet (though we usually do above),
-    // try it as a last resort if it's potentially available.
-    if (desktopSnapshotEndpoint !== "supabase-sync" && state.currentUser?.id) {
-      const supabaseSnapshot = await readDesktopSnapshotFromSupabase();
-      if (supabaseSnapshot) return supabaseSnapshot;
-    }
-
     const permissionPromptEndpoint = endpoints.find((candidate) => {
       const addressSpace = getEndpointAddressSpace(candidate);
       return addressSpace === "local" || addressSpace === "private" || addressSpace === "loopback";
@@ -671,8 +671,8 @@ export function createHeroMediaPlayerController(options) {
 
     const isRemoteOrigin = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
     if (permissionPromptEndpoint && !isRemoteOrigin) maybeTriggerLocalNetworkAccessPrompt(permissionPromptEndpoint);
-
-    throw lastError || new Error("Desktop media endpoint is unavailable.");
+    
+    return null;
   }
 
   let lastDesktopPollTime = 0;
