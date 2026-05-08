@@ -265,7 +265,7 @@ function scoreSession(session) {
     const appLabel = resolveMediaAppLabel(sourceAppId).toLowerCase();
     const isBrowser = appLabel.includes("chrome") || appLabel.includes("edge") || appLabel.includes("firefox") || appLabel.includes("browser");
     if (isBrowser) {
-      if (preferredSource === "youtube" && (title.includes("youtube") || album.includes("youtube"))) {
+      if (preferredSource === "youtube" && (title.includes("youtube") || album.includes("youtube") || extractYoutubeVideoId(title) || extractYoutubeVideoId(album))) {
         sourceMatched = true;
       } else if (preferredSource === "spotify" && (title.includes("spotify") || album.includes("spotify"))) {
         sourceMatched = true;

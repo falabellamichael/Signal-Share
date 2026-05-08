@@ -1038,14 +1038,25 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (!snapshot || !snapshot.active) return null;
     const title = normalizeText(snapshot.title);
     const meta = normalizeText(snapshot.meta);
-    if (!title) return null;
+    if (!title || title === "now playing" || title === "youtube" || title === "spotify") return null;
 
     const posts = typeof getAllPosts === "function" ? getAllPosts() : [];
     return posts.find((p) => {
       const pTitle = normalizeText(p.title);
       const pCreator = normalizeText(p.creator);
-      if (pTitle === title && (pCreator === meta || !meta)) return true;
-      if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) return true;
+      
+      // Strict match
+      if (pTitle === title) {
+        if (!meta || pCreator === meta || title.includes(pCreator)) return true;
+      }
+      
+      // Near match for longer titles
+      if (title.length > 10 && pTitle.length > 10) {
+        if (title.startsWith(pTitle) || pTitle.startsWith(title)) {
+           if (!meta || pCreator === meta) return true;
+        }
+      }
+      
       return false;
     }) || null;
   }
@@ -1559,14 +1570,6 @@ The companion bridge is designed with several security layers to keep your PC sa
     });
     elements.heroPlayerVolumeSlider.addEventListener("input", handleVolumeInput);
 
-    elements.heroSourceYoutube?.addEventListener("click", () => {
-      state.heroControlSource = "youtube";
-      render();
-    });
-    elements.heroSourceSpotify?.addEventListener("click", () => {
-      state.heroControlSource = "spotify";
-      render();
-    });
     elements.heroModeFeed?.addEventListener("click", () => {
       state.heroControlMode = "feed";
       render();
@@ -1624,13 +1627,18 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     // Source Toggle Button Highlighting
+    const bridgeAvailable = Boolean(desktopSnapshot?.available);
     if (elements.heroSourceYoutube) {
       const isYoutubeActive = state.heroControlSource === "youtube";
       elements.heroSourceYoutube.classList.toggle("is-active", isYoutubeActive);
+      elements.heroSourceYoutube.classList.toggle("is-disabled", !bridgeAvailable);
+      elements.heroSourceYoutube.disabled = !bridgeAvailable;
     }
     if (elements.heroSourceSpotify) {
       const isSpotifyActive = state.heroControlSource === "spotify";
       elements.heroSourceSpotify.classList.toggle("is-active", isSpotifyActive);
+      elements.heroSourceSpotify.classList.toggle("is-disabled", !bridgeAvailable);
+      elements.heroSourceSpotify.disabled = !bridgeAvailable;
     }
 
     if (elements.heroPlayerPrevButton.disabled !== !canStep) {

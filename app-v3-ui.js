@@ -531,6 +531,12 @@ export function createAppUi(context) {
   }
 
   function setHeroControlSource(source) {
+    const btn = source === "youtube" ? elements.heroSourceYoutube : elements.heroSourceSpotify;
+    if (btn && btn.disabled) {
+      showToast(`${formatProviderName(source)} control requires the Companion Bridge to be running on your PC.`, "info");
+      return;
+    }
+
     state.heroControlSource = source;
     heroMediaPlayerController.render();
   }
@@ -2690,6 +2696,22 @@ export function createAppUi(context) {
   function updateActiveFilterChip() { elements.filterRow.querySelectorAll("[data-filter]").forEach((chip) => { const isActive = chip.dataset.filter === state.filter; chip.classList.toggle("is-active", isActive); chip.setAttribute("aria-pressed", isActive ? "true" : "false"); }); }
 
   function showFeedback(message, isError = false) { elements.formFeedback.textContent = message; elements.formFeedback.classList.toggle("is-error", isError); }
+
+  function showToast(message, type = "info") {
+    const container = document.getElementById("toastContainer");
+    if (!container) return;
+
+    const toast = document.createElement("div");
+    toast.className = `toast is-${type}`;
+    toast.textContent = message;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.animation = "toast-out 0.3s ease forwards";
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
 
   function resetComposer() { elements.postForm.reset(); clearSelectedMedia(); state.previewExternal = null; hydrateRememberedCreator(); updateSourceHelp("none"); showFeedback(""); }
 
