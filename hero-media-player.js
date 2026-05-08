@@ -1443,16 +1443,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     render();
   }
 
-  function renderStagePreview(mode, post, fallbackMedia) {
-    renderHeroStagePreview(Object.assign({}, options, {
-      stage: elements.heroPlayerStage,
-      mode,
-      post,
-      fallbackMedia,
-      nativeSnapshot,
-      desktopSnapshot
-    }));
-  }
+
   function attachEventListeners() {
     if (listenersAttached || !hasUi()) return;
     listenersAttached = true;
