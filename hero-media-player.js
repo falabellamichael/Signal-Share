@@ -555,7 +555,12 @@ The companion bridge is designed with several security layers to keep your PC sa
       pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
     }
 
-    return candidates;
+    const sourceParam = state.heroControlSource ? `source=${state.heroControlSource}` : "";
+    return candidates.map(c => {
+      if (!c || !sourceParam) return c;
+      const separator = c.includes("?") ? "&" : "?";
+      return `${c}${separator}${sourceParam}`;
+    });
   }
 
   function deriveDesktopActionEndpoint(snapshotEndpoint) {
