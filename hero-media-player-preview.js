@@ -550,9 +550,7 @@ export function renderHeroStagePreview(options = {}) {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
 
-      const isYouTube = matchedPost?.sourceKind === "youtube" ||
-                        /youtube|ytmusic|yt music/i.test(nativeSnapshot?.appPackage || "") ||
-                        /youtube|yt music/i.test(nativeSnapshot?.meta || "");
+      const isYouTube = matchedPost?.sourceKind === "youtube" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("youtube"));
       commitCard(stage, {
         badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA",
         title: isYouTube ? "" : (nativeSnapshot.title || matchedPost?.title || "Now playing"),
@@ -576,9 +574,7 @@ export function renderHeroStagePreview(options = {}) {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
 
-      const isYouTube = matchedPost?.sourceKind === "youtube" ||
-                        /youtube|ytmusic|yt music/i.test(desktopSnapshot?.appPackage || "") ||
-                        /youtube|yt music/i.test(desktopSnapshot?.meta || "");
+      const isYouTube = matchedPost?.sourceKind === "youtube" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("youtube"));
       commitCard(stage, {
         badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA",
         title: isYouTube ? "" : (desktopSnapshot.title || matchedPost?.title || "Now playing"),
@@ -641,15 +637,13 @@ export function renderHeroStagePreview(options = {}) {
     getSpotifyPreviewImageUrl,
   });
 
-  const isYouTube = post?.sourceKind === "youtube";
-
   // Handle async metadata resolution for preview card
   let resolvedMetadata = externalMetadata;
   if (externalMetadata instanceof Promise) {
     // Render initial card with fallback while metadata loads
     commitCard(stage, {
       badge: "",
-      title: isYouTube ? "" : (post.title || "Now playing"),
+      title: post.title || "Now playing",
       meta: formatPostMeta(post, creatorSummary),
       artworkUrl: artworkUrl,
     });
@@ -659,7 +653,7 @@ export function renderHeroStagePreview(options = {}) {
       if (metadata) {
         commitCard(stage, {
           badge: "",
-          title: isYouTube ? "" : (metadata?.title || post.title || "Now playing"),
+          title: metadata?.title || post.title || "Now playing",
           meta: metadata.creator || "",
           artworkUrl: metadata?.artworkUrl || artworkUrl,
         });
@@ -670,6 +664,7 @@ export function renderHeroStagePreview(options = {}) {
     return;
   }
 
+  const isYouTube = post?.sourceKind === "youtube";
   commitCard(stage, {
     badge: "",
     title: isYouTube ? "" : (resolvedMetadata?.title || post.title || "Now playing"),
