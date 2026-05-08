@@ -296,6 +296,11 @@ export function createHeroMediaPlayerController(options) {
   }
 
   function withLocalNetworkFetchOptions(url, init = {}) {
+    // Do not force a targetAddressSpace value here. Chrome can classify localhost,
+    // 127.0.0.1, and LAN addresses itself, and forcing the wrong value causes the
+    // exact CORS / Private Network Access block shown in DevTools.
+    return init;
+  }) {
     try {
       const resolved = new URL(url, window.location.href);
       const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
