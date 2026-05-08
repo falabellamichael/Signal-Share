@@ -644,7 +644,7 @@ export function createHeroMediaPlayerController(options) {
     const endpoints = resolveDesktopSnapshotEndpoints();
     for (const endpoint of endpoints) {
       try {
-        console.debug(`[Hero] Probing bridge endpoint: ${endpoint}`);
+        console.log(`[Hero] Probing bridge endpoint: ${endpoint}`);
         const response = await window.fetch(endpoint, withLocalNetworkFetchOptions(endpoint, {
           method: "GET",
           cache: "no-store",
@@ -660,6 +660,7 @@ export function createHeroMediaPlayerController(options) {
         desktopActionEndpoint = deriveDesktopActionEndpoint(endpoint);
         return normalizeDesktopSnapshot(payload);
       } catch (error) {
+        console.warn(`[Hero] Bridge probe failed for ${endpoint}:`, error.message);
         lastError = error;
       }
     }
