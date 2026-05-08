@@ -340,7 +340,10 @@ export function createAppUi(context) {
 
   function sanitizeSnapshotMeta(text) {
     if (typeof text !== "string") return "";
-    return text.replace(/\s*[-·|]\s*Signal\s*Share\s*$/i, "").trim();
+    return text
+      .replace(/^(Spotify|YouTube|Chrome|Edge|Firefox)\s*[-·|]\s*/i, "")
+      .replace(/\s*[-·|]\s*Signal\s*Share\s*$/i, "")
+      .trim();
   }
 
   const heroMediaPlayerController = createHeroMediaPlayerController({
@@ -2301,7 +2304,8 @@ export function createAppUi(context) {
 
     syncOverlayBodyState();
 
-    elements.miniPlayerKind.textContent = `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`;
+    const creatorName = creatorSummary?.displayName ?? post.creator;
+    elements.miniPlayerKind.textContent = post.title ? `${post.title} · ${creatorName}` : `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`;
     elements.miniPlayerTitle.textContent = post.title;
     elements.miniPlayerCaption.textContent = post.caption;
     elements.miniPlayerCreator.textContent = creatorSummary?.displayName ?? post.creator;
@@ -2332,11 +2336,34 @@ export function createAppUi(context) {
     if (!state.viewerPostId && !state.viewerAttachment) { elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); syncOverlayBodyState(); return; }
     if (state.viewerAttachment) {
       const attachment = state.viewerAttachment; clearViewerMedia(); elements.viewer.classList.add("is-open"); elements.viewer.setAttribute("aria-hidden", "false"); syncOverlayBodyState();
-      renderViewerAttachmentMedia(elements.viewerStage, attachment); elements.viewerKind.textContent = `${attachment.kind === "video" ? "Video" : "Image"} / Direct message`; elements.viewerTitle.textContent = attachment.title; elements.viewerCaption.textContent = attachment.caption; elements.viewerCreator.textContent = attachment.creator; elements.viewerCreator.onclick = null; elements.viewerCreator.tabIndex = -1; elements.viewerCreator.setAttribute("aria-disabled", "true"); elements.viewerTime.textContent = formatMessageTimestamp(attachment.createdAt); elements.viewerCollapseButton.hidden = true; elements.viewerTags.innerHTML = ""; elements.viewerPrevButton.disabled = true; elements.viewerNextButton.disabled = true; return;
+      renderViewerAttachmentMedia(elements.viewerStage, attachment); 
+      elements.viewerKind.textContent = `${attachment.title} · ${attachment.creator}`; 
+      elements.viewerTitle.textContent = attachment.title; 
+      elements.viewerCaption.textContent = attachment.caption; 
+      elements.viewerCreator.textContent = attachment.creator; 
+      elements.viewerCreator.onclick = null; 
+      elements.viewerCreator.tabIndex = -1; 
+      elements.viewerCreator.setAttribute("aria-disabled", "true"); 
+      elements.viewerTime.textContent = formatMessageTimestamp(attachment.createdAt); 
+      elements.viewerCollapseButton.hidden = true; 
+      elements.viewerTags.innerHTML = ""; 
+      elements.viewerPrevButton.disabled = true; 
+      elements.viewerNextButton.disabled = true; 
+      return;
     }
     const post = getPostById(state.viewerPostId); if (!post) { closeViewer(); return; }
     const creatorSummary = getProfileSummaryForPost(post); clearViewerMedia(); elements.viewer.classList.add("is-open"); elements.viewer.setAttribute("aria-hidden", "false"); syncOverlayBodyState();
-    renderViewerMedia(elements.viewerStage, post); elements.viewerKind.textContent = `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`; elements.viewerTitle.textContent = post.title; elements.viewerCaption.textContent = post.caption; elements.viewerCreator.textContent = creatorSummary?.displayName ?? post.creator; elements.viewerCreator.tabIndex = creatorSummary ? 0 : -1; elements.viewerCreator.setAttribute("aria-disabled", creatorSummary ? "false" : "true"); elements.viewerCreator.onclick = creatorSummary ? (event) => openProfileByKey(creatorSummary.key, event.currentTarget) : null; elements.viewerTime.textContent = formatTimestamp(post.createdAt); elements.viewerCollapseButton.hidden = !isPlayablePost(post);
+    renderViewerMedia(elements.viewerStage, post); 
+    const viewerCreatorName = creatorSummary?.displayName ?? post.creator;
+    elements.viewerKind.textContent = post.title ? `${post.title} · ${viewerCreatorName}` : `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`; 
+    elements.viewerTitle.textContent = post.title; 
+    elements.viewerCaption.textContent = post.caption; 
+    elements.viewerCreator.textContent = creatorSummary?.displayName ?? post.creator; 
+    elements.viewerCreator.tabIndex = creatorSummary ? 0 : -1; 
+    elements.viewerCreator.setAttribute("aria-disabled", creatorSummary ? "false" : "true"); 
+    elements.viewerCreator.onclick = creatorSummary ? (event) => openProfileByKey(creatorSummary.key, event.currentTarget) : null; 
+    elements.viewerTime.textContent = formatTimestamp(post.createdAt); 
+    elements.viewerCollapseButton.hidden = !isPlayablePost(post);
     elements.viewerTags.innerHTML = ""; post.tags.forEach((tag) => { const pill = document.createElement("span"); pill.className = "tag-pill"; pill.textContent = `#${tag}`; elements.viewerTags.appendChild(pill); });
     const canStep = state.visiblePostIds.length > 1; elements.viewerPrevButton.disabled = !canStep; elements.viewerNextButton.disabled = !canStep;
   }

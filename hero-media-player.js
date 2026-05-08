@@ -1616,7 +1616,11 @@ The companion bridge is designed with several security layers to keep your PC sa
     let nextStatus = "";
 
     if (mode === "device") {
-      nextHeader = "Device System Media";
+      if (nativeSnapshot?.active && nativeSnapshot.title) {
+        nextHeader = `${nativeSnapshot.title} · ${nativeSnapshot.meta || "Device"}`;
+      } else {
+        nextHeader = "Device System Media";
+      }
       if (nativeSnapshot?.permissionRequired) {
         nextTitle = "Enable device media access";
         nextCaption = "Allow notification access so this panel can control what is playing on your device.";
@@ -1631,7 +1635,11 @@ The companion bridge is designed with several security layers to keep your PC sa
         nextStatus = "Device system media";
       }
     } else if (mode === "desktop") {
-      nextHeader = "PC System Media";
+      if (desktopSnapshot?.active && desktopSnapshot.title) {
+        nextHeader = `${desktopSnapshot.title} · ${desktopSnapshot.meta || "PC"}`;
+      } else {
+        nextHeader = "PC System Media";
+      }
       if (desktopSnapshot?.active) {
         nextTitle = desktopSnapshot.title || "Now playing";
         nextCaption = desktopSnapshot.meta || "Desktop playback";
@@ -1642,9 +1650,9 @@ The companion bridge is designed with several security layers to keep your PC sa
         nextStatus = "PC system media";
       }
     } else if (mode === "app" && !post && fallbackMedia instanceof HTMLMediaElement) {
-      nextHeader = "Browser Media";
       const fallbackTitle = browserMetadata?.title || fallbackMedia.getAttribute("title") || "Now playing in this browser";
       const fallbackMeta = [browserMetadata?.artist, browserMetadata?.album].filter(Boolean).join(" · ");
+      nextHeader = fallbackMeta ? `${fallbackTitle} · ${fallbackMeta}` : fallbackTitle;
       nextTitle = fallbackTitle;
       nextCaption = fallbackMeta || "Active browser media session";
       nextStatus = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
@@ -1658,7 +1666,12 @@ The companion bridge is designed with several security layers to keep your PC sa
       const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
       const providerName = post?.sourceKind === "youtube" ? "YouTube" : (post?.sourceKind === "spotify" ? "Spotify" : "App");
 
-      nextHeader = `${providerName.toUpperCase()} PREVIEW`;
+      if (post && post.title) {
+        nextHeader = `${post.title} · ${creatorName}`;
+      } else {
+        nextHeader = `${providerName.toUpperCase()} PREVIEW`;
+      }
+
       nextTitle = post?.title || "Ready to play";
       nextCaption = post ? `${post.caption} · ${creatorName}` : "";
       nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
