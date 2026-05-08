@@ -582,25 +582,28 @@ export function createAppUi(context) {
   function setHeroControlMode(mode) {
     state.heroControlMode = mode;
     
-    // If switching back to feed, ensure we refresh the UI immediately
-    if (mode === "feed") {
-      heroMediaPlayerController.render();
-    } else {
-      // If switching to media, ensure bridge is active
+    // If switching to media, ensure bridge is active
+    if (mode === "media") {
       state.desktopBridgeSuspended = false;
-      heroMediaPlayerController.render();
     }
+
+    render();
   }
 
   function setHeroControlSource(source) {
-    if (state.heroControlMode !== "media") return;
+    // If not in media mode, auto-switch to it when a source is selected
+    if (state.heroControlMode !== "media") {
+      state.heroControlMode = "media";
+      state.desktopBridgeSuspended = false;
+    }
 
     if (heroMediaPlayerController && typeof heroMediaPlayerController.setHeroControlSource === "function") {
       heroMediaPlayerController.setHeroControlSource(source);
     } else {
       state.heroControlSource = source;
-      heroMediaPlayerController.render();
     }
+
+    render();
   }
 
   function render() {
@@ -636,15 +639,15 @@ export function createAppUi(context) {
 
     if (elements.heroSourceYoutube) {
       const isYoutubeActive = state.heroControlSource === "youtube";
-      elements.heroSourceYoutube.classList.toggle("is-active", isYoutubeActive && isHeroMediaMode);
-      elements.heroSourceYoutube.classList.toggle("is-disabled", !canToggleSource);
-      elements.heroSourceYoutube.disabled = !canToggleSource;
+      elements.heroSourceYoutube.classList.toggle("is-active", isYoutubeActive);
+      elements.heroSourceYoutube.classList.toggle("is-disabled", false);
+      elements.heroSourceYoutube.disabled = false;
     }
     if (elements.heroSourceSpotify) {
       const isSpotifyActive = state.heroControlSource === "spotify";
-      elements.heroSourceSpotify.classList.toggle("is-active", isSpotifyActive && isHeroMediaMode);
-      elements.heroSourceSpotify.classList.toggle("is-disabled", !canToggleSource);
-      elements.heroSourceSpotify.disabled = !canToggleSource;
+      elements.heroSourceSpotify.classList.toggle("is-active", isSpotifyActive);
+      elements.heroSourceSpotify.classList.toggle("is-disabled", false);
+      elements.heroSourceSpotify.disabled = false;
     }
 
     heroMediaPlayerController.render();

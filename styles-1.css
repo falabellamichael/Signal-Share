@@ -1852,24 +1852,22 @@ body[data-theme="ember"] #heroPlayerOpenMiniButton {
 }
 
 .hero-player-source-toggle.is-dimmed {
-  opacity: 0.35;
-  filter: grayscale(1);
-  pointer-events: none;
-  background: rgba(19, 33, 43, 0.04);
+  opacity: 0.65;
+  filter: grayscale(0.5);
+  background: rgba(19, 33, 43, 0.06);
   border-color: transparent;
 }
 
-.hero-player-source-toggle.is-dimmed .source-toggle-button {
-  background: transparent !important;
-  color: var(--muted) !important;
-  box-shadow: none !important;
+.hero-player-source-toggle.is-dimmed .source-toggle-button:not(.is-active) {
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
 }
 
 .source-toggle-button.is-disabled {
-  opacity: 0.5;
-  filter: grayscale(1);
-  cursor: not-allowed;
-  pointer-events: none;
+  opacity: 0.75;
+  filter: grayscale(0.2);
+  cursor: pointer;
 }
 
 .source-toggle-button.is-disabled:hover {
