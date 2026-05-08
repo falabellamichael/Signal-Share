@@ -2178,7 +2178,7 @@ export function createAppUi(context) {
     
     const request = (async () => {
       try {
-        const response = await fetch(`https://youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${externalId}`)}&format=json`);
+        const response = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${externalId}`)}`);
         if (response.ok) {
           const data = await response.json();
           const metadata = { title: data.title || "", creator: data.author_name || "YouTube", thumbnailUrl: data.thumbnail_url || "" };
