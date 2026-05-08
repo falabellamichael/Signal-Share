@@ -1046,16 +1046,19 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
   function getEffectiveHeroMode(controllablePost) {
     if (state.heroControlMode === "feed") return "app";
     if (state.heroControlMode === "media") {
-      // If we have an active desktop snapshot, prioritize it
+      // Prioritize whatever is actually active
       if (desktopSnapshot?.active) return "desktop";
-      // If we have an active native snapshot, prioritize it
       if (nativeSnapshot?.active) return "device";
 
-      // Fallback preference
+      // If nothing is active, prefer desktop bridge if it seems healthy
       if (canUseDesktopBridge() && desktopPollFailureCount < 5) return "desktop";
       return "device";
     }
-    return shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
+
+    // Auto mode
+    if (shouldUseNativeMode(controllablePost)) return "device";
+    if (shouldUseDesktopMode(controllablePost)) return "desktop";
+    return "app";
   }
 
   function handlePlayPause(forcePlay) {
@@ -1067,8 +1070,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
       return;
     }
 
-    const post = controllablePost;
-    if (shouldUseNativeMode(post)) {
+    if (mode === "device") {
       if (nativeSnapshot?.permissionRequired && hasNativeSettingsBridge()) {
         try { getNativeBridge().openNowPlayingAccessSettings(); } catch {}
         return;
@@ -1076,32 +1078,17 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
       performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
       return;
     }
-    if (shouldUseDesktopMode(post) && desktopSnapshot?.available) {
+
+    if (mode === "desktop") {
       performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
       return;
     }
 
-    if (!post && getFallbackPageMediaElement() instanceof HTMLMediaElement) {
+    // Fallback to local playback if for some reason we have no mode but have media
+    if (getFallbackPageMediaElement() instanceof HTMLMediaElement) {
       toggleLocalPlayback(forcePlay);
       render();
-      return;
     }
-
-    const hadControllablePost = Boolean(post);
-    if (!ensureControllablePost()) {
-      render();
-      return;
-    }
-    if (!hadControllablePost) {
-      state.miniPlayerExpanded = false;
-      renderMiniPlayer();
-    }
-    if (typeof forcePlay === "boolean") {
-      toggleLocalPlayback(forcePlay);
-    } else {
-      toggleLocalPlayback(true);
-    }
-    render();
   }
 
   function handlePrevious() {
@@ -1113,27 +1100,25 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
       return;
     }
 
-    const post = controllablePost;
-    if (shouldUseNativeMode(post)) {
+    if (mode === "device") {
       performNativeAction(NATIVE_ACTION_PREVIOUS);
       return;
     }
-    if (shouldUseDesktopMode(post) && desktopSnapshot?.available) {
+
+    if (mode === "desktop") {
       performDesktopAction(DESKTOP_ACTION_PREVIOUS);
       return;
     }
 
-    if (!post && getFallbackPageMediaElement() instanceof HTMLMediaElement) {
+    if (getFallbackPageMediaElement() instanceof HTMLMediaElement) {
       render();
       return;
     }
 
-    if (!ensureControllablePost()) {
-      render();
-      return;
+    if (ensureControllablePost()) {
+      stepMiniPlayer(-1);
+      state.heroPlayerPlaybackState = "paused";
     }
-    stepMiniPlayer(-1);
-    state.heroPlayerPlaybackState = "paused";
   }
 
   function handleNext() {
@@ -1147,31 +1132,25 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
       return;
     }
 
-    const post = controllablePost;
-    if (shouldUseNativeMode(post)) {
+    if (mode === "device") {
       performNativeAction(NATIVE_ACTION_NEXT);
       return;
     }
-    if (shouldUseDesktopMode(post) && desktopSnapshot?.available) {
+
+    if (mode === "desktop") {
       performDesktopAction(DESKTOP_ACTION_NEXT);
       return;
     }
 
-    if (!post && getFallbackPageMediaElement() instanceof HTMLMediaElement) {
+    if (getFallbackPageMediaElement() instanceof HTMLMediaElement) {
       render();
       return;
     }
 
-    if (!ensureControllablePost()) {
-      render();
-      return;
-    }
-    if (mode === "app") {
-      stepHeroPlayer(1);
-    } else {
+    if (ensureControllablePost()) {
       stepMiniPlayer(1);
+      state.heroPlayerPlaybackState = "paused";
     }
-    state.heroPlayerPlaybackState = "paused";
   }
 
   function handleVolumeInput(event) {
@@ -1272,34 +1251,31 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
 
     const controllablePost = getControllablePlayerPost();
     const mode = getEffectiveHeroMode(controllablePost);
+
+    // When in Media mode, we don't treat the internal "Hero Active" state as valid
+    // unless it's explicitly matching the system media (unlikely for manual toggle).
+    const isHeroActive = mode === "app" && state.heroPlayerPostId && !!state.heroPlayerElement;
+
     const post = mode === "app" ? getHeroPost() : controllablePost;
+
     const mediaElement = getActivePlayerMediaElement();
     const fallbackMedia = getFallbackPageMediaElement();
     const browserMetadata = getBrowserMediaMetadata();
+
     const playbackState = mode === "device"
       ? normalizePlaybackState(nativeSnapshot?.playbackState)
       : mode === "desktop"
         ? normalizePlaybackState(desktopSnapshot?.playbackState)
         : getLocalPlaybackState();
-    const supportsPlayback = mode === "device"
-      ? hasNativeActionBridge()
-      : mode === "desktop"
-        ? Boolean(desktopSnapshot?.available)
-        : (playableCount > 0);
+
     const supportsVolume = (mode === "desktop" && desktopSnapshot?.available) || (mode === "app" && (
       mediaElement instanceof HTMLMediaElement
       || fallbackMedia instanceof HTMLMediaElement
       || post?.sourceKind === "youtube"
     ));
+
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
-    const canBootstrapPlayback = !post
-      && playableCount > 0
-      && !(fallbackMedia instanceof HTMLMediaElement)
-      && (
-        mode === "app"
-        || (mode === "desktop" && !desktopSnapshot?.active)
-      );
 
     if (mode === "device") {
       if (nativeSnapshot?.permissionRequired) {
@@ -1325,47 +1301,40 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
         elements.heroPlayerCaption.textContent = "Start playback in YouTube, Spotify, or another desktop app.";
         elements.heroPlayerStatus.textContent = "PC system media";
       }
-    } else if (!post && fallbackMedia instanceof HTMLMediaElement) {
+    } else if (mode === "app" && !post && fallbackMedia instanceof HTMLMediaElement) {
       const fallbackTitle = browserMetadata?.title || fallbackMedia.getAttribute("title") || "Now playing in this browser";
       const fallbackMeta = [browserMetadata?.artist, browserMetadata?.album].filter(Boolean).join(" · ");
       elements.heroPlayerTitle.textContent = fallbackTitle;
       elements.heroPlayerCaption.textContent = fallbackMeta || "Active browser media session";
       elements.heroPlayerStatus.textContent = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
-    } else if (!post) {
+    } else if (mode === "app" && !post) {
       elements.heroPlayerTitle.textContent = "Ready to play";
       elements.heroPlayerCaption.textContent = "";
       elements.heroPlayerStatus.textContent = "App media standby";
     } else {
       const creatorSummary = getProfileSummaryForPost(post);
-      elements.heroPlayerTitle.textContent = post.title;
-      elements.heroPlayerCaption.textContent = `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`;
-      elements.heroPlayerStatus.textContent = `${creatorSummary?.displayName ?? post.creator} · ${formatTimestamp(post.createdAt)}`;
+      elements.heroPlayerTitle.textContent = post?.title || "Ready to play";
+      elements.heroPlayerCaption.textContent = post ? `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}` : "";
+      elements.heroPlayerStatus.textContent = post ? `${creatorSummary?.displayName ?? post.creator} · ${formatTimestamp(post.createdAt)}` : "App media standby";
     }
 
-    if (elements.heroModeFeed) elements.heroModeFeed.classList.toggle("is-active", state.heroControlMode === "feed");
-    if (elements.heroModeMedia) elements.heroModeMedia.classList.toggle("is-active", state.heroControlMode === "media");
-
     elements.heroPlayerPlayPauseButton.textContent = playbackState === "playing" ? "Pause" : "Play";
-    // We already set the disabled state at the top based on hasPost
-    elements.heroPlayerPlayPauseButton.title = hasPost || canBootstrapPlayback
-      ? ""
-      : "No controllable playback session found.";
+    elements.heroPlayerPlayPauseButton.disabled = mode === "app" && !post;
 
     elements.heroPlayerVolumeSlider.disabled = !supportsVolume;
     elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
     elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
 
-    const isHeroActive = state.heroPlayerPostId === post?.id && !!state.heroPlayerElement;
     if (!isHeroActive) {
       renderHeroStagePreview(Object.assign({}, options, {
         stage: elements.heroPlayerStage,
         mode,
-        post,
+        post: mode === "app" ? post : null, // ONLY pass the feed post if we are in app mode
         fallbackMedia,
         nativeSnapshot,
         desktopSnapshot,
         matchedPost,
-        active: false // Force preview card for standby posts
+        active: mode !== "app" // Treat media modes as "active" to show info/matched player
       }));
     }
     syncMediaSession({
