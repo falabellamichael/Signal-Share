@@ -835,8 +835,8 @@ select {
   padding: 18px 20px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 250, 242, 0.8);
-  backdrop-filter: blur(18px);
+  background: rgba(255, 250, 242, 0.94);
+  box-shadow: var(--shadow);
   position: sticky;
   top: calc(18px + var(--status-bar-safe-space));
   z-index: 10;
@@ -987,7 +987,6 @@ select {
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   background: var(--surface);
-  backdrop-filter: blur(20px);
   box-shadow: var(--shadow);
   position: relative;
   overflow: hidden;
@@ -1186,7 +1185,7 @@ h1 {
 .settings-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 32, 0.45);
+  background: rgba(15, 23, 32, 0.4);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -1904,7 +1903,6 @@ body[data-theme="ember"] #heroPlayerOpenMiniButton {
   pointer-events: auto;
   min-width: 280px;
   max-width: 90vw;
-  backdrop-filter: blur(12px);
 }
 
 .toast.is-error {
