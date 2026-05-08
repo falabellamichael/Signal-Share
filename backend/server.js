@@ -287,7 +287,16 @@ function safeGetMediaSessions() {
     const allSessions = SMTCMonitor.getMediaSessions();
     smtcFailureCount = 0;
     lastSmtcErrorMessage = "";
-    return Array.isArray(allSessions) ? allSessions.filter(Boolean) : [];
+    const sessions = Array.isArray(allSessions) ? allSessions.filter(Boolean) : [];
+    
+    if (sessions.length > 0) {
+      console.log(`[Bridge] Found ${sessions.length} media sessions:`);
+      sessions.forEach((s, i) => {
+        console.log(`  [${i}] App: ${s.sourceAppUserModelId || s.sourceAppId}, Title: ${s.media?.title}, Status: ${s.playback?.playbackStatus}`);
+      });
+    }
+
+    return sessions;
   } catch (error) {
     smtcFailureCount += 1;
     logSmtcError(error);
