@@ -249,7 +249,26 @@ function scoreSession(session) {
   score += priority * 100;
   
   const sourceAppId = `${session.sourceAppUserModelId || session.sourceAppId || ""}`.trim();
-  if (isPreferredApp(sourceAppId, session._preferredSource)) {
+  const title = `${session.media?.title || ""}`.trim().toLowerCase();
+  const album = `${session.media?.albumTitle || ""}`.trim().toLowerCase();
+  const preferredSource = session._preferredSource;
+
+  let sourceMatched = isPreferredApp(sourceAppId, preferredSource);
+  
+  // Secondary check: if the app is a browser but the title/album mentions the source
+  if (!sourceMatched && preferredSource) {
+    const appLabel = resolveMediaAppLabel(sourceAppId).toLowerCase();
+    const isBrowser = appLabel.includes("chrome") || appLabel.includes("edge") || appLabel.includes("firefox") || appLabel.includes("browser");
+    if (isBrowser) {
+      if (preferredSource === "youtube" && (title.includes("youtube") || album.includes("youtube"))) {
+        sourceMatched = true;
+      } else if (preferredSource === "spotify" && (title.includes("spotify") || album.includes("spotify"))) {
+        sourceMatched = true;
+      }
+    }
+  }
+
+  if (sourceMatched) {
     score += 1000; // Massive boost for user-selected toggle source
   }
 

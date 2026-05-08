@@ -249,8 +249,23 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   function isPreferredNowPlayingSnapshot(snapshot = null) {
     if (!snapshot) return false;
-    return isPreferredNowPlayingAppPackage(snapshot.appPackage)
-      || isPreferredNowPlayingUri(snapshot.openUri);
+    const isPreferredPackage = isPreferredNowPlayingAppPackage(snapshot.appPackage);
+    const isPreferredUri = isPreferredNowPlayingUri(snapshot.openUri);
+    if (isPreferredPackage || isPreferredUri) return true;
+
+    // Fallback: Check title and meta for source keywords if we have a preferred source
+    if (state.heroControlSource && state.heroControlSource !== "all") {
+      const title = normalizeText(snapshot.title);
+      const meta = normalizeText(snapshot.meta);
+      if (state.heroControlSource === "youtube") {
+        return title.includes("youtube") || meta.includes("youtube");
+      }
+      if (state.heroControlSource === "spotify") {
+        return title.includes("spotify") || meta.includes("spotify");
+      }
+    }
+
+    return false;
   }
 
   function hasSnapshotPlaybackContext(snapshot = null) {
