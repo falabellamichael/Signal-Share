@@ -1594,12 +1594,6 @@ The companion bridge is designed with several security layers to keep your PC sa
       playbackState = "paused";
     }
 
-    const supportsVolume = mode === "app" && (
-      mediaElement instanceof HTMLMediaElement
-      || fallbackMedia instanceof HTMLMediaElement
-      || post?.sourceKind === "youtube"
-    );
-
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
     const matchedPost = mode === "desktop" && desktopSnapshot?.active ? findMatchedPost(desktopSnapshot) : null;
     const supportsVolume = getEffectiveHeroMode() === "app";
