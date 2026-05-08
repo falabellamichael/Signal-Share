@@ -452,9 +452,9 @@ export function createAppUi(context) {
     elements.viewerNextButton.addEventListener("click", () => stepViewer(1));
     elements.miniExpandButton.addEventListener("click", expandMiniPlayer);
     elements.miniCloseButton.addEventListener("click", closeMiniPlayer);
-    elements.miniPrevButton.addEventListener("click", () => heroMediaPlayerController.handlePrevious());
-    elements.miniPlayPauseButton.addEventListener("click", () => heroMediaPlayerController.handlePlayPause());
-    elements.miniNextButton.addEventListener("click", () => heroMediaPlayerController.handleNext());
+    elements.miniPrevButton.addEventListener("click", handleMiniPrevious);
+    elements.miniPlayPauseButton.addEventListener("click", handleMiniPlayPause);
+    elements.miniNextButton.addEventListener("click", handleMiniNext);
     elements.miniPlayerStage.addEventListener("click", handleMiniPlayerStageClick);
     elements.miniPlayerVolumeSlider.addEventListener("input", (event) => heroMediaPlayerController.handleVolumeInput(event));
     elements.miniPlayerHead.addEventListener("pointerdown", beginMiniPlayerDrag);
@@ -1616,13 +1616,25 @@ export function createAppUi(context) {
     );
     const nextIndex =
       (currentIndex + direction + playableCount) % playableCount;
-    setHeroPost(playablePosts[nextIndex]);
+    const nextPost = playablePosts[nextIndex];
+
+    const wasActive = !!state.heroPlayerElement;
+    state.heroPlayerPostId = nextPost.id;
+    localStorage.setItem(HERO_POST_KEY, nextPost.id);
+
+    if (wasActive) {
+      mountHeroMedia(nextPost, { autoplay: true });
+      state.heroPlayerPlaybackState = "playing";
+    }
+
+    heroMediaPlayerController.render();
   }
 
 
 
   function getActivePlayerMediaElement() {
-    const activeEl = state.activePlayerElement || state.heroPlayerElement;
+    // Priority: explicitly mounted hero element, then any shared active element (viewer/mini)
+    const activeEl = state.heroPlayerElement || state.activePlayerElement;
     if (activeEl instanceof HTMLElement) {
       if (activeEl instanceof HTMLMediaElement) return activeEl;
       const mediaElement = activeEl.querySelector("video, audio");
@@ -1885,7 +1897,8 @@ export function createAppUi(context) {
       artworkUrl
     }));
   }
-  function formatPostBadge(post, formatKind, getSignalLabel) {
+
+  function formatPostBadge(post, formatKind, getSignalLabel) {
     const kind = typeof formatKind === "function" ? formatKind(post?.mediaKind ? `${post.mediaKind} post` : "Media post", post?.mediaKind || "media") : "Media post";
     const signal = typeof getSignalLabel === "function" ? getSignalLabel("Live on feed", post) : "Live on feed";
     return [kind, signal].filter(Boolean).join(" / ");
@@ -2111,9 +2124,22 @@ export function createAppUi(context) {
 
   function renderMiniPlayerPlaybackButton(post = getControllablePlayerPost()) {
     if (!(elements.miniPlayPauseButton instanceof HTMLButtonElement)) return;
-    const mediaElement = getActivePlayerMediaElement();
-    let playbackState = state.heroPlayerPlaybackState === "playing" ? "playing" : "paused";
-    if (mediaElement instanceof HTMLMediaElement) playbackState = mediaElement.paused ? "paused" : "playing";
+    const media = state.activePlayerElement;
+    let playbackState = "paused";
+
+    if (media) {
+      const mediaEl = media instanceof HTMLMediaElement ? media : media.querySelector("video, audio");
+      const iframe = media instanceof HTMLIFrameElement ? media : media.querySelector("iframe");
+
+      if (mediaEl instanceof HTMLMediaElement) {
+        playbackState = mediaEl.paused ? "paused" : "playing";
+      } else if (iframe && post?.sourceKind === "youtube") {
+        playbackState = iframe.dataset.playbackState === "playing" ? "playing" : "paused";
+      }
+    } else {
+      playbackState = state.heroPlayerPlaybackState === "playing" ? "playing" : "paused";
+    }
+
     elements.miniPlayPauseButton.textContent = playbackState === "playing" ? "Pause" : "Play";
     elements.miniPlayPauseButton.disabled = !post;
   }
@@ -2313,6 +2339,42 @@ export function createAppUi(context) {
   function handleMiniPlayerStageClick(event) { if (!event.target.closest("iframe, video, audio") && !state.miniPlayerExpanded) expandMiniPlayer(); }
 
   function handleMiniPlayerVolumeInput(event) { heroMediaPlayerController.handleVolumeInput(event); }
+
+  function handleMiniPlayPause() {
+    if (!state.playerPostId) return;
+    const post = getPostById(state.playerPostId);
+    if (!post) return;
+
+    const media = state.activePlayerElement;
+    if (!media) return;
+
+    const mediaEl = media instanceof HTMLMediaElement ? media : media.querySelector("video, audio");
+    const iframe = media instanceof HTMLIFrameElement ? media : media.querySelector("iframe");
+
+    if (mediaEl instanceof HTMLMediaElement) {
+      if (mediaEl.paused) mediaEl.play().catch(() => {});
+      else mediaEl.pause();
+    } else if (iframe && post.sourceKind === "youtube") {
+      const isPlaying = iframe.dataset.playbackState === "playing";
+      postMessageToYouTubePlayer(iframe, isPlaying ? "pauseVideo" : "playVideo");
+      iframe.dataset.playbackState = isPlaying ? "paused" : "playing";
+    }
+    renderMiniPlayer();
+  }
+
+  function handleMiniNext() {
+    stepMiniPlayer(1);
+    const post = getPostById(state.playerPostId);
+    if (post) mountPersistentPlayer(elements.miniPlayerStage, post, "mini");
+    renderMiniPlayer();
+  }
+
+  function handleMiniPrevious() {
+    stepMiniPlayer(-1);
+    const post = getPostById(state.playerPostId);
+    if (post) mountPersistentPlayer(elements.miniPlayerStage, post, "mini");
+    renderMiniPlayer();
+  }
 
   function getPlayableVisiblePostIds() { return state.visiblePostIds.filter((id) => isPlayablePost(getPostById(id))); }
 
