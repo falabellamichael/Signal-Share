@@ -59,7 +59,7 @@ export function createHeroMediaPlayerController(options) {
   let desktopActionInFlight = false;
   let lastDesktopActionAt = 0;
   let lastDesktopActionKey = "";
-  const DESKTOP_ACTION_COOLDOWN_MS = 650;
+  const DESKTOP_ACTION_COOLDOWN_MS = 1200;
   const desktopArtworkFallbackCache = new Map();
   const resolvedArtworkMap = new Map();
 
@@ -1179,21 +1179,22 @@ export function createHeroMediaPlayerController(options) {
 
     if (mode === "desktop") {
       const playbackStatus = normalizePlaybackState(desktopSnapshot?.playbackState);
-      const isPlaying = playbackStatus === "playing";
-      const action = isPlaying ? "pause" : "play";
+      const nextPlaybackState = playbackStatus === "playing" ? "paused" : "playing";
 
-      // Optimistic UI update so the button responds immediately instead of waiting on PowerShell/SMTC.
+      // Use one toggle action only. Explicit play/pause actions are unreliable with some
+      // Windows/browser media sessions and can bounce YouTube between play and pause.
+      // The local snapshot is updated optimistically so the button does not require repeated clicks.
       if (desktopSnapshot) {
         desktopSnapshot = {
           ...desktopSnapshot,
           active: true,
-          playbackState: action === "play" ? "playing" : "paused",
+          playbackState: nextPlaybackState,
         };
         lastDesktopSnapshotSignature = getDesktopSnapshotSignature(desktopSnapshot);
         render();
       }
 
-      performDesktopAction(action);
+      performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
       return;
     }
 

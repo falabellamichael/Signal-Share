@@ -45,6 +45,8 @@ const LAST_GOOD_SNAPSHOT_MAX_AGE_MS = 15000;
 const SNAPSHOT_CACHE_TTL_MS = Number(process.env.SIGNAL_SHARE_SNAPSHOT_CACHE_TTL_MS || 3500);
 const SUPABASE_SYNC_INTERVAL_MS = Number(process.env.SIGNAL_SHARE_SYNC_INTERVAL_MS || 15000);
 const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true" || process.env.SIGNAL_SHARE_REMOTE_MEDIA === "true";
+const MEDIA_ACTION_COOLDOWN_MS = 900;
+const lastMediaActionAtByKey = new Map();
 
 let lastGoodSnapshot = null;
 let lastGoodSnapshotAt = 0;
@@ -456,29 +458,17 @@ using System;
 using System.Runtime.InteropServices;
 public static class MediaKeySender {
   [DllImport("user32.dll", SetLastError=true)]
-  public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
-  [DllImport("user32.dll", SetLastError=true)]
-  public static extern IntPtr GetForegroundWindow();
-  [DllImport("user32.dll", SetLastError=true)]
   public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 }
 "@
 
-$WM_APPCOMMAND = 0x0319
-$SMTO_ABORTIFHUNG = 0x0002
-$HWND_BROADCAST = [IntPtr]0xffff
 $KEYEVENTF_EXTENDEDKEY = 0x0001
 $KEYEVENTF_KEYUP = 0x0002
-$result = [UIntPtr]::Zero
-$lParam = [IntPtr](${appCommand} -shl 16)
 
-[void][MediaKeySender]::SendMessageTimeout($HWND_BROADCAST, $WM_APPCOMMAND, [IntPtr]::Zero, $lParam, $SMTO_ABORTIFHUNG, 180, [ref]$result)
-$foreground = [MediaKeySender]::GetForegroundWindow()
-if ($foreground -ne [IntPtr]::Zero) {
-  [void][MediaKeySender]::SendMessageTimeout($foreground, $WM_APPCOMMAND, $foreground, $lParam, $SMTO_ABORTIFHUNG, 180, [ref]$result)
-}
+# Send exactly one media-key event. Do not also broadcast WM_APPCOMMAND,
+# because Chrome/YouTube/Spotify may receive both and toggle twice.
 [MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
-Start-Sleep -Milliseconds 30
+Start-Sleep -Milliseconds 45
 [MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
 Write-Output "ok"
   `.trim();
@@ -520,6 +510,15 @@ app.post("/api/system-media/action", async (req, res) => {
     return res.json({ ok: true });
   }
   if (!MEDIA_KEY_CODES[action]) return res.status(400).json({ ok: false });
+
+  const actionKey = `${action}|${appPackage}`;
+  const now = Date.now();
+  const lastActionAt = lastMediaActionAtByKey.get(actionKey) || 0;
+  if (now - lastActionAt < MEDIA_ACTION_COOLDOWN_MS) {
+    return res.json({ ok: true, skipped: true, reason: "duplicate-action-cooldown" });
+  }
+  lastMediaActionAtByKey.set(actionKey, now);
+
   const ok = await sendSystemMediaKey(action, appPackage);
   invalidateSnapshotCache();
   res.json({ ok });
