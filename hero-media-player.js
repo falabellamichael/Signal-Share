@@ -453,7 +453,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       const resolved = new URL(url, window.location.href);
       const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
       if (addressSpace !== "local" && addressSpace !== "private" && addressSpace !== "loopback") return init;
-      const secret = localStorage.getItem("ss_bridge_secret");
+      const secret = localStorage.getItem("ss_bridge_secret") || "ss_bridge_secret_v1";
       const headers = {
         ...init.headers,
         "target-address-space": addressSpace,

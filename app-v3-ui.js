@@ -89,11 +89,12 @@ export function createAppUi(context) {
     themePickerDescription: document.querySelector("#themePickerDescription"),
     densitySelect: document.querySelector("#densitySelect"),
     motionSelect: document.querySelector("#motionSelect"),
-    statusBarStripToggle: document.querySelector("#statusBarStripToggle"),
-    notificationHideSenderToggle: document.querySelector("#notificationHideSenderToggle"),
-    notificationHideBodyToggle: document.querySelector("#notificationHideBodyToggle"),
-    showEmailToggle: document.querySelector("#showEmailToggle"),
-    resetPlayerPositionButton: document.querySelector("#resetPlayerPositionButton"),
+    statusBarStripToggle: document.getElementById("statusBarStripToggle"),
+    notificationHideSenderToggle: document.getElementById("notificationHideSenderToggle"),
+    notificationHideBodyToggle: document.getElementById("notificationHideBodyToggle"),
+    showEmailToggle: document.getElementById("showEmailToggle"),
+    bridgeSecretInput: document.getElementById("bridgeSecretInput"),
+    resetPlayerPositionButton: document.getElementById("resetPlayerPositionButton"),
     resetPreferencesButton: document.querySelector("#resetPreferencesButton"),
     messagesNavLink: document.querySelector("#messagesNavLink"),
     profileNavLink: document.querySelector("#profileNavLink"),
@@ -409,6 +410,14 @@ export function createAppUi(context) {
     elements.notificationHideSenderToggle.addEventListener("change", handleNotificationHideSenderToggle);
     elements.notificationHideBodyToggle.addEventListener("change", handleNotificationHideBodyToggle);
     elements.showEmailToggle.addEventListener("change", handleShowEmailToggle);
+    
+    if (elements.bridgeSecretInput) {
+      elements.bridgeSecretInput.value = localStorage.getItem("ss_bridge_secret") || "";
+      elements.bridgeSecretInput.addEventListener("input", (event) => {
+        localStorage.setItem("ss_bridge_secret", event.target.value.trim());
+      });
+    }
+
     elements.resetPlayerPositionButton.addEventListener("click", resetPlayerDockPosition);
     elements.resetPreferencesButton.addEventListener("click", resetUserPreferences);
     elements.messagesNavLink.addEventListener("click", handleMessagesNavClick);

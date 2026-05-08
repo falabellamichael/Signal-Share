@@ -218,11 +218,10 @@ function isPreferredApp(sourceAppId = "", preferredSource = "") {
   if (preferredSource === "youtube") {
     return normalized.includes("youtube") 
       || normalized.includes("ytmusic") 
-      || normalized.includes("youtube.music")
-      || isBrowser;
+      || normalized.includes("youtube.music");
   }
   if (preferredSource === "spotify") {
-    return normalized.includes("spotify") || isBrowser;
+    return normalized.includes("spotify");
   }
 
   return normalized.includes("spotify") 
@@ -256,19 +255,21 @@ function scoreSession(session) {
   const album = `${session.media?.albumTitle || ""}`.trim().toLowerCase();
   const preferredSource = session._preferredSource;
 
-  let sourceMatched = isPreferredApp(sourceAppId, preferredSource);
+  // Secondary check: if the app is a browser, it ONLY matches if title/album contains keywords
+  const appLabel = resolveMediaAppLabel(sourceAppId).toLowerCase();
+  const isBrowser = appLabel.includes("chrome") || appLabel.includes("edge") || appLabel.includes("firefox") || appLabel.includes("browser") || appLabel.includes("opera");
   
-  // Secondary check: if the app is a browser but the title/album mentions the source
-  if (!sourceMatched && preferredSource) {
-    const appLabel = resolveMediaAppLabel(sourceAppId).toLowerCase();
-    const isBrowser = appLabel.includes("chrome") || appLabel.includes("edge") || appLabel.includes("firefox") || appLabel.includes("browser");
+  if (preferredSource && preferredSource !== "all") {
     if (isBrowser) {
-      if (preferredSource === "youtube" && (title.includes("youtube") || album.includes("youtube") || extractYoutubeVideoId(title) || extractYoutubeVideoId(album))) {
-        sourceMatched = true;
-      } else if (preferredSource === "spotify" && (title.includes("spotify") || album.includes("spotify"))) {
-        sourceMatched = true;
+      if (preferredSource === "youtube") {
+        sourceMatched = (title.includes("youtube") || album.includes("youtube") || extractYoutubeVideoId(title) || extractYoutubeVideoId(album));
+      } else if (preferredSource === "spotify") {
+        sourceMatched = (title.includes("spotify") || album.includes("spotify"));
       }
     }
+  } else {
+    // If no preference, anything goes, but prioritize known ones
+    sourceMatched = isPreferredApp(sourceAppId, "all");
   }
 
   if (sourceMatched) {
@@ -634,7 +635,9 @@ if ($winRtSuccess) {
       }
     }
     
-    # Final fallback only if no specific source is preferred
+    # Final fallback ONLY if NO specific source is preferred.
+    # If "youtube" or "spotify" is requested but WinRT failed to find a session, 
+    # we DO NOT want to broadcast a global key that might hit the WRONG app.
     if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all") {
       $KEYEVENTF_EXTENDEDKEY = 0x0001
       $KEYEVENTF_KEYUP = 0x0002
@@ -643,6 +646,7 @@ if ($winRtSuccess) {
       [MediaActionTarget]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
       Write-Output "ok-global"
     } else {
+      # If we are here, we had a preferred source but found no active targeted session
       Write-Output "fail-source-not-active"
     }
   } catch {
