@@ -437,14 +437,14 @@ function createPostStandbyPreview(post, options = {}) {
 
   return {
     key: getCardKey({
-      badge: `Up Next · ${providerLabel || "App Media"}`,
+      badge: `UP NEXT · ${providerLabel || "App Media"}`,
       title: post.title || "Next playable post",
       meta,
       note: "Press Play to start playback.",
       artworkUrl,
     }),
     node: createPreviewCard({
-      badge: `Up Next · ${providerLabel || "App Media"}`,
+      badge: `UP NEXT · ${providerLabel || "App Media"}`,
       title: post.title || "Next playable post",
       meta,
       note: "Press Play to start playback.",
@@ -538,7 +538,7 @@ export function renderHeroStagePreview(options = {}) {
   if (mode === "device") {
     if (nativeSnapshot?.permissionRequired) {
       commitCard(stage, {
-        badge: "Device media",
+        badge: "ON-DEVICE MEDIA",
         title: "Enable access",
         meta: "Allow media access to control this device.",
         note: "Use Play to open settings.",
@@ -551,7 +551,7 @@ export function renderHeroStagePreview(options = {}) {
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
 
       commitCard(stage, {
-        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "Device media",
+        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA",
         title: nativeSnapshot.title || matchedPost?.title || "Now playing",
         meta: nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback"),
         note: nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing",
@@ -561,7 +561,7 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "Device media",
+      badge: "ON-DEVICE MEDIA",
       title: "No active playback",
       meta: "Start a track in any media app on this device.",
     });
@@ -574,7 +574,7 @@ export function renderHeroStagePreview(options = {}) {
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
 
       commitCard(stage, {
-        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC system media",
+        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA",
         title: desktopSnapshot.title || matchedPost?.title || "Now playing",
         meta: desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback"),
         note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
@@ -590,7 +590,7 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "PC system media",
+      badge: "PC SYSTEM MEDIA",
       title: "Waiting for playback",
       meta: "Start YouTube, Spotify, or another desktop app.",
     });
@@ -606,7 +606,7 @@ export function renderHeroStagePreview(options = {}) {
       : fallbackMetaRaw;
 
     commitCard(stage, {
-      badge: "Browser media",
+      badge: "BROWSER MEDIA",
       title: fallbackTitle,
       meta: fallbackMeta || "Active browser media session",
       note: fallbackMedia.paused ? "Paused" : "Playing",

@@ -32,6 +32,7 @@ export function createHeroMediaPlayerController(options) {
     getHeroPlayablePosts,
     resolveYouTubePreviewId,
     isNativeCapacitorApp,
+    onStatusChange
   } = options;
 
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
@@ -1267,7 +1268,12 @@ The companion bridge is designed with several security layers to keep your PC sa
           hydrateDesktopSpotifyArtwork(snapshot, getControllablePlayerPost());
         }
 
-        if (renderAfter && didChange) render();
+        if (renderAfter && didChange) {
+          render();
+          if (typeof onStatusChange === "function") {
+            onStatusChange();
+          }
+        }
         return desktopSnapshot;
       })
       .catch(() => {
@@ -1288,7 +1294,12 @@ The companion bridge is designed with several security layers to keep your PC sa
           console.warn("[Hero] Desktop media bridge not detected. Run the Signal-Share desktop bridge on your PC with: node server.js");
         }
 
-        if (renderAfter && didChange) render();
+        if (renderAfter && didChange) {
+          render();
+          if (typeof onStatusChange === "function") {
+            onStatusChange();
+          }
+        }
         return null;
       })
       .finally(() => {
@@ -2000,7 +2011,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       } else {
         nextTitle = "Device media idle";
         nextCaption = "Start playback in any media app.";
-        nextStatus = "Device system media";
+        nextStatus = "ON-DEVICE MEDIA";
       }
     } else if (mode === "desktop") {
       nextHeader = getSystemMediaHeaderLabel();
@@ -2016,17 +2027,17 @@ The companion bridge is designed with several security layers to keep your PC sa
           : preferredSource === "youtube"
             ? "Start YouTube playback in your browser."
             : "Start playback in YouTube, Spotify, or another desktop app.";
-        nextStatus = "PC system media";
+        nextStatus = "PC SYSTEM MEDIA";
       }
     } else if (mode === "app" && !post && fallbackMedia instanceof HTMLMediaElement) {
-      nextHeader = "Browser Media";
+      nextHeader = "BROWSER MEDIA";
       const fallbackTitle = browserMetadata?.title || fallbackMedia.getAttribute("title") || "Now playing in this browser";
       const fallbackMeta = [browserMetadata?.artist, browserMetadata?.album].filter(Boolean).join(" · ");
       nextTitle = fallbackTitle;
       nextCaption = fallbackMeta || "Active browser media session";
       nextStatus = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
     } else if (mode === "app" && !post) {
-      nextHeader = "App Media";
+      nextHeader = "APP MEDIA";
       nextTitle = "Ready to play";
       nextCaption = "";
       nextStatus = "App media standby";
@@ -2120,6 +2131,10 @@ The companion bridge is designed with several security layers to keep your PC sa
       }
       return false;
     },
+    getSnapshot: () => ({
+      native: nativeSnapshot,
+      desktop: desktopSnapshot
+    }),
     showCompanionPrompt,
     hideCompanionPrompt,
     handleCompanionResponse,

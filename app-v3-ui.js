@@ -378,6 +378,7 @@ export function createAppUi(context) {
     getHeroPlayablePosts,
     resolveYouTubePreviewId,
     isNativeCapacitorApp,
+    onStatusChange: render
   });
 
   function attachEventListeners() {

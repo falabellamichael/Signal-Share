@@ -1459,10 +1459,10 @@
 }
 
 .external-stage strong {
-  font-family: "Instrument Serif", serif;
-  font-size: 2.2rem;
-  font-weight: 400;
-  line-height: 0.96;
+  font-family: inherit;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.15;
 }
 
 .external-stage p {
@@ -1564,18 +1564,19 @@
 }
 
 .external-preview-badge {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.74);
+  letter-spacing: 0.16em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .external-preview-title {
   margin: 0;
-  font-family: "Instrument Serif", serif;
-  font-size: 2.2rem;
-  font-weight: 400;
-  line-height: 0.96;
+  font-family: inherit;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.15;
 }
 
 .external-preview-copy {
@@ -1737,9 +1738,10 @@
 }
 
 .audio-stage strong {
-  font-family: "Instrument Serif", serif;
-  font-size: 2.2rem;
-  line-height: 1;
+  font-family: inherit;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.15;
 }
 
 .card-body {
@@ -1853,13 +1855,14 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
+  justify-content: flex-end;
+  align-items: flex-start;
+  text-align: left;
   padding: 24px;
-  background: linear-gradient(135deg, var(--surface-strong), var(--surface));
-  color: var(--text);
+  background: linear-gradient(135deg, #0b0f14, #1a232e);
+  color: #fff;
   overflow: hidden;
+  border-radius: var(--radius-xl);
 }
 
 .hero-player-preview-image {
@@ -1868,8 +1871,8 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.26;
-  filter: blur(0.3px);
+  opacity: 0.35;
+  filter: brightness(0.6);
   pointer-events: none;
   z-index: 0;
   transition: opacity 340ms ease;
@@ -1879,38 +1882,40 @@
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 8px;
-  max-width: 440px;
+  gap: 4px;
+  max-width: 100%;
 }
 
 .hero-player-preview-badge {
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent);
-  margin-bottom: 4px;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 12px;
 }
 
 .hero-player-preview-title {
-  font-family: "Instrument Serif", serif;
-  font-size: clamp(1.4rem, 4vw, 2.2rem);
-  line-height: 1;
-  margin-bottom: 4px;
+  font-family: inherit;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 8px;
+  color: #fff;
 }
 
 .hero-player-preview-meta {
-  font-size: 0.92rem;
-  color: var(--muted);
+  font-size: 1.05rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.95);
   line-height: 1.4;
 }
 
 .hero-player-preview-note {
-  font-size: 0.78rem;
-  color: var(--muted);
-  font-style: italic;
-  margin-top: 10px;
-  opacity: 0.8;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 14px;
 }
 
 .hero-player-active-iframe {
@@ -2013,12 +2018,13 @@
 }
 
 .hero-player-companion-card .hero-player-preview-title {
-  font-size: 1.3rem;
-  font-family: "Instrument Serif", serif;
-  margin-bottom: 1px;
-  line-height: 1;
+  font-size: 1.25rem;
+  font-family: inherit;
+  margin-bottom: 2px;
+  line-height: 1.2;
   color: var(--text);
   flex-shrink: 0;
+  font-weight: 700;
 }
 
 .hero-player-companion-card .hero-player-preview-meta {
