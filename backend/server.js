@@ -332,8 +332,6 @@ function selectPreferredMediaSession(preferredSource = "") {
   const sessions = safeGetMediaSessions();
   return pickBestSession(sessions, preferredSource);
 }
-  return pickBestSession(safeGetMediaSessions());
-}
 
 function resolveMediaAppLabel(sourceAppId = "") {
   if (!sourceAppId) return "";
