@@ -51,7 +51,7 @@ export function createAppUi(context) {
     parseExternalMediaUrl, healPosts, parseSpotifyUrl, isHostedPostingEnabled,
     getAppConfig, updatePostLikeCount, createDemoGraphic,
   } = context;
-  
+
   const elements = {
     siteHeader: document.querySelector(".site-header"),
     postForm: document.querySelector("#postForm"),
@@ -394,7 +394,7 @@ export function createAppUi(context) {
     elements.settingsToggleButton.addEventListener("click", toggleSettingsPanel);
     elements.settingsBackdrop.addEventListener("click", closeSettingsPanel);
     elements.settingsCloseButton.addEventListener("click", closeSettingsPanel);
-    
+
     // Listeners for bell button are now handled inline in index.html to prevent conflicts
     if (elements.keyboardShortcutsButton) elements.keyboardShortcutsButton.addEventListener("click", () => window.showSettingsPage && window.showSettingsPage('shortcuts'));
     if (elements.notificationsBackdrop) elements.notificationsBackdrop.addEventListener("click", handleNotificationsBackdropClick);
@@ -411,7 +411,7 @@ export function createAppUi(context) {
     elements.notificationHideSenderToggle.addEventListener("change", handleNotificationHideSenderToggle);
     elements.notificationHideBodyToggle.addEventListener("change", handleNotificationHideBodyToggle);
     elements.showEmailToggle.addEventListener("change", handleShowEmailToggle);
-    
+
     if (elements.bridgeSecretInput) {
       elements.bridgeSecretInput.value = localStorage.getItem("ss_bridge_secret") || "";
       elements.bridgeSecretInput.addEventListener("input", (event) => {
@@ -519,14 +519,14 @@ export function createAppUi(context) {
     });
     document.addEventListener("click", handleThemePickerOutsideClick);
     document.addEventListener("click", handleExpandedMessengerOutsideClick);
-    
+
     // Notification Interactivity
     document.addEventListener("signal:notificationClick", (event) => {
       const notification = event.detail;
       if (!notification || !notification.data) return;
-      
+
       closeNotificationsPanel();
-      
+
       if (notification.data.type === "message" && notification.data.threadId) {
         void openMessengerThreadFromNotification(notification.data.threadId);
       } else if (notification.data.type === "post" && notification.data.postId) {
@@ -543,28 +543,28 @@ export function createAppUi(context) {
           // 1 = playing, 2 = paused, 0 = ended, 3 = buffering
           const isEnded = data.info === 0;
           const newState = (data.info === 1 || data.info === 3) ? "playing" : "paused";
-          
+
           if (isEnded) {
-             setTimeout(() => {
-               const iframes = document.querySelectorAll("iframe");
-               iframes.forEach(iframe => {
-                 if (iframe.contentWindow === event.source) {
-                   if (state.heroPlayerElement?.contains(iframe)) {
-                     heroMediaPlayerController.handleNext();
-                   } else if (state.activePlayerElement?.contains(iframe)) {
-                     handleMiniNext();
-                   }
-                 }
-               });
-             }, 1200);
+            setTimeout(() => {
+              const iframes = document.querySelectorAll("iframe");
+              iframes.forEach(iframe => {
+                if (iframe.contentWindow === event.source) {
+                  if (state.heroPlayerElement?.contains(iframe)) {
+                    heroMediaPlayerController.handleNext();
+                  } else if (state.activePlayerElement?.contains(iframe)) {
+                    handleMiniNext();
+                  }
+                }
+              });
+            }, 1200);
           }
 
           // Update global state if this matches our active hero or mini player
           if (state.heroPlayerPlaybackState !== newState) {
-             state.heroPlayerPlaybackState = newState;
-             heroMediaPlayerController.render();
+            state.heroPlayerPlaybackState = newState;
+            heroMediaPlayerController.render();
           }
-          
+
           // Also update the dataset on the iframe itself for mini-player logic
           const iframes = document.querySelectorAll("iframe");
           iframes.forEach(iframe => {
@@ -581,7 +581,7 @@ export function createAppUi(context) {
 
   function setHeroControlMode(mode) {
     state.heroControlMode = mode;
-    
+
     // If switching to media, ensure bridge is active
     if (mode === "media") {
       state.desktopBridgeSuspended = false;
@@ -657,7 +657,7 @@ export function createAppUi(context) {
     updateComposerAccess();
   }
 
-  window.renderNotificationsPanel = function() {
+  window.renderNotificationsPanel = function () {
     const isOpen = state.notificationsPanelOpen;
     if (elements.notificationsPanel) {
       elements.notificationsPanel.hidden = !isOpen;
@@ -990,7 +990,7 @@ export function createAppUi(context) {
   function renderActiveThread(isReady) {
     const activeThread = getActiveThread();
     const partner = activeThread ? getThreadPartnerProfile(activeThread) : null;
-    
+
     if (!isReady) {
       elements.activeThreadLabel.textContent = "Sign in to open inbox";
       elements.activeThreadMeta.textContent = "Live messaging is available only for activated accounts.";
@@ -999,7 +999,7 @@ export function createAppUi(context) {
       elements.messageEmpty.textContent = "Messaging stays disabled until you sign in and confirm your email.";
       return;
     }
-    
+
     if (!activeThread) {
       elements.activeThreadLabel.textContent = "Choose a member";
       elements.activeThreadMeta.textContent = "Start a direct conversation from the member list.";
@@ -1020,7 +1020,7 @@ export function createAppUi(context) {
     }
 
     elements.messageEmpty.hidden = true;
-    
+
     // Surgical update: Only append messages that aren't already in the DOM
     const existingRows = Array.from(elements.messageList.querySelectorAll(".message-row"));
     const existingIds = new Set(existingRows.map(row => row.dataset.id).filter(Boolean));
@@ -1056,7 +1056,7 @@ export function createAppUi(context) {
       bubble.append(body, meta);
       row.appendChild(bubble);
       elements.messageList.appendChild(row);
-      
+
       // Auto-scroll on new message
       elements.messageList.scrollTop = elements.messageList.scrollHeight;
     });
@@ -1078,15 +1078,15 @@ export function createAppUi(context) {
 
   function handleMessageAttachmentInputChange(event) { const [file] = Array.from(event.target.files ?? []); if (!file) { clearMessageAttachmentSelection(); return; } handleMessageAttachmentSelection(file); }
 
-  function handleMessageAttachmentSelection(file) { 
+  function handleMessageAttachmentSelection(file) {
     const kind = getMessageAttachmentKind(file.type);
     const sizeLimit = kind === "image" ? MAX_IMAGE_FILE_SIZE : MAX_VIDEO_FILE_SIZE;
-    if (file.size > sizeLimit) { showMessengerFeedback(`Choose an attachment smaller than ${kind === "image" ? "50 MB" : "15 MB"}.`, true); clearMessageAttachmentSelection({ preserveFeedback: true }); return; } 
-    clearMessageAttachmentSelection({ preserveFeedback: true }); 
-    state.messageAttachmentFile = file; 
-    if (kind !== "file") state.messageAttachmentPreviewUrl = URL.createObjectURL(file); 
-    showMessengerFeedback(`${file.name} is ready to send.`); 
-    renderMessageAttachmentPreview(); 
+    if (file.size > sizeLimit) { showMessengerFeedback(`Choose an attachment smaller than ${kind === "image" ? "50 MB" : "15 MB"}.`, true); clearMessageAttachmentSelection({ preserveFeedback: true }); return; }
+    clearMessageAttachmentSelection({ preserveFeedback: true });
+    state.messageAttachmentFile = file;
+    if (kind !== "file") state.messageAttachmentPreviewUrl = URL.createObjectURL(file);
+    showMessengerFeedback(`${file.name} is ready to send.`);
+    renderMessageAttachmentPreview();
   }
 
   function clearMessageAttachmentSelection(options = {}) { const { preserveFeedback = false } = options; if (state.messageAttachmentPreviewUrl) { URL.revokeObjectURL(state.messageAttachmentPreviewUrl); state.messageAttachmentPreviewUrl = ""; } state.messageAttachmentFile = null; elements.messageAttachmentInput.value = ""; elements.messageAttachmentPreview.hidden = true; elements.messageAttachmentPreview.replaceChildren(); elements.messageAttachmentClearButton.hidden = true; if (!preserveFeedback && elements.messengerFeedback.textContent.includes("ready to send")) showMessengerFeedback(""); }
@@ -1161,7 +1161,7 @@ export function createAppUi(context) {
 
   function toggleSettingsPanel(event) { if (event) { event.preventDefault(); event.stopPropagation(); } if (state.settingsPanelOpen) closeSettingsPanel(); else openSettingsPanel(); }
 
-  window.showSettingsPage = function(page) {
+  window.showSettingsPage = function (page) {
     state.settingsActivePage = page;
     renderSettingsPanel();
     if (page === 'shortcuts') {
@@ -1171,7 +1171,7 @@ export function createAppUi(context) {
 
   function renderSettingsPanel() {
     if (!elements.settingsPanel) return;
-    
+
     const isOpen = state.settingsPanelOpen;
     if (!isOpen) state.themePickerOpen = false;
     elements.settingsPanel.hidden = !isOpen;
@@ -1185,7 +1185,7 @@ export function createAppUi(context) {
       const isMain = state.settingsActivePage === 'main';
       if (elements.settingsMainPage) elements.settingsMainPage.style.display = isMain ? 'block' : 'none';
       if (elements.settingsShortcutsPage) elements.settingsShortcutsPage.style.display = isMain ? 'none' : 'block';
-      
+
       if (isMain) {
         if (elements.densitySelect) elements.densitySelect.value = state.preferences.density;
         if (elements.motionSelect) elements.motionSelect.value = state.preferences.motion;
@@ -1200,14 +1200,14 @@ export function createAppUi(context) {
 
   let notificationsOpenedAt = 0;
 
-  function openNotificationsPanel() { 
-    state.notificationsPanelOpen = true; 
+  function openNotificationsPanel() {
+    state.notificationsPanelOpen = true;
     notificationsOpenedAt = performance.now();
-    setMobileHeaderHidden(false); 
+    setMobileHeaderHidden(false);
     render();
     if (window.notifications?.resetBadge) window.notifications.resetBadge();
     if (window.renderNotificationsHistory) window.renderNotificationsHistory();
-    requestAnimationFrame(() => elements.notificationsCloseButton?.focus?.()); 
+    requestAnimationFrame(() => elements.notificationsCloseButton?.focus?.());
   }
 
   function handleNotificationsBackdropClick(event) {
@@ -1220,30 +1220,30 @@ export function createAppUi(context) {
     closeNotificationsPanel();
   }
 
-  function closeNotificationsPanel(options = {}) { 
-    const { restoreFocus = true } = options; 
-    if (!state.notificationsPanelOpen) return; 
-    state.notificationsPanelOpen = false; 
-    render(); 
-    if (restoreFocus && elements.notificationsLauncherButton) elements.notificationsLauncherButton.focus(); 
+  function closeNotificationsPanel(options = {}) {
+    const { restoreFocus = true } = options;
+    if (!state.notificationsPanelOpen) return;
+    state.notificationsPanelOpen = false;
+    render();
+    if (restoreFocus && elements.notificationsLauncherButton) elements.notificationsLauncherButton.focus();
   }
 
   let lastToggleTime = 0;
-  window.toggleNotificationsPanel = function(event) { 
+  window.toggleNotificationsPanel = function (event) {
     console.log("[App] Toggling notifications panel...");
     const now = Date.now();
     if (now - lastToggleTime < 300) return; // Prevent double-toggle
     lastToggleTime = now;
 
-    if (event) { event.preventDefault(); event.stopPropagation(); } 
-    if (state.notificationsPanelOpen) closeNotificationsPanel(); else openNotificationsPanel(); 
+    if (event) { event.preventDefault(); event.stopPropagation(); }
+    if (state.notificationsPanelOpen) closeNotificationsPanel(); else openNotificationsPanel();
   }
 
   // Initial setup for the notification bell
   if (elements.notificationsLauncherButton) {
     const bell = elements.notificationsLauncherButton;
     bell.style.cssText = "background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; color: inherit; padding: 0 8px; z-index: 10000; pointer-events: auto !important; -webkit-tap-highlight-color: rgba(0,0,0,0); flex-shrink: 0; min-height: 44px; min-width: 44px;";
-    
+
     bell.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -1261,7 +1261,7 @@ export function createAppUi(context) {
     if (!elements.shortcutsList) return;
     const shortcuts = window.keyboardBindings ? window.keyboardBindings.getShortcuts() : [];
     elements.shortcutsList.innerHTML = "";
-    
+
     shortcuts.forEach(([key, info]) => {
       const item = document.createElement("div");
       item.style.display = "flex";
@@ -1271,7 +1271,7 @@ export function createAppUi(context) {
       item.style.background = "var(--surface, rgba(255, 250, 242, 0.5))";
       item.style.borderRadius = "12px";
       item.style.border = "1px solid var(--line, rgba(19, 33, 43, 0.1))";
-      
+
       item.innerHTML = `
         <span style="font-size: 0.95rem; font-weight: 500; color: var(--text, #13212b);">${info.description}</span>
         <kbd style="
@@ -1382,13 +1382,13 @@ export function createAppUi(context) {
     state.playerPosition = clampPlayerPosition(state.playerPosition ?? defaultPosition);
     state.playerDrag = { pointerId: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
     elements.miniPlayer.classList.add("is-dragging"); applyMiniPlayerPosition();
-    if (typeof elements.miniPlayerHead.setPointerCapture === "function") { try { elements.miniPlayerHead.setPointerCapture(event.pointerId); } catch {} }
+    if (typeof elements.miniPlayerHead.setPointerCapture === "function") { try { elements.miniPlayerHead.setPointerCapture(event.pointerId); } catch { } }
     event.preventDefault();
   }
 
   function handleMiniPlayerDrag(event) { if (!state.playerDrag || event.pointerId !== state.playerDrag.pointerId) return; state.playerPosition = clampPlayerPosition({ x: event.clientX - state.playerDrag.offsetX, y: event.clientY - state.playerDrag.offsetY }); applyMiniPlayerPosition(); }
 
-  function endMiniPlayerDrag(event) { if (!state.playerDrag || event.pointerId !== state.playerDrag.pointerId) return; if (typeof elements.miniPlayerHead.releasePointerCapture === "function") { try { elements.miniPlayerHead.releasePointerCapture(event.pointerId); } catch {} } state.playerDrag = null; elements.miniPlayer.classList.remove("is-dragging"); savePlayerPosition(state.playerPosition); }
+  function endMiniPlayerDrag(event) { if (!state.playerDrag || event.pointerId !== state.playerDrag.pointerId) return; if (typeof elements.miniPlayerHead.releasePointerCapture === "function") { try { elements.miniPlayerHead.releasePointerCapture(event.pointerId); } catch { } } state.playerDrag = null; elements.miniPlayer.classList.remove("is-dragging"); savePlayerPosition(state.playerPosition); }
 
   function handleViewportResize() { updateViewportMetrics(); syncMobileHeaderVisibility(); syncMobileMessengerMode(); if (!state.playerPostId || !state.playerPosition) return; applyMiniPlayerPosition(); }
 
@@ -1478,16 +1478,16 @@ export function createAppUi(context) {
     elements.feedGrid.innerHTML = "";
     const posts = getVisiblePosts();
     const pagePosts = getCurrentFeedPagePosts(posts);
-    
+
     if (feedScrollObserver) feedScrollObserver.disconnect();
-    
+
     pagePosts.forEach((post) => {
       const card = createFeedCard(post);
       elements.feedGrid.appendChild(card);
       const appendedCard = elements.feedGrid.lastElementChild;
       if (feedScrollObserver && appendedCard instanceof Element) feedScrollObserver.observe(appendedCard);
     });
-    
+
     elements.emptyState.hidden = posts.length !== 0;
     renderFeedPagination(posts);
   }
@@ -1496,7 +1496,7 @@ export function createAppUi(context) {
     const fragment = elements.feedCardTemplate.content.cloneNode(true);
     const cardElement = fragment.querySelector(".feed-card");
     if (cardElement) cardElement.dataset.postId = post.id;
-    
+
     const mediaContainer = fragment.querySelector(".card-media"); const kind = fragment.querySelector(".card-kind"); const signal = fragment.querySelector(".card-signal"); const title = fragment.querySelector(".card-title"); const caption = fragment.querySelector(".card-caption"); const creator = fragment.querySelector(".card-creator"); const time = fragment.querySelector(".card-time"); const tags = fragment.querySelector(".card-tags"); const openButton = fragment.querySelector(".open-button"); const saveButton = fragment.querySelector(".save-button"); const likeButton = fragment.querySelector(".like-button"); const deleteButton = fragment.querySelector(".delete-button"); const creatorSummary = getProfileSummaryForPost(post);
     kind.textContent = formatKind(post.mediaKind); signal.textContent = getSignalLabel(post); title.textContent = post.title; caption.textContent = post.caption; creator.textContent = creatorSummary?.displayName ?? post.creator; time.textContent = formatTimestamp(post.createdAt); likeButton.textContent = `${getLikeCount(post)} likes`; saveButton.textContent = isPostSaved(post.id) ? "Saved" : "Save"; saveButton.setAttribute("aria-pressed", isPostSaved(post.id) ? "true" : "false"); saveButton.classList.toggle("is-saved", isPostSaved(post.id)); openButton.textContent = isPlayablePost(post) ? "Play" : "Open";
     const isLiked = state.likedPosts.includes(post.id); likeButton.setAttribute("aria-pressed", isLiked ? "true" : "false"); if (isLiked) likeButton.classList.add("is-liked");
@@ -1599,119 +1599,119 @@ export function createAppUi(context) {
   function renderViewerAttachmentMedia(container, attachment) { if (!attachment?.url || !attachment?.kind) return; if (attachment.kind === "image") { const image = document.createElement("img"); image.className = "viewer-media"; image.loading = "eager"; image.alt = attachment.title || "Shared image"; image.src = attachment.url; container.appendChild(image); return; } const video = document.createElement("video"); video.className = "viewer-media"; video.controls = true; video.preload = "metadata"; video.playsInline = true; video.src = attachment.url; container.appendChild(video); }
 
   function renderMiniPlayerMedia(container, post) { mountPersistentPlayer(container, post, "mini"); }
- 
+
   const HERO_POST_KEY = "signal-share-hero-player-post-id";
- 
-   function getHeroPost() {
-     const heroPostId = state.heroPlayerPostId || localStorage.getItem(HERO_POST_KEY);
-     const heroPost = heroPostId ? getPostById(heroPostId) : null;
-     if (heroPost && isPlayablePost(heroPost)) return heroPost;
-     const latestPlayable = getVisiblePosts().find((post) => isPlayablePost(post));
-     if (latestPlayable) {
-       state.heroPlayerPostId = latestPlayable.id;
-       localStorage.setItem(HERO_POST_KEY, latestPlayable.id);
-     }
-     return latestPlayable || null;
-   }
- 
-   function setHeroPost(post) {
-     if (!post || !isPlayablePost(post)) return;
-     state.heroPlayerPostId = post.id;
-     localStorage.setItem(HERO_POST_KEY, post.id);
-     heroMediaPlayerController.render();
-   }
- 
-   function mountHeroYouTube(post, options = {}) {
-     const { autoplay = false } = options;
-     const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
-     if (!videoId || !elements.heroPlayerStage) return;
- 
-     const iframe = document.createElement("iframe");
-     iframe.className = "hero-player-active-iframe";
-     iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&playsinline=1&rel=0&modestbranding=1&autoplay=${autoplay ? 1 : 0}`;
-     iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-     iframe.allowFullscreen = true;
-     iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
- 
-     elements.heroPlayerStage.replaceChildren(iframe);
-     state.heroPlayerElement = iframe;
-     state.heroPlayerPostId = post.id;
-   }
- 
-   function mountHeroMedia(post, options = {}) {
-     if (!post || !elements.heroPlayerStage) return;
-     const { autoplay = false } = options;
-     
-     // Stop existing playback if any
-     if (state.heroPlayerElement) {
-       const oldMedia = state.heroPlayerElement instanceof HTMLMediaElement 
-         ? state.heroPlayerElement 
-         : state.heroPlayerElement.querySelector?.("video, audio");
-       if (oldMedia instanceof HTMLMediaElement) oldMedia.pause();
 
-       const oldFrame = state.heroPlayerElement instanceof HTMLIFrameElement
-         ? state.heroPlayerElement
-         : state.heroPlayerElement.querySelector?.("iframe");
-       if (oldFrame) oldFrame.src = "about:blank";
-     }
+  function getHeroPost() {
+    const heroPostId = state.heroPlayerPostId || localStorage.getItem(HERO_POST_KEY);
+    const heroPost = heroPostId ? getPostById(heroPostId) : null;
+    if (heroPost && isPlayablePost(heroPost)) return heroPost;
+    const latestPlayable = getVisiblePosts().find((post) => isPlayablePost(post));
+    if (latestPlayable) {
+      state.heroPlayerPostId = latestPlayable.id;
+      localStorage.setItem(HERO_POST_KEY, latestPlayable.id);
+    }
+    return latestPlayable || null;
+  }
 
-     state.heroPlayerPostId = post.id;
-     state.heroPlayerElement = createPersistentPlayer(post, { autoplay });
-     
-     if (autoplay) {
-       const media = state.heroPlayerElement instanceof HTMLMediaElement 
-         ? state.heroPlayerElement 
-         : state.heroPlayerElement.querySelector?.("video, audio");
-       if (media instanceof HTMLMediaElement) {
-         media.autoplay = true;
-         media.play().catch(() => {});
-       }
-       // YouTube/Spotify autoplay is handled via URL params in createActivePlayerDescriptor/Stage
-     }
+  function setHeroPost(post) {
+    if (!post || !isPlayablePost(post)) return;
+    state.heroPlayerPostId = post.id;
+    localStorage.setItem(HERO_POST_KEY, post.id);
+    heroMediaPlayerController.render();
+  }
 
-     elements.heroPlayerStage.replaceChildren(state.heroPlayerElement);
-     applyPlayerVolumeToActiveElement();
-   }
- 
-   function playHeroMedia() {
-     const post = getHeroPost();
-     if (!post) return;
-     
-     // If this post is already active and VISIBLE in the hero, toggle its playback
-     const isMounted = state.heroPlayerElement && elements.heroPlayerStage.contains(state.heroPlayerElement);
-     if (state.heroPlayerPostId === post.id && isMounted) {
-       const media = state.heroPlayerElement instanceof HTMLMediaElement 
-         ? state.heroPlayerElement 
-         : (state.heroPlayerElement instanceof HTMLIFrameElement
-           ? state.heroPlayerElement
-           : state.heroPlayerElement.querySelector("video, audio, iframe"));
-       
-       if (media instanceof HTMLMediaElement) {
-         if (media.paused) {
-           media.play().catch(() => {});
-           state.heroPlayerPlaybackState = "playing";
-         } else {
-           media.pause();
-           state.heroPlayerPlaybackState = "paused";
-         }
-         heroMediaPlayerController.render();
-         return;
-       } else if (media instanceof HTMLIFrameElement && post.sourceKind === "youtube") {
-         const isPlaying = state.heroPlayerPlaybackState === "playing";
-         postMessageToYouTubePlayer(media, isPlaying ? "pauseVideo" : "playVideo");
-         state.heroPlayerPlaybackState = isPlaying ? "paused" : "playing";
-         heroMediaPlayerController.render();
-         return;
-       }
-     }
+  function mountHeroYouTube(post, options = {}) {
+    const { autoplay = false } = options;
+    const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
+    if (!videoId || !elements.heroPlayerStage) return;
 
-     // If not mounted or different post, mount and play
-     setHeroPost(post);
-     mountHeroMedia(post, { autoplay: true });
-     state.heroPlayerPlaybackState = "playing";
-     heroMediaPlayerController.render();
-   }
- 
+    const iframe = document.createElement("iframe");
+    iframe.className = "hero-player-active-iframe";
+    iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&playsinline=1&rel=0&modestbranding=1&autoplay=${autoplay ? 1 : 0}`;
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+    iframe.allowFullscreen = true;
+    iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
+
+    elements.heroPlayerStage.replaceChildren(iframe);
+    state.heroPlayerElement = iframe;
+    state.heroPlayerPostId = post.id;
+  }
+
+  function mountHeroMedia(post, options = {}) {
+    if (!post || !elements.heroPlayerStage) return;
+    const { autoplay = false } = options;
+
+    // Stop existing playback if any
+    if (state.heroPlayerElement) {
+      const oldMedia = state.heroPlayerElement instanceof HTMLMediaElement
+        ? state.heroPlayerElement
+        : state.heroPlayerElement.querySelector?.("video, audio");
+      if (oldMedia instanceof HTMLMediaElement) oldMedia.pause();
+
+      const oldFrame = state.heroPlayerElement instanceof HTMLIFrameElement
+        ? state.heroPlayerElement
+        : state.heroPlayerElement.querySelector?.("iframe");
+      if (oldFrame) oldFrame.src = "about:blank";
+    }
+
+    state.heroPlayerPostId = post.id;
+    state.heroPlayerElement = createPersistentPlayer(post, { autoplay });
+
+    if (autoplay) {
+      const media = state.heroPlayerElement instanceof HTMLMediaElement
+        ? state.heroPlayerElement
+        : state.heroPlayerElement.querySelector?.("video, audio");
+      if (media instanceof HTMLMediaElement) {
+        media.autoplay = true;
+        media.play().catch(() => { });
+      }
+      // YouTube/Spotify autoplay is handled via URL params in createActivePlayerDescriptor/Stage
+    }
+
+    elements.heroPlayerStage.replaceChildren(state.heroPlayerElement);
+    applyPlayerVolumeToActiveElement();
+  }
+
+  function playHeroMedia() {
+    const post = getHeroPost();
+    if (!post) return;
+
+    // If this post is already active and VISIBLE in the hero, toggle its playback
+    const isMounted = state.heroPlayerElement && elements.heroPlayerStage.contains(state.heroPlayerElement);
+    if (state.heroPlayerPostId === post.id && isMounted) {
+      const media = state.heroPlayerElement instanceof HTMLMediaElement
+        ? state.heroPlayerElement
+        : (state.heroPlayerElement instanceof HTMLIFrameElement
+          ? state.heroPlayerElement
+          : state.heroPlayerElement.querySelector("video, audio, iframe"));
+
+      if (media instanceof HTMLMediaElement) {
+        if (media.paused) {
+          media.play().catch(() => { });
+          state.heroPlayerPlaybackState = "playing";
+        } else {
+          media.pause();
+          state.heroPlayerPlaybackState = "paused";
+        }
+        heroMediaPlayerController.render();
+        return;
+      } else if (media instanceof HTMLIFrameElement && post.sourceKind === "youtube") {
+        const isPlaying = state.heroPlayerPlaybackState === "playing";
+        postMessageToYouTubePlayer(media, isPlaying ? "pauseVideo" : "playVideo");
+        state.heroPlayerPlaybackState = isPlaying ? "paused" : "playing";
+        heroMediaPlayerController.render();
+        return;
+      }
+    }
+
+    // If not mounted or different post, mount and play
+    setHeroPost(post);
+    mountHeroMedia(post, { autoplay: true });
+    state.heroPlayerPlaybackState = "playing";
+    heroMediaPlayerController.render();
+  }
+
   function getHeroPlayablePosts() {
     const visibleIds =
       typeof getPlayableVisiblePostIds === "function"
@@ -1869,7 +1869,7 @@ export function createAppUi(context) {
         const type = `${segments[0] || ""}`.trim().toLowerCase();
         const externalId = `${segments[1] || ""}`.trim();
         if (isSpotifyEntityType(type) && externalId) return `spotify:${type}:${externalId}`;
-      } catch {}
+      } catch { }
     }
     return "spotify:";
   }
@@ -2080,21 +2080,21 @@ export function createAppUi(context) {
 
     // Fetch external metadata (YouTube/Spotify title and artist)
     const externalMetadata = getExternalPreviewMetadata(post);
-    
+
     if ((isNativeAndroidExternal || isDesktopExternal) && (variant === "viewer" || variant === "mini")) {
       const note = post.sourceKind === "youtube"
         ? (isDesktopExternal ? "Click preview to open in YouTube Desktop." : "Tap preview to open in YouTube or YouTube Music.")
         : (isDesktopExternal ? "Click preview to open in Spotify Desktop." : "Tap preview to open in the Spotify app.");
-      
+
       const creatorSummary = getProfileSummaryForPost(post);
       const artworkUrl = resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl });
-      
+
       // Helper to create and append the launchable preview card
       const createLaunchableCard = (metadata) => {
         const stage = createPreviewCard({
-          badge: "",
+          badge: formatPostBadge(post, formatKind, getSignalLabel),
           title: metadata?.title || post.title || "Now playing",
-          meta: metadata?.creator || formatPostMeta(post, creatorSummary),
+          meta: metadata?.creator ? `${metadata.creator} · ${formatPostMeta(post, creatorSummary, formatTimestamp).split(" · ").slice(1).join(" · ")}` : formatPostMeta(post, creatorSummary, formatTimestamp),
           note,
           artworkUrl: metadata?.artworkUrl || artworkUrl
         });
@@ -2146,12 +2146,12 @@ export function createAppUi(context) {
     // Fallback preview card with external metadata
     const creatorSummary = getProfileSummaryForPost(post);
     const artworkUrl = resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl });
-    
+
     const createFallbackCard = (metadata) => {
       return createPreviewCard({
-        badge: "",
+        badge: formatPostBadge(post, formatKind, getSignalLabel),
         title: metadata?.title || post.title || "Now playing",
-        meta: metadata?.creator || formatPostMeta(post, creatorSummary),
+        meta: metadata?.creator ? `${metadata.creator} · (Live on feed)` : formatPostMeta(post, creatorSummary, formatTimestamp),
         note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player.",
         artworkUrl: metadata?.artworkUrl || artworkUrl
       });
@@ -2173,12 +2173,16 @@ export function createAppUi(context) {
     }
   }
 
-  function formatPostBadge() {
-    return "";
+  function formatPostBadge(post, formatKind, getSignalLabel) {
+    const kind = typeof formatKind === "function" ? formatKind(post?.mediaKind ? `${post.mediaKind} post` : "Media post", post?.mediaKind || "media") : "Media post";
+    const signal = typeof getSignalLabel === "function" ? getSignalLabel("Live on feed", post) : "Live on feed";
+    return [kind, signal].filter(Boolean).join(" / ");
   }
 
-  function formatPostMeta(post, creatorSummary) {
-    return creatorSummary?.displayName ?? post?.creator ?? "";
+  function formatPostMeta(post, creatorSummary, formatTimestamp) {
+    const creator = creatorSummary?.displayName ?? post?.creator ?? "Signal Share";
+    const timestamp = typeof formatTimestamp === "function" ? formatTimestamp(post?.createdAt) : "";
+    return [creator, timestamp].filter(Boolean).join(" · ");
   }
 
   function formatExternalPreviewBadge(provider, creator = "") {
@@ -2234,32 +2238,32 @@ export function createAppUi(context) {
   async function getSpotifyPreviewMetadata(source) {
     const sourceUrl = resolveSpotifyPreviewSourceUrl(source); if (!sourceUrl) return null;
     const cacheKey = `spotify:preview:v10:${sourceUrl}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
-    const request = Promise.all([fetchSpotifyPreviewCatalogMetadata(source, sourceUrl), fetchSpotifyPreviewOEmbedMetadata(sourceUrl)]).then(([cat, oem]) => { 
+    const request = Promise.all([fetchSpotifyPreviewCatalogMetadata(source, sourceUrl), fetchSpotifyPreviewOEmbedMetadata(sourceUrl)]).then(([cat, oem]) => {
       const fallbackCreator = deriveSpotifyCreatorFromSourceTitle(source, cat?.title || oem?.title || "");
       const metadata = {
         title: cat?.title || oem?.title || "",
         creator: cat?.creator || oem?.creator || fallbackCreator || "",
         thumbnailUrl: cat?.thumbnailUrl || oem?.thumbnailUrl || "",
-        error: cat?.error && !oem?.title ? cat.error : null 
-      }; 
-      const hasMetadata = Boolean(metadata.title || metadata.creator || metadata.thumbnailUrl); 
-      return hasMetadata ? metadata : (metadata.error ? metadata : null); 
+        error: cat?.error && !oem?.title ? cat.error : null
+      };
+      const hasMetadata = Boolean(metadata.title || metadata.creator || metadata.thumbnailUrl);
+      return hasMetadata ? metadata : (metadata.error ? metadata : null);
     }).then(result => {
       externalPreviewCache.set(cacheKey, result);
       return result;
-    }).catch(() => { 
-      externalPreviewCache.set(cacheKey, null); 
-      return null; 
+    }).catch(() => {
+      externalPreviewCache.set(cacheKey, null);
+      return null;
     });
     externalPreviewCache.set(cacheKey, request); return request;
   }
 
-  async function fetchSpotifyPreviewCatalogMetadata(source, sourceUrl) { 
-    if (!state.supabase || state.backendMode !== "supabase" || !state.currentUser) return { error: "Not Signed In" }; 
-    const functionName = getSpotifyPreviewFunctionName(); 
-    if (!functionName) return { error: "Config Missing" }; 
-    try { 
-      const { data, error } = await state.supabase.functions.invoke(functionName, { body: { url: sourceUrl, market: getSpotifyPreviewMarket() } }); 
+  async function fetchSpotifyPreviewCatalogMetadata(source, sourceUrl) {
+    if (!state.supabase || state.backendMode !== "supabase" || !state.currentUser) return { error: "Not Signed In" };
+    const functionName = getSpotifyPreviewFunctionName();
+    if (!functionName) return { error: "Config Missing" };
+    try {
+      const { data, error } = await state.supabase.functions.invoke(functionName, { body: { url: sourceUrl, market: getSpotifyPreviewMarket() } });
       if (error) {
         console.error("[Spotify] Edge Function Error:", error);
         let msg = "API Error";
@@ -2267,9 +2271,9 @@ export function createAppUi(context) {
         else if (typeof error === "object" && error.message) msg = error.message;
         return { error: msg };
       }
-      if (!data || data.error) return { error: data?.error || "Empty Response" }; 
-      return { title: typeof data.title === "string" ? data.title.trim() : "", creator: typeof data.creator === "string" ? data.creator.trim() : "", thumbnailUrl: typeof data.thumbnailUrl === "string" ? data.thumbnailUrl.trim() : "" }; 
-    } catch (err) { return { error: "Network Error" }; } 
+      if (!data || data.error) return { error: data?.error || "Empty Response" };
+      return { title: typeof data.title === "string" ? data.title.trim() : "", creator: typeof data.creator === "string" ? data.creator.trim() : "", thumbnailUrl: typeof data.thumbnailUrl === "string" ? data.thumbnailUrl.trim() : "" };
+    } catch (err) { return { error: "Network Error" }; }
   }
 
 
@@ -2292,7 +2296,7 @@ export function createAppUi(context) {
   async function getYouTubePreviewMetadata(source) {
     const externalId = resolveYouTubePreviewId(source, parseYouTubeUrl); if (!externalId) return null;
     const cacheKey = `youtube:preview:${externalId}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
-    
+
     const request = (async () => {
       try {
         const response = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${externalId}`)}`);
@@ -2302,8 +2306,8 @@ export function createAppUi(context) {
           externalPreviewCache.set(cacheKey, metadata);
           return metadata;
         }
-      } catch (e) {}
-      
+      } catch (e) { }
+
       const metadata = {
         title: typeof source?.title === "string" ? source.title.trim() : "",
         creator: "YouTube",
@@ -2312,7 +2316,7 @@ export function createAppUi(context) {
       externalPreviewCache.set(cacheKey, metadata);
       return metadata;
     })();
-    
+
     externalPreviewCache.set(cacheKey, request); return request;
   }
 
@@ -2371,7 +2375,7 @@ export function createAppUi(context) {
           const externalId = segments[2] || parsedSpotify.externalId || "";
           const fromEmbed = buildSpotifyCanonicalUrl(type, externalId);
           if (fromEmbed) return fromEmbed;
-        } catch {}
+        } catch { }
       }
 
       try {
@@ -2385,7 +2389,7 @@ export function createAppUi(context) {
         const externalId = segments[1] || "";
         const canonical = buildSpotifyCanonicalUrl(type, externalId);
         if (canonical) return canonical;
-      } catch {}
+      } catch { }
     }
 
     const directExternalId = `${source?.externalId || ""}`.trim();
@@ -2512,7 +2516,7 @@ export function createAppUi(context) {
     const cachedExt = externalPreviewCache.get(post.sourceKind === "spotify" ? `spotify:preview:v10:${spotifyUrl}` : (post.sourceKind === "youtube" ? `youtube:preview:${resolveYouTubePreviewId(post, parseYouTubeUrl)}` : null));
     const isFetching = cachedExt instanceof Promise;
     const ext = isFetching ? null : cachedExt;
-    
+
     const artist = ext?.creator || (post.sourceKind === "youtube" || post.sourceKind === "spotify" ? formatProviderName(post.sourceKind) : (creatorSummary?.displayName ?? post.creator));
     elements.miniPlayerKind.textContent = `${artist} / ${getSignalLabel(post)}`;
     if (isFetching && !cachedExt.__listenerAttached) {
@@ -2550,19 +2554,19 @@ export function createAppUi(context) {
     if (!state.viewerPostId && !state.viewerAttachment) { elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); syncOverlayBodyState(); return; }
     if (state.viewerAttachment) {
       const attachment = state.viewerAttachment; clearViewerMedia(); elements.viewer.classList.add("is-open"); elements.viewer.setAttribute("aria-hidden", "false"); syncOverlayBodyState();
-      renderViewerAttachmentMedia(elements.viewerStage, attachment); 
-      elements.viewerKind.textContent = `${attachment.title} · ${attachment.creator}`; 
-      elements.viewerTitle.textContent = attachment.title; 
-      elements.viewerCaption.textContent = attachment.caption; 
-      elements.viewerCreator.textContent = attachment.creator; 
-      elements.viewerCreator.onclick = null; 
-      elements.viewerCreator.tabIndex = -1; 
-      elements.viewerCreator.setAttribute("aria-disabled", "true"); 
-      elements.viewerTime.textContent = formatMessageTimestamp(attachment.createdAt); 
-      elements.viewerCollapseButton.hidden = true; 
-      elements.viewerTags.innerHTML = ""; 
-      elements.viewerPrevButton.disabled = true; 
-      elements.viewerNextButton.disabled = true; 
+      renderViewerAttachmentMedia(elements.viewerStage, attachment);
+      elements.viewerKind.textContent = `${attachment.title} · ${attachment.creator}`;
+      elements.viewerTitle.textContent = attachment.title;
+      elements.viewerCaption.textContent = attachment.caption;
+      elements.viewerCreator.textContent = attachment.creator;
+      elements.viewerCreator.onclick = null;
+      elements.viewerCreator.tabIndex = -1;
+      elements.viewerCreator.setAttribute("aria-disabled", "true");
+      elements.viewerTime.textContent = formatMessageTimestamp(attachment.createdAt);
+      elements.viewerCollapseButton.hidden = true;
+      elements.viewerTags.innerHTML = "";
+      elements.viewerPrevButton.disabled = true;
+      elements.viewerNextButton.disabled = true;
       return;
     }
     const post = getPostById(state.viewerPostId); if (!post) { closeViewer(); return; }
@@ -2572,7 +2576,7 @@ export function createAppUi(context) {
     const cachedViewerExt = externalPreviewCache.get(post.sourceKind === "spotify" ? `spotify:preview:v10:${spotifyViewerUrl}` : (post.sourceKind === "youtube" ? `youtube:preview:${resolveYouTubePreviewId(post, parseYouTubeUrl)}` : null));
     const isViewerFetching = cachedViewerExt instanceof Promise;
     const viewerExt = isViewerFetching ? null : cachedViewerExt;
-    
+
     const viewerArtist = viewerExt?.creator || (post.sourceKind === "youtube" || post.sourceKind === "spotify" ? formatProviderName(post.sourceKind) : (creatorSummary?.displayName ?? post.creator));
     elements.viewerKind.textContent = `${viewerArtist} / ${getSignalLabel(post)}`;
     if (isViewerFetching && !cachedViewerExt.__listenerAttached) {
@@ -2580,13 +2584,13 @@ export function createAppUi(context) {
       cachedViewerExt.then(() => renderViewer());
     }
 
-    elements.viewerTitle.textContent = viewerExt?.title || post.title; 
-    elements.viewerCaption.textContent = viewerExt?.creator ? `${viewerExt.creator} · ${getSignalLabel(post)}` : post.caption; 
-    elements.viewerCreator.textContent = viewerExt?.creator || (creatorSummary?.displayName ?? post.creator); 
-    elements.viewerCreator.tabIndex = creatorSummary ? 0 : -1; 
-    elements.viewerCreator.setAttribute("aria-disabled", creatorSummary ? "false" : "true"); 
-    elements.viewerCreator.onclick = creatorSummary ? (event) => openProfileByKey(creatorSummary.key, event.currentTarget) : null; 
-    elements.viewerTime.textContent = formatTimestamp(post.createdAt); 
+    elements.viewerTitle.textContent = viewerExt?.title || post.title;
+    elements.viewerCaption.textContent = viewerExt?.creator ? `${viewerExt.creator} · ${getSignalLabel(post)}` : post.caption;
+    elements.viewerCreator.textContent = viewerExt?.creator || (creatorSummary?.displayName ?? post.creator);
+    elements.viewerCreator.tabIndex = creatorSummary ? 0 : -1;
+    elements.viewerCreator.setAttribute("aria-disabled", creatorSummary ? "false" : "true");
+    elements.viewerCreator.onclick = creatorSummary ? (event) => openProfileByKey(creatorSummary.key, event.currentTarget) : null;
+    elements.viewerTime.textContent = formatTimestamp(post.createdAt);
     elements.viewerCollapseButton.hidden = !isPlayablePost(post);
     elements.viewerTags.innerHTML = ""; post.tags.forEach((tag) => { const pill = document.createElement("span"); pill.className = "tag-pill"; pill.textContent = `#${tag}`; elements.viewerTags.appendChild(pill); });
     const canStep = state.visiblePostIds.length > 1; elements.viewerPrevButton.disabled = !canStep; elements.viewerNextButton.disabled = !canStep;
@@ -2745,7 +2749,7 @@ export function createAppUi(context) {
     const iframe = media instanceof HTMLIFrameElement ? media : media.querySelector("iframe");
 
     if (mediaEl instanceof HTMLMediaElement) {
-      if (mediaEl.paused) mediaEl.play().catch(() => {});
+      if (mediaEl.paused) mediaEl.play().catch(() => { });
       else mediaEl.pause();
     } else if (iframe && post.sourceKind === "youtube") {
       const isPlaying = state.heroPlayerPlaybackState === "playing" || iframe.dataset.playbackState === "playing";
@@ -2785,7 +2789,7 @@ export function createAppUi(context) {
   }
 
   function renderExternalPreview(parsedExternal) {
-    clearPreviewOnly(); elements.previewShell.hidden = false; const wrapper = document.createElement("div"); wrapper.className = "preview-card"; 
+    clearPreviewOnly(); elements.previewShell.hidden = false; const wrapper = document.createElement("div"); wrapper.className = "preview-card";
     const stage = createPreviewCard({
       badge: `${formatProviderName(parsedExternal.provider)} / Preview`,
       title: parsedExternal.label || "External content",

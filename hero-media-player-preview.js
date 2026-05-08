@@ -277,7 +277,7 @@ export function createCompanionCard(options = {}) {
 
   const meta = document.createElement("p");
   meta.className = "hero-player-preview-meta";
-  meta.textContent = "Download the desktop bridge to sync YouTube and Spotify from this PC.";
+  meta.textContent = "";
   copy.appendChild(meta);
 
   const action = document.createElement("div");
@@ -536,10 +536,10 @@ export function renderHeroStagePreview(options = {}) {
   if (mode === "device") {
     if (nativeSnapshot?.permissionRequired) {
       commitCard(stage, {
-        badge: "ON-DEVICE MEDIA",
+        badge: "",
         title: "Enable access",
-        meta: "Allow media access to control this device.",
-        note: "Use Play to open settings.",
+        meta: "",
+        note: "",
       });
       return;
     }
@@ -549,19 +549,19 @@ export function renderHeroStagePreview(options = {}) {
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
 
       commitCard(stage, {
-        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA",
+        badge: "",
         title: nativeSnapshot.title || matchedPost?.title || "Now playing",
-        meta: nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback"),
-        note: nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing",
+        meta: nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary) : ""),
+        note: "",
         artworkUrl: artworkUrl,
       });
       return;
     }
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "ON-DEVICE MEDIA",
+      badge: "",
       title: "No active playback",
-      meta: "Start a track in any media app on this device.",
+      meta: "",
     });
     return;
   }
@@ -572,10 +572,10 @@ export function renderHeroStagePreview(options = {}) {
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
 
       commitCard(stage, {
-        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA",
+        badge: "",
         title: desktopSnapshot.title || matchedPost?.title || "Now playing",
-        meta: desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback"),
-        note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
+        meta: desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary) : ""),
+        note: "",
         artworkUrl: artworkUrl,
       });
       return;
@@ -588,9 +588,9 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "PC SYSTEM MEDIA",
+      badge: "",
       title: "Waiting for playback",
-      meta: "Start YouTube, Spotify, or another desktop app.",
+      meta: "",
     });
     return;
   }
