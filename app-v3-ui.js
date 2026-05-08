@@ -541,8 +541,24 @@ export function createAppUi(context) {
         const data = JSON.parse(event.data);
         if (data.event === "onStateChange") {
           // 1 = playing, 2 = paused, 0 = ended, 3 = buffering
+          const isEnded = data.info === 0;
           const newState = (data.info === 1 || data.info === 3) ? "playing" : "paused";
           
+          if (isEnded) {
+             setTimeout(() => {
+               const iframes = document.querySelectorAll("iframe");
+               iframes.forEach(iframe => {
+                 if (iframe.contentWindow === event.source) {
+                   if (state.heroPlayerElement?.contains(iframe)) {
+                     heroMediaPlayerController.handleNext();
+                   } else if (state.activePlayerElement?.contains(iframe)) {
+                     handleMiniNext();
+                   }
+                 }
+               });
+             }, 1200);
+          }
+
           // Update global state if this matches our active hero or mini player
           if (state.heroPlayerPlaybackState !== newState) {
              state.heroPlayerPlaybackState = newState;
@@ -583,8 +599,17 @@ export function createAppUi(context) {
       return;
     }
 
-    state.heroControlSource = source;
-    heroMediaPlayerController.render();
+    // Automatically switch to Media mode if we are picking a system source
+    if (state.heroControlMode === "feed") {
+      setHeroControlMode("media");
+    }
+
+    if (heroMediaPlayerController && typeof heroMediaPlayerController.setHeroControlSource === "function") {
+      heroMediaPlayerController.setHeroControlSource(source);
+    } else {
+      state.heroControlSource = source;
+      heroMediaPlayerController.render();
+    }
   }
 
   function render() {
@@ -606,21 +631,21 @@ export function createAppUi(context) {
     const isHeroFeedMode = state.heroControlMode === "feed";
     const isHeroMediaMode = state.heroControlMode === "media";
     const bridgeSnapshot = heroMediaPlayerController?.getSnapshot?.();
-    const bridgeAvailable = Boolean(bridgeSnapshot?.desktop?.available);
-    const canToggleSource = isHeroMediaMode && bridgeAvailable;
+    const bridgeAvailable = Boolean(bridgeSnapshot?.desktop?.available || bridgeSnapshot?.isBridgeDetected);
+    const canToggleSource = bridgeAvailable;
 
     if (elements.heroModeFeed) elements.heroModeFeed.classList.toggle("is-active", isHeroFeedMode);
     if (elements.heroModeMedia) elements.heroModeMedia.classList.toggle("is-active", isHeroMediaMode);
 
     if (elements.heroSourceYoutube) {
-      const isYoutubeActive = isHeroMediaMode && state.heroControlSource === "youtube";
-      elements.heroSourceYoutube.classList.toggle("is-active", isYoutubeActive);
+      const isYoutubeActive = state.heroControlSource === "youtube";
+      elements.heroSourceYoutube.classList.toggle("is-active", isYoutubeActive && isHeroMediaMode);
       elements.heroSourceYoutube.classList.toggle("is-disabled", !canToggleSource);
       elements.heroSourceYoutube.disabled = !canToggleSource;
     }
     if (elements.heroSourceSpotify) {
-      const isSpotifyActive = isHeroMediaMode && state.heroControlSource === "spotify";
-      elements.heroSourceSpotify.classList.toggle("is-active", isSpotifyActive);
+      const isSpotifyActive = state.heroControlSource === "spotify";
+      elements.heroSourceSpotify.classList.toggle("is-active", isSpotifyActive && isHeroMediaMode);
       elements.heroSourceSpotify.classList.toggle("is-disabled", !canToggleSource);
       elements.heroSourceSpotify.disabled = !canToggleSource;
     }
@@ -1743,6 +1768,12 @@ export function createAppUi(context) {
       state.heroPlayerPlaybackState = "playing";
     }
 
+    // Scroll to the active post in the feed if it's visible
+    const feedCard = elements.feedGrid.querySelector(`[data-post-id="${nextPost.id}"]`);
+    if (feedCard) {
+      feedCard.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
     heroMediaPlayerController.render();
   }
 
@@ -1910,7 +1941,27 @@ export function createAppUi(context) {
 
   function syncPlayerVolumeFromMediaElement(event) { const mediaElement = event?.target; if (!(mediaElement instanceof HTMLMediaElement)) return; state.playerVolume = normalizePlayerVolume(mediaElement.muted ? 0 : mediaElement.volume, state.playerVolume); savePlayerVolume(state.playerVolume); renderMiniPlayerVolumeControl(); heroMediaPlayerController.render(); }
 
-  function syncPlayerPlaybackFromMediaElement(event) { const mediaElement = event?.target; if (!(mediaElement instanceof HTMLMediaElement)) return; state.heroPlayerPlaybackState = mediaElement.paused ? "paused" : "playing"; heroMediaPlayerController.render(); }
+  function syncPlayerPlaybackFromMediaElement(event) {
+    const mediaElement = event?.target;
+    if (!(mediaElement instanceof HTMLMediaElement)) return;
+
+    if (event.type === "ended") {
+      state.heroPlayerPlaybackState = "paused";
+      // Auto-advance if this is a hero or mini player session
+      if (state.heroPlayerElement?.contains(mediaElement) || (state.activePlayerElement && state.activePlayerElement.contains(mediaElement))) {
+        setTimeout(() => {
+          if (state.heroPlayerElement?.contains(mediaElement)) {
+            heroMediaPlayerController.handleNext();
+          } else if (state.activePlayerPostId) {
+            handleMiniNext();
+          }
+        }, 1200);
+      }
+    } else {
+      state.heroPlayerPlaybackState = mediaElement.paused ? "paused" : "playing";
+    }
+    heroMediaPlayerController.render();
+  }
 
   function attachPersistentPlayerMediaListeners(mediaElement) { if (!(mediaElement instanceof HTMLMediaElement)) return; mediaElement.addEventListener("volumechange", syncPlayerVolumeFromMediaElement); mediaElement.addEventListener("play", syncPlayerPlaybackFromMediaElement); mediaElement.addEventListener("pause", syncPlayerPlaybackFromMediaElement); mediaElement.addEventListener("ended", syncPlayerPlaybackFromMediaElement); }
 

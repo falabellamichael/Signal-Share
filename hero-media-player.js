@@ -252,6 +252,8 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
   }
 
+  let bridgeDetected = false;
+
   function syncHeroControlSourceChange(source = "") {
     const normalized = normalizeText(source);
     const nextSource = normalized === "youtube" || normalized === "spotify" ? normalized : "";
@@ -263,7 +265,10 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     if (previousSource === nextSource) return;
 
-    desktopSnapshotEndpoint = "";
+    // Do NOT clear desktopSnapshotEndpoint here; keep the last working endpoint
+    // to avoid unnecessary re-probing of the local network.
+    // desktopSnapshotEndpoint = "";
+
     desktopActionEndpoint = "";
     desktopSnapshotReadPromise = null;
     lastDesktopSnapshotSignature = "none";
@@ -1263,6 +1268,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         lastDesktopSnapshotSignature = nextSignature;
         desktopPollFailureCount = 0;
         state.desktopBridgeSuspended = false;
+        if (snapshot?.available) bridgeDetected = true;
 
         if (snapshot && snapshot.active && !snapshot.artworkUri) {
           hydrateDesktopSpotifyArtwork(snapshot, getControllablePlayerPost());
@@ -1736,20 +1742,29 @@ The companion bridge is designed with several security layers to keep your PC sa
     const mode = getEffectiveHeroMode(controllablePost);
 
     if (mode === "app") {
+      const wasActive = state.heroPlayerPostId && state.heroPlayerElement && elements.heroPlayerStage.contains(state.heroPlayerElement);
       // Force preview update
       if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
       stepHeroPlayer(-1);
+      if (!wasActive) state.heroPlayerPlaybackState = "paused";
+      render();
       return;
     }
 
     if (mode === "device") {
-      if (nativeSnapshot) render();
+      if (nativeSnapshot) {
+        nativeSnapshot.playbackState = "playing"; // Optimistic
+        render();
+      }
       performNativeAction(NATIVE_ACTION_PREVIOUS);
       return;
     }
 
     if (mode === "desktop") {
-      if (desktopSnapshot) render();
+      if (desktopSnapshot) {
+        desktopSnapshot.playbackState = "playing"; // Optimistic
+        render();
+      }
       performDesktopAction(DESKTOP_ACTION_PREVIOUS);
       return;
     }
@@ -1762,6 +1777,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (ensureControllablePost()) {
       stepMiniPlayer(-1);
       state.heroPlayerPlaybackState = "paused";
+      render();
     }
   }
 
@@ -1770,22 +1786,29 @@ The companion bridge is designed with several security layers to keep your PC sa
     const mode = getEffectiveHeroMode(controllablePost);
 
     if (mode === "app") {
+      const wasActive = state.heroPlayerPostId && state.heroPlayerElement && elements.heroPlayerStage.contains(state.heroPlayerElement);
       // Force preview update
       if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
       stepHeroPlayer(1);
-      state.heroPlayerPlaybackState = "paused";
+      if (!wasActive) state.heroPlayerPlaybackState = "paused";
       render();
       return;
     }
 
     if (mode === "device") {
-      if (nativeSnapshot) render();
+      if (nativeSnapshot) {
+        nativeSnapshot.playbackState = "playing"; // Optimistic
+        render();
+      }
       performNativeAction(NATIVE_ACTION_NEXT);
       return;
     }
 
     if (mode === "desktop") {
-      if (desktopSnapshot) render();
+      if (desktopSnapshot) {
+        desktopSnapshot.playbackState = "playing"; // Optimistic
+        render();
+      }
       performDesktopAction(DESKTOP_ACTION_NEXT);
       return;
     }
@@ -1798,6 +1821,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (ensureControllablePost()) {
       stepMiniPlayer(1);
       state.heroPlayerPlaybackState = "paused";
+      render();
     }
   }
 
@@ -1891,7 +1915,6 @@ The companion bridge is designed with several security layers to keep your PC sa
       if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
     });
     elements.heroPlayerVolumeSlider.addEventListener("input", handleVolumeInput);
-    document.addEventListener("click", handleHeroSourceToggleClick, true);
 
     window.addEventListener("signal:nativeBridgeReady", () => {
       startNativeSnapshotPolling();
@@ -2133,7 +2156,8 @@ The companion bridge is designed with several security layers to keep your PC sa
     },
     getSnapshot: () => ({
       native: nativeSnapshot,
-      desktop: desktopSnapshot
+      desktop: desktopSnapshot,
+      isBridgeDetected: bridgeDetected
     }),
     showCompanionPrompt,
     hideCompanionPrompt,
