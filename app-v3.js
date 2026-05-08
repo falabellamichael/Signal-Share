@@ -318,6 +318,7 @@ if (!window[globalStateKey]) {
     viewerPostId: null,
     viewerAttachment: null,
     miniPlayerUrl: "",
+    heroControlMode: "feed",
     viewerUrl: "",
     returnFocusElement: null,
     profileReturnFocusElement: null,

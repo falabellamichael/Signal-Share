@@ -963,9 +963,19 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
     }
   }
 
+  function getEffectiveHeroMode(controllablePost) {
+    if (state.heroControlMode === "feed") return "app";
+    if (state.heroControlMode === "media") {
+      if (shouldUseNativeMode(controllablePost)) return "device";
+      if (shouldUseDesktopMode(controllablePost)) return "desktop";
+      return "device"; // Default to device mode if requested media mode
+    }
+    return shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
+  }
+
   function handlePlayPause(forcePlay) {
     const controllablePost = getControllablePlayerPost();
-    const mode = shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
+    const mode = getEffectiveHeroMode(controllablePost);
 
     if (mode === "app") {
       playHeroMedia();
@@ -1011,7 +1021,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
 
   function handlePrevious() {
     const controllablePost = getControllablePlayerPost();
-    const mode = shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
+    const mode = getEffectiveHeroMode(controllablePost);
 
     if (mode === "app") {
       stepHeroPlayer(-1);
@@ -1043,7 +1053,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
 
   function handleNext() {
     const controllablePost = getControllablePlayerPost();
-    const mode = shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
+    const mode = getEffectiveHeroMode(controllablePost);
 
     if (mode === "app") {
       stepHeroPlayer(1);
@@ -1081,8 +1091,9 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
 
   function handleVolumeInput(event) {
     const post = getControllablePlayerPost();
-    if (shouldUseNativeMode(post)) return;
-    if (shouldUseDesktopMode(post) && desktopSnapshot?.available) return;
+    const mode = getEffectiveHeroMode(post);
+    if (mode === "device" || mode === "desktop") return;
+
     const rawValue = Number(event.target?.value);
     state.playerVolume = normalizePlayerVolume(rawValue / 100, state.playerVolume);
     savePlayerVolume(state.playerVolume);
@@ -1169,7 +1180,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
     }
 
     const controllablePost = getControllablePlayerPost();
-    const mode = shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
+    const mode = getEffectiveHeroMode(controllablePost);
     const post = mode === "app" ? getHeroPost() : controllablePost;
     const mediaElement = getActivePlayerMediaElement();
     const fallbackMedia = getFallbackPageMediaElement();
@@ -1239,6 +1250,9 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
       elements.heroPlayerCaption.textContent = `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`;
       elements.heroPlayerStatus.textContent = `${creatorSummary?.displayName ?? post.creator} · ${formatTimestamp(post.createdAt)}`;
     }
+
+    if (elements.heroModeFeed) elements.heroModeFeed.classList.toggle("is-active", state.heroControlMode === "feed");
+    if (elements.heroModeMedia) elements.heroModeMedia.classList.toggle("is-active", state.heroControlMode === "media");
 
     elements.heroPlayerPlayPauseButton.textContent = playbackState === "playing" ? "Pause" : "Play";
     // We already set the disabled state at the top based on hasPost

@@ -262,6 +262,9 @@ export function createAppUi(context) {
     heroPlayerNextButton: document.querySelector("#heroPlayerNextButton"),
     heroPlayerVolumeSlider: document.querySelector("#heroPlayerVolumeSlider"),
     heroPlayerVolumeValue: document.querySelector("#heroPlayerVolumeValue"),
+    heroPlayerOpenMiniButton: document.querySelector("#heroPlayerOpenMiniButton"),
+    heroModeFeed: document.querySelector("#heroModeFeed"),
+    heroModeMedia: document.querySelector("#heroModeMedia"),
   };
 
   const OVERLAY_SCROLL_CONTAINER_SELECTOR = [
@@ -457,6 +460,12 @@ export function createAppUi(context) {
     elements.miniNextButton.addEventListener("click", handleMiniNext);
     elements.miniPlayerStage.addEventListener("click", handleMiniPlayerStageClick);
     elements.miniPlayerVolumeSlider.addEventListener("input", (event) => heroMediaPlayerController.handleVolumeInput(event));
+    elements.heroPlayerOpenMiniButton?.addEventListener("click", () => {
+      const postId = state.heroPlayerPostId || getHeroPost()?.id;
+      if (postId) openMiniPlayer(postId, elements.heroPlayerOpenMiniButton);
+    });
+    elements.heroModeFeed?.addEventListener("click", () => setHeroControlMode("feed"));
+    elements.heroModeMedia?.addEventListener("click", () => setHeroControlMode("media"));
     elements.miniPlayerHead.addEventListener("pointerdown", beginMiniPlayerDrag);
     heroMediaPlayerController.attachEventListeners();
     initializeFeedScrollObserver();
@@ -504,6 +513,11 @@ export function createAppUi(context) {
         void openViewer(notification.data.postId);
       }
     });
+  }
+
+  function setHeroControlMode(mode) {
+    state.heroControlMode = mode;
+    heroMediaPlayerController.render();
   }
 
   function render() {
