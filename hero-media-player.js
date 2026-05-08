@@ -260,9 +260,9 @@ The companion bridge is designed with several security layers to keep your PC sa
       const openUri = normalizeText(snapshot.openUri);
       
       if (state.heroControlSource === "youtube") {
+        if (title.includes("spotify") || meta.includes("spotify")) return false; // Strict exclusion
         if (title.includes("youtube") || meta.includes("youtube") || openUri.includes("youtube.com")) return true;
         
-        // Only check for video ID if it's a browser session, otherwise it's too broad
         const app = normalizeText(snapshot.appPackage);
         const isBrowser = app.includes("chrome") || app.includes("edge") || app.includes("firefox") || app.includes("browser");
         if (isBrowser) {
@@ -271,6 +271,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         }
       }
       if (state.heroControlSource === "spotify") {
+        if (title.includes("youtube") || meta.includes("youtube")) return false; // Strict exclusion
         return title.includes("spotify") || meta.includes("spotify") || openUri.includes("spotify.com") || normalizeText(snapshot.appPackage).includes("spotify");
       }
     }

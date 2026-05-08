@@ -524,22 +524,25 @@ function Is-Match-Source($s, $p) {
   $isBrowser = $id -match "chrome|edge|firefox|browser"
   
   if ($p -eq "youtube") {
+    if ($id -like "*spotify*") { return $false } # Strict exclusion
     if ($id -match "youtube|ytmusic") { return $true }
     if ($isBrowser) {
        try {
          $m = $s.TryGetMediaPropertiesAsync().GetResults()
+         if ($m.Title -match "spotify" -or $m.AlbumTitle -match "spotify") { return $false } # Strict exclusion
          if ($m.Title -match "youtube" -or $m.AlbumTitle -match "youtube") { return $true }
-         # Check for 11-char video ID in title
          if ($m.Title -match "[a-zA-Z0-9_-]{11}") { return $true }
        } catch {}
     }
     return $false
   }
   if ($p -eq "spotify") {
+    if ($id -match "youtube|ytmusic") { return $false } # Strict exclusion
     if ($id -like "*spotify*") { return $true }
     if ($isBrowser) {
        try {
          $m = $s.TryGetMediaPropertiesAsync().GetResults()
+         if ($m.Title -match "youtube" -or $m.AlbumTitle -match "youtube") { return $false } # Strict exclusion
          if ($m.Title -match "spotify" -or $m.AlbumTitle -match "spotify") { return $true }
        } catch {}
     }
