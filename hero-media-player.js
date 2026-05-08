@@ -1435,11 +1435,17 @@ export function createHeroMediaPlayerController(options) {
     const fallbackMedia = getFallbackPageMediaElement();
     const browserMetadata = getBrowserMediaMetadata();
 
-    const playbackState = mode === "device"
+    let playbackState = mode === "device"
       ? normalizePlaybackState(nativeSnapshot?.playbackState)
       : mode === "desktop"
         ? normalizePlaybackState(desktopSnapshot?.playbackState)
         : getLocalPlaybackState();
+
+    // If we are in app mode but the actual player isn't in the stage yet,
+    // it's effectively "paused" (showing a preview card).
+    if (mode === "app" && !isHeroActive) {
+      playbackState = "paused";
+    }
 
     const supportsVolume = mode === "app" && (
       mediaElement instanceof HTMLMediaElement

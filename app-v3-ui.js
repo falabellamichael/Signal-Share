@@ -1565,8 +1565,9 @@ export function createAppUi(context) {
      const post = getHeroPost();
      if (!post) return;
      
-     // If this post is already active in the hero, toggle its playback
-     if (state.heroPlayerPostId === post.id && state.heroPlayerElement) {
+     // If this post is already active and VISIBLE in the hero, toggle its playback
+     const isMounted = state.heroPlayerElement && elements.heroPlayerStage.contains(state.heroPlayerElement);
+     if (state.heroPlayerPostId === post.id && isMounted) {
        const media = state.heroPlayerElement instanceof HTMLMediaElement 
          ? state.heroPlayerElement 
          : (state.heroPlayerElement instanceof HTMLIFrameElement
@@ -1574,8 +1575,14 @@ export function createAppUi(context) {
            : state.heroPlayerElement.querySelector("video, audio, iframe"));
        
        if (media instanceof HTMLMediaElement) {
-         if (media.paused) media.play().catch(() => {});
-         else media.pause();
+         if (media.paused) {
+           media.play().catch(() => {});
+           state.heroPlayerPlaybackState = "playing";
+         } else {
+           media.pause();
+           state.heroPlayerPlaybackState = "paused";
+         }
+         heroMediaPlayerController.render();
          return;
        } else if (media instanceof HTMLIFrameElement && post.sourceKind === "youtube") {
          const isPlaying = state.heroPlayerPlaybackState === "playing";
@@ -1586,6 +1593,7 @@ export function createAppUi(context) {
        }
      }
 
+     // If not mounted or different post, mount and play
      setHeroPost(post);
      mountHeroMedia(post, { autoplay: true });
      state.heroPlayerPlaybackState = "playing";
