@@ -309,12 +309,6 @@ export function createActivePlayerStage(descriptor) {
   container.className = "hero-player-active-stage";
   container.dataset.provider = descriptor.provider || "external";
 
-  // Use a more flexible base style and let CSS or provider-specific overrides handle the rest
-  container.style.cssText =
-    descriptor.provider === "spotify"
-      ? "width:100%;height:152px;border-radius:18px;overflow:hidden;background:#000;margin:14px auto;"
-      : "width:100%;aspect-ratio:16/9;background:#000;border-radius:18px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin:14px auto;box-shadow:0 10px 30px rgba(0,0,0,0.4);";
-
   const iframe = document.createElement("iframe");
   iframe.className = "hero-player-active-frame";
   iframe.src = descriptor.src;
