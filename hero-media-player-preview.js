@@ -291,23 +291,42 @@ export function createCompanionCard(options = {}) {
   downloadBtn.textContent = "Download Now";
   downloadBtn.type = "button";
 
-  const securityLink = document.createElement("a");
-  securityLink.href = "#";
-  securityLink.id = "companionSecurityLinkCard";
-  securityLink.className = "hero-player-preview-note";
-  securityLink.style.textDecoration = "underline";
-  securityLink.style.marginTop = "0";
-  securityLink.textContent = "Read Security Guide";
-  securityLink.addEventListener("click", (e) => {
+  const securityActions = document.createElement("p");
+  securityActions.className = "hero-player-preview-note";
+  securityActions.style.marginTop = "8px";
+  securityActions.style.fontSize = "0.75rem";
+  securityActions.style.opacity = "0.8";
+
+  const downloadSecurity = document.createElement("a");
+  downloadSecurity.href = "#";
+  downloadSecurity.id = "companionSecurityLinkCard";
+  downloadSecurity.style.textDecoration = "underline";
+  downloadSecurity.style.color = "inherit";
+  downloadSecurity.textContent = "download safety measures HERE";
+  downloadSecurity.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (window.heroMediaPlayerController && typeof window.heroMediaPlayerController.downloadSecurityReadme === "function") {
       window.heroMediaPlayerController.downloadSecurityReadme();
     }
   });
-  
+
+  const securitySeparator = document.createTextNode(" or ");
+
+  const viewSecurity = document.createElement("a");
+  viewSecurity.href = "/security.html";
+  viewSecurity.target = "_blank";
+  viewSecurity.style.textDecoration = "underline";
+  viewSecurity.style.color = "inherit";
+  viewSecurity.textContent = "read them in browser HERE";
+  viewSecurity.addEventListener("click", (e) => { e.stopPropagation(); });
+
+  securityActions.appendChild(downloadSecurity);
+  securityActions.appendChild(securitySeparator);
+  securityActions.appendChild(viewSecurity);
+
   action.appendChild(downloadBtn);
-  action.appendChild(securityLink);
+  action.appendChild(securityActions);
   copy.appendChild(action);
 
   card.appendChild(copy);

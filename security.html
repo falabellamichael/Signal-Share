@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Guide | Signal Share Companion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0c0c0c;
+      --surface: #161616;
+      --surface-strong: #1e1e1e;
+      --accent: #f0f0f0;
+      --accent-dim: #a0a0a0;
+      --text: #ffffff;
+      --muted: #888888;
+      --line: rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+      display: flex;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 680px;
+      width: 100%;
+    }
+
+    header {
+      margin-bottom: 60px;
+      text-align: center;
+    }
+
+    h1 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(2.5rem, 8vw, 3.5rem);
+      font-weight: 400;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 1.1rem;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 40px;
+      margin-bottom: 40px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 24px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h2::before {
+      content: "";
+      display: block;
+      width: 4px;
+      height: 24px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    .measure {
+      margin-bottom: 32px;
+    }
+
+    .measure:last-child {
+      margin-bottom: 0;
+    }
+
+    .measure strong {
+      display: block;
+      color: var(--text);
+      font-size: 1.05rem;
+      margin-bottom: 4px;
+    }
+
+    .measure p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 40px 0;
+      border-top: 1px solid var(--line);
+      margin-top: 40px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      background: var(--accent);
+      color: #000;
+      text-decoration: none;
+      border-radius: 99px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      opacity: 0.9;
+    }
+
+    .back-link {
+      display: block;
+      margin-top: 24px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+
+    .back-link:hover {
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Security Guide</h1>
+      <p class="subtitle">The Signal Share Companion bridge is designed with several security layers to keep your PC safe.</p>
+    </header>
+
+    <div class="card">
+      <h2>Active Safety Measures</h2>
+      
+      <div class="measure">
+        <strong>1. Local Loopback Only</strong>
+        <p>The bridge binds only to 127.0.0.1. It is not accessible from other devices on your network or the internet.</p>
+      </div>
+
+      <div class="measure">
+        <strong>2. CORS Protection</strong>
+        <p>Only requests from the official Signal Share domain or localhost are allowed to communicate with the bridge.</p>
+      </div>
+
+      <div class="measure">
+        <strong>3. Authentication Required</strong>
+        <p>Every action (Play, Pause, Skip) requires a local secret token stored in your browser's private storage.</p>
+      </div>
+
+      <div class="measure">
+        <strong>4. Disabled URI Opening</strong>
+        <p>The ability to open arbitrary links is disabled by default to prevent malicious URL injection from external sources.</p>
+      </div>
+
+      <div class="measure">
+        <strong>5. Rate Limiting</strong>
+        <p>Commands are rate-limited to 30 requests per minute to prevent automated spamming of your system media controls.</p>
+      </div>
+
+      <div class="measure">
+        <strong>6. No Admin Required</strong>
+        <p>The companion should never be run as an Administrator. It runs with your normal user permissions for maximum safety.</p>
+      </div>
+
+      <div class="measure">
+        <strong>7. Port Safety</strong>
+        <p>The bridge port is not exposed through UPnP or firewall rules automatically, keeping your network perimeter secure.</p>
+      </div>
+
+      <div class="measure">
+        <strong>8. Remote Sync Control</strong>
+        <p>Remote control via Supabase is disabled by default and requires explicit user activation with a valid User ID.</p>
+      </div>
+    </div>
+
+    <div class="card" style="text-align: center;">
+      <h2>How to Verify</h2>
+      <p style="color: var(--muted); margin-bottom: 24px;">You can inspect the source code of the <code>server.js</code> file included in the companion package to see these measures in action.</p>
+      <a href="https://github.com/falabellamichael/Signal-Share" target="_blank" class="btn">View Source on GitHub</a>
+    </div>
+
+    <footer>
+      <p style="color: var(--muted); font-size: 0.85rem;">Signal Share Companion Bridge Security Documentation</p>
+      <a href="/" class="back-link">← Return to Player</a>
+    </footer>
+  </div>
+</body>
+</html>
