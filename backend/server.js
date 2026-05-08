@@ -603,25 +603,50 @@ try {
 if ($winRtSuccess) {
   Write-Output "ok"
 } else {
-  # ONLY fallback to global keys if NO specific source is preferred.
-  # This prevents "Spotify toggle controlling YouTube" crosstalk.
-  if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all") {
+  # WinRT failed. Try targeted Win32 PostMessage for known apps or fallback if allowed.
+  try {
     Add-Type @"
     using System;
     using System.Runtime.InteropServices;
-    public static class MediaKeySender {
-      [DllImport("user32.dll", SetLastError=true)]
-      public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    public static class MediaActionTarget {
+        [DllImport("user32.dll")]
+        public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+        [DllImport("user32.dll", SetLastError=true)]
+        public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
     }
 "@
-    $KEYEVENTF_EXTENDEDKEY = 0x0001
-    $KEYEVENTF_KEYUP = 0x0002
-    [MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
-    Start-Sleep -Milliseconds 45
-    [MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
-    Write-Output "ok"
-  } else {
-    Write-Output "fail-source-not-found"
+    $WM_APPCOMMAND = 0x0319
+    $APPCOMMANDS = @{
+      "play_pause" = 14; "next" = 11; "previous" = 12; "stop" = 13;
+      "volume_up" = 10; "volume_down" = 9; "volume_mute" = 8
+    }
+    $cmd = $APPCOMMANDS["${action}"]
+    $lParam = [IntPtr]($cmd -shl 16)
+    
+    if ($preferred -eq "spotify") {
+      $hwnd = [MediaActionTarget]::FindWindow("SpotifyMainWindow", $null)
+      if ($hwnd -ne [IntPtr]::Zero) {
+        [MediaActionTarget]::PostMessage($hwnd, $WM_APPCOMMAND, [IntPtr]::Zero, $lParam)
+        Write-Output "ok-win32-spotify"
+        exit
+      }
+    }
+    
+    # Final fallback only if no specific source is preferred
+    if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all") {
+      $KEYEVENTF_EXTENDEDKEY = 0x0001
+      $KEYEVENTF_KEYUP = 0x0002
+      [MediaActionTarget]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
+      Start-Sleep -Milliseconds 45
+      [MediaActionTarget]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
+      Write-Output "ok-global"
+    } else {
+      Write-Output "fail-source-not-active"
+    }
+  } catch {
+    Write-Output "fail-win32-error"
   }
 }
 `.trim();
