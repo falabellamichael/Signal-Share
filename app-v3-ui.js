@@ -628,6 +628,12 @@ export function createAppUi(context) {
     if (elements.heroModeFeed) elements.heroModeFeed.classList.toggle("is-active", isHeroFeedMode);
     if (elements.heroModeMedia) elements.heroModeMedia.classList.toggle("is-active", isHeroMediaMode);
 
+    // Sync the source toggle group container
+    const sourceToggleGroup = elements.heroSourceYoutube?.parentElement;
+    if (sourceToggleGroup) {
+      sourceToggleGroup.classList.toggle("is-dimmed", !isHeroMediaMode);
+    }
+
     if (elements.heroSourceYoutube) {
       const isYoutubeActive = state.heroControlSource === "youtube";
       elements.heroSourceYoutube.classList.toggle("is-active", isYoutubeActive && isHeroMediaMode);

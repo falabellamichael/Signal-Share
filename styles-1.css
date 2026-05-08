@@ -1851,11 +1851,23 @@ body[data-theme="ember"] #heroPlayerOpenMiniButton {
   box-shadow: 0 2px 8px rgba(15, 23, 32, 0.12);
 }
 
+.hero-player-source-toggle.is-dimmed {
+  opacity: 0.45;
+  filter: grayscale(0.85);
+  background: rgba(0, 0, 0, 0.04);
+  pointer-events: none;
+}
+
 .source-toggle-button.is-disabled {
-  opacity: 0.35;
-  filter: grayscale(1) brightness(0.8);
+  opacity: 0.5;
+  filter: grayscale(1);
   cursor: not-allowed;
-  pointer-events: auto; /* Allow click to show feedback */
+  pointer-events: none;
+}
+
+.source-toggle-button.is-disabled:hover {
+  transform: none;
+  border-color: transparent;
 }
 
 /* Toast System */
