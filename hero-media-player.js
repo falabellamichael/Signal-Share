@@ -1674,19 +1674,22 @@ The companion bridge is designed with several security layers to keep your PC sa
         
         const artist = ext?.creator || formatProviderName(post.sourceKind);
         nextHeader = `${artist} / ${getSignalLabel(post)}`;
-        // Since we are polling, we don't need to attach a .then() listener here.
-        // The next poll cycle will pick up the resolved metadata from the cache.
+        nextTitle = ext?.title || post.title || "Ready to play";
+        nextCaption = ext?.creator ? `${ext.creator} · ${getSignalLabel(post)}` : (post ? `${post.caption} · ${creatorName}` : "");
+        
         if (isFetching) {
           // Metadata is still loading...
         }
       } else if (post) {
         nextHeader = `${creatorName} / ${getSignalLabel(post)}`;
+        nextTitle = post.title || "Ready to play";
+        nextCaption = `${post.caption} · ${creatorName}`;
       } else {
         nextHeader = "App Media Standby";
+        nextTitle = "Ready to play";
+        nextCaption = "";
       }
 
-      nextTitle = post?.title || "Ready to play";
-      nextCaption = post ? `${post.caption} · ${creatorName}` : "";
       nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
     }
 

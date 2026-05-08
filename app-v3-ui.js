@@ -2348,11 +2348,14 @@ export function createAppUi(context) {
     
     const artist = ext?.creator || (post.sourceKind === "youtube" || post.sourceKind === "spotify" ? formatProviderName(post.sourceKind) : (creatorSummary?.displayName ?? post.creator));
     elements.miniPlayerKind.textContent = `${artist} / ${getSignalLabel(post)}`;
-    if (isFetching) cachedExt.then(() => renderMiniPlayer());
+    if (isFetching && !cachedExt.__listenerAttached) {
+      cachedExt.__listenerAttached = true;
+      cachedExt.then(() => renderMiniPlayer());
+    }
 
-    elements.miniPlayerTitle.textContent = post.title;
-    elements.miniPlayerCaption.textContent = post.caption;
-    elements.miniPlayerCreator.textContent = creatorSummary?.displayName ?? post.creator;
+    elements.miniPlayerTitle.textContent = ext?.title || post.title;
+    elements.miniPlayerCaption.textContent = ext?.creator ? `${ext.creator} · ${getSignalLabel(post)}` : post.caption;
+    elements.miniPlayerCreator.textContent = ext?.creator || (creatorSummary?.displayName ?? post.creator);
     elements.miniPlayerCreator.onclick = creatorSummary ? (event) => openProfileByKey(creatorSummary.key, event.currentTarget) : null;
     elements.miniPlayerTime.textContent = formatTimestamp(post.createdAt);
     elements.miniExpandButton.textContent = state.miniPlayerExpanded ? "Collapse" : "Expand";
@@ -2405,11 +2408,14 @@ export function createAppUi(context) {
     
     const viewerArtist = viewerExt?.creator || (post.sourceKind === "youtube" || post.sourceKind === "spotify" ? formatProviderName(post.sourceKind) : (creatorSummary?.displayName ?? post.creator));
     elements.viewerKind.textContent = `${viewerArtist} / ${getSignalLabel(post)}`;
-    if (isViewerFetching) cachedViewerExt.then(() => renderViewer());
+    if (isViewerFetching && !cachedViewerExt.__listenerAttached) {
+      cachedViewerExt.__listenerAttached = true;
+      cachedViewerExt.then(() => renderViewer());
+    }
 
-    elements.viewerTitle.textContent = post.title; 
-    elements.viewerCaption.textContent = post.caption; 
-    elements.viewerCreator.textContent = creatorSummary?.displayName ?? post.creator; 
+    elements.viewerTitle.textContent = viewerExt?.title || post.title; 
+    elements.viewerCaption.textContent = viewerExt?.creator ? `${viewerExt.creator} · ${getSignalLabel(post)}` : post.caption; 
+    elements.viewerCreator.textContent = viewerExt?.creator || (creatorSummary?.displayName ?? post.creator); 
     elements.viewerCreator.tabIndex = creatorSummary ? 0 : -1; 
     elements.viewerCreator.setAttribute("aria-disabled", creatorSummary ? "false" : "true"); 
     elements.viewerCreator.onclick = creatorSummary ? (event) => openProfileByKey(creatorSummary.key, event.currentTarget) : null; 
