@@ -1658,7 +1658,9 @@ export function createAppUi(context) {
     return null;
   }
 
-  function getControllablePlayerPost() { return getPostById(state.activePlayerPostId || state.playerPostId); }
+  function getControllablePlayerPost() {
+    return getPostById(state.heroPlayerPostId || state.activePlayerPostId || state.playerPostId);
+  }
 
   function resolveExternalEmbedSource(post) {
     if (!post) return "";

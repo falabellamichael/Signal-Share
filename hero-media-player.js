@@ -54,6 +54,11 @@ export function createHeroMediaPlayerController(options) {
   let localNetworkPromptLastAttemptAt = 0;
   let pendingDesktopArtworkKey = "";
   const desktopArtworkFallbackCache = new Map();
+  const resolvedArtworkMap = new Map();
+
+  function isThenable(value) {
+    return Boolean(value && typeof value.then === "function");
+  }
 
   function initializeSdkHooks() {
     // Spotify Web Playback SDK initialization
@@ -792,8 +797,29 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
       title = dataOrPost.title || "";
       artist = dataOrPost.artist || "";
       album = dataOrPost.album || "Signal Share";
-      if (dataOrPost.artwork) {
-        artwork = Array.isArray(dataOrPost.artwork) ? dataOrPost.artwork : [{ src: dataOrPost.artwork }];
+
+      const rawArtwork = dataOrPost.artwork;
+      if (rawArtwork) {
+        if (typeof rawArtwork === "string" && rawArtwork.trim()) {
+          artwork = [{ src: rawArtwork }];
+        } else if (isThenable(rawArtwork)) {
+          // It's a promise (e.g. from Spotify artwork resolution).
+          // We can't use it synchronously in MediaMetadata, but we can
+          // wait for it and re-sync once it resolves.
+          rawArtwork.then(resolvedUrl => {
+            if (typeof resolvedUrl !== "string" || !resolvedUrl.trim()) return;
+            if (resolvedArtworkMap.get(title) === resolvedUrl) return;
+            resolvedArtworkMap.set(title, resolvedUrl);
+            syncMediaSession({ ...dataOrPost, artwork: resolvedUrl });
+          }).catch(() => {});
+
+          // Use a cached version if we have one from a previous resolution of this title
+          const cached = resolvedArtworkMap.get(title);
+          if (cached) artwork = [{ src: cached }];
+          else artwork = []; // Don't pass the Promise object!
+        } else if (Array.isArray(rawArtwork)) {
+          artwork = rawArtwork;
+        }
       }
       playbackState = getLocalPlaybackState();
     } else {
@@ -966,9 +992,8 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
   function getEffectiveHeroMode(controllablePost) {
     if (state.heroControlMode === "feed") return "app";
     if (state.heroControlMode === "media") {
-      if (shouldUseNativeMode(controllablePost)) return "device";
-      if (shouldUseDesktopMode(controllablePost)) return "desktop";
-      return "device"; // Default to device mode if requested media mode
+      if (canUseDesktopBridge()) return "desktop";
+      return "device";
     }
     return shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
   }
@@ -1092,15 +1117,21 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
   function handleVolumeInput(event) {
     const post = getControllablePlayerPost();
     const mode = getEffectiveHeroMode(post);
-    if (mode === "device" || mode === "desktop") return;
 
     const rawValue = Number(event.target?.value);
-    state.playerVolume = normalizePlayerVolume(rawValue / 100, state.playerVolume);
+    const volume = normalizePlayerVolume(rawValue / 100, state.playerVolume);
+
+    state.playerVolume = volume;
     savePlayerVolume(state.playerVolume);
-    applyPlayerVolumeToActiveElement();
-    const fallbackMedia = getFallbackPageMediaElement();
-    if (!(getActivePlayerMediaElement() instanceof HTMLMediaElement) && fallbackMedia instanceof HTMLMediaElement) {
-      try { fallbackMedia.volume = state.playerVolume; } catch {}
+
+    if (mode === "desktop" && desktopSnapshot?.available) {
+      performDesktopAction("set_volume", { volume: Math.round(volume * 100) });
+    } else if (mode === "app") {
+      applyPlayerVolumeToActiveElement();
+      const fallbackMedia = getFallbackPageMediaElement();
+      if (!(getActivePlayerMediaElement() instanceof HTMLMediaElement) && fallbackMedia instanceof HTMLMediaElement) {
+        try { fallbackMedia.volume = state.playerVolume; } catch {}
+      }
     }
     render();
   }
@@ -1195,11 +1226,11 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
       : mode === "desktop"
         ? Boolean(desktopSnapshot?.available)
         : (playableCount > 0);
-    const supportsVolume = mode === "app" && (
+    const supportsVolume = (mode === "desktop" && desktopSnapshot?.available) || (mode === "app" && (
       mediaElement instanceof HTMLMediaElement
       || fallbackMedia instanceof HTMLMediaElement
       || post?.sourceKind === "youtube"
-    );
+    ));
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
     const canBootstrapPlayback = !post
