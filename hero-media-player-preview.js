@@ -282,14 +282,32 @@ export function createCompanionCard(options = {}) {
 
   const action = document.createElement("div");
   action.className = "hero-player-preview-actions";
-  
+  action.style.display = "grid";
+  action.style.gap = "10px";
+  action.style.justifyItems = "center";
+
   const downloadBtn = document.createElement("button");
   downloadBtn.className = "button button-primary hero-companion-download-btn";
   downloadBtn.textContent = "Download Now";
   downloadBtn.type = "button";
-  // The click listener will be handled by the controller
+
+  const securityLink = document.createElement("a");
+  securityLink.href = "#";
+  securityLink.id = "companionSecurityLinkCard";
+  securityLink.className = "hero-player-preview-note";
+  securityLink.style.textDecoration = "underline";
+  securityLink.style.marginTop = "0";
+  securityLink.textContent = "Read Security Guide";
+  securityLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.heroMediaPlayerController && typeof window.heroMediaPlayerController.downloadSecurityReadme === "function") {
+      window.heroMediaPlayerController.downloadSecurityReadme();
+    }
+  });
   
   action.appendChild(downloadBtn);
+  action.appendChild(securityLink);
   copy.appendChild(action);
 
   card.appendChild(copy);

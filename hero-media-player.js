@@ -134,6 +134,26 @@ echo.
 echo  The bridge has stopped.
 pause`.trim();
 
+  const COMPANION_SECURITY_README = `
+# Signal Share Companion Security
+
+The companion bridge is designed with several security layers to keep your PC safe.
+
+## Active Safety Measures
+
+1.  **Local Loopback Only**: The bridge binds only to 127.0.0.1. It is not accessible from other devices on your network or the internet.
+2.  **CORS Protection**: Only requests from the official Signal Share domain or localhost are allowed.
+3.  **Authentication Required**: Every action (Play, Pause, Skip) requires a local secret token stored in your browser.
+4.  **Disabled URI Opening**: The ability to open arbitrary links is disabled by default to prevent malicious URL injection.
+5.  **Rate Limiting**: Commands are rate-limited to prevent automated spamming of your system media controls.
+6.  **No Admin Required**: The companion should never be run as an Administrator. It runs with your normal user permissions.
+7.  **Port Safety**: The bridge port is not exposed through UPnP or firewall rules automatically.
+8.  **Remote Sync Control**: Remote control via Supabase is disabled by default and requires explicit user activation.
+
+## How to Verify
+You can inspect the source code of the server.js file included in the companion package to see these measures in action.
+`.trim();
+
   const desktopArtworkFallbackCache = new Map();
   const resolvedArtworkMap = new Map();
 
@@ -1460,6 +1480,11 @@ pause`.trim();
       downloadCompanion();
     });
 
+    document.getElementById("companionSecurityLink")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      downloadSecurityReadme();
+    });
+
     document.getElementById("copySetupCommand")?.addEventListener("click", () => {
       const cmd = document.getElementById("setupCommand")?.textContent;
       if (cmd) {
@@ -1675,7 +1700,8 @@ pause`.trim();
     showCompanionPrompt,
     hideCompanionPrompt,
     handleCompanionResponse,
-    downloadCompanion
+    downloadCompanion,
+    downloadSecurityReadme
   };
 
   function showCompanionPrompt() {
@@ -1713,6 +1739,18 @@ pause`.trim();
     companionPromptDismissed = true;
     localStorage.setItem("ss_companion_dismissed", "true");
     render();
+  }
+
+  function downloadSecurityReadme() {
+    const blob = new Blob([COMPANION_SECURITY_README], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "COMPANION_SECURITY.md";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   function showSetupInstructions() {
