@@ -1766,9 +1766,9 @@ h1 {
 
 .hero-player-options {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 12px;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 16px;
 }
 
@@ -1778,6 +1778,38 @@ h1 {
   padding: 4px;
   border-radius: 999px;
   border: 1px solid var(--line);
+  align-self: center;
+  margin-top: 2px;
+}
+
+.hero-player-source-toggle {
+  display: flex;
+  background: rgba(19, 33, 43, 0.08);
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  align-self: center;
+  margin-top: 2px;
+}
+
+.source-toggle-button {
+  border: 0;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+
+.source-toggle-button.is-active {
+  background: var(--surface-dark);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(15, 23, 32, 0.12);
 }
 
 .mode-toggle-button {
@@ -1806,9 +1838,22 @@ body[data-theme="ember"] .hero-player-mode-toggle {
   background: rgba(255, 255, 255, 0.06);
 }
 
+body[data-theme="midnight"] .hero-player-source-toggle,
+body[data-theme="contrast"] .hero-player-source-toggle,
+body[data-theme="ember"] .hero-player-source-toggle {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 body[data-theme="midnight"] .mode-toggle-button.is-active,
 body[data-theme="contrast"] .mode-toggle-button.is-active,
 body[data-theme="ember"] .mode-toggle-button.is-active {
+  background: var(--accent);
+  color: #000;
+}
+
+body[data-theme="midnight"] .source-toggle-button.is-active,
+body[data-theme="contrast"] .source-toggle-button.is-active,
+body[data-theme="ember"] .source-toggle-button.is-active {
   background: var(--accent);
   color: #000;
 }

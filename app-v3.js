@@ -321,6 +321,7 @@ if (!window[globalStateKey]) {
     heroControlMode: "feed",
     desktopBridgeSuspended: false,
     viewerUrl: "",
+    heroControlSource: "youtube",
     returnFocusElement: null,
     profileReturnFocusElement: null,
     activeFeedPostId: null,

@@ -232,6 +232,8 @@ export function createAppUi(context) {
     heroPlayerOpenMiniButton: document.querySelector("#heroPlayerOpenMiniButton"),
     heroModeFeed: document.querySelector("#heroModeFeed"),
     heroModeMedia: document.querySelector("#heroModeMedia"),
+    heroSourceYoutube: document.querySelector("#heroSourceYoutube"),
+    heroSourceSpotify: document.querySelector("#heroSourceSpotify"),
   };
 
   const OVERLAY_SCROLL_CONTAINER_SELECTOR = [
@@ -472,6 +474,8 @@ export function createAppUi(context) {
       state.desktopBridgeSuspended = false;
       setHeroControlMode("media");
     });
+    elements.heroSourceYoutube?.addEventListener("click", () => setHeroControlSource("youtube"));
+    elements.heroSourceSpotify?.addEventListener("click", () => setHeroControlSource("spotify"));
     elements.miniPlayerHead.addEventListener("pointerdown", beginMiniPlayerDrag);
     heroMediaPlayerController.attachEventListeners();
     initializeFeedScrollObserver();
@@ -523,6 +527,11 @@ export function createAppUi(context) {
 
   function setHeroControlMode(mode) {
     state.heroControlMode = mode;
+    heroMediaPlayerController.render();
+  }
+
+  function setHeroControlSource(source) {
+    state.heroControlSource = source;
     heroMediaPlayerController.render();
   }
 

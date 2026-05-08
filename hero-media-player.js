@@ -210,6 +210,15 @@ The companion bridge is designed with several security layers to keep your PC sa
   function isPreferredNowPlayingAppPackage(value = "") {
     const normalized = normalizeText(value);
     if (!normalized) return false;
+    const preferred = state.heroControlSource;
+    if (preferred === "youtube") {
+      return normalized.includes("youtube")
+        || normalized.includes("ytmusic")
+        || normalized.includes("youtube.music");
+    }
+    if (preferred === "spotify") {
+      return normalized.includes("spotify");
+    }
     return normalized.includes("spotify")
       || normalized.includes("youtube")
       || normalized.includes("ytmusic")
@@ -219,6 +228,17 @@ The companion bridge is designed with several security layers to keep your PC sa
   function isPreferredNowPlayingUri(value = "") {
     const normalized = normalizeText(value);
     if (!normalized) return false;
+    const preferred = state.heroControlSource;
+    if (preferred === "spotify") {
+      return normalized.startsWith("spotify:")
+        || normalized.includes("open.spotify.com");
+    }
+    if (preferred === "youtube") {
+      return normalized.startsWith("vnd.youtube:")
+        || normalized.includes("youtube.com")
+        || normalized.includes("music.youtube.com")
+        || normalized.includes("youtu.be/");
+    }
     return normalized.startsWith("spotify:")
       || normalized.includes("open.spotify.com")
       || normalized.startsWith("vnd.youtube:")
@@ -1548,6 +1568,16 @@ The companion bridge is designed with several security layers to keep your PC sa
       if (elements.heroModeMedia.classList.contains("is-active") !== isMediaActive) {
         elements.heroModeMedia.classList.toggle("is-active", isMediaActive);
       }
+    }
+
+    // Source Toggle Button Highlighting
+    if (elements.heroSourceYoutube) {
+      const isYoutubeActive = state.heroControlSource === "youtube";
+      elements.heroSourceYoutube.classList.toggle("is-active", isYoutubeActive);
+    }
+    if (elements.heroSourceSpotify) {
+      const isSpotifyActive = state.heroControlSource === "spotify";
+      elements.heroSourceSpotify.classList.toggle("is-active", isSpotifyActive);
     }
 
     if (elements.heroPlayerPrevButton.disabled !== !canStep) {
