@@ -150,8 +150,6 @@ The companion bridge is designed with several security layers to keep your PC sa
 7.  **Port Safety**: The bridge port is not exposed through UPnP or firewall rules automatically.
 8.  **Remote Sync Control**: Remote control via Supabase is disabled by default and requires explicit user activation.
 
-## How to Verify
-You can inspect the source code of the server.js file included in the companion package to see these measures in action.
 `.trim();
 
   const desktopArtworkFallbackCache = new Map();
