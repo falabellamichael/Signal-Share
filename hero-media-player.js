@@ -1604,10 +1604,11 @@ You can inspect the source code of the server.js file included in the companion 
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
 
     if (mode === "device") {
+      elements.heroPlayerHeader.textContent = "Device System Media";
       if (nativeSnapshot?.permissionRequired) {
         elements.heroPlayerTitle.textContent = "Enable device media access";
         elements.heroPlayerCaption.textContent = "Allow notification access so this panel can control what is playing on your device.";
-        elements.heroPlayerStatus.textContent = "Device system media";
+        elements.heroPlayerStatus.textContent = "Access Required";
       } else if (nativeSnapshot?.active) {
         elements.heroPlayerTitle.textContent = nativeSnapshot.title || "Now playing";
         elements.heroPlayerCaption.textContent = nativeSnapshot.meta || "Device playback";
@@ -1618,6 +1619,7 @@ You can inspect the source code of the server.js file included in the companion 
         elements.heroPlayerStatus.textContent = "Device system media";
       }
     } else if (mode === "desktop") {
+      elements.heroPlayerHeader.textContent = "PC System Media";
       if (desktopSnapshot?.active) {
         elements.heroPlayerTitle.textContent = desktopSnapshot.title || "Now playing";
         elements.heroPlayerCaption.textContent = desktopSnapshot.meta || "Desktop playback";
@@ -1628,17 +1630,21 @@ You can inspect the source code of the server.js file included in the companion 
         elements.heroPlayerStatus.textContent = "PC system media";
       }
     } else if (mode === "app" && !post && fallbackMedia instanceof HTMLMediaElement) {
+      elements.heroPlayerHeader.textContent = "Browser Media";
       const fallbackTitle = browserMetadata?.title || fallbackMedia.getAttribute("title") || "Now playing in this browser";
       const fallbackMeta = [browserMetadata?.artist, browserMetadata?.album].filter(Boolean).join(" · ");
       elements.heroPlayerTitle.textContent = fallbackTitle;
       elements.heroPlayerCaption.textContent = fallbackMeta || "Active browser media session";
       elements.heroPlayerStatus.textContent = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
     } else if (mode === "app" && !post) {
+      elements.heroPlayerHeader.textContent = "App Media";
       elements.heroPlayerTitle.textContent = "Ready to play";
       elements.heroPlayerCaption.textContent = "";
       elements.heroPlayerStatus.textContent = "App media standby";
     } else {
       const creatorSummary = getProfileSummaryForPost(post);
+      const providerName = post?.sourceKind === "youtube" ? "YouTube" : (post?.sourceKind === "spotify" ? "Spotify" : "App");
+      elements.heroPlayerHeader.textContent = `${providerName} Preview`;
       elements.heroPlayerTitle.textContent = post?.title || "Ready to play";
       elements.heroPlayerCaption.textContent = post ? `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}` : "";
       elements.heroPlayerStatus.textContent = post ? `${creatorSummary?.displayName ?? post.creator} · ${formatTimestamp(post.createdAt)}` : "App media standby";
