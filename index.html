@@ -1312,8 +1312,37 @@
         <h3>Companion Download</h3>
         <p>Would you like to download the optional companion to control PC media from the Media Player?</p>
         <div class="companion-prompt-actions">
-          <button class="button button-primary" id="companionPromptYes">Yes</button>
+          <button class="button button-primary" id="companionPromptYes">Yes, Download Setup</button>
+          <button class="button button-secondary" id="companionPromptInstructions">How to Install</button>
           <button class="button button-secondary" id="companionPromptNo">No Thanks</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="companion-prompt-overlay" id="companionSetupOverlay" hidden>
+      <div class="companion-prompt-dialog companion-setup-dialog">
+        <h3>Setup Companion</h3>
+        <div class="setup-steps">
+          <div class="setup-step">
+            <strong>1. Download</strong>
+            <p>Download the <code>setup-companion.bat</code> file from the repository.</p>
+          </div>
+          <div class="setup-step">
+            <strong>2. Run</strong>
+            <p>Double-click the file to install dependencies and start the bridge.</p>
+          </div>
+          <div class="setup-step">
+            <strong>3. Keep Open</strong>
+            <p>Leave the terminal window open while you use the player.</p>
+          </div>
+        </div>
+        <div class="setup-command-box">
+          <p>Or run this in terminal:</p>
+          <code id="setupCommand">npm install && npm start</code>
+          <button class="button button-secondary button-small" id="copySetupCommand">Copy</button>
+        </div>
+        <div class="companion-prompt-actions">
+          <button class="button button-primary" id="companionSetupClose">Got it</button>
         </div>
       </div>
     </section>

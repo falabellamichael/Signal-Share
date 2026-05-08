@@ -1954,3 +1954,67 @@
 .hero-companion-download-btn {
   min-width: 160px;
 }
+
+.companion-setup-dialog {
+  max-width: 520px;
+}
+
+.setup-steps {
+  display: grid;
+  gap: 20px;
+  text-align: left;
+  margin-bottom: 28px;
+}
+
+.setup-step {
+  display: grid;
+  gap: 4px;
+}
+
+.setup-step strong {
+  font-size: 0.9rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.setup-step p {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.setup-command-box {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-bottom: 28px;
+  text-align: left;
+  position: relative;
+}
+
+.setup-command-box p {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.setup-command-box code {
+  display: block;
+  font-family: monospace;
+  font-size: 0.95rem;
+  background: rgba(0,0,0,0.05);
+  padding: 8px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.setup-command-box .button-small {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+}

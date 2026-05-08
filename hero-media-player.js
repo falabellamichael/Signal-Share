@@ -1366,8 +1366,26 @@ export function createHeroMediaPlayerController(options) {
     document.getElementById("companionPromptYes")?.addEventListener("click", () => {
       handleCompanionResponse(true);
     });
+    document.getElementById("companionPromptInstructions")?.addEventListener("click", () => {
+      showSetupInstructions();
+    });
     document.getElementById("companionPromptNo")?.addEventListener("click", () => {
       handleCompanionResponse(false);
+    });
+
+    document.getElementById("companionSetupClose")?.addEventListener("click", () => {
+      hideSetupInstructions();
+    });
+
+    document.getElementById("copySetupCommand")?.addEventListener("click", () => {
+      const cmd = document.getElementById("setupCommand")?.textContent;
+      if (cmd) {
+        navigator.clipboard.writeText(cmd).then(() => {
+          const btn = document.getElementById("copySetupCommand");
+          if (btn) btn.textContent = "Copied!";
+          setTimeout(() => { if (btn) btn.textContent = "Copy"; }, 2000);
+        });
+      }
     });
 
     elements.heroPlayerStage?.addEventListener("click", (e) => {
@@ -1599,10 +1617,20 @@ export function createHeroMediaPlayerController(options) {
   }
 
   function downloadCompanion() {
-    const downloadUrl = "https://github.com/falabellamichael/Signal-Share";
+    const downloadUrl = "https://raw.githubusercontent.com/falabellamichael/Signal-Share/main/setup-companion.bat";
     window.open(downloadUrl, "_blank");
     companionPromptDismissed = true;
     localStorage.setItem("ss_companion_dismissed", "true");
     render();
+  }
+
+  function showSetupInstructions() {
+    const overlay = document.getElementById("companionSetupOverlay");
+    if (overlay) overlay.hidden = false;
+  }
+
+  function hideSetupInstructions() {
+    const overlay = document.getElementById("companionSetupOverlay");
+    if (overlay) overlay.hidden = true;
   }
 }
