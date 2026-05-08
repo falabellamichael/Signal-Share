@@ -359,18 +359,22 @@ export function createHeroMediaPlayerController(options) {
       pushDesktopEndpointCandidate(candidates, `${baseUrl}/api/system-media/current`, seen);
     }
 
-    // Prefer loopback candidates before same-origin so local desktop media bridge
-    // does not emit avoidable 404s when the UI is served by a non-Node host.
+    // Only try localhost/loopback if we are actually local OR if we have reason to believe a bridge is there.
+    // GitHub Pages / Remote Origins should not poll relative /api paths as they are guaranteed 404s.
+    const isLocalOrigin = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
     pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
     pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
 
-    try {
-      pushDesktopEndpointCandidate(candidates, new URL("/api/system-media/current", window.location.href).toString(), seen);
-    } catch {
-      pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);
+    if (isLocalOrigin) {
+      try {
+        pushDesktopEndpointCandidate(candidates, new URL("/api/system-media/current", window.location.href).toString(), seen);
+      } catch {
+        pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);
+      }
     }
 
-    if (!candidates.length) {
+    if (!candidates.length && isLocalOrigin) {
       pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);
     }
     return candidates;
@@ -664,6 +668,12 @@ export function createHeroMediaPlayerController(options) {
       desktopSnapshot = null;
       return Promise.resolve(null);
     }
+
+    // If we've failed too many times, only poll occasionally (e.g. every 5th call)
+    if (desktopPollFailureCount > 10 && (Date.now() % 5 !== 0)) {
+      return Promise.resolve(desktopSnapshot);
+    }
+
     return readDesktopSnapshot()
       .then((snapshot) => {
         desktopSnapshot = snapshot;
@@ -674,7 +684,12 @@ export function createHeroMediaPlayerController(options) {
         if (renderAfter) render();
         return desktopSnapshot;
       })
-      .catch(() => {
+      .catch((error) => {
+        // Log errors only occasionally to keep console clean
+        if (desktopPollFailureCount % 5 === 0) {
+           console.warn("[Hero] Desktop media polling issue:", error.message || error);
+        }
+
         desktopSnapshot = null;
         desktopPollFailureCount += 1;
         if (renderAfter) render();
@@ -996,7 +1011,13 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
   function getEffectiveHeroMode(controllablePost) {
     if (state.heroControlMode === "feed") return "app";
     if (state.heroControlMode === "media") {
-      if (canUseDesktopBridge()) return "desktop";
+      // If we have an active desktop snapshot, prioritize it
+      if (desktopSnapshot?.active) return "desktop";
+      // If we have an active native snapshot, prioritize it
+      if (nativeSnapshot?.active) return "device";
+
+      // Fallback preference
+      if (canUseDesktopBridge() && desktopPollFailureCount < 5) return "desktop";
       return "device";
     }
     return shouldUseNativeMode(controllablePost) ? "device" : (shouldUseDesktopMode(controllablePost) ? "desktop" : "app");
