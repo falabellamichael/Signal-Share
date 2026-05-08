@@ -1099,7 +1099,8 @@ export function createHeroMediaPlayerController(options) {
     }
 
     if (mode === "desktop") {
-      const isPlaying = playbackState === "playing";
+      const playbackStatus = normalizePlaybackState(desktopSnapshot?.playbackState);
+      const isPlaying = playbackStatus === "playing";
       const action = isPlaying ? "pause" : "play";
       performDesktopAction(action);
       return;
