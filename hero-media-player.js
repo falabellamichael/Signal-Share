@@ -2013,7 +2013,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         nextCaption = "Allow notification access to control playback.";
         nextStatus = "Access required";
       } else if (nativeSnapshot?.active) {
-        nextTitle = getPreferredHeroControlSource() === "youtube" ? "" : cleanSnapshotTitle(nativeSnapshot.title);
+        nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
         nextCaption = cleanSnapshotCreator(nativeSnapshot, "Device playback");
         nextStatus = getPlaybackStatusLabel(nativeSnapshot.playbackState);
       } else {
@@ -2024,7 +2024,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     } else if (mode === "desktop") {
       nextHeader = getSystemMediaHeaderLabel();
       if (desktopSnapshot?.active) {
-        nextTitle = getPreferredHeroControlSource() === "youtube" ? "" : cleanSnapshotTitle(desktopSnapshot.title);
+        nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
         nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
         nextStatus = getPlaybackStatusLabel(desktopSnapshot.playbackState);
       } else {
