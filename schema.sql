@@ -916,6 +916,8 @@ create table if not exists public.system_media (
   meta text,
   artwork_uri text,
   open_uri text,
+  app_package text,
+  device_name text,
   updated_at timestamptz not null default now()
 );
 
@@ -945,6 +947,12 @@ create policy "Users can manage their own media actions"
   on public.system_media_actions for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+drop trigger if exists set_system_media_updated_at on public.system_media;
+create trigger set_system_media_updated_at
+  before update on public.system_media
+  for each row
+  execute function public.set_updated_at();
 
 do $$
 begin

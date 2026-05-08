@@ -611,6 +611,8 @@ export function createHeroMediaPlayerController(options) {
         title: data.title,
         meta: data.meta,
         artworkUri: data.artwork_uri,
+        appPackage: data.app_package,
+        deviceName: data.device_name,
       });
     } catch (error) {
       console.error("Failed to read desktop snapshot from Supabase:", error);
