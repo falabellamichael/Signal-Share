@@ -1099,7 +1099,9 @@ export function createHeroMediaPlayerController(options) {
     }
 
     if (mode === "desktop") {
-      performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
+      const isPlaying = playbackState === "playing";
+      const action = isPlaying ? "pause" : "play";
+      performDesktopAction(action);
       return;
     }
 

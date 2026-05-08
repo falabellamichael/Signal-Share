@@ -374,35 +374,17 @@ if ($winRtSuccess) {
   exit 0
 }
 
+# Fallback: Single-method key event to avoid double-triggering
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
 public static class MediaKeySender {
-  [DllImport("user32.dll", SetLastError=true)]
-  public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
-  [DllImport("user32.dll", SetLastError=true)]
-  public static extern IntPtr GetForegroundWindow();
-  [DllImport("user32.dll", SetLastError=true)]
+  [DllImport("user32.dll")]
   public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 }
 "@
-
-$WM_APPCOMMAND = 0x0319
-$SMTO_ABORTIFHUNG = 0x0002
-$HWND_BROADCAST = [IntPtr]0xffff
-$KEYEVENTF_EXTENDEDKEY = 0x0001
-$KEYEVENTF_KEYUP = 0x0002
-$result = [UIntPtr]::Zero
-$lParam = [IntPtr](${appCommand} -shl 16)
-
-[void][MediaKeySender]::SendMessageTimeout($HWND_BROADCAST, $WM_APPCOMMAND, [IntPtr]::Zero, $lParam, $SMTO_ABORTIFHUNG, 180, [ref]$result)
-$foreground = [MediaKeySender]::GetForegroundWindow()
-if ($foreground -ne [IntPtr]::Zero) {
-  [void][MediaKeySender]::SendMessageTimeout($foreground, $WM_APPCOMMAND, $foreground, $lParam, $SMTO_ABORTIFHUNG, 180, [ref]$result)
-}
-[MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
-Start-Sleep -Milliseconds 30
-[MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
+[MediaKeySender]::keybd_event(${vkCode}, 0, 0x0001, [UIntPtr]::Zero)
+[MediaKeySender]::keybd_event(${vkCode}, 0, (0x0001 -bor 0x0002), [UIntPtr]::Zero)
 Write-Output "ok"
   `.trim();
 
@@ -473,28 +455,38 @@ async function syncToSupabase() {
   } catch (err) { console.error("Sync crash:", err); }
 }
 
+let isPerformingAction = false;
 function subscribeToMediaActions() {
   if (!isWindows || !userId) return;
   console.log(`[Bridge] Subscribing to actions for ${userId}...`);
   supabase.channel('media_actions').on('postgres_changes', {
     event: 'INSERT', schema: 'public', table: 'system_media_actions', filter: `user_id=eq.${userId}`
   }, async (payload) => {
-    const data = payload.new;
-    const action = data.action;
-    const app_package = data.app_package;
-    // Check for uri in column or in payload JSONB
-    const uri = data.uri || data.payload?.uri;
-
-    console.log(`[Bridge] Remote action: ${action} for ${app_package || 'current'}`);
-
-    if (action === "open_uri") {
-      if (uri) {
-        spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
+    if (isPerformingAction) return;
+    isPerformingAction = true;
+    try {
+      const { action, app_package, uri } = payload.new;
+      console.log(`[Bridge] Remote action: ${action}`);
+      if (action === "open_uri") {
+        if (uri) {
+          spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
+        }
+      } else {
+        await sendSystemMediaKey(action, app_package);
       }
-    } else {
-      await sendSystemMediaKey(action, app_package);
+      
+      // Cleanup: Delete old actions for this user to keep the table clean
+      supabase.from("system_media_actions")
+        .delete()
+        .eq("user_id", userId)
+        .lt("created_at", new Date(Date.now() - 60000).toISOString())
+        .then(() => {});
+
+      // Delay sync slightly to allow the OS to update the media state
+      setTimeout(syncToSupabase, 800);
+    } finally {
+      setTimeout(() => { isPerformingAction = false; }, 500);
     }
-    await syncToSupabase();
   }).subscribe();
 }
 
