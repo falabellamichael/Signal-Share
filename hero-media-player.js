@@ -367,8 +367,8 @@ export function createHeroMediaPlayerController(options) {
     // GitHub Pages / Remote Origins should not poll relative /api paths as they are guaranteed 404s.
     // We only try localhost/loopback if we have reason to believe a bridge is there or if in Media mode.
     if (isRemoteOrigin && desktopPollFailureCount > 3 && state.heroControlMode !== "media") {
-       // On remote, if it's failing, don't even try loopback unless user is looking for it
-       return candidates;
+      // On remote, if it's failing, don't even try loopback unless user is looking for it
+      return candidates;
     }
 
     pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
@@ -637,6 +637,7 @@ export function createHeroMediaPlayerController(options) {
     const endpoints = resolveDesktopSnapshotEndpoints();
     for (const endpoint of endpoints) {
       try {
+        console.debug(`[Hero] Probing bridge endpoint: ${endpoint}`);
         const response = await window.fetch(endpoint, withLocalNetworkFetchOptions(endpoint, {
           method: "GET",
           cache: "no-store",
@@ -647,6 +648,7 @@ export function createHeroMediaPlayerController(options) {
         }));
         if (!response.ok) throw new Error(`Desktop media endpoint returned ${response.status}.`);
         const payload = await response.json();
+        console.info(`[Hero] Successfully connected to bridge: ${endpoint}`);
         desktopSnapshotEndpoint = endpoint;
         desktopActionEndpoint = deriveDesktopActionEndpoint(endpoint);
         return normalizeDesktopSnapshot(payload);
@@ -727,12 +729,12 @@ export function createHeroMediaPlayerController(options) {
         }
 
         // Only warn occasionally, and never if suspended or on native app
-        const shouldWarn = !state.desktopBridgeSuspended 
-          && !isNativeCapacitorApp() 
+        const shouldWarn = !state.desktopBridgeSuspended
+          && !isNativeCapacitorApp()
           && (desktopPollFailureCount % 30 === 1);
 
         if (shouldWarn) {
-          // Warning removed to prevent console noise
+           console.warn("[Hero] Desktop media bridge not detected. Please ensure the Signal-Share companion app is running on your PC (backend/server.js).");
         }
 
         if (renderAfter) render();
@@ -814,7 +816,7 @@ export function createHeroMediaPlayerController(options) {
       const pTitle = normalizeText(p.title);
       const pCreator = normalizeText(p.creator);
       if (pTitle === title && (pCreator === meta || !meta)) return true;
-if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) return true;
+      if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) return true;
       return false;
     }) || null;
   }
@@ -836,7 +838,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
 
   function setMediaSessionHandler(action, handler) {
     if (!("mediaSession" in navigator) || typeof navigator.mediaSession.setActionHandler !== "function") return;
-    try { navigator.mediaSession.setActionHandler(action, handler); } catch {}
+    try { navigator.mediaSession.setActionHandler(action, handler); } catch { }
   }
 
   function syncMediaSession(dataOrPost, mode, fallbackMedia) {
@@ -869,7 +871,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
             if (resolvedArtworkMap.get(title) === resolvedUrl) return;
             resolvedArtworkMap.set(title, resolvedUrl);
             syncMediaSession({ ...dataOrPost, artwork: resolvedUrl });
-          }).catch(() => {});
+          }).catch(() => { });
 
           // Use a cached version if we have one from a previous resolution of this title
           const cached = resolvedArtworkMap.get(title);
@@ -915,7 +917,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
       }
     }
 
-    try { session.playbackState = playbackState; } catch {}
+    try { session.playbackState = playbackState; } catch { }
 
     const MetadataCtor = typeof window !== "undefined" ? window.MediaMetadata : null;
     if (typeof MetadataCtor === "function") {
@@ -965,7 +967,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
       const shouldPlay = typeof forcePlay === "boolean" ? forcePlay : mediaElement.paused;
       if (shouldPlay) {
         const playResult = mediaElement.play();
-        if (playResult && typeof playResult.catch === "function") playResult.catch(() => {});
+        if (playResult && typeof playResult.catch === "function") playResult.catch(() => { });
         state.heroPlayerPlaybackState = "playing";
       } else {
         mediaElement.pause();
@@ -1000,7 +1002,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
 
   function performDesktopAction(action, payload = {}) {
     if (!canUseDesktopBridge()) return Promise.resolve(false);
-    
+
     // If the active snapshot came from Supabase, or we are on a remote origin without a local bridge endpoint yet,
     // use Supabase to sync the action.
     const isRemoteOrigin = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
@@ -1089,7 +1091,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
 
     if (mode === "device") {
       if (nativeSnapshot?.permissionRequired && hasNativeSettingsBridge()) {
-        try { getNativeBridge().openNowPlayingAccessSettings(); } catch {}
+        try { getNativeBridge().openNowPlayingAccessSettings(); } catch { }
         return;
       }
       performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
@@ -1186,7 +1188,7 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
       applyPlayerVolumeToActiveElement();
       const fallbackMedia = getFallbackPageMediaElement();
       if (!(getActivePlayerMediaElement() instanceof HTMLMediaElement) && fallbackMedia instanceof HTMLMediaElement) {
-        try { fallbackMedia.volume = state.playerVolume; } catch {}
+        try { fallbackMedia.volume = state.playerVolume; } catch { }
       }
     }
     render();

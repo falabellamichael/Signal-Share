@@ -465,6 +465,8 @@ async function syncToSupabase() {
       meta: payload.meta,
       artwork_uri: payload.artworkUri,
       open_uri: payload.openUri,
+      app_package: payload.appPackage,
+      device_name: payload.deviceName || "Desktop PC",
       updated_at: new Date().toISOString(),
     });
     if (error) console.error("Sync error:", error.message);
