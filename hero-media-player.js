@@ -1254,6 +1254,14 @@ export function createHeroMediaPlayerController(options) {
     const playableCount = playablePosts.length;
     const canStep = playableCount > 1;
     const hasPost = Boolean(heroPost);
+    
+    // Toggle Button Highlighting
+    if (elements.heroModeFeed) {
+      elements.heroModeFeed.classList.toggle("is-active", state.heroControlMode === "feed");
+    }
+    if (elements.heroModeMedia) {
+      elements.heroModeMedia.classList.toggle("is-active", state.heroControlMode === "media");
+    }
 
     elements.heroPlayerPrevButton.disabled = !canStep;
     elements.heroPlayerNextButton.disabled = !canStep;

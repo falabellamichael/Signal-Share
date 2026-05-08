@@ -479,8 +479,14 @@ function subscribeToMediaActions() {
   supabase.channel('media_actions').on('postgres_changes', {
     event: 'INSERT', schema: 'public', table: 'system_media_actions', filter: `user_id=eq.${userId}`
   }, async (payload) => {
-    const { action, app_package, uri } = payload.new;
-    console.log(`[Bridge] Remote action: ${action}`);
+    const data = payload.new;
+    const action = data.action;
+    const app_package = data.app_package;
+    // Check for uri in column or in payload JSONB
+    const uri = data.uri || data.payload?.uri;
+
+    console.log(`[Bridge] Remote action: ${action} for ${app_package || 'current'}`);
+
     if (action === "open_uri") {
       if (uri) {
         spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
