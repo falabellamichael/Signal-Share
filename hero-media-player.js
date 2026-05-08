@@ -1602,24 +1602,19 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
     const matchedPost = mode === "desktop" && desktopSnapshot?.active ? findMatchedPost(desktopSnapshot) : null;
+    const supportsVolume = getEffectiveHeroMode() === "app";
 
-    let externalMetadata = null;
-    let isMetadataFetching = false;
-
-    let nextHeader = "";
-    let nextTitle = "";
+    let nextHeader = "App Media Standby";
+    let nextTitle = "Ready to play";
     let nextCaption = "";
-    let nextStatus = "";
+    let nextStatus = "App media standby";
+    let externalMetadata = null;
 
     if (mode === "device") {
-      if (nativeSnapshot?.active && nativeSnapshot.meta) {
-        nextHeader = `${nativeSnapshot.meta} / System Media`;
-      } else {
-        nextHeader = "Device System Media";
-      }
+      nextHeader = nativeSnapshot?.meta ? `${nativeSnapshot.meta} / System Media` : "Device System Media";
       if (nativeSnapshot?.permissionRequired) {
         nextTitle = "Enable device media access";
-        nextCaption = "Allow notification access so this panel can control what is playing on your device.";
+        nextCaption = "Allow notification access to control playback.";
         nextStatus = "Access Required";
       } else if (nativeSnapshot?.active) {
         nextTitle = nativeSnapshot.title || "Now playing";
@@ -1627,64 +1622,39 @@ The companion bridge is designed with several security layers to keep your PC sa
         nextStatus = "Device system media";
       } else {
         nextTitle = "Device media idle";
-        nextCaption = "Start playback in any media app to control it here.";
+        nextCaption = "Start playback on your device.";
         nextStatus = "Device system media";
       }
     } else if (mode === "desktop") {
-      if (desktopSnapshot?.active && desktopSnapshot.meta) {
-        nextHeader = `${desktopSnapshot.meta} / System Media`;
-      } else {
-        nextHeader = "PC System Media";
-      }
+      nextHeader = desktopSnapshot?.meta ? `${desktopSnapshot.meta} / System Media` : "PC System Media";
       if (desktopSnapshot?.active) {
         nextTitle = desktopSnapshot.title || "Now playing";
         nextCaption = desktopSnapshot.meta || "Desktop playback";
         nextStatus = "PC system media";
       } else {
         nextTitle = "PC media idle";
-        nextCaption = "Start playback in YouTube, Spotify, or another desktop app.";
+        nextCaption = "Start playback on your desktop.";
         nextStatus = "PC system media";
       }
-    } else if (mode === "app" && !post && fallbackMedia instanceof HTMLMediaElement) {
-      const fallbackTitle = browserMetadata?.title || fallbackMedia.getAttribute("title") || "Now playing in this browser";
-      const fallbackMeta = [browserMetadata?.artist, browserMetadata?.album].filter(Boolean).join(" · ");
-      nextHeader = fallbackMeta ? `${fallbackTitle} · ${fallbackMeta}` : fallbackTitle;
-      nextTitle = fallbackTitle;
-      nextCaption = fallbackMeta || "Active browser media session";
-      nextStatus = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
-    } else if (mode === "app" && !post) {
-      nextHeader = "App Media";
-      nextTitle = "Ready to play";
-      nextCaption = "";
-      nextStatus = "App media standby";
-    } else {
+    } else if (mode === "browser" && canUseFallbackMedia(fallbackMedia)) {
+      const browserMeta = typeof getBrowserMediaMetadata === "function" ? getBrowserMediaMetadata() : null;
+      const browserTitle = browserMeta?.title || fallbackMedia.getAttribute("title") || "Browser playback";
+      nextHeader = browserMeta?.artist ? `${browserTitle} · ${browserMeta.artist}` : browserTitle;
+      nextTitle = browserTitle;
+      nextCaption = browserMeta?.artist || "Active browser session";
+      nextStatus = fallbackMedia.paused ? "Paused" : "Playing";
+    } else if (post) {
       const creatorSummary = getProfileSummaryForPost(post);
       const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
+      
+      const ext = getExternalPreviewMetadata(post);
+      externalMetadata = (ext instanceof Promise) ? null : ext;
 
-      if (post && (post.sourceKind === "youtube" || post.sourceKind === "spotify")) {
-        const metadata = getExternalPreviewMetadata(post);
-        isMetadataFetching = metadata instanceof Promise;
-        externalMetadata = isMetadataFetching ? null : metadata;
-        
-        const artist = externalMetadata?.creator || formatProviderName(post.sourceKind);
-        nextHeader = `${artist} / ${getSignalLabel(post)}`;
-        nextTitle = externalMetadata?.title || post.title || "Ready to play";
-        nextCaption = externalMetadata?.creator ? `${externalMetadata.creator} · ${getSignalLabel(post)}` : (post ? `${post.caption} · ${creatorName}` : "");
-        
-        if (isMetadataFetching) {
-          // Metadata is still loading...
-        }
-      } else if (post) {
-        nextHeader = `${creatorName} / ${getSignalLabel(post)}`;
-        nextTitle = post.title || "Ready to play";
-        nextCaption = `${post.caption} · ${creatorName}`;
-      } else {
-        nextHeader = "App Media Standby";
-        nextTitle = "Ready to play";
-        nextCaption = "";
-      }
-
-      nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
+      const artist = externalMetadata?.creator || (post.sourceKind === "youtube" || post.sourceKind === "spotify" ? formatProviderName(post.sourceKind) : creatorName);
+      nextHeader = `${artist} / ${getSignalLabel(post)}`;
+      nextTitle = externalMetadata?.title || post.title || "Ready to play";
+      nextCaption = externalMetadata?.creator ? `${externalMetadata.creator} · ${getSignalLabel(post)}` : (post.caption ? `${post.caption} · ${creatorName}` : creatorName);
+      nextStatus = `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}`;
     }
 
     // Only touch the DOM if values have changed
@@ -1693,45 +1663,33 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (elements.heroPlayerCaption.textContent !== nextCaption) elements.heroPlayerCaption.textContent = nextCaption;
     if (elements.heroPlayerStatus.textContent !== nextStatus) elements.heroPlayerStatus.textContent = nextStatus;
 
-    const playPauseLabel = playbackState === "playing" ? "Pause" : "Play";
-    if (elements.heroPlayerPlayPauseButton.textContent !== playPauseLabel) {
-      elements.heroPlayerPlayPauseButton.textContent = playPauseLabel;
-    }
+    elements.heroPlayerPlayPauseButton.textContent = playbackState === "playing" ? "Pause" : "Play";
+    elements.heroPlayerPlayPauseButton.disabled = mode === "app" && !post;
 
-    const isPlayPauseDisabled = mode === "app" && !post;
-    if (elements.heroPlayerPlayPauseButton.disabled !== isPlayPauseDisabled) {
-      elements.heroPlayerPlayPauseButton.disabled = isPlayPauseDisabled;
-    }
-
-    if (elements.heroPlayerVolumeSlider.disabled !== !supportsVolume) {
-      elements.heroPlayerVolumeSlider.disabled = !supportsVolume;
-    }
+    elements.heroPlayerVolumeSlider.disabled = !supportsVolume;
     if (elements.heroPlayerVolumeSlider.value !== String(volumePercent)) {
       elements.heroPlayerVolumeSlider.value = String(volumePercent);
     }
-    const volumeText = supportsVolume ? `${volumePercent}%` : "--";
-    if (elements.heroPlayerVolumeValue.textContent !== volumeText) {
-      elements.heroPlayerVolumeValue.textContent = volumeText;
-    }
+    elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
 
     if (!isHeroActive) {
       renderHeroStagePreview(Object.assign({}, options, {
         stage: elements.heroPlayerStage,
         mode,
-        post: mode === "app" ? post : null, // ONLY pass the feed post if we are in app mode
+        post: mode === "app" ? post : null,
         fallbackMedia,
         desktopSnapshot,
         matchedPost,
         externalMetadata,
         showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot?.active,
-        active: mode !== "app" // Treat media modes as "active" to show info/matched player
+        active: mode !== "app"
       }));
     }
 
     syncMediaSession({
       title: nextTitle,
       artist: nextCaption,
-      artwork: post ? resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl }) : (browserMetadata?.artwork || ""),
+      artwork: post ? resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl }) : "",
     });
     if (typeof renderMiniPlayer === "function") renderMiniPlayer();
   }
