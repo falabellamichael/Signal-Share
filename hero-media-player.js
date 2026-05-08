@@ -1658,17 +1658,20 @@ The companion bridge is designed with several security layers to keep your PC sa
       const creatorSummary = getProfileSummaryForPost(post);
       const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
       
+      let externalMetadata = null;
+      let isMetadataFetching = false;
+
       if (post && (post.sourceKind === "youtube" || post.sourceKind === "spotify")) {
         const metadata = getExternalPreviewMetadata(post);
-        const isFetching = metadata instanceof Promise;
-        const ext = isFetching ? null : metadata;
+        isMetadataFetching = metadata instanceof Promise;
+        externalMetadata = isMetadataFetching ? null : metadata;
         
-        const artist = ext?.creator || formatProviderName(post.sourceKind);
+        const artist = externalMetadata?.creator || formatProviderName(post.sourceKind);
         nextHeader = `${artist} / ${getSignalLabel(post)}`;
-        nextTitle = ext?.title || post.title || "Ready to play";
-        nextCaption = ext?.creator ? `${ext.creator} · ${getSignalLabel(post)}` : (post ? `${post.caption} · ${creatorName}` : "");
+        nextTitle = externalMetadata?.title || post.title || "Ready to play";
+        nextCaption = externalMetadata?.creator ? `${externalMetadata.creator} · ${getSignalLabel(post)}` : (post ? `${post.caption} · ${creatorName}` : "");
         
-        if (isFetching) {
+        if (isMetadataFetching) {
           // Metadata is still loading...
         }
       } else if (post) {
@@ -1719,7 +1722,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         fallbackMedia,
         desktopSnapshot,
         matchedPost,
-        externalMetadata: ext,
+        externalMetadata,
         showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot?.active,
         active: mode !== "app" // Treat media modes as "active" to show info/matched player
       }));
