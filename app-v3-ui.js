@@ -1419,17 +1419,28 @@ export function createAppUi(context) {
     controls.appendChild(nextButton); elements.feedPagination.append(summary, controls);
   }
 
+  let lastScrollOverlayOpen = null;
+  let lastModalOverlayOpen = null;
+
   function syncOverlayBodyState() {
     const modalOverlayOpen = Boolean(state.viewerPostId || state.viewerAttachment || state.activeProfileKey || state.settingsPanelOpen || state.notificationsPanelOpen || state.adminBanPanelOpen);
     const scrollOverlayOpen = Boolean(modalOverlayOpen || state.messengerOpen || state.playerPostId);
-    document.documentElement.classList.toggle("overlay-scroll-active", scrollOverlayOpen);
-    document.body.classList.toggle("viewer-open", modalOverlayOpen);
-    document.body.classList.toggle("overlay-scroll-active", scrollOverlayOpen);
-    window.__signalShareOverlayOpen = scrollOverlayOpen;
 
-    // Native bridge: Disable pull-to-refresh when any overlay is open
-    if (window.NativeBridge && typeof window.NativeBridge.setPullToRefreshEnabled === "function") {
-      window.NativeBridge.setPullToRefreshEnabled(!scrollOverlayOpen);
+    if (scrollOverlayOpen !== lastScrollOverlayOpen) {
+      document.documentElement.classList.toggle("overlay-scroll-active", scrollOverlayOpen);
+      document.body.classList.toggle("overlay-scroll-active", scrollOverlayOpen);
+      lastScrollOverlayOpen = scrollOverlayOpen;
+      window.__signalShareOverlayOpen = scrollOverlayOpen;
+
+      // Native bridge: Disable pull-to-refresh when any overlay is open
+      if (window.NativeBridge && typeof window.NativeBridge.setPullToRefreshEnabled === "function") {
+        window.NativeBridge.setPullToRefreshEnabled(!scrollOverlayOpen);
+      }
+    }
+
+    if (modalOverlayOpen !== lastModalOverlayOpen) {
+      document.body.classList.toggle("viewer-open", modalOverlayOpen);
+      lastModalOverlayOpen = modalOverlayOpen;
     }
   }
 
@@ -2257,16 +2268,55 @@ export function createAppUi(context) {
   }
 
   function renderMiniPlayer() {
-    if (!state.playerPostId) { moveFocusOutOfMiniPlayer(); state.playerDrag = null; elements.miniPlayer.classList.remove("is-open"); elements.miniPlayer.classList.remove("is-expanded"); elements.miniPlayer.classList.remove("is-dragging"); elements.miniPlayer.setAttribute("aria-hidden", "true"); elements.miniPlayerVolume.hidden = true; renderMiniPlayerPlaybackButton(null); clearMiniPlayerMedia(); syncOverlayBodyState(); return; }
-    const post = getPostById(state.playerPostId); if (!post || !isPlayablePost(post)) { closeMiniPlayer(); return; }
+    if (!state.playerPostId) {
+      moveFocusOutOfMiniPlayer();
+      state.playerDrag = null;
+      if (elements.miniPlayer.classList.contains("is-open")) {
+        elements.miniPlayer.classList.remove("is-open", "is-expanded", "is-dragging");
+        elements.miniPlayer.setAttribute("aria-hidden", "true");
+        elements.miniPlayerVolume.hidden = true;
+        renderMiniPlayerPlaybackButton(null);
+        clearMiniPlayerMedia();
+        syncOverlayBodyState();
+      }
+      return;
+    }
+
+    const post = getPostById(state.playerPostId);
+    if (!post || !isPlayablePost(post)) { closeMiniPlayer(); return; }
+
     const creatorSummary = getProfileSummaryForPost(post);
-    elements.miniPlayer.classList.add("is-open"); elements.miniPlayer.classList.toggle("is-expanded", state.miniPlayerExpanded); elements.miniPlayer.setAttribute("aria-hidden", "false");
+    elements.miniPlayer.classList.add("is-open");
+    elements.miniPlayer.classList.toggle("is-expanded", state.miniPlayerExpanded);
+    elements.miniPlayer.setAttribute("aria-hidden", "false");
+
     syncOverlayBodyState();
-    elements.miniPlayerKind.textContent = `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`; elements.miniPlayerTitle.textContent = post.title; elements.miniPlayerCaption.textContent = post.caption; elements.miniPlayerCreator.textContent = creatorSummary?.displayName ?? post.creator; elements.miniPlayerCreator.onclick = creatorSummary ? (event) => openProfileByKey(creatorSummary.key, event.currentTarget) : null; elements.miniPlayerTime.textContent = formatTimestamp(post.createdAt); elements.miniExpandButton.textContent = state.miniPlayerExpanded ? "Collapse" : "Expand";
-    elements.miniPlayerTags.innerHTML = ""; post.tags.forEach((tag) => { const pill = document.createElement("span"); pill.className = "tag-pill"; pill.textContent = `#${tag}`; elements.miniPlayerTags.appendChild(pill); });
-    const playableIds = getPlayableVisiblePostIds(); const canStep = playableIds.length > 1; elements.miniPrevButton.disabled = !canStep; elements.miniNextButton.disabled = !canStep; renderMiniPlayerPlaybackButton(post);
-    renderMiniPlayerMedia(elements.miniPlayerStage, post); renderMiniPlayerVolumeControl(); applyMiniPlayerPosition();
-    window.requestAnimationFrame(() => { if (state.playerPostId === post.id) applyMiniPlayerPosition(); });
+
+    elements.miniPlayerKind.textContent = `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`;
+    elements.miniPlayerTitle.textContent = post.title;
+    elements.miniPlayerCaption.textContent = post.caption;
+    elements.miniPlayerCreator.textContent = creatorSummary?.displayName ?? post.creator;
+    elements.miniPlayerCreator.onclick = creatorSummary ? (event) => openProfileByKey(creatorSummary.key, event.currentTarget) : null;
+    elements.miniPlayerTime.textContent = formatTimestamp(post.createdAt);
+    elements.miniExpandButton.textContent = state.miniPlayerExpanded ? "Collapse" : "Expand";
+
+    elements.miniPlayerTags.innerHTML = "";
+    post.tags.forEach((tag) => {
+      const pill = document.createElement("span");
+      pill.className = "tag-pill";
+      pill.textContent = `#${tag}`;
+      elements.miniPlayerTags.appendChild(pill);
+    });
+
+    const playableIds = getPlayableVisiblePostIds();
+    const canStep = playableIds.length > 1;
+    elements.miniPrevButton.disabled = !canStep;
+    elements.miniNextButton.disabled = !canStep;
+    renderMiniPlayerPlaybackButton(post);
+
+    renderMiniPlayerMedia(elements.miniPlayerStage, post);
+    renderMiniPlayerVolumeControl();
+    applyMiniPlayerPosition();
   }
 
   function renderViewer() {

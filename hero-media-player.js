@@ -40,7 +40,7 @@ export function createHeroMediaPlayerController(options) {
   const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
-  const DESKTOP_POLL_INTERVAL_MS = 8000;
+  const DESKTOP_POLL_INTERVAL_MS = 2500;
   const LOCAL_NETWORK_PROMPT_COOLDOWN_MS = 30000;
 
   let listenersAttached = false;
@@ -58,6 +58,9 @@ export function createHeroMediaPlayerController(options) {
   let lastDesktopSnapshotSignature = "";
   let desktopActionInFlight = false;
   let lastDesktopActionAt = 0;
+  let lastNativeActionAt = 0;
+  let lastDesktopPollTime = 0;
+  let lastNativePollTime = 0;
   let lastDesktopActionKey = "";
   const DESKTOP_ACTION_COOLDOWN_MS = 1200;
   const desktopArtworkFallbackCache = new Map();
@@ -199,6 +202,13 @@ export function createHeroMediaPlayerController(options) {
   }
 
   function refreshNativeSnapshot({ renderAfter = true } = {}) {
+    if (!hasNativeSnapshotBridge()) return null;
+
+    const now = Date.now();
+    if (now - lastNativeActionAt < 2500) return nativeSnapshot;
+    if (now - lastNativePollTime < NATIVE_POLL_INTERVAL_MS - 200) return nativeSnapshot;
+    lastNativePollTime = now;
+
     nativeSnapshot = readNativeSnapshot();
     if (nativeSnapshot && nativeSnapshot.active && !nativeSnapshot.artworkUri) {
       hydrateDesktopSpotifyArtwork(nativeSnapshot, getControllablePlayerPost());
@@ -720,7 +730,7 @@ export function createHeroMediaPlayerController(options) {
     return null;
   }
 
-  let lastDesktopPollTime = 0;
+
 
   function refreshDesktopSnapshot({ renderAfter = true, force = false } = {}) {
     if (!canUseDesktopBridge()) {
@@ -1050,8 +1060,22 @@ export function createHeroMediaPlayerController(options) {
     if (!hasNativeActionBridge()) return false;
     const bridge = getNativeBridge();
     try {
+      lastNativeActionAt = Date.now();
+
+      // Truly optimistic update
+      if (nativeSnapshot) {
+        if (action === NATIVE_ACTION_PLAY_PAUSE) {
+          nativeSnapshot.playbackState = (nativeSnapshot.playbackState === "playing") ? "paused" : "playing";
+        } else if (action === NATIVE_ACTION_NEXT || action === NATIVE_ACTION_PREVIOUS) {
+          nativeSnapshot.title = "Switching...";
+        }
+        render();
+      }
+
       const success = bridge.performNowPlayingAction(action);
-      window.setTimeout(() => { refreshNativeSnapshot(); }, 220);
+      window.setTimeout(() => {
+        if (Date.now() - lastNativeActionAt > 1400) refreshNativeSnapshot();
+      }, 1500);
       return Boolean(success);
     } catch {
       return false;
@@ -1073,6 +1097,16 @@ export function createHeroMediaPlayerController(options) {
     lastDesktopActionAt = now;
     lastDesktopActionKey = actionKey;
     desktopActionInFlight = true;
+
+    // Truly optimistic update for UI responsiveness
+    if (desktopSnapshot) {
+      if (action === "play_pause") {
+        desktopSnapshot.playbackState = (desktopSnapshot.playbackState === "playing") ? "paused" : "playing";
+      } else if (action === "next" || action === "previous") {
+        desktopSnapshot.title = "Switching track...";
+      }
+      render();
+    }
 
     // If the active snapshot came from Supabase, or we are on a remote origin without a local bridge endpoint yet,
     // use Supabase to sync the action.
@@ -1108,7 +1142,9 @@ export function createHeroMediaPlayerController(options) {
     }))
       .then((response) => response.ok ? response.json() : { ok: false })
       .then((payload) => {
-        window.setTimeout(() => { refreshDesktopSnapshot({ force: true }); }, 420);
+        window.setTimeout(() => {
+          if (Date.now() - lastDesktopActionAt > 2000) refreshDesktopSnapshot({ force: true });
+        }, 2200);
         return Boolean(payload?.ok);
       })
       .catch(() => false)
