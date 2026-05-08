@@ -1768,12 +1768,6 @@ export function createAppUi(context) {
       state.heroPlayerPlaybackState = "playing";
     }
 
-    // Scroll to the active post in the feed if it's visible
-    const feedCard = elements.feedGrid.querySelector(`[data-post-id="${nextPost.id}"]`);
-    if (feedCard) {
-      feedCard.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-
     heroMediaPlayerController.render();
   }
 
