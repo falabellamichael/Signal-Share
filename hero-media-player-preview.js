@@ -571,10 +571,11 @@ export function renderHeroStagePreview(options = {}) {
       return;
     }
 
+    const shouldHideText = isMediaYoutubeMode;
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "ON-DEVICE MEDIA",
-      title: "No active playback",
-      meta: "Start a track in any media app on this device.",
+      badge: shouldHideText ? "" : "ON-DEVICE MEDIA",
+      title: shouldHideText ? "" : "No active playback",
+      meta: shouldHideText ? "" : "Start a track in any media app on this device.",
     });
     return;
   }
@@ -608,10 +609,11 @@ export function renderHeroStagePreview(options = {}) {
       return;
     }
 
+    const shouldHideText = isMediaYoutubeMode;
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "PC SYSTEM MEDIA",
-      title: "Waiting for playback",
-      meta: "Start YouTube, Spotify, or another desktop app.",
+      badge: shouldHideText ? "" : "PC SYSTEM MEDIA",
+      title: shouldHideText ? "" : "Waiting for playback",
+      meta: shouldHideText ? "" : "Start YouTube, Spotify, or another desktop app.",
     });
     return;
   }
