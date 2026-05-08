@@ -48,6 +48,7 @@ const supabase = createClient(
 
 app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {
+  console.log(`[Bridge] ${req.method} ${req.url}`);
   const requestedHeaders = req.headers["access-control-request-headers"];
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
