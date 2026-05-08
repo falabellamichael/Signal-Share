@@ -318,7 +318,7 @@ export function createCompanionCard(options = {}) {
   viewSecurity.target = "_blank";
   viewSecurity.style.textDecoration = "underline";
   viewSecurity.style.color = "inherit";
-  viewSecurity.textContent = "read them in browser HERE";
+  viewSecurity.textContent = "read in browser HERE";
   viewSecurity.addEventListener("click", (e) => { e.stopPropagation(); });
 
   securityActions.appendChild(downloadSecurity);
