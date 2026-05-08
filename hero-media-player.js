@@ -1673,7 +1673,11 @@ The companion bridge is designed with several security layers to keep your PC sa
         
         const artist = ext?.creator || formatProviderName(post.sourceKind);
         nextHeader = `${artist} / ${getSignalLabel(post)}`;
-        if (isFetching) metadata.then(() => render());
+        // Since we are polling, we don't need to attach a .then() listener here.
+        // The next poll cycle will pick up the resolved metadata from the cache.
+        if (isFetching) {
+          // Metadata is still loading...
+        }
       } else if (post) {
         nextHeader = `${creatorName} / ${getSignalLabel(post)}`;
       } else {

@@ -312,6 +312,35 @@ export function createAppUi(context) {
       .trim();
   }
 
+  function formatProviderName(kind = "") {
+    const k = `${kind || ""}`.trim().toLowerCase();
+    if (k === "youtube") return "YouTube";
+    if (k === "spotify") return "Spotify";
+    return k.charAt(0).toUpperCase() + k.slice(1);
+  }
+
+  function getExternalPreviewMetadata(post) {
+    if (!post) return null;
+    if (post.sourceKind === "youtube") {
+      return getYouTubePreviewMetadata(post);
+    }
+    if (post.sourceKind === "spotify") {
+      const sourceUrl = resolveSpotifyPreviewSourceUrl(post);
+      if (!sourceUrl) return null;
+      return getSpotifyPreviewMetadata(sourceUrl);
+    }
+    return null;
+  }
+
+  function getSpotifyPreviewImageUrl(source) {
+    const sourceUrl = resolveSpotifyPreviewSourceUrl(source);
+    if (!sourceUrl) return "";
+    const cacheKey = `spotify:preview:v10:${sourceUrl}`;
+    const cached = externalPreviewCache.get(cacheKey);
+    if (cached && !(cached instanceof Promise)) return cached.thumbnailUrl || "";
+    return "";
+  }
+
   const heroMediaPlayerController = createHeroMediaPlayerController({
     state,
     elements,
@@ -336,14 +365,15 @@ export function createAppUi(context) {
     postMessageToYouTubePlayer,
     getSpotifyPreviewImageUrl,
     parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getExternalPreviewMetadata,
+    formatProviderName,
     getHeroPost,
     setHeroPost,
     playHeroMedia,
     stepHeroPlayer,
     getHeroPlayablePosts,
     resolveYouTubePreviewId,
-    getExternalPreviewMetadata,
-    formatProviderName,
     isNativeCapacitorApp,
   });
 
@@ -2200,37 +2230,33 @@ export function createAppUi(context) {
     return "";
   }
 
-  function formatProviderName(kind = "") {
-    const value = String(kind || "").toLowerCase();
-    if (value === "youtube") return "YouTube";
-    if (value === "spotify") return "Spotify";
-    return "App";
-  }
 
-  function getExternalPreviewMetadata(post) {
-    if (!post) return null;
-    if (post.sourceKind === "youtube") {
-      return getYouTubePreviewMetadata(post);
-    }
-    if (post.sourceKind === "spotify") {
-      const sourceUrl = resolveSpotifyPreviewSourceUrl(post);
-      if (!sourceUrl) return null;
-      return getSpotifyPreviewMetadata(sourceUrl);
-    }
-    return null;
-  }
 
-  function getSpotifyPreviewImageUrl(source) {
-    const sourceUrl = resolveSpotifyPreviewSourceUrl(source);
-    if (!sourceUrl) return "";
-    const cacheKey = `spotify:preview:v10:${sourceUrl}`;
-    const cached = externalPreviewCache.get(cacheKey);
-    if (cached && !(cached instanceof Promise)) return cached.thumbnailUrl || "";
-    return "";
-  }
+
 
   function createExternalPreviewStage() { return document.createElement("div"); }
-  function applyExternalPreviewMetadata() {}
+  function applyExternalPreviewMetadata(stage, post) {
+    if (!stage || !post) return;
+    const metadata = getExternalPreviewMetadata(post);
+    if (!metadata) return;
+
+    if (metadata instanceof Promise) {
+      metadata.then((data) => {
+        if (data && stage.isConnected) {
+          const titleEl = stage.querySelector(".preview-title");
+          const artistEl = stage.querySelector(".preview-artist");
+          if (titleEl) titleEl.textContent = data.title || "";
+          if (artistEl) artistEl.textContent = data.creator || "";
+        }
+      });
+      return;
+    }
+
+    const titleEl = stage.querySelector(".preview-title");
+    const artistEl = stage.querySelector(".preview-artist");
+    if (titleEl) titleEl.textContent = metadata.title || "";
+    if (artistEl) artistEl.textContent = metadata.creator || "";
+  }
 
 
   function renderMiniPlayerVolumeControl() {
