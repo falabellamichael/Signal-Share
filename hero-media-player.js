@@ -36,7 +36,7 @@ export function createHeroMediaPlayerController(options) {
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
   const NATIVE_ACTION_NEXT = "next";
   const NATIVE_ACTION_PREVIOUS = "previous";
-  const NATIVE_POLL_INTERVAL_MS = 3000;
+  const NATIVE_POLL_INTERVAL_MS = 2000;
   const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
@@ -1424,7 +1424,10 @@ export function createHeroMediaPlayerController(options) {
 
     // When in Media mode, we don't treat the internal "Hero Active" state as valid
     // unless it's explicitly matching the system media (unlikely for manual toggle).
-    const isHeroActive = mode === "app" && state.heroPlayerPostId && !!state.heroPlayerElement;
+    const isHeroActive = mode === "app"
+      && state.heroPlayerPostId
+      && !!state.heroPlayerElement
+      && elements.heroPlayerStage.contains(state.heroPlayerElement);
 
     const post = mode === "app" ? getHeroPost() : controllablePost;
 
