@@ -27,3 +27,12 @@ Thumbs.db
 
 supabase/.temp/
 .supabase/.temp/
+
+# Private backend / companion files
+backend/
+.env
+.env.*
+*.env
+node_modules/
+downloads/SignalShareDesktopCompanion/
+downloads/SignalShareDesktopCompanion.zip
