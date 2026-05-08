@@ -40,7 +40,7 @@ export function createHeroMediaPlayerController(options) {
   const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
-  const DESKTOP_POLL_INTERVAL_MS = 2500;
+  const DESKTOP_POLL_INTERVAL_MS = 2000;
   const LOCAL_NETWORK_PROMPT_COOLDOWN_MS = 30000;
 
   let listenersAttached = false;
@@ -209,11 +209,15 @@ export function createHeroMediaPlayerController(options) {
     if (now - lastNativePollTime < NATIVE_POLL_INTERVAL_MS - 200) return nativeSnapshot;
     lastNativePollTime = now;
 
-    nativeSnapshot = readNativeSnapshot();
+    const rawSnapshot = readNativeSnapshot();
+    const nextSignature = getDesktopSnapshotSignature(rawSnapshot); // Use same signature logic
+    const didChange = nextSignature !== (nativeSnapshot ? getDesktopSnapshotSignature(nativeSnapshot) : "none");
+
+    nativeSnapshot = rawSnapshot;
     if (nativeSnapshot && nativeSnapshot.active && !nativeSnapshot.artworkUri) {
       hydrateDesktopSpotifyArtwork(nativeSnapshot, getControllablePlayerPost());
     }
-    if (renderAfter) render();
+    if (renderAfter && didChange) render();
     return nativeSnapshot;
   }
 
@@ -1069,13 +1073,15 @@ export function createHeroMediaPlayerController(options) {
         } else if (action === NATIVE_ACTION_NEXT || action === NATIVE_ACTION_PREVIOUS) {
           nativeSnapshot.title = "Switching...";
         }
+        // Force a key change in the preview stage
+        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
         render();
       }
 
       const success = bridge.performNowPlayingAction(action);
       window.setTimeout(() => {
-        if (Date.now() - lastNativeActionAt > 1400) refreshNativeSnapshot();
-      }, 1500);
+        if (Date.now() - lastNativeActionAt > 900) refreshNativeSnapshot();
+      }, 1000);
       return Boolean(success);
     } catch {
       return false;
@@ -1105,6 +1111,8 @@ export function createHeroMediaPlayerController(options) {
       } else if (action === "next" || action === "previous") {
         desktopSnapshot.title = "Switching track...";
       }
+      // Force a key change in the preview stage
+      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
       render();
     }
 
@@ -1142,9 +1150,9 @@ export function createHeroMediaPlayerController(options) {
     }))
       .then((response) => response.ok ? response.json() : { ok: false })
       .then((payload) => {
-        window.setTimeout(() => {
-          if (Date.now() - lastDesktopActionAt > 2000) refreshDesktopSnapshot({ force: true });
-        }, 2200);
+        // Trigger a sequence of refreshes to catch the track change as soon as it happens
+        window.setTimeout(() => refreshDesktopSnapshot({ force: true }), 800);
+        window.setTimeout(() => refreshDesktopSnapshot({ force: true }), 2000);
         return Boolean(payload?.ok);
       })
       .catch(() => false)
@@ -1246,6 +1254,8 @@ export function createHeroMediaPlayerController(options) {
     const mode = getEffectiveHeroMode(controllablePost);
 
     if (mode === "app") {
+      // Force preview update
+      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
       stepHeroPlayer(-1);
       return;
     }
@@ -1276,6 +1286,8 @@ export function createHeroMediaPlayerController(options) {
     const mode = getEffectiveHeroMode(controllablePost);
 
     if (mode === "app") {
+      // Force preview update
+      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
       stepHeroPlayer(1);
       state.heroPlayerPlaybackState = "paused";
       render();

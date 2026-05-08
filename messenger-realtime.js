@@ -53,10 +53,10 @@ window.MessengerRealtime = class MessengerRealtime {
             this.retryTimeout = setTimeout(() => {
               this.retryTimeout = null;
               this.init();
-            }, 5000);
+            }, 7000);
           }
         }
-      });
+      }, 20000);
 
     // Heartbeat to monitor health
     if (this.heartbeat) clearInterval(this.heartbeat);
