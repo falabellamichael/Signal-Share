@@ -554,12 +554,12 @@ export function renderHeroStagePreview(options = {}) {
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
 
       const isYouTube = matchedPost?.sourceKind === "youtube" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("youtube"));
-      const shouldHideText = isYouTube && isMediaYoutubeMode;
+      const shouldHideTitle = isYouTube && isMediaYoutubeMode;
       commitCard(stage, {
-        badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
-        title: shouldHideText ? "" : (nativeSnapshot.title || matchedPost?.title || "Now playing"),
-        meta: shouldHideText ? "" : (nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback")),
-        note: shouldHideText ? "" : (nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
+        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA",
+        title: shouldHideTitle ? "" : (nativeSnapshot.title || matchedPost?.title || "Now playing"),
+        meta: nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback"),
+        note: nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing",
         artworkUrl: artworkUrl,
       });
       return;
@@ -579,12 +579,12 @@ export function renderHeroStagePreview(options = {}) {
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
 
       const isYouTube = matchedPost?.sourceKind === "youtube" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("youtube"));
-      const shouldHideText = isYouTube && isMediaYoutubeMode;
+      const shouldHideTitle = isYouTube && isMediaYoutubeMode;
       commitCard(stage, {
-        badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
-        title: shouldHideText ? "" : (desktopSnapshot.title || matchedPost?.title || "Now playing"),
-        meta: shouldHideText ? "" : (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback")),
-        note: shouldHideText ? "" : (desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
+        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA",
+        title: shouldHideTitle ? "" : (desktopSnapshot.title || matchedPost?.title || "Now playing"),
+        meta: desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback"),
+        note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
         artworkUrl: artworkUrl,
       });
       return;
@@ -674,11 +674,11 @@ export function renderHeroStagePreview(options = {}) {
   }
 
   const isYouTube = post?.sourceKind === "youtube";
-  const shouldHideText = isYouTube && isMediaYoutubeMode;
+  const shouldHideTitle = isYouTube && isMediaYoutubeMode;
   commitCard(stage, {
     badge: "",
-    title: shouldHideText ? "" : (resolvedMetadata?.title || post.title || "Now playing"),
-    meta: shouldHideText ? "" : (resolvedMetadata?.creator || formatPostMeta(post, creatorSummary)),
+    title: shouldHideTitle ? "" : (resolvedMetadata?.title || post.title || "Now playing"),
+    meta: resolvedMetadata?.creator || formatPostMeta(post, creatorSummary),
     artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
   });
 }
