@@ -66,17 +66,29 @@ export function createHeroMediaPlayerController(options) {
   const DESKTOP_ACTION_COOLDOWN_MS = 1200;
   const COMPANION_SETUP_SCRIPT = `@echo off
 setlocal
-title Signal Share Companion Setup
+title Signal Share Companion
 color 0B
+
 echo.
 echo  --------------------------------------------------------
 echo    SIGNAL SHARE COMPANION
-echo    Desktop Media Bridge Setup
+echo    Secure Desktop Media Bridge
 echo  --------------------------------------------------------
 echo.
-echo  This tool will prepare your PC to sync YouTube, Spotify,
-echo  and other system media with the Signal Share player.
-echo.
+
+:: Check for Administrator privileges
+net session >nul 2>&1
+if %errorlevel% == 0 (
+    color 0E
+    echo  [!] WARNING: Running as Administrator is NOT recommended.
+    echo  For better security, please run this script as a normal user.
+    echo.
+    choice /C YN /M "Do you want to continue as Admin anyway?"
+    if errorlevel 2 exit /b 1
+    color 0B
+)
+
+:: Check for Node.js
 node -v >nul 2>&1
 if %errorlevel% neq 0 (
     color 0C
@@ -88,34 +100,35 @@ if %errorlevel% neq 0 (
     pause
     exit /b 1
 )
-echo  [STEP 1] Installing core components...
-echo  (This may take a minute on the first run)
+
+echo  [1/2] Preparing components...
 echo.
 call npm install --no-audit --no-fund --quiet
 if %errorlevel% neq 0 (
     color 0C
     echo  [!] ERROR: Failed to install components.
-    echo  Check your internet connection and try again.
     echo.
     pause
     exit /b 1
 )
+
 echo.
-echo  [STEP 2] Launching the Media Bridge...
+echo  [2/2] Launching Secured Bridge...
 echo.
 echo  --------------------------------------------------------
 echo    SUCCESS! The bridge is now active.
 echo.
-echo    WHAT IS HAPPENING?
-echo    We are running 'npm start', which triggers a local
-echo    web server on your PC. This server securely bridges
-echo    the Signal Share website to your Windows media keys.
+echo    SECURITY HARDENING ACTIVE:
+echo    - Binding to 127.0.0.1 (Local loopback only)
+echo    - CORS Whitelisting enabled
+echo    - Rate limiting enabled
+echo    - External port exposure disabled
 echo.
 echo    IMPORTANT: Keep this window open!
-echo    If you close it, the Media Player won't be able
-echo    to control your PC playback.
+echo    If you close it, PC Media control will stop.
 echo  --------------------------------------------------------
 echo.
+
 npm start
 echo.
 echo  The bridge has stopped.
@@ -373,9 +386,17 @@ pause`.trim();
       const resolved = new URL(url, window.location.href);
       const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
       if (addressSpace !== "local" && addressSpace !== "private" && addressSpace !== "loopback") return init;
+      const secret = localStorage.getItem("ss_bridge_secret");
+      const headers = {
+        ...init.headers,
+        "target-address-space": addressSpace,
+      };
+      if (secret) {
+        headers["X-Bridge-Secret"] = secret;
+      }
       return {
         ...init,
-        targetAddressSpace: addressSpace,
+        headers,
       };
     } catch {
       return init;

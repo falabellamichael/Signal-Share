@@ -45,8 +45,21 @@ const LAST_GOOD_SNAPSHOT_MAX_AGE_MS = 15000;
 const SNAPSHOT_CACHE_TTL_MS = Number(process.env.SIGNAL_SHARE_SNAPSHOT_CACHE_TTL_MS || 3500);
 const SUPABASE_SYNC_INTERVAL_MS = Number(process.env.SIGNAL_SHARE_SYNC_INTERVAL_MS || 15000);
 const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true" || process.env.SIGNAL_SHARE_REMOTE_MEDIA === "true";
+const ALLOW_OPEN_URI = process.env.SIGNAL_SHARE_ALLOW_OPEN_URI === "true";
+const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
 const MEDIA_ACTION_COOLDOWN_MS = 900;
 const lastMediaActionAtByKey = new Map();
+
+// Rate limiting for system actions
+const actionCounts = new Map(); // ip -> { count, resetAt }
+const MAX_ACTIONS_PER_MINUTE = 30;
+
+const CORS_WHITELIST = [
+  "https://signal-share.pages.dev",
+  "https://signal-share.com",
+  "http://localhost",
+  "http://127.0.0.1"
+];
 
 let lastGoodSnapshot = null;
 let lastGoodSnapshotAt = 0;
@@ -63,16 +76,52 @@ const supabase = createClient(
 );
 
 app.use(express.json({ limit: "1mb" }));
+
+// Security & CORS Middleware
 app.use((req, res, next) => {
-  const requestedHeaders = req.headers["access-control-request-headers"];
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", requestedHeaders || "Content-Type, target-address-space");
-  res.setHeader("Access-Control-Allow-Private-Network", "true");
-  if (req.method === "OPTIONS") {
-    res.sendStatus(204);
-    return;
+  const origin = req.headers.origin;
+  const isWhitelisted = origin && CORS_WHITELIST.some(allowed => origin.startsWith(allowed));
+  const isLocalhost = !origin || origin.includes("localhost") || origin.includes("127.0.0.1");
+
+  if (isWhitelisted || isLocalhost) {
+    res.setHeader("Access-Control-Allow-Origin", origin || "*");
   }
+  
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, target-address-space");
+  res.setHeader("Access-Control-Allow-Private-Network", "true");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  // Secret Token Validation
+  if (BRIDGE_SECRET && req.path.startsWith("/api/system-media")) {
+    const providedSecret = req.headers['x-bridge-secret'];
+    if (providedSecret !== BRIDGE_SECRET) {
+      console.warn(`[Security] Unauthorized access attempt from ${req.ip}`);
+      return res.status(403).json({ error: "Unauthorized: Invalid Bridge Secret" });
+    }
+  }
+
+  // Simple Rate Limiting for Actions
+  if (req.method === "POST" && req.path.endsWith("/action")) {
+    const now = Date.now();
+    const state = actionCounts.get(req.ip) || { count: 0, resetAt: now + 60000 };
+    
+    if (now > state.resetAt) {
+      state.count = 0;
+      state.resetAt = now + 60000;
+    }
+    
+    state.count++;
+    actionCounts.set(req.ip, state);
+    
+    if (state.count > MAX_ACTIONS_PER_MINUTE) {
+      return res.status(429).json({ error: "Too many actions. Please slow down." });
+    }
+  }
+
   next();
 });
 
@@ -503,6 +552,9 @@ app.post("/api/system-media/action", async (req, res) => {
   const action = `${req.body?.action || ""}`.trim().toLowerCase();
   const appPackage = `${req.body?.appPackage || ""}`.trim();
   if (action === "open_uri") {
+    if (!ALLOW_OPEN_URI) {
+      return res.status(403).json({ ok: false, error: "open_uri is disabled for security." });
+    }
     const uri = `${req.body?.uri || ""}`.trim();
     if (!uri) return res.status(400).json({ ok: false });
     // Use PowerShell to start the URI
@@ -593,7 +645,7 @@ function subscribeToMediaActions() {
   }).subscribe();
 }
 
-app.listen(port, "0.0.0.0", () => {
+app.listen(port, "127.0.0.1", () => {
   console.log(`[Bridge] Server on http://localhost:${port}`);
   if (isWindows && enableRemoteMediaSync && userId) {
     console.log(`[Bridge] Remote media sync enabled for ${userId}.`);
