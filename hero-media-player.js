@@ -257,11 +257,16 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (state.heroControlSource && state.heroControlSource !== "all") {
       const title = normalizeText(snapshot.title);
       const meta = normalizeText(snapshot.meta);
+      const openUri = normalizeText(snapshot.openUri);
+      
       if (state.heroControlSource === "youtube") {
-        return title.includes("youtube") || meta.includes("youtube");
+        if (title.includes("youtube") || meta.includes("youtube") || openUri.includes("youtube.com")) return true;
+        // Check for 11-char video ID in title/meta as a last resort
+        const ytIdPattern = /[a-zA-Z0-9_-]{11}/;
+        if (ytIdPattern.test(snapshot.title) || ytIdPattern.test(snapshot.meta)) return true;
       }
       if (state.heroControlSource === "spotify") {
-        return title.includes("spotify") || meta.includes("spotify");
+        return title.includes("spotify") || meta.includes("spotify") || openUri.includes("spotify.com");
       }
     }
 
@@ -1289,6 +1294,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       body: JSON.stringify({
         action,
         appPackage: desktopSnapshot?.appPackage || "",
+        preferredSource: state.heroControlSource || "",
         ...payload
       }),
     }))

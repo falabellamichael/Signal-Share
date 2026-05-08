@@ -471,23 +471,25 @@ function buildSnapshotPayload({ force = false, preferredSource = "" } = {}) {
   cachedSnapshotAt = now;
   return payload;
 }
-
 function invalidateSnapshotCache() {
   cachedSnapshotPayload = null;
   cachedSnapshotAt = 0;
 }
-function sendSystemMediaKey(action, targetAppPackage = "") {
+function sendSystemMediaKey(action, targetAppPackage = "", preferredSource = "") {
   const vkCode = MEDIA_KEY_CODES[action];
-  const appCommand = APP_COMMAND_CODES[action];
   const winrtMethodName = WINRT_ACTION_METHODS[action];
-  if (!vkCode || !appCommand || !winrtMethodName) return Promise.resolve(false);
+  if (!vkCode || !winrtMethodName) return Promise.resolve(false);
 
   const script = `
 $ErrorActionPreference = "Stop"
 $winRtSuccess = $false
 $targetApp = [string]$env:SIGNAL_SHARE_TARGET_APP
+$preferred = [string]$env:SIGNAL_SHARE_PREFERRED_SOURCE
+
 if ($null -eq $targetApp) { $targetApp = "" }
+if ($null -eq $preferred) { $preferred = "" }
 $targetApp = $targetApp.Trim()
+$preferred = $preferred.Trim().ToLower()
 
 function Normalize-AppId([string]$value) {
   if ([string]::IsNullOrWhiteSpace($value)) { return "" }
@@ -501,17 +503,44 @@ function Matches-AppId([string]$candidate, [string]$target) {
   $candidateNorm = Normalize-AppId $candidate
   $targetNorm = Normalize-AppId $target
   if ([string]::IsNullOrWhiteSpace($candidateNorm) -or [string]::IsNullOrWhiteSpace($targetNorm)) { return $false }
-  if ($candidateNorm -eq $targetNorm) { return $true }
-  if ($candidateNorm.StartsWith($targetNorm)) { return $true }
-  if ($targetNorm.StartsWith($candidateNorm)) { return $true }
-  return $false
+  return ($candidateNorm -eq $targetNorm) -or ($candidateNorm.StartsWith($targetNorm)) -or ($targetNorm.StartsWith($candidateNorm))
+}
+
+function Is-Match-Source($s, $p) {
+  if ([string]::IsNullOrWhiteSpace($p) -or $p -eq "all") { return $true }
+  $id = Normalize-AppId $s.SourceAppUserModelId
+  $isBrowser = $id -match "chrome|edge|firefox|browser"
+  
+  if ($p -eq "youtube") {
+    if ($id -match "youtube|ytmusic") { return $true }
+    if ($isBrowser) {
+       try {
+         $m = $s.TryGetMediaPropertiesAsync().GetResults()
+         if ($m.Title -match "youtube" -or $m.AlbumTitle -match "youtube") { return $true }
+         # Check for 11-char video ID in title
+         if ($m.Title -match "[a-zA-Z0-9_-]{11}") { return $true }
+       } catch {}
+    }
+    return $false
+  }
+  if ($p -eq "spotify") {
+    if ($id -like "*spotify*") { return $true }
+    if ($isBrowser) {
+       try {
+         $m = $s.TryGetMediaPropertiesAsync().GetResults()
+         if ($m.Title -match "spotify" -or $m.AlbumTitle -match "spotify") { return $true }
+       } catch {}
+    }
+    return $false
+  }
+  return $true
 }
 
 try {
   Add-Type -AssemblyName System.Runtime.WindowsRuntime
   $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime]
   $asTaskMethod = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
-    $_.ToString() -eq 'System.Threading.Tasks.Task\\\`1[TResult] AsTask[TResult](Windows.Foundation.IAsyncOperation\\\`1[TResult])'
+    $_.ToString() -eq 'System.Threading.Tasks.Task\`1[TResult] AsTask[TResult](Windows.Foundation.IAsyncOperation\`1[TResult])'
   } | Select-Object -First 1
 
   if ($asTaskMethod -ne $null) {
@@ -520,20 +549,29 @@ try {
     $manager = $managerTask.Result
     $session = $null
 
-    if ($manager -ne $null -and -not [string]::IsNullOrWhiteSpace($targetApp)) {
-      try {
-        foreach ($candidate in $manager.GetSessions()) {
-          if ($null -eq $candidate) { continue }
-          if (Matches-AppId $candidate.SourceAppUserModelId $targetApp) {
-            $session = $candidate
-            break
+    if ($manager -ne $null) {
+      $sessions = $manager.GetSessions()
+      if (-not [string]::IsNullOrWhiteSpace($targetApp)) {
+        foreach ($s in $sessions) {
+          if (Matches-AppId $s.SourceAppUserModelId $targetApp) {
+            if (Is-Match-Source $s $preferred) {
+              $session = $s
+              break
+            }
           }
         }
-      } catch {}
-    }
-
-    if ($session -eq $null -and $manager -ne $null) {
-      $session = $manager.GetCurrentSession()
+      }
+      if ($session -eq $null -and -not [string]::IsNullOrWhiteSpace($preferred) -and $preferred -ne "all") {
+        foreach ($s in $sessions) {
+           if (Is-Match-Source $s $preferred) {
+             $session = $s
+             break
+           }
+        }
+      }
+      if ($session -eq $null -and ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all")) {
+        $session = $manager.GetCurrentSession()
+      }
     }
 
     if ($session -ne $null) {
@@ -549,33 +587,32 @@ try {
 
 if ($winRtSuccess) {
   Write-Output "ok"
-  exit 0
-}
-
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-public static class MediaKeySender {
-  [DllImport("user32.dll", SetLastError=true)]
-  public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-}
+} else {
+  Add-Type @"
+  using System;
+  using System.Runtime.InteropServices;
+  public static class MediaKeySender {
+    [DllImport("user32.dll", SetLastError=true)]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+  }
 "@
-
-$KEYEVENTF_EXTENDEDKEY = 0x0001
-$KEYEVENTF_KEYUP = 0x0002
-
-# Send exactly one media-key event. Do not also broadcast WM_APPCOMMAND,
-# because Chrome/YouTube/Spotify may receive both and toggle twice.
-[MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
-Start-Sleep -Milliseconds 45
-[MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
-Write-Output "ok"
-  `.trim();
+  $KEYEVENTF_EXTENDEDKEY = 0x0001
+  $KEYEVENTF_KEYUP = 0x0002
+  [MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
+  Start-Sleep -Milliseconds 45
+  [MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
+  Write-Output "ok"
+}
+`.trim();
 
   return new Promise((resolve) => {
     const child = spawn("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], {
       windowsHide: true,
-      env: { ...process.env, SIGNAL_SHARE_TARGET_APP: targetAppPackage },
+      env: { 
+        ...process.env, 
+        SIGNAL_SHARE_TARGET_APP: targetAppPackage,
+        SIGNAL_SHARE_PREFERRED_SOURCE: preferredSource
+      },
     });
     let stdout = "";
     let stderr = "";
@@ -599,9 +636,11 @@ app.get("/api/system-media/current", (req, res) => {
   }
 });
 
-app.post("/api/system-media/action", async (req, res) => {
+app.post("/api/system-media/action", rateLimitSystemMediaAction, async (req, res) => {
   const action = `${req.body?.action || ""}`.trim().toLowerCase();
   const appPackage = `${req.body?.appPackage || ""}`.trim();
+  const preferredSource = `${req.body?.preferredSource || ""}`.trim();
+
   if (action === "open_uri") {
     if (!ALLOW_OPEN_URI) {
       return res.status(403).json({ ok: false, error: "open_uri is disabled for security." });
@@ -622,7 +661,7 @@ app.post("/api/system-media/action", async (req, res) => {
   }
   lastMediaActionAtByKey.set(actionKey, now);
 
-  const ok = await sendSystemMediaKey(action, appPackage);
+  const ok = await sendSystemMediaKey(action, appPackage, preferredSource);
   invalidateSnapshotCache();
   res.json({ ok });
 
