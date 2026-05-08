@@ -593,16 +593,7 @@ export function createAppUi(context) {
   }
 
   function setHeroControlSource(source) {
-    const btn = source === "youtube" ? elements.heroSourceYoutube : elements.heroSourceSpotify;
-    if (btn && btn.disabled) {
-      showToast(`${formatProviderName(source)} control requires the Companion Bridge to be running on your PC.`, "info");
-      return;
-    }
-
-    // Automatically switch to Media mode if we are picking a system source
-    if (state.heroControlMode === "feed") {
-      setHeroControlMode("media");
-    }
+    if (state.heroControlMode !== "media") return;
 
     if (heroMediaPlayerController && typeof heroMediaPlayerController.setHeroControlSource === "function") {
       heroMediaPlayerController.setHeroControlSource(source);
@@ -630,9 +621,9 @@ export function createAppUi(context) {
     // Hero Media Player Controls - Centralized Sync
     const isHeroFeedMode = state.heroControlMode === "feed";
     const isHeroMediaMode = state.heroControlMode === "media";
-    const bridgeSnapshot = heroMediaPlayerController?.getSnapshot?.();
-    const bridgeAvailable = Boolean(bridgeSnapshot?.desktop?.available || bridgeSnapshot?.isBridgeDetected);
-    const canToggleSource = bridgeAvailable;
+
+    // Use mode-based availability for zero lag
+    const canToggleSource = isHeroMediaMode;
 
     if (elements.heroModeFeed) elements.heroModeFeed.classList.toggle("is-active", isHeroFeedMode);
     if (elements.heroModeMedia) elements.heroModeMedia.classList.toggle("is-active", isHeroMediaMode);
