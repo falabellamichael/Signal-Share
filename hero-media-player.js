@@ -638,7 +638,7 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     // Enforce source filter: if a source is selected, only allow that source through
     if (state.heroControlSource && state.heroControlSource !== "all") {
-      if (!isPreferredNowPlayingSnapshot(snapshot)) {
+      if (snapshot.active && !isPreferredNowPlayingSnapshot(snapshot)) {
         return {
           ...snapshot,
           active: false,
