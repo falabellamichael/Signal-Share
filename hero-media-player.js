@@ -30,6 +30,7 @@ export function createHeroMediaPlayerController(options) {
     stepHeroPlayer,
     getHeroPlayablePosts,
     resolveYouTubePreviewId,
+    isNativeCapacitorApp,
   } = options;
 
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
@@ -723,7 +724,12 @@ export function createHeroMediaPlayerController(options) {
           state.desktopBridgeSuspended = true;
         }
 
-        if (desktopPollFailureCount % 10 === 1) {
+        // Only warn occasionally, and never if suspended or on native app
+        const shouldWarn = !state.desktopBridgeSuspended 
+          && !isNativeCapacitorApp() 
+          && (desktopPollFailureCount % 30 === 1);
+
+        if (shouldWarn) {
            console.warn("[Hero] Desktop media bridge not detected. Ensure the companion app is running.");
         }
 

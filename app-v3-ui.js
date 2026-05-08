@@ -372,6 +372,7 @@ export function createAppUi(context) {
     stepHeroPlayer,
     getHeroPlayablePosts,
     resolveYouTubePreviewId,
+    isNativeCapacitorApp,
   });
 
   function attachEventListeners() {
