@@ -1530,10 +1530,9 @@ export function createHeroMediaPlayerController(options) {
         mode,
         post: mode === "app" ? post : null, // ONLY pass the feed post if we are in app mode
         fallbackMedia,
-        nativeSnapshot,
         desktopSnapshot,
         matchedPost,
-        showCompanionCard: mode === "desktop" && !desktopSnapshot?.active && !companionPromptDismissed,
+        showCompanionCard: mode === "desktop" && !desktopSnapshot?.active,
         active: mode !== "app" // Treat media modes as "active" to show info/matched player
       }));
     }
