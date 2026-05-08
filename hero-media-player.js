@@ -1545,17 +1545,26 @@ You can inspect the source code of the server.js file included in the companion 
     const canStep = playableCount > 1;
     const hasPost = Boolean(heroPost);
 
-    // Toggle Button Highlighting
+    // Toggle Button Highlighting - Only update if changed
     if (elements.heroModeFeed) {
-      elements.heroModeFeed.classList.toggle("is-active", state.heroControlMode === "feed");
+      const isFeedActive = state.heroControlMode === "feed";
+      if (elements.heroModeFeed.classList.contains("is-active") !== isFeedActive) {
+        elements.heroModeFeed.classList.toggle("is-active", isFeedActive);
+      }
     }
     if (elements.heroModeMedia) {
-      elements.heroModeMedia.classList.toggle("is-active", state.heroControlMode === "media");
+      const isMediaActive = state.heroControlMode === "media";
+      if (elements.heroModeMedia.classList.contains("is-active") !== isMediaActive) {
+        elements.heroModeMedia.classList.toggle("is-active", isMediaActive);
+      }
     }
 
-    elements.heroPlayerPrevButton.disabled = !canStep;
-    elements.heroPlayerNextButton.disabled = !canStep;
-    elements.heroPlayerPlayPauseButton.disabled = !hasPost;
+    if (elements.heroPlayerPrevButton.disabled !== !canStep) {
+      elements.heroPlayerPrevButton.disabled = !canStep;
+    }
+    if (elements.heroPlayerNextButton.disabled !== !canStep) {
+      elements.heroPlayerNextButton.disabled = !canStep;
+    }
 
     if (!hasNativeSnapshotBridge()) {
       nativeSnapshot = null;
@@ -1603,59 +1612,86 @@ You can inspect the source code of the server.js file included in the companion 
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
 
+    let nextHeader = "";
+    let nextTitle = "";
+    let nextCaption = "";
+    let nextStatus = "";
+
     if (mode === "device") {
-      elements.heroPlayerHeader.textContent = "Device System Media";
+      nextHeader = "Device System Media";
       if (nativeSnapshot?.permissionRequired) {
-        elements.heroPlayerTitle.textContent = "Enable device media access";
-        elements.heroPlayerCaption.textContent = "Allow notification access so this panel can control what is playing on your device.";
-        elements.heroPlayerStatus.textContent = "Access Required";
+        nextTitle = "Enable device media access";
+        nextCaption = "Allow notification access so this panel can control what is playing on your device.";
+        nextStatus = "Access Required";
       } else if (nativeSnapshot?.active) {
-        elements.heroPlayerTitle.textContent = nativeSnapshot.title || "Now playing";
-        elements.heroPlayerCaption.textContent = nativeSnapshot.meta || "Device playback";
-        elements.heroPlayerStatus.textContent = "Device system media";
+        nextTitle = nativeSnapshot.title || "Now playing";
+        nextCaption = nativeSnapshot.meta || "Device playback";
+        nextStatus = "Device system media";
       } else {
-        elements.heroPlayerTitle.textContent = "Device media idle";
-        elements.heroPlayerCaption.textContent = "Start playback in any media app to control it here.";
-        elements.heroPlayerStatus.textContent = "Device system media";
+        nextTitle = "Device media idle";
+        nextCaption = "Start playback in any media app to control it here.";
+        nextStatus = "Device system media";
       }
     } else if (mode === "desktop") {
-      elements.heroPlayerHeader.textContent = "PC System Media";
+      nextHeader = "PC System Media";
       if (desktopSnapshot?.active) {
-        elements.heroPlayerTitle.textContent = desktopSnapshot.title || "Now playing";
-        elements.heroPlayerCaption.textContent = desktopSnapshot.meta || "Desktop playback";
-        elements.heroPlayerStatus.textContent = "PC system media";
+        nextTitle = desktopSnapshot.title || "Now playing";
+        nextCaption = desktopSnapshot.meta || "Desktop playback";
+        nextStatus = "PC system media";
       } else {
-        elements.heroPlayerTitle.textContent = "PC media idle";
-        elements.heroPlayerCaption.textContent = "Start playback in YouTube, Spotify, or another desktop app.";
-        elements.heroPlayerStatus.textContent = "PC system media";
+        nextTitle = "PC media idle";
+        nextCaption = "Start playback in YouTube, Spotify, or another desktop app.";
+        nextStatus = "PC system media";
       }
     } else if (mode === "app" && !post && fallbackMedia instanceof HTMLMediaElement) {
-      elements.heroPlayerHeader.textContent = "Browser Media";
+      nextHeader = "Browser Media";
       const fallbackTitle = browserMetadata?.title || fallbackMedia.getAttribute("title") || "Now playing in this browser";
       const fallbackMeta = [browserMetadata?.artist, browserMetadata?.album].filter(Boolean).join(" · ");
-      elements.heroPlayerTitle.textContent = fallbackTitle;
-      elements.heroPlayerCaption.textContent = fallbackMeta || "Active browser media session";
-      elements.heroPlayerStatus.textContent = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
+      nextTitle = fallbackTitle;
+      nextCaption = fallbackMeta || "Active browser media session";
+      nextStatus = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
     } else if (mode === "app" && !post) {
-      elements.heroPlayerHeader.textContent = "App Media";
-      elements.heroPlayerTitle.textContent = "Ready to play";
-      elements.heroPlayerCaption.textContent = "";
-      elements.heroPlayerStatus.textContent = "App media standby";
+      nextHeader = "App Media";
+      nextTitle = "Ready to play";
+      nextCaption = "";
+      nextStatus = "App media standby";
     } else {
       const creatorSummary = getProfileSummaryForPost(post);
+      const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
       const providerName = post?.sourceKind === "youtube" ? "YouTube" : (post?.sourceKind === "spotify" ? "Spotify" : "App");
-      elements.heroPlayerHeader.textContent = `${providerName} Preview`;
-      elements.heroPlayerTitle.textContent = post?.title || "Ready to play";
-      elements.heroPlayerCaption.textContent = post ? `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}` : "";
-      elements.heroPlayerStatus.textContent = post ? `${creatorSummary?.displayName ?? post.creator} · ${formatTimestamp(post.createdAt)}` : "App media standby";
+
+      nextHeader = `${providerName.toUpperCase()} PREVIEW`;
+      nextTitle = post?.title || "Ready to play";
+      nextCaption = post ? `${post.caption} · ${creatorName}` : "";
+      nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
     }
 
-    elements.heroPlayerPlayPauseButton.textContent = playbackState === "playing" ? "Pause" : "Play";
-    elements.heroPlayerPlayPauseButton.disabled = mode === "app" && !post;
+    // Only touch the DOM if values have changed
+    if (elements.heroPlayerHeader.textContent !== nextHeader) elements.heroPlayerHeader.textContent = nextHeader;
+    if (elements.heroPlayerTitle.textContent !== nextTitle) elements.heroPlayerTitle.textContent = nextTitle;
+    if (elements.heroPlayerCaption.textContent !== nextCaption) elements.heroPlayerCaption.textContent = nextCaption;
+    if (elements.heroPlayerStatus.textContent !== nextStatus) elements.heroPlayerStatus.textContent = nextStatus;
 
-    elements.heroPlayerVolumeSlider.disabled = !supportsVolume;
-    elements.heroPlayerVolumeSlider.value = `${volumePercent}`;
-    elements.heroPlayerVolumeValue.textContent = supportsVolume ? `${volumePercent}%` : "--";
+    const playPauseLabel = playbackState === "playing" ? "Pause" : "Play";
+    if (elements.heroPlayerPlayPauseButton.textContent !== playPauseLabel) {
+      elements.heroPlayerPlayPauseButton.textContent = playPauseLabel;
+    }
+
+    const isPlayPauseDisabled = mode === "app" && !post;
+    if (elements.heroPlayerPlayPauseButton.disabled !== isPlayPauseDisabled) {
+      elements.heroPlayerPlayPauseButton.disabled = isPlayPauseDisabled;
+    }
+
+    if (elements.heroPlayerVolumeSlider.disabled !== !supportsVolume) {
+      elements.heroPlayerVolumeSlider.disabled = !supportsVolume;
+    }
+    if (elements.heroPlayerVolumeSlider.value !== String(volumePercent)) {
+      elements.heroPlayerVolumeSlider.value = String(volumePercent);
+    }
+    const volumeText = supportsVolume ? `${volumePercent}%` : "--";
+    if (elements.heroPlayerVolumeValue.textContent !== volumeText) {
+      elements.heroPlayerVolumeValue.textContent = volumeText;
+    }
 
     if (!isHeroActive) {
       renderHeroStagePreview(Object.assign({}, options, {
@@ -1669,13 +1705,10 @@ You can inspect the source code of the server.js file included in the companion 
         active: mode !== "app" // Treat media modes as "active" to show info/matched player
       }));
     }
-    elements.heroPlayerVolumeSlider.disabled = !supportsVolume;
-    elements.heroPlayerVolumeSlider.value = volumePercent;
-    elements.heroPlayerVolumeValue.textContent = `${volumePercent}%`;
 
     syncMediaSession({
-      title: elements.heroPlayerTitle.textContent,
-      artist: elements.heroPlayerCaption.textContent,
+      title: nextTitle,
+      artist: nextCaption,
       artwork: post ? resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl }) : (browserMetadata?.artwork || ""),
     });
     if (typeof renderMiniPlayer === "function") renderMiniPlayer();
