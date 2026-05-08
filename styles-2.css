@@ -1869,7 +1869,7 @@
   height: 100%;
   object-fit: cover;
   opacity: 0.26;
-  filter: blur(1.5px);
+  filter: blur(0.3px);
   pointer-events: none;
   z-index: 0;
   transition: opacity 340ms ease;
