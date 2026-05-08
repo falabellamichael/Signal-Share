@@ -551,7 +551,7 @@ export function renderHeroStagePreview(options = {}) {
       commitCard(stage, {
         badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA",
         title: nativeSnapshot.title || matchedPost?.title || "Now playing",
-        meta: nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback"),
+        meta: options.hideMeta ? "" : (nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback")),
         note: nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing",
         artworkUrl: artworkUrl,
       });
@@ -574,7 +574,7 @@ export function renderHeroStagePreview(options = {}) {
       commitCard(stage, {
         badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA",
         title: desktopSnapshot.title || matchedPost?.title || "Now playing",
-        meta: desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback"),
+        meta: options.hideMeta ? "" : (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback")),
         note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
         artworkUrl: artworkUrl,
       });
@@ -640,7 +640,7 @@ export function renderHeroStagePreview(options = {}) {
     commitCard(stage, {
       badge: "",
       title: post.title || "Now playing",
-      meta: formatPostMeta(post, creatorSummary),
+      meta: options.hideMeta ? "" : formatPostMeta(post, creatorSummary),
       artworkUrl: artworkUrl,
     });
 
@@ -650,7 +650,7 @@ export function renderHeroStagePreview(options = {}) {
         commitCard(stage, {
           badge: "",
           title: metadata?.title || post.title || "Now playing",
-          meta: metadata.creator || "",
+          meta: options.hideMeta ? "" : (metadata.creator || ""),
           artworkUrl: metadata?.artworkUrl || artworkUrl,
         });
       }
@@ -663,7 +663,7 @@ export function renderHeroStagePreview(options = {}) {
   commitCard(stage, {
     badge: "",
     title: resolvedMetadata?.title || post.title || "Now playing",
-    meta: resolvedMetadata?.creator || formatPostMeta(post, creatorSummary),
+    meta: options.hideMeta ? "" : (resolvedMetadata?.creator || formatPostMeta(post, creatorSummary)),
     artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
   });
 }
