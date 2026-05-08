@@ -1390,7 +1390,7 @@ export function createHeroMediaPlayerController(options) {
 
     elements.heroPlayerStage?.addEventListener("click", (e) => {
       if (e.target.closest(".hero-companion-download-btn")) {
-        downloadCompanion();
+        showSetupInstructions();
       }
     });
     elements.heroPlayerPrevButton.addEventListener("click", (event) => {
