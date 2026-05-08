@@ -2067,9 +2067,12 @@ The companion bridge is designed with several security layers to keep your PC sa
       nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
     }
 
+    const isYouTubeMode = getPreferredHeroControlSource() === "youtube" || post?.sourceKind === "youtube";
+    const displayTitle = isYouTubeMode ? "" : nextTitle;
+
     // Only touch the DOM if values have changed
     if (elements.heroPlayerHeader.textContent !== nextHeader) elements.heroPlayerHeader.textContent = nextHeader;
-    if (elements.heroPlayerTitle.textContent !== nextTitle) elements.heroPlayerTitle.textContent = nextTitle;
+    if (elements.heroPlayerTitle.textContent !== displayTitle) elements.heroPlayerTitle.textContent = displayTitle;
     if (elements.heroPlayerCaption.textContent !== nextCaption) elements.heroPlayerCaption.textContent = nextCaption;
     if (elements.heroPlayerStatus.textContent !== nextStatus) elements.heroPlayerStatus.textContent = nextStatus;
 

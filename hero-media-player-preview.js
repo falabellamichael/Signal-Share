@@ -231,10 +231,12 @@ export function createPreviewCard({ badge = "", title = "", meta = "", note = ""
     copy.appendChild(badgeNode);
   }
 
-  const titleNode = document.createElement("p");
-  titleNode.className = "hero-player-preview-title";
-  titleNode.textContent = title || "Ready to play";
-  copy.appendChild(titleNode);
+  if (title) {
+    const titleNode = document.createElement("p");
+    titleNode.className = "hero-player-preview-title";
+    titleNode.textContent = title;
+    copy.appendChild(titleNode);
+  }
 
   if (meta) {
     const metaNode = document.createElement("p");
@@ -546,11 +548,12 @@ export function renderHeroStagePreview(options = {}) {
 
     if (nativeSnapshot?.active) {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
+      const isYouTube = matchedPost?.sourceKind === "youtube" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("youtube"));
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
 
       commitCard(stage, {
         badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA",
-        title: nativeSnapshot.title || matchedPost?.title || "Now playing",
+        title: isYouTube ? "" : (nativeSnapshot.title || matchedPost?.title || "Now playing"),
         meta: nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback"),
         note: nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing",
         artworkUrl: artworkUrl,
@@ -569,11 +572,12 @@ export function renderHeroStagePreview(options = {}) {
   if (mode === "desktop") {
     if (desktopSnapshot?.active) {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
+      const isYouTube = matchedPost?.sourceKind === "youtube" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("youtube"));
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
 
       commitCard(stage, {
         badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA",
-        title: desktopSnapshot.title || matchedPost?.title || "Now playing",
+        title: isYouTube ? "" : (desktopSnapshot.title || matchedPost?.title || "Now playing"),
         meta: desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback"),
         note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
         artworkUrl: artworkUrl,
@@ -660,9 +664,10 @@ export function renderHeroStagePreview(options = {}) {
     return;
   }
 
+  const isYouTube = post?.sourceKind === "youtube";
   commitCard(stage, {
     badge: "",
-    title: resolvedMetadata?.title || post.title || "Now playing",
+    title: isYouTube ? "" : (resolvedMetadata?.title || post.title || "Now playing"),
     meta: resolvedMetadata?.creator || formatPostMeta(post, creatorSummary),
     artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
   });
