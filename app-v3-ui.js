@@ -2076,6 +2076,8 @@ export function createAppUi(context) {
   }
 
 
+  async function fetchSpotifyPreviewOEmbedMetadata(sourceUrl) { return null; }
+
   function getSpotifyPreviewMarket() { const locale = (Array.isArray(navigator.languages) && navigator.languages[0]) || navigator.language || navigator.userLanguage || ""; const match = `${locale}`.trim().match(/[-_]([A-Za-z]{2})$/); return match ? match[1].toUpperCase() : "US"; }
 
   function resolveYouTubePreviewCandidates(source) {
