@@ -1599,7 +1599,7 @@ export function createHeroMediaPlayerController(options) {
   }
 
   function downloadCompanion() {
-    const downloadUrl = "https://github.com/falabellamichael/Signal-Share/releases/latest";
+    const downloadUrl = "https://github.com/falabellamichael/Signal-Share";
     window.open(downloadUrl, "_blank");
     companionPromptDismissed = true;
     localStorage.setItem("ss_companion_dismissed", "true");
