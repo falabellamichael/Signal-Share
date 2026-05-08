@@ -1603,6 +1603,9 @@ The companion bridge is designed with several security layers to keep your PC sa
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
     const matchedPost = mode === "desktop" && desktopSnapshot?.active ? findMatchedPost(desktopSnapshot) : null;
 
+    let externalMetadata = null;
+    let isMetadataFetching = false;
+
     let nextHeader = "";
     let nextTitle = "";
     let nextCaption = "";
@@ -1657,9 +1660,6 @@ The companion bridge is designed with several security layers to keep your PC sa
     } else {
       const creatorSummary = getProfileSummaryForPost(post);
       const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
-      
-      let externalMetadata = null;
-      let isMetadataFetching = false;
 
       if (post && (post.sourceKind === "youtube" || post.sourceKind === "spotify")) {
         const metadata = getExternalPreviewMetadata(post);
