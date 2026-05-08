@@ -1501,43 +1501,33 @@ export function createAppUi(context) {
      if (!post || !elements.heroPlayerStage) return;
      const { autoplay = false } = options;
      
-     if (post.sourceKind === "youtube") {
-       mountHeroYouTube(post, options);
-       return;
-     }
- 
-     // If we already have this post mounted in the hero element, just ensure it's playing if requested
-     if (state.heroPlayerPostId === post.id && state.heroPlayerElement) {
-       if (autoplay) {
-         const media = state.heroPlayerElement instanceof HTMLMediaElement 
-           ? state.heroPlayerElement 
-           : state.heroPlayerElement.querySelector("video, audio");
-         if (media instanceof HTMLMediaElement) media.play().catch(() => {});
-       }
-       return;
-     }
- 
-     // If another post was playing, stop it
+     // Stop existing playback if any
      if (state.heroPlayerElement) {
        const oldMedia = state.heroPlayerElement instanceof HTMLMediaElement 
          ? state.heroPlayerElement 
-         : state.heroPlayerElement.querySelector("video, audio");
+         : state.heroPlayerElement.querySelector?.("video, audio");
        if (oldMedia instanceof HTMLMediaElement) oldMedia.pause();
+
+       const oldFrame = state.heroPlayerElement instanceof HTMLIFrameElement
+         ? state.heroPlayerElement
+         : state.heroPlayerElement.querySelector?.("iframe");
+       if (oldFrame) oldFrame.src = "about:blank";
      }
- 
+
      state.heroPlayerPostId = post.id;
      state.heroPlayerElement = createPersistentPlayer(post);
      
      if (autoplay) {
        const media = state.heroPlayerElement instanceof HTMLMediaElement 
          ? state.heroPlayerElement 
-         : state.heroPlayerElement.querySelector("video, audio");
+         : state.heroPlayerElement.querySelector?.("video, audio");
        if (media instanceof HTMLMediaElement) {
          media.autoplay = true;
          media.play().catch(() => {});
        }
+       // YouTube/Spotify autoplay is handled via URL params in createActivePlayerDescriptor/Stage
      }
- 
+
      elements.heroPlayerStage.replaceChildren(state.heroPlayerElement);
      applyPlayerVolumeToActiveElement();
    }
@@ -1637,9 +1627,14 @@ export function createAppUi(context) {
     const activeEl = state.heroPlayerElement || state.activePlayerElement;
     if (activeEl instanceof HTMLElement) {
       if (activeEl instanceof HTMLMediaElement) return activeEl;
+
       const mediaElement = activeEl.querySelector("video, audio");
       if (mediaElement instanceof HTMLMediaElement) return mediaElement;
+
       if (activeEl instanceof HTMLIFrameElement) return activeEl;
+
+      const iframeElement = activeEl.querySelector("iframe");
+      if (iframeElement instanceof HTMLIFrameElement) return iframeElement;
     }
     const heroStage = elements?.heroPlayerStage || document.querySelector("#heroPlayerStage");
     if (heroStage) {
@@ -1792,9 +1787,40 @@ export function createAppUi(context) {
   function attachPersistentPlayerMediaListeners(mediaElement) { if (!(mediaElement instanceof HTMLMediaElement)) return; mediaElement.addEventListener("volumechange", syncPlayerVolumeFromMediaElement); mediaElement.addEventListener("play", syncPlayerPlaybackFromMediaElement); mediaElement.addEventListener("pause", syncPlayerPlaybackFromMediaElement); mediaElement.addEventListener("ended", syncPlayerPlaybackFromMediaElement); }
 
   function applyPlayerVolumeToActiveElement() {
-    const mediaElement = getActivePlayerMediaElement(); if (mediaElement instanceof HTMLMediaElement) { const nextVolume = normalizePlayerVolume(state.playerVolume); mediaElement.volume = nextVolume; mediaElement.muted = nextVolume === 0; return true; }
-    const post = getControllablePlayerPost(); if (post?.sourceKind === "youtube" && state.activePlayerElement instanceof HTMLIFrameElement) { const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100); postMessageToYouTubePlayer(state.activePlayerElement, "setVolume", [volumePercent]); postMessageToYouTubePlayer(state.activePlayerElement, volumePercent === 0 ? "mute" : "unMute"); return true; }
-    return false;
+    const el = getActivePlayerMediaElement();
+    if (el instanceof HTMLMediaElement) {
+      const nextVolume = normalizePlayerVolume(state.playerVolume);
+      el.volume = nextVolume;
+      el.muted = nextVolume === 0;
+      return true;
+    }
+
+    // Handle YouTube iframes in either Mini or Hero player
+    const controllablePost = getControllablePlayerPost();
+    const heroPost = getPostById(state.heroPlayerPostId);
+    const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
+
+    let handled = false;
+
+    // Check Mini/Viewer shared element
+    if (controllablePost?.sourceKind === "youtube" && state.activePlayerElement instanceof HTMLIFrameElement) {
+      postMessageToYouTubePlayer(state.activePlayerElement, "setVolume", [volumePercent]);
+      postMessageToYouTubePlayer(state.activePlayerElement, volumePercent === 0 ? "mute" : "unMute");
+      handled = true;
+    }
+
+    // Check Hero element (it might be a container div or the iframe itself)
+    const heroFrame = state.heroPlayerElement instanceof HTMLIFrameElement
+      ? state.heroPlayerElement
+      : state.heroPlayerElement?.querySelector?.("iframe");
+
+    if (heroPost?.sourceKind === "youtube" && heroFrame instanceof HTMLIFrameElement) {
+      postMessageToYouTubePlayer(heroFrame, "setVolume", [volumePercent]);
+      postMessageToYouTubePlayer(heroFrame, volumePercent === 0 ? "mute" : "unMute");
+      handled = true;
+    }
+
+    return handled;
   }
 
   function mountPersistentPlayer(container, post, variant) {
@@ -1806,14 +1832,41 @@ export function createAppUi(context) {
     const descriptor = createActivePlayerDescriptor(post, parseYouTubeUrl);
     if (descriptor) {
       const stage = createActivePlayerStage(descriptor);
-      const frame = stage?.querySelector("iframe");
-      if (frame) {
-        frame.addEventListener("load", () => { if (state.activePlayerElement === frame) applyPlayerVolumeToActiveElement(); });
-        return frame;
+      if (stage) {
+        const frame = stage.querySelector("iframe");
+        if (frame) {
+          frame.addEventListener("load", () => {
+            applyPlayerVolumeToActiveElement();
+          });
+        }
+        return stage;
       }
     }
-    if (post.mediaKind === "video") { const video = document.createElement("video"); video.controls = true; video.preload = "metadata"; video.playsInline = true; video.src = resolveActivePlayerSource(post); attachPersistentPlayerMediaListeners(video); return video; }
-    const shell = document.createElement("div"); const audioStage = document.createElement("div"); audioStage.dataset.audioStage = "true"; const label = document.createElement("span"); label.textContent = "Audio drop"; const title = document.createElement("strong"); title.textContent = post.title; const audio = document.createElement("audio"); audio.dataset.audioPlayer = "true"; audio.controls = true; audio.preload = "metadata"; audio.src = resolveActivePlayerSource(post); attachPersistentPlayerMediaListeners(audio); audioStage.append(label, title); shell.append(audioStage, audio); return shell;
+    if (post.mediaKind === "video") {
+      const video = document.createElement("video");
+      video.controls = true;
+      video.preload = "metadata";
+      video.playsInline = true;
+      video.src = resolveActivePlayerSource(post);
+      attachPersistentPlayerMediaListeners(video);
+      return video;
+    }
+    const shell = document.createElement("div");
+    const audioStage = document.createElement("div");
+    audioStage.dataset.audioStage = "true";
+    const label = document.createElement("span");
+    label.textContent = "Audio drop";
+    const title = document.createElement("strong");
+    title.textContent = post.title;
+    const audio = document.createElement("audio");
+    audio.dataset.audioPlayer = "true";
+    audio.controls = true;
+    audio.preload = "metadata";
+    audio.src = resolveActivePlayerSource(post);
+    attachPersistentPlayerMediaListeners(audio);
+    audioStage.append(label, title);
+    shell.append(audioStage, audio);
+    return shell;
   }
 
   function applyPersistentPlayerVariant(post, variant) {

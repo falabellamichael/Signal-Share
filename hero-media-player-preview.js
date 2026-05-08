@@ -537,7 +537,8 @@ export function renderHeroStagePreview(options = {}) {
     return;
   }
 
-  if (commitActivePlayer(stage, post, previewOptions)) return;
+  // Only mount the active iframe player if explicitly requested (e.g. for already active browser/device sessions)
+  if (options.active && commitActivePlayer(stage, post, previewOptions)) return;
 
   const creatorSummary = safeCall(getProfileSummaryForPost, null, post);
   const artworkUrl = resolveAppPreviewArtwork(post, {

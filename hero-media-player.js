@@ -1259,7 +1259,8 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
         fallbackMedia,
         nativeSnapshot,
         desktopSnapshot,
-        matchedPost
+        matchedPost,
+        active: false // Force preview card for standby posts
       }));
     }
     syncMediaSession({
