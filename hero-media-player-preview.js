@@ -633,12 +633,39 @@ export function renderHeroStagePreview(options = {}) {
     getSpotifyPreviewImageUrl,
   });
 
+  // Handle async metadata resolution for preview card
+  let resolvedMetadata = externalMetadata;
+  if (externalMetadata instanceof Promise) {
+    // Render initial card with fallback while metadata loads
+    commitCard(stage, {
+      badge: formatPostBadge(post, formatKind, getSignalLabel),
+      title: post.title || "Now playing",
+      meta: formatPostMeta(post, creatorSummary, formatTimestamp),
+      artworkUrl: artworkUrl,
+    });
+    
+    // Fetch metadata and update card when available
+    externalMetadata.then(metadata => {
+      if (metadata) {
+        commitCard(stage, {
+          badge: formatPostBadge(post, formatKind, getSignalLabel),
+          title: metadata?.title || post.title || "Now playing",
+          meta: `${metadata.creator} · ${getSignalLabel ? getSignalLabel("Live on feed", post) : "Live on feed"}`,
+          artworkUrl: metadata?.artworkUrl || artworkUrl,
+        });
+      }
+    }).catch(() => {
+      // Silently ignore errors, card already rendered with fallback
+    });
+    return;
+  }
+
   commitCard(stage, {
     badge: formatPostBadge(post, formatKind, getSignalLabel),
-    title: externalMetadata?.title || post.title || "Now playing",
-    meta: externalMetadata?.creator 
-      ? `${externalMetadata.creator} · ${getSignalLabel ? getSignalLabel("Live on feed", post) : "Live on feed"}` 
+    title: resolvedMetadata?.title || post.title || "Now playing",
+    meta: resolvedMetadata?.creator 
+      ? `${resolvedMetadata.creator} · ${getSignalLabel ? getSignalLabel("Live on feed", post) : "Live on feed"}` 
       : formatPostMeta(post, creatorSummary, formatTimestamp),
-    artworkUrl: externalMetadata?.artworkUrl || artworkUrl,
+    artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
   });
 }
