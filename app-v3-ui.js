@@ -48,45 +48,10 @@ export function createAppUi(context) {
     getLatestPostedPostId, formatTimestamp, formatFileSize, parseTags, getMediaKind,
     resolveViewerSource, resolveActivePlayerSource, compareByNewest, getSpotlightPost, getPostById,
     isPostSaved, rememberCreatorInput, rememberCreator, buildUploadPost, buildExternalPost,
-    parseExternalMediaUrl, healPosts, parseSpotifyUrl, formatProviderName, isHostedPostingEnabled,
+    parseExternalMediaUrl, healPosts, parseSpotifyUrl, isHostedPostingEnabled,
     getAppConfig, updatePostLikeCount, createDemoGraphic,
   } = context;
   
-  async function getSpotifyPreviewImageUrl(source) { const metadata = await getSpotifyPreviewMetadata(source); return typeof metadata?.thumbnailUrl === "string" ? metadata.thumbnailUrl : ""; }
-
-  async function getSpotifyPreviewMetadata(sourceUrl) { 
-    if (!sourceUrl) return { error: "No URL" }; 
-    const cacheKey = `spotify:preview:v10:${sourceUrl}`;
-    const cached = externalPreviewCache.get(cacheKey); 
-    if (cached) return cached; 
-    const data = await fetchSpotifyPreviewCatalogMetadata(sourceUrl); 
-    if (data && !data.error) { 
-      externalPreviewCache.set(cacheKey, data); 
-      return data; 
-    } 
-    return data || { error: "Fetch failed" }; 
-  }
-
-  async function fetchSpotifyPreviewCatalogMetadata(sourceUrl) { 
-    try { 
-      const supabase = createSupabaseClient(APP_CONFIG.supabaseUrl, APP_CONFIG.supabaseAnonKey); 
-      const { data, error } = await supabase.functions.invoke(APP_CONFIG.spotifyEdgeFunctionUrl || "spotify-preview-metadata", { body: { url: sourceUrl } }); 
-      if (error) { 
-        console.error("[Spotify] Edge Function Error:", error); 
-        let msg = "API Error"; 
-        if (error instanceof Error) msg = error.message; 
-        else if (typeof error === "object" && error.message) msg = error.message; 
-        return { error: msg }; 
-      } 
-      if (!data || data.error) return { error: data?.error || "Empty Response" }; 
-      return { title: typeof data.title === "string" ? data.title.trim() : "", creator: typeof data.creator === "string" ? data.creator.trim() : "", thumbnailUrl: typeof data.thumbnailUrl === "string" ? data.thumbnailUrl.trim() : "" }; 
-    } catch (err) { return { error: "Network Error" }; } 
-  }
-
-  async function fetchSpotifyPreviewOEmbedMetadata(sourceUrl) { 
-    return null; 
-  }
-
   const elements = {
     siteHeader: document.querySelector(".site-header"),
     postForm: document.querySelector("#postForm"),
@@ -2068,8 +2033,6 @@ export function createAppUi(context) {
   }
 
   async function loadSpotifyPreviewImage(stage, image, source) { const thumbnailUrl = await getSpotifyPreviewImageUrl(source); if (!stage.isConnected || !thumbnailUrl) return; loadPreviewImageCandidates(stage, image, [thumbnailUrl]); }
-
-  async function getExternalPreviewMetadata(source) { if (source.provider === "spotify") return getSpotifyPreviewMetadata(source); if (source.provider === "youtube") return getYouTubePreviewMetadata(source); return null; }
 
   async function getSpotifyPreviewMetadata(source) {
     const sourceUrl = resolveSpotifyPreviewSourceUrl(source); if (!sourceUrl) return null;
