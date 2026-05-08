@@ -255,6 +255,53 @@ export function createPreviewCard({ badge = "", title = "", meta = "", note = ""
   return card;
 }
 
+/**
+ * Creates a card specifically for downloading the companion app.
+ */
+export function createCompanionCard(options = {}) {
+  const card = document.createElement("article");
+  card.className = "hero-player-preview hero-player-companion-card";
+
+  const copy = document.createElement("div");
+  copy.className = "hero-player-preview-copy";
+
+  const badge = document.createElement("p");
+  badge.className = "hero-player-preview-badge";
+  badge.textContent = "Optional Companion";
+  copy.appendChild(badge);
+
+  const title = document.createElement("p");
+  title.className = "hero-player-preview-title";
+  title.textContent = "Control your PC media";
+  copy.appendChild(title);
+
+  const meta = document.createElement("p");
+  meta.className = "hero-player-preview-meta";
+  meta.textContent = "Download the desktop bridge to sync YouTube and Spotify from this PC.";
+  copy.appendChild(meta);
+
+  const action = document.createElement("div");
+  action.className = "hero-player-preview-actions";
+  
+  const downloadBtn = document.createElement("button");
+  downloadBtn.className = "button button-primary hero-companion-download-btn";
+  downloadBtn.textContent = "Download Now";
+  downloadBtn.type = "button";
+  // The click listener will be handled by the controller
+  
+  action.appendChild(downloadBtn);
+  copy.appendChild(action);
+
+  card.appendChild(copy);
+  
+  // Optional: Add a graphic or icon if artworkUrl is provided
+  if (options.artworkUrl) {
+    attachArtwork(card, "Companion", options.artworkUrl);
+  }
+
+  return card;
+}
+
 export function createActivePlayerStage(descriptor) {
   if (!descriptor?.src) return null;
 
@@ -499,6 +546,12 @@ export function renderHeroStagePreview(options = {}) {
         note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
         artworkUrl: desktopSnapshot.artworkUri || "",
       });
+      return;
+    }
+
+    if (options.showCompanionCard) {
+      const card = createCompanionCard();
+      setStageContent(stage, card, "companion-download");
       return;
     }
 

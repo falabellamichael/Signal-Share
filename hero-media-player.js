@@ -62,6 +62,7 @@ export function createHeroMediaPlayerController(options) {
   let lastDesktopPollTime = 0;
   let lastNativePollTime = 0;
   let lastDesktopActionKey = "";
+  let companionPromptDismissed = localStorage.getItem("ss_companion_dismissed") === "true";
   const DESKTOP_ACTION_COOLDOWN_MS = 1200;
   const desktopArtworkFallbackCache = new Map();
   const resolvedArtworkMap = new Map();
@@ -100,6 +101,7 @@ export function createHeroMediaPlayerController(options) {
       && elements.heroPlayerNextButton
       && elements.heroPlayerVolumeSlider
       && elements.heroPlayerVolumeValue
+      && document.getElementById("companionPromptOverlay")
     );
   }
 
@@ -1202,6 +1204,11 @@ export function createHeroMediaPlayerController(options) {
     }
 
     if (mode === "desktop") {
+      if (!desktopSnapshot?.active && !companionPromptDismissed) {
+        showCompanionPrompt();
+        return;
+      }
+
       const playbackStatus = normalizePlaybackState(desktopSnapshot?.playbackState);
       const nextPlaybackState = playbackStatus === "playing" ? "paused" : "playing";
 
@@ -1354,6 +1361,19 @@ export function createHeroMediaPlayerController(options) {
     elements.heroPlayerPlayPauseButton.addEventListener("click", (event) => {
       handlePlayPause();
       if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
+    });
+
+    document.getElementById("companionPromptYes")?.addEventListener("click", () => {
+      handleCompanionResponse(true);
+    });
+    document.getElementById("companionPromptNo")?.addEventListener("click", () => {
+      handleCompanionResponse(false);
+    });
+
+    elements.heroPlayerStage?.addEventListener("click", (e) => {
+      if (e.target.closest(".hero-companion-download-btn")) {
+        downloadCompanion();
+      }
     });
     elements.heroPlayerPrevButton.addEventListener("click", (event) => {
       handlePrevious();
@@ -1513,6 +1533,7 @@ export function createHeroMediaPlayerController(options) {
         nativeSnapshot,
         desktopSnapshot,
         matchedPost,
+        showCompanionCard: mode === "desktop" && !desktopSnapshot?.active && !companionPromptDismissed,
         active: mode !== "app" // Treat media modes as "active" to show info/matched player
       }));
     }
@@ -1550,6 +1571,39 @@ export function createHeroMediaPlayerController(options) {
         return performDesktopAction("open_uri", { uri });
       }
       return false;
-    }
+    },
+    showCompanionPrompt,
+    hideCompanionPrompt,
+    handleCompanionResponse,
+    downloadCompanion
   };
+
+  function showCompanionPrompt() {
+    const overlay = document.getElementById("companionPromptOverlay");
+    if (overlay) overlay.hidden = false;
+  }
+
+  function hideCompanionPrompt() {
+    const overlay = document.getElementById("companionPromptOverlay");
+    if (overlay) overlay.hidden = true;
+  }
+
+  function handleCompanionResponse(accepted) {
+    hideCompanionPrompt();
+    if (accepted) {
+      downloadCompanion();
+    } else {
+      companionPromptDismissed = true;
+      localStorage.setItem("ss_companion_dismissed", "true");
+      render();
+    }
+  }
+
+  function downloadCompanion() {
+    const downloadUrl = "https://github.com/falabellamichael/Signal-Share/releases/latest";
+    window.open(downloadUrl, "_blank");
+    companionPromptDismissed = true;
+    localStorage.setItem("ss_companion_dismissed", "true");
+    render();
+  }
 }
