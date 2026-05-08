@@ -209,7 +209,7 @@ function attachArtwork(card, title, artworkUrl) {
         if (card.dataset.artworkRequestToken !== requestToken) return;
         addImage(url);
       })
-      .catch(() => {});
+      .catch(() => { });
   }
 }
 
@@ -277,7 +277,7 @@ export function createCompanionCard(options = {}) {
 
   const meta = document.createElement("p");
   meta.className = "hero-player-preview-meta";
-  meta.textContent = "";
+  meta.textContent = "Download the desktop bridge to sync YouTube and Spotify from this PC.";
   copy.appendChild(meta);
 
   const action = document.createElement("div");
@@ -330,7 +330,7 @@ export function createCompanionCard(options = {}) {
   copy.appendChild(action);
 
   card.appendChild(copy);
-  
+
   // Optional: Add a graphic or icon if artworkUrl is provided
   if (options.artworkUrl) {
     attachArtwork(card, "Companion", options.artworkUrl);
@@ -392,7 +392,7 @@ function commitActivePlayer(stage, post, options) {
       post.mediaKind === "audio"
         ? "display:block;width:100%;height:80px;background:transparent;margin:10px 0;"
         : "display:block;border-radius:18px;background:#000;object-fit:contain;width:100%;height:100%;";
-    
+
     // For local audio, we want the stage itself to be smaller
     if (post.mediaKind === "audio") {
       stage.style.aspectRatio = "auto";
@@ -536,10 +536,10 @@ export function renderHeroStagePreview(options = {}) {
   if (mode === "device") {
     if (nativeSnapshot?.permissionRequired) {
       commitCard(stage, {
-        badge: "",
+        badge: "ON-DEVICE MEDIA",
         title: "Enable access",
-        meta: "",
-        note: "",
+        meta: "Allow media access to control this device.",
+        note: "Use Play to open settings.",
       });
       return;
     }
@@ -549,19 +549,19 @@ export function renderHeroStagePreview(options = {}) {
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
 
       commitCard(stage, {
-        badge: "",
+        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA",
         title: nativeSnapshot.title || matchedPost?.title || "Now playing",
-        meta: nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary) : ""),
-        note: "",
+        meta: nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback"),
+        note: nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing",
         artworkUrl: artworkUrl,
       });
       return;
     }
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "",
+      badge: "ON-DEVICE MEDIA",
       title: "No active playback",
-      meta: "",
+      meta: "Start a track in any media app on this device.",
     });
     return;
   }
@@ -572,10 +572,10 @@ export function renderHeroStagePreview(options = {}) {
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
 
       commitCard(stage, {
-        badge: "",
+        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA",
         title: desktopSnapshot.title || matchedPost?.title || "Now playing",
-        meta: desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary) : ""),
-        note: "",
+        meta: desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback"),
+        note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
         artworkUrl: artworkUrl,
       });
       return;
@@ -588,9 +588,9 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "",
+      badge: "PC SYSTEM MEDIA",
       title: "Waiting for playback",
-      meta: "",
+      meta: "Start YouTube, Spotify, or another desktop app.",
     });
     return;
   }
@@ -643,7 +643,7 @@ export function renderHeroStagePreview(options = {}) {
       meta: formatPostMeta(post, creatorSummary),
       artworkUrl: artworkUrl,
     });
-    
+
     // Fetch metadata and update card when available
     externalMetadata.then(metadata => {
       if (metadata) {
