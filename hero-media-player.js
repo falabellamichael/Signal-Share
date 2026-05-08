@@ -258,41 +258,42 @@ export function createHeroMediaPlayerController(options) {
   function getTargetAddressSpaceForHostname(hostname = "") {
     const value = `${hostname || ""}`.trim().toLowerCase();
     if (!value) return "";
-    if (value === "localhost" || value.endsWith(".localhost")) return "local";
+
+    // Browser Private Network Access treats localhost / 127.0.0.1 / ::1 as loopback.
+    // Keep this distinct from LAN/private IPs so we do not create a target-address-space mismatch.
+    if (value === "localhost" || value.endsWith(".localhost")) return "loopback";
+    if (value === "::1" || value === "[::1]") return "loopback";
     if (value.endsWith(".local")) return "local";
-    if (value === "::1" || value === "[::1]") return "local";
+
     if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) {
       const octets = value.split(".").map((entry) => Number.parseInt(entry, 10));
       if (octets.some((entry) => Number.isNaN(entry) || entry < 0 || entry > 255)) return "";
+
       const [a, b] = octets;
-      if (a === 127) return "local";
+      if (a === 127) return "loopback";
       if (a === 10) return "private";
       if (a === 169 && b === 254) return "private";
       if (a === 172 && b >= 16 && b <= 31) return "private";
       if (a === 192 && b === 168) return "private";
       return "";
     }
+
     const bracketedIpv6 = value.match(/^\[([0-9a-f:.]+)\]$/i);
     const ipv6 = (bracketedIpv6?.[1] || value).toLowerCase();
+
     if (!ipv6.includes(":")) return "";
-    if (ipv6 === "::1") return "local";
+    if (ipv6 === "::1") return "loopback";
     if (ipv6.startsWith("fe80:")) return "private";
     if (ipv6.startsWith("fc") || ipv6.startsWith("fd")) return "private";
+
     return "";
   }
 
   function withLocalNetworkFetchOptions(url, init = {}) {
-    try {
-      const resolved = new URL(url, window.location.href);
-      const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
-      if (addressSpace !== "local" && addressSpace !== "private" && addressSpace !== "loopback") return init;
-      return {
-        ...init,
-        targetAddressSpace: addressSpace,
-      };
-    } catch {
-      return init;
-    }
+    // Do not force a targetAddressSpace value here. Chrome can classify localhost,
+    // 127.0.0.1, and LAN addresses itself, and forcing the wrong value causes the
+    // exact CORS / Private Network Access block shown in DevTools.
+    return init;
   }
 
   function isLocalNetworkAccessPromptEligible() {
@@ -349,6 +350,27 @@ export function createHeroMediaPlayerController(options) {
   function resolveDesktopSnapshotEndpoints() {
     const candidates = [];
     const seen = new Set();
+
+    const protocol = `${window.location.protocol || ""}`.toLowerCase();
+    const host = `${window.location.hostname || ""}`.trim().toLowerCase();
+    const originAddressSpace = getTargetAddressSpaceForHostname(host);
+
+    const isLoopbackOrigin = protocol === "file:"
+      || !host
+      || host === "localhost"
+      || host.endsWith(".localhost")
+      || host === "127.0.0.1"
+      || host === "::1"
+      || host === "[::1]";
+
+    const isLocalOrigin = isLoopbackOrigin
+      || originAddressSpace === "private"
+      || originAddressSpace === "local"
+      || originAddressSpace === "loopback";
+
+    const isRemoteOrigin = !isLocalOrigin;
+
+    // If a previous endpoint already worked, try it first.
     pushDesktopEndpointCandidate(candidates, desktopSnapshotEndpoint, seen);
 
     if (typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT === "string" && window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT.trim()) {
@@ -360,34 +382,8 @@ export function createHeroMediaPlayerController(options) {
       pushDesktopEndpointCandidate(candidates, `${baseUrl}/api/system-media/current`, seen);
     }
 
-    // Only use relative /api endpoints when the page itself is being served locally.
-    // Remote hosts such as GitHub Pages cannot serve /api/system-media/current.
-    const protocol = `${window.location.protocol || ""}`.toLowerCase();
-    const host = `${window.location.hostname || ""}`.trim().toLowerCase();
-    const originAddressSpace = getTargetAddressSpaceForHostname(host);
-    const isLoopbackOrigin = protocol === "file:"
-      || !host
-      || host === "localhost"
-      || host.endsWith(".localhost")
-      || host === "127.0.0.1"
-      || host === "::1"
-      || host === "[::1]";
-    const isLocalOrigin = isLoopbackOrigin || originAddressSpace === "private" || originAddressSpace === "local";
-    const isRemoteOrigin = !isLocalOrigin;
-
-    // GitHub Pages / remote origins should not keep hammering localhost forever unless
-    // the user explicitly opens Media mode or an endpoint/base URL was configured.
-    if (isRemoteOrigin && desktopPollFailureCount > 3 && state.heroControlMode !== "media") {
-      return candidates;
-    }
-
-    // The desktop bridge server listens on port 3000 by default. These are absolute
-    // loopback URLs, so they still work when the web app is hosted remotely, as long
-    // as the browser allows local/private-network access.
-    pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
-    pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
-
-    // Relative /api only exists when the same local Express server is serving the page.
+    // If the page is already being served by the local Express server, same-origin
+    // must be first. This avoids localhost -> 127.0.0.1 CORS/PNA errors.
     if (isLocalOrigin && protocol !== "file:") {
       try {
         pushDesktopEndpointCandidate(candidates, new URL("/api/system-media/current", window.location.href).toString(), seen);
@@ -395,6 +391,22 @@ export function createHeroMediaPlayerController(options) {
         pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);
       }
     }
+
+    // GitHub Pages / remote origins should not keep hammering loopback forever unless
+    // the user explicitly opens Media mode or configured an endpoint/base URL.
+    if (isRemoteOrigin && desktopPollFailureCount > 3 && state.heroControlMode !== "media") {
+      return candidates;
+    }
+
+    // Loopback fallbacks. Match the current hostname first to avoid cross-origin noise.
+    if (host === "127.0.0.1") {
+      pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
+      pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
+    } else {
+      pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
+      pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
+    }
+
     return candidates;
   }
 
