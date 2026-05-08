@@ -218,10 +218,11 @@ function isPreferredApp(sourceAppId = "", preferredSource = "") {
   if (preferredSource === "youtube") {
     return normalized.includes("youtube") 
       || normalized.includes("ytmusic") 
-      || normalized.includes("youtube.music");
+      || normalized.includes("youtube.music")
+      || isBrowser;
   }
   if (preferredSource === "spotify") {
-    return normalized.includes("spotify");
+    return normalized.includes("spotify") || isBrowser;
   }
 
   return normalized.includes("spotify") 
@@ -294,11 +295,27 @@ function pickBestSession(sessions = [], preferredSource = "") {
   if (preferredSource && preferredSource !== "all") {
     candidates = sessions.filter(s => {
       s._preferredSource = preferredSource;
-      const sourceAppId = `${s.sourceAppUserModelId || s.sourceAppId || ""}`.trim();
-      return isPreferredApp(sourceAppId, preferredSource);
+      const sourceAppId = `${s.sourceAppUserModelId || s.sourceAppId || ""}`.trim().toLowerCase();
+      const title = `${s.media?.title || ""}`.trim().toLowerCase();
+      const album = `${s.media?.albumTitle || ""}`.trim().toLowerCase();
+      
+      const isNativeMatch = isPreferredApp(sourceAppId, preferredSource);
+      if (!isNativeMatch) return false;
+
+      const appLabel = resolveMediaAppLabel(sourceAppId).toLowerCase();
+      const isBrowser = appLabel.includes("chrome") || appLabel.includes("edge") || appLabel.includes("firefox") || appLabel.includes("browser") || appLabel.includes("opera");
+      
+      if (isBrowser) {
+        if (preferredSource === "youtube") {
+          return (title.includes("youtube") || album.includes("youtube") || extractYoutubeVideoId(title) || extractYoutubeVideoId(album));
+        } else if (preferredSource === "spotify") {
+          return (title.includes("spotify") || album.includes("spotify"));
+        }
+      }
+      
+      return true;
     });
     
-    // If no sessions match the preferred source, return null instead of falling back to something else
     if (candidates.length === 0) return null;
   }
 
