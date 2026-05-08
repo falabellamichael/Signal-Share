@@ -1765,79 +1765,67 @@ h1 {
 }
 
 .hero-player-options {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
+  display: flex;
   gap: 12px;
-  align-items: flex-start;
+  align-items: stretch;
   margin-bottom: 16px;
 }
 
-.hero-player-mode-toggle {
+#heroPlayerOpenMiniButton {
+  flex: 1;
+  font-size: 1.1rem;
+  padding: 0 20px;
+  height: auto;
+  min-height: 72px;
   display: flex;
-  background: rgba(19, 33, 43, 0.08);
-  padding: 4px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  align-self: center;
-  margin-top: 2px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
 }
 
+.hero-player-toggles-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+}
+
+.hero-player-mode-toggle,
 .hero-player-source-toggle {
   display: flex;
   background: rgba(19, 33, 43, 0.08);
-  padding: 4px;
+  padding: 3px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  align-self: center;
-  margin-top: 2px;
+  width: fit-content;
 }
 
+.mode-toggle-button,
 .source-toggle-button {
   border: 0;
   background: transparent;
-  padding: 6px 14px;
+  padding: 4px 10px;
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
   cursor: pointer;
   transition: all 180ms ease;
+  min-width: 60px;
 }
 
+.mode-toggle-button.is-active,
 .source-toggle-button.is-active {
   background: var(--surface-dark);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(15, 23, 32, 0.12);
-}
-
-.mode-toggle-button {
-  border: 0;
-  background: transparent;
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  cursor: pointer;
-  transition: all 180ms ease;
-}
-
-.mode-toggle-button.is-active {
-  background: var(--surface-dark);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(15, 23, 32, 0.12);
+  box-shadow: 0 2px 8px rgba(15, 23, 32, 0.12);
 }
 
 body[data-theme="midnight"] .hero-player-mode-toggle,
 body[data-theme="contrast"] .hero-player-mode-toggle,
-body[data-theme="ember"] .hero-player-mode-toggle {
-  background: rgba(255, 255, 255, 0.06);
-}
-
+body[data-theme="ember"] .hero-player-mode-toggle,
 body[data-theme="midnight"] .hero-player-source-toggle,
 body[data-theme="contrast"] .hero-player-source-toggle,
 body[data-theme="ember"] .hero-player-source-toggle {
@@ -1846,11 +1834,7 @@ body[data-theme="ember"] .hero-player-source-toggle {
 
 body[data-theme="midnight"] .mode-toggle-button.is-active,
 body[data-theme="contrast"] .mode-toggle-button.is-active,
-body[data-theme="ember"] .mode-toggle-button.is-active {
-  background: var(--accent);
-  color: #000;
-}
-
+body[data-theme="ember"] .mode-toggle-button.is-active,
 body[data-theme="midnight"] .source-toggle-button.is-active,
 body[data-theme="contrast"] .source-toggle-button.is-active,
 body[data-theme="ember"] .source-toggle-button.is-active {
