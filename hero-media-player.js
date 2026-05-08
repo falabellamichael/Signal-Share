@@ -732,7 +732,7 @@ export function createHeroMediaPlayerController(options) {
           && (desktopPollFailureCount % 30 === 1);
 
         if (shouldWarn) {
-           console.warn("[Hero] Desktop media bridge not detected. Ensure the companion app is running.");
+          // Warning removed to prevent console noise
         }
 
         if (renderAfter) render();
