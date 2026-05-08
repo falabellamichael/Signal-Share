@@ -1309,11 +1309,10 @@
 
     <section class="companion-prompt-overlay" id="companionPromptOverlay" hidden>
       <div class="companion-prompt-dialog">
-        <h3>Companion Download</h3>
-        <p>Would you like to download the optional companion to control PC media from the Media Player?</p>
+        <h3>Companion Bridge</h3>
+        <p>Would you like to setup the optional companion bridge to control PC media from the Media Player?</p>
         <div class="companion-prompt-actions">
-          <button class="button button-primary" id="companionPromptYes">Yes, Download Setup</button>
-          <button class="button button-secondary" id="companionPromptInstructions">How to Install</button>
+          <button class="button button-primary" id="companionPromptInstructions">Download Now</button>
           <button class="button button-secondary" id="companionPromptNo">No Thanks</button>
         </div>
       </div>
@@ -1324,20 +1323,20 @@
         <h3>Setup Companion</h3>
         <div class="setup-steps">
           <div class="setup-step">
-            <strong>1. Download</strong>
-            <p>Download the <code>setup-companion.bat</code> file from the repository.</p>
+            <strong>1. Install Node.js</strong>
+            <p>Ensure you have <a href="https://nodejs.org/" target="_blank" style="color: var(--accent); text-decoration: underline;">Node.js</a> installed on your PC.</p>
           </div>
           <div class="setup-step">
-            <strong>2. Run</strong>
-            <p>Double-click the file to install dependencies and start the bridge.</p>
+            <strong>2. Get the Files</strong>
+            <p>Download the Signal Share project files to your local machine.</p>
           </div>
           <div class="setup-step">
-            <strong>3. Keep Open</strong>
-            <p>Leave the terminal window open while you use the player.</p>
+            <strong>3. Run Bridge</strong>
+            <p>Open a terminal in the project folder and run the command below.</p>
           </div>
         </div>
         <div class="setup-command-box">
-          <p>Or run this in terminal:</p>
+          <p>Run in terminal:</p>
           <code id="setupCommand">npm install && npm start</code>
           <button class="button button-secondary button-small" id="copySetupCommand">Copy</button>
         </div>

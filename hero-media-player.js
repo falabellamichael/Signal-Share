@@ -1616,14 +1616,6 @@ export function createHeroMediaPlayerController(options) {
     }
   }
 
-  function downloadCompanion() {
-    const downloadUrl = `https://raw.githubusercontent.com/falabellamichael/Signal-Share/main/setup-companion.bat?t=${Date.now()}`;
-    window.open(downloadUrl, "_blank");
-    companionPromptDismissed = true;
-    localStorage.setItem("ss_companion_dismissed", "true");
-    render();
-  }
-
   function showSetupInstructions() {
     const overlay = document.getElementById("companionSetupOverlay");
     if (overlay) overlay.hidden = false;
