@@ -1788,6 +1788,7 @@ h1 {
   flex-direction: column;
   gap: 6px;
   justify-content: center;
+  align-items: center;
 }
 
 .hero-player-mode-toggle,

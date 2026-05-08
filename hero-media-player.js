@@ -1523,6 +1523,23 @@ The companion bridge is designed with several security layers to keep your PC sa
     });
     elements.heroPlayerVolumeSlider.addEventListener("input", handleVolumeInput);
 
+    elements.heroSourceYoutube?.addEventListener("click", () => {
+      state.heroControlSource = "youtube";
+      render();
+    });
+    elements.heroSourceSpotify?.addEventListener("click", () => {
+      state.heroControlSource = "spotify";
+      render();
+    });
+    elements.heroModeFeed?.addEventListener("click", () => {
+      state.heroControlMode = "feed";
+      render();
+    });
+    elements.heroModeMedia?.addEventListener("click", () => {
+      state.heroControlMode = "media";
+      render();
+    });
+
     window.addEventListener("signal:nativeBridgeReady", () => {
       startNativeSnapshotPolling();
       refreshNativeSnapshot();
