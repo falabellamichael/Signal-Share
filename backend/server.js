@@ -17,6 +17,7 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const isWindows = process.platform === "win32";
 const userId = process.env.SIGNAL_SHARE_USER_ID;
+const enableRemoteMedia = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true";
 
 const MEDIA_KEY_CODES = {
   play_pause: 0xb3,
@@ -565,11 +566,13 @@ function subscribeToMediaActions() {
 
 app.listen(port, "0.0.0.0", () => {
   console.log(`[Bridge] Server on http://localhost:${port}`);
-  if (isWindows && userId) {
-    console.log(`[Bridge] User verified: ${userId}`);
+  if (isWindows && userId && enableRemoteMedia) {
+    console.log(`[Bridge] Remote Media Enabled: ${userId}`);
     setInterval(syncToSupabase, 5000);
     subscribeToMediaActions();
     syncToSupabase();
+  } else if (isWindows && userId) {
+    console.log(`[Bridge] Local Media only. Remote sync disabled.`);
   } else if (!userId) {
     console.error("[Bridge] ERROR: No User ID found in .env");
   }
