@@ -213,24 +213,22 @@ function extractYoutubeVideoId(value) {
 
 function isPreferredApp(sourceAppId = "", preferredSource = "") {
   const normalized = `${sourceAppId || ""}`.trim().toLowerCase();
-  
+  const isBrowser = normalized.includes("chrome") || normalized.includes("edge") || normalized.includes("firefox") || normalized.includes("browser");
+
   if (preferredSource === "youtube") {
     return normalized.includes("youtube") 
       || normalized.includes("ytmusic") 
       || normalized.includes("youtube.music")
-      || normalized.includes("chrome") 
-      || normalized.includes("edge")
-      || normalized.includes("browser");
+      || isBrowser;
   }
   if (preferredSource === "spotify") {
-    return normalized.includes("spotify");
+    return normalized.includes("spotify") || isBrowser;
   }
 
   return normalized.includes("spotify") 
     || normalized.includes("youtube") 
     || normalized.includes("ytmusic") 
-    || normalized.includes("chrome") 
-    || normalized.includes("edge") 
+    || isBrowser
     || normalized.includes("signalshare");
 }
 
@@ -602,20 +600,26 @@ try {
 if ($winRtSuccess) {
   Write-Output "ok"
 } else {
-  Add-Type @"
-  using System;
-  using System.Runtime.InteropServices;
-  public static class MediaKeySender {
-    [DllImport("user32.dll", SetLastError=true)]
-    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-  }
+  # ONLY fallback to global keys if NO specific source is preferred.
+  # This prevents "Spotify toggle controlling YouTube" crosstalk.
+  if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all") {
+    Add-Type @"
+    using System;
+    using System.Runtime.InteropServices;
+    public static class MediaKeySender {
+      [DllImport("user32.dll", SetLastError=true)]
+      public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    }
 "@
-  $KEYEVENTF_EXTENDEDKEY = 0x0001
-  $KEYEVENTF_KEYUP = 0x0002
-  [MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
-  Start-Sleep -Milliseconds 45
-  [MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
-  Write-Output "ok"
+    $KEYEVENTF_EXTENDEDKEY = 0x0001
+    $KEYEVENTF_KEYUP = 0x0002
+    [MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 45
+    [MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
+    Write-Output "ok"
+  } else {
+    Write-Output "fail-source-not-found"
+  }
 }
 `.trim();
 
