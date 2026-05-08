@@ -253,6 +253,7 @@ export function createAppUi(context) {
     miniPrevButton: document.querySelector("#miniPrevButton"),
     miniPlayPauseButton: document.querySelector("#miniPlayPauseButton"),
     miniNextButton: document.querySelector("#miniNextButton"),
+    heroPlayerHeader: document.querySelector("#heroPlayerHeader"),
     heroPlayerTitle: document.querySelector("#heroPlayerTitle"),
     heroPlayerCaption: document.querySelector("#heroPlayerCaption"),
     heroPlayerStatus: document.querySelector("#heroPlayerStatus"),

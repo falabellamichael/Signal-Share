@@ -182,7 +182,8 @@ You can inspect the source code of the server.js file included in the companion 
 
   function hasUi() {
     return Boolean(
-      elements.heroPlayerTitle
+      elements.heroPlayerHeader
+      && elements.heroPlayerTitle
       && elements.heroPlayerCaption
       && elements.heroPlayerStatus
       && elements.heroPlayerStage
