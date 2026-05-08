@@ -56,11 +56,12 @@ export function createAppUi(context) {
 
   async function getSpotifyPreviewMetadata(sourceUrl) { 
     if (!sourceUrl) return { error: "No URL" }; 
-    const cached = externalPreviewCache.get(sourceUrl); 
+    const cacheKey = `spotify:preview:v10:${sourceUrl}`;
+    const cached = externalPreviewCache.get(cacheKey); 
     if (cached) return cached; 
     const data = await fetchSpotifyPreviewCatalogMetadata(sourceUrl); 
     if (data && !data.error) { 
-      externalPreviewCache.set(sourceUrl, data); 
+      externalPreviewCache.set(cacheKey, data); 
       return data; 
     } 
     return data || { error: "Fetch failed" }; 
@@ -368,6 +369,14 @@ export function createAppUi(context) {
     stepMiniPlayer,
     renderMiniPlayer,
     postMessageToYouTubePlayer,
+    getSpotifyPreviewImageUrl,
+    parseYouTubeUrl,
+    getHeroPost,
+    setHeroPost,
+    playHeroMedia,
+    stepHeroPlayer,
+    getHeroPlayablePosts,
+    resolveYouTubePreviewId,
     getExternalPreviewMetadata,
     formatProviderName,
     isNativeCapacitorApp,
@@ -2226,6 +2235,35 @@ export function createAppUi(context) {
     return "";
   }
 
+  function formatProviderName(kind = "") {
+    const value = String(kind || "").toLowerCase();
+    if (value === "youtube") return "YouTube";
+    if (value === "spotify") return "Spotify";
+    return "App";
+  }
+
+  function getExternalPreviewMetadata(post) {
+    if (!post) return null;
+    if (post.sourceKind === "youtube") {
+      return getYouTubePreviewMetadata(post);
+    }
+    if (post.sourceKind === "spotify") {
+      const sourceUrl = resolveSpotifyPreviewSourceUrl(post);
+      if (!sourceUrl) return null;
+      return getSpotifyPreviewMetadata(sourceUrl);
+    }
+    return null;
+  }
+
+  function getSpotifyPreviewImageUrl(source) {
+    const sourceUrl = resolveSpotifyPreviewSourceUrl(source);
+    if (!sourceUrl) return "";
+    const cacheKey = `spotify:preview:v10:${sourceUrl}`;
+    const cached = externalPreviewCache.get(cacheKey);
+    if (cached && !(cached instanceof Promise)) return cached.thumbnailUrl || "";
+    return "";
+  }
+
   function createExternalPreviewStage() { return document.createElement("div"); }
   function applyExternalPreviewMetadata() {}
 
@@ -2312,11 +2350,12 @@ export function createAppUi(context) {
     elements.miniPlayer.setAttribute("aria-hidden", "false");
 
     syncOverlayBodyState();
-    const cachedExt = externalPreviewCache.get(post.sourceKind === "spotify" ? `spotify:preview:v10:${post.sourceUrl}` : (post.sourceKind === "youtube" ? `youtube:preview:${resolveYouTubePreviewId(post, parseYouTubeUrl)}` : null));
+    const spotifyUrl = post.sourceKind === "spotify" ? resolveSpotifyPreviewSourceUrl(post) : null;
+    const cachedExt = externalPreviewCache.get(post.sourceKind === "spotify" ? `spotify:preview:v10:${spotifyUrl}` : (post.sourceKind === "youtube" ? `youtube:preview:${resolveYouTubePreviewId(post, parseYouTubeUrl)}` : null));
     const isFetching = cachedExt instanceof Promise;
     const ext = isFetching ? null : cachedExt;
     
-    const artist = ext?.creator || (post.sourceKind === "youtube" || post.sourceKind === "spotify" ? formatProviderName(post.sourceKind) : creatorName);
+    const artist = ext?.creator || (post.sourceKind === "youtube" || post.sourceKind === "spotify" ? formatProviderName(post.sourceKind) : (creatorSummary?.displayName ?? post.creator));
     elements.miniPlayerKind.textContent = `${artist} / ${getSignalLabel(post)}`;
     if (isFetching) cachedExt.then(() => renderMiniPlayer());
 
@@ -2368,7 +2407,8 @@ export function createAppUi(context) {
     const post = getPostById(state.viewerPostId); if (!post) { closeViewer(); return; }
     const creatorSummary = getProfileSummaryForPost(post); clearViewerMedia(); elements.viewer.classList.add("is-open"); elements.viewer.setAttribute("aria-hidden", "false"); syncOverlayBodyState();
     renderViewerMedia(elements.viewerStage, post);
-    const cachedViewerExt = externalPreviewCache.get(post.sourceKind === "spotify" ? `spotify:preview:v10:${post.sourceUrl}` : (post.sourceKind === "youtube" ? `youtube:preview:${resolveYouTubePreviewId(post, parseYouTubeUrl)}` : null));
+    const spotifyViewerUrl = post.sourceKind === "spotify" ? resolveSpotifyPreviewSourceUrl(post) : null;
+    const cachedViewerExt = externalPreviewCache.get(post.sourceKind === "spotify" ? `spotify:preview:v10:${spotifyViewerUrl}` : (post.sourceKind === "youtube" ? `youtube:preview:${resolveYouTubePreviewId(post, parseYouTubeUrl)}` : null));
     const isViewerFetching = cachedViewerExt instanceof Promise;
     const viewerExt = isViewerFetching ? null : cachedViewerExt;
     

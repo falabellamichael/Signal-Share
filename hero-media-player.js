@@ -1585,7 +1585,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       && !!state.heroPlayerElement
       && elements.heroPlayerStage.contains(state.heroPlayerElement);
 
-    const post = mode === "app" ? getHeroPost() : controllablePost;
+    const post = mode === "app" ? getHeroPost() : getControllablePlayerPost();
 
     const mediaElement = getActivePlayerMediaElement();
     const fallbackMedia = getFallbackPageMediaElement();
@@ -1610,7 +1610,6 @@ The companion bridge is designed with several security layers to keep your PC sa
     );
 
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
-    const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
 
     let nextHeader = "";
     let nextTitle = "";
