@@ -484,10 +484,8 @@ function formatPostBadge(post, formatKind, getSignalLabel) {
   return [kind, signal].filter(Boolean).join(" / ");
 }
 
-function formatPostMeta(post, creatorSummary, formatTimestamp) {
-  const creator = creatorSummary?.displayName ?? post?.creator ?? "Signal Share";
-  const timestamp = safeCall(formatTimestamp, "", post?.createdAt);
-  return [creator, timestamp].filter(Boolean).join(" · ");
+function formatPostMeta(post, creatorSummary) {
+  return creatorSummary?.displayName ?? post?.creator ?? "";
 }
 
 export function renderHeroStagePreview(options = {}) {
@@ -606,10 +604,10 @@ export function renderHeroStagePreview(options = {}) {
       : fallbackMetaRaw;
 
     commitCard(stage, {
-      badge: "BROWSER MEDIA",
+      badge: "",
       title: fallbackTitle,
-      meta: fallbackMeta || "Active browser media session",
-      note: fallbackMedia.paused ? "Paused" : "Playing",
+      meta: metadata?.artist || "Active media",
+      note: "",
       artworkUrl: metadata?.artworkUrl || "",
     });
     return;
@@ -617,10 +615,10 @@ export function renderHeroStagePreview(options = {}) {
 
   if (!post) {
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "Signal Share",
-      title: "Ready for your signal",
-      meta: "Select a track or video to start listening.",
-      note: "Your media will appear here.",
+      badge: "",
+      title: "Ready",
+      meta: "Select media to begin",
+      note: "",
     });
     return;
   }
@@ -640,9 +638,9 @@ export function renderHeroStagePreview(options = {}) {
   if (externalMetadata instanceof Promise) {
     // Render initial card with fallback while metadata loads
     commitCard(stage, {
-      badge: formatPostBadge(post, formatKind, getSignalLabel),
+      badge: "",
       title: post.title || "Now playing",
-      meta: formatPostMeta(post, creatorSummary, formatTimestamp),
+      meta: formatPostMeta(post, creatorSummary),
       artworkUrl: artworkUrl,
     });
     
@@ -650,9 +648,9 @@ export function renderHeroStagePreview(options = {}) {
     externalMetadata.then(metadata => {
       if (metadata) {
         commitCard(stage, {
-          badge: formatPostBadge(post, formatKind, getSignalLabel),
+          badge: "",
           title: metadata?.title || post.title || "Now playing",
-          meta: `${metadata.creator} · ${getSignalLabel ? getSignalLabel("Live on feed", post) : "Live on feed"}`,
+          meta: metadata.creator || "",
           artworkUrl: metadata?.artworkUrl || artworkUrl,
         });
       }
@@ -663,11 +661,9 @@ export function renderHeroStagePreview(options = {}) {
   }
 
   commitCard(stage, {
-    badge: formatPostBadge(post, formatKind, getSignalLabel),
+    badge: "",
     title: resolvedMetadata?.title || post.title || "Now playing",
-    meta: resolvedMetadata?.creator 
-      ? `${resolvedMetadata.creator} · ${getSignalLabel ? getSignalLabel("Live on feed", post) : "Live on feed"}` 
-      : formatPostMeta(post, creatorSummary, formatTimestamp),
+    meta: resolvedMetadata?.creator || formatPostMeta(post, creatorSummary),
     artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
   });
 }
