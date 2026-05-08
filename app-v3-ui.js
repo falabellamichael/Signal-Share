@@ -532,11 +532,47 @@ export function createAppUi(context) {
         void openViewer(notification.data.postId);
       }
     });
+
+    // YouTube IFrame API State Synchronization
+    window.addEventListener("message", (event) => {
+      if (typeof event.data !== "string") return;
+      try {
+        const data = JSON.parse(event.data);
+        if (data.event === "onStateChange") {
+          // 1 = playing, 2 = paused, 0 = ended, 3 = buffering
+          const newState = (data.info === 1 || data.info === 3) ? "playing" : "paused";
+          
+          // Update global state if this matches our active hero or mini player
+          if (state.heroPlayerPlaybackState !== newState) {
+             state.heroPlayerPlaybackState = newState;
+             heroMediaPlayerController.render();
+          }
+          
+          // Also update the dataset on the iframe itself for mini-player logic
+          const iframes = document.querySelectorAll("iframe");
+          iframes.forEach(iframe => {
+            if (iframe.contentWindow === event.source) {
+              iframe.dataset.playbackState = newState;
+            }
+          });
+        }
+      } catch (e) {
+        // Not a JSON message or not from YouTube
+      }
+    });
   }
 
   function setHeroControlMode(mode) {
     state.heroControlMode = mode;
-    heroMediaPlayerController.render();
+    
+    // If switching back to feed, ensure we refresh the UI immediately
+    if (mode === "feed") {
+      heroMediaPlayerController.render();
+    } else {
+      // If switching to media, ensure bridge is active
+      state.desktopBridgeSuspended = false;
+      heroMediaPlayerController.render();
+    }
   }
 
   function setHeroControlSource(source) {
@@ -564,6 +600,30 @@ export function createAppUi(context) {
     renderOverview();
     renderFeed();
     renderMiniPlayer();
+
+    // Hero Media Player Controls - Centralized Sync
+    const isHeroFeedMode = state.heroControlMode === "feed";
+    const isHeroMediaMode = state.heroControlMode === "media";
+    const bridgeSnapshot = heroMediaPlayerController?.getSnapshot?.();
+    const bridgeAvailable = Boolean(bridgeSnapshot?.desktop?.available);
+    const canToggleSource = isHeroMediaMode && bridgeAvailable;
+
+    if (elements.heroModeFeed) elements.heroModeFeed.classList.toggle("is-active", isHeroFeedMode);
+    if (elements.heroModeMedia) elements.heroModeMedia.classList.toggle("is-active", isHeroMediaMode);
+
+    if (elements.heroSourceYoutube) {
+      const isYoutubeActive = isHeroMediaMode && state.heroControlSource === "youtube";
+      elements.heroSourceYoutube.classList.toggle("is-active", isYoutubeActive);
+      elements.heroSourceYoutube.classList.toggle("is-disabled", !canToggleSource);
+      elements.heroSourceYoutube.disabled = !canToggleSource;
+    }
+    if (elements.heroSourceSpotify) {
+      const isSpotifyActive = isHeroMediaMode && state.heroControlSource === "spotify";
+      elements.heroSourceSpotify.classList.toggle("is-active", isSpotifyActive);
+      elements.heroSourceSpotify.classList.toggle("is-disabled", !canToggleSource);
+      elements.heroSourceSpotify.disabled = !canToggleSource;
+    }
+
     heroMediaPlayerController.render();
     renderViewer();
     renderProfileView();
@@ -2646,9 +2706,11 @@ export function createAppUi(context) {
       if (mediaEl.paused) mediaEl.play().catch(() => {});
       else mediaEl.pause();
     } else if (iframe && post.sourceKind === "youtube") {
-      const isPlaying = iframe.dataset.playbackState === "playing";
+      const isPlaying = state.heroPlayerPlaybackState === "playing" || iframe.dataset.playbackState === "playing";
       postMessageToYouTubePlayer(iframe, isPlaying ? "pauseVideo" : "playVideo");
-      iframe.dataset.playbackState = isPlaying ? "paused" : "playing";
+      const nextState = isPlaying ? "paused" : "playing";
+      state.heroPlayerPlaybackState = nextState;
+      iframe.dataset.playbackState = nextState;
     }
     renderMiniPlayer();
   }

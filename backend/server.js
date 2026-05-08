@@ -42,12 +42,12 @@ const WINRT_ACTION_METHODS = {
 const MAX_ARTWORK_BYTES = Number(process.env.SIGNAL_SHARE_MAX_ARTWORK_BYTES || 160000);
 const SMTC_ERROR_LOG_COOLDOWN_MS = 30000;
 const LAST_GOOD_SNAPSHOT_MAX_AGE_MS = 15000;
-const SNAPSHOT_CACHE_TTL_MS = Number(process.env.SIGNAL_SHARE_SNAPSHOT_CACHE_TTL_MS || 3500);
+const SNAPSHOT_CACHE_TTL_MS = Number(process.env.SIGNAL_SHARE_SNAPSHOT_CACHE_TTL_MS || 900);
 const SUPABASE_SYNC_INTERVAL_MS = Number(process.env.SIGNAL_SHARE_SYNC_INTERVAL_MS || 5000);
 const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true" || process.env.SIGNAL_SHARE_REMOTE_MEDIA === "true";
 const ALLOW_OPEN_URI = process.env.SIGNAL_SHARE_ALLOW_OPEN_URI === "true";
 const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
-const MEDIA_ACTION_COOLDOWN_MS = 900;
+const MEDIA_ACTION_COOLDOWN_MS = 280;
 const lastMediaActionAtByKey = new Map();
 
 // Rate limiting for system actions
@@ -70,6 +70,7 @@ let lastSmtcErrorLoggedAt = 0;
 let lastSupabaseSyncKey = "";
 let cachedSnapshotPayload = null;
 let cachedSnapshotAt = 0;
+let mediaActionQueue = Promise.resolve();
 
 const supabase = createClient(
   process.env.SUPABASE_URL || "",
@@ -80,54 +81,51 @@ app.use(express.json({ limit: "1mb" }));
 
 // Security & CORS Middleware
 app.use((req, res, next) => {
-  console.log(`[Bridge] ${req.method} ${req.path} from ${req.headers.origin || 'unknown origin'}`);
-  
   const origin = req.headers.origin;
-  const isWhitelisted = origin && CORS_WHITELIST.some(allowed => origin.startsWith(allowed));
+  const isWhitelisted = origin && CORS_WHITELIST.some((allowed) => origin.startsWith(allowed));
   const isLocalhost = !origin || origin.includes("localhost") || origin.includes("127.0.0.1");
 
   if (isWhitelisted || isLocalhost) {
     res.setHeader("Access-Control-Allow-Origin", origin || "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Bridge-Secret, x-bridge-secret, target-address-space, access-control-allow-private-network");
-    res.setHeader("Access-Control-Allow-Private-Network", "true");
-    res.setHeader("Access-Control-Max-Age", "86400");
-    res.setHeader("Vary", "Origin, Access-Control-Request-Headers");
   }
+
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret");
+  res.setHeader("Access-Control-Allow-Private-Network", "true");
+  res.setHeader("Access-Control-Max-Age", "86400");
+  res.setHeader("Vary", "Origin, Access-Control-Request-Headers");
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
-  
-  // Secret Token Validation
+
   if (BRIDGE_SECRET && req.path.startsWith("/api/system-media")) {
-    const providedSecret = (req.headers['x-bridge-secret'] || '').trim();
+    const providedSecret = `${req.headers["x-bridge-secret"] || ""}`.trim();
     if (providedSecret !== BRIDGE_SECRET.trim()) {
-      console.warn(`[Security] Unauthorized access attempt: Secret mismatch`);
+      console.warn(`[Security] Unauthorized media bridge request from ${req.ip}`);
       return res.status(403).json({ error: "Unauthorized: Invalid Bridge Secret" });
+    }
+  }
+
+  if (req.method === "POST" && req.path.endsWith("/action")) {
+    const now = Date.now();
+    const state = actionCounts.get(req.ip) || { count: 0, resetAt: now + 60000 };
+
+    if (now > state.resetAt) {
+      state.count = 0;
+      state.resetAt = now + 60000;
+    }
+
+    state.count++;
+    actionCounts.set(req.ip, state);
+
+    if (state.count > MAX_ACTIONS_PER_MINUTE) {
+      return res.status(429).json({ error: "Too many actions. Please slow down." });
     }
   }
 
   next();
 });
-
-const rateLimitSystemMediaAction = (req, res, next) => {
-  const now = Date.now();
-  const state = actionCounts.get(req.ip) || { count: 0, resetAt: now + 60000 };
-  
-  if (now > state.resetAt) {
-    state.count = 0;
-    state.resetAt = now + 60000;
-  }
-  
-  state.count++;
-  actionCounts.set(req.ip, state);
-  
-  if (state.count > MAX_ACTIONS_PER_MINUTE) {
-    return res.status(429).json({ error: "Too many actions. Please slow down." });
-  }
-  next();
-};
 
 app.use(express.static(projectRoot));
 
@@ -211,24 +209,37 @@ function extractYoutubeVideoId(value) {
   return directIdMatch ? directIdMatch[0] : "";
 }
 
+function normalizePreferredSource(value = "") {
+  const normalized = `${value || ""}`.trim().toLowerCase();
+  return normalized === "youtube" || normalized === "spotify" ? normalized : "";
+}
+
+function isBrowserLikeSource(sourceAppId = "") {
+  const normalized = `${sourceAppId || ""}`.trim().toLowerCase();
+  return normalized.includes("chrome")
+    || normalized.includes("edge")
+    || normalized.includes("msedge")
+    || normalized.includes("firefox")
+    || normalized.includes("opera")
+    || normalized.includes("browser");
+}
+
 function isPreferredApp(sourceAppId = "", preferredSource = "") {
   const normalized = `${sourceAppId || ""}`.trim().toLowerCase();
-  const isBrowser = normalized.includes("chrome") || normalized.includes("edge") || normalized.includes("firefox") || normalized.includes("browser");
+  const preferred = normalizePreferredSource(preferredSource);
 
-  if (preferredSource === "youtube") {
-    return normalized.includes("youtube") 
-      || normalized.includes("ytmusic") 
+  if (preferred === "spotify") return normalized.includes("spotify") || isBrowserLikeSource(normalized);
+  if (preferred === "youtube") {
+    return normalized.includes("youtube")
+      || normalized.includes("ytmusic")
       || normalized.includes("youtube.music")
-      || isBrowser;
-  }
-  if (preferredSource === "spotify") {
-    return normalized.includes("spotify") || isBrowser;
+      || isBrowserLikeSource(normalized);
   }
 
-  return normalized.includes("spotify") 
-    || normalized.includes("youtube") 
-    || normalized.includes("ytmusic") 
-    || isBrowser
+  return normalized.includes("spotify")
+    || normalized.includes("youtube")
+    || normalized.includes("ytmusic")
+    || isBrowserLikeSource(normalized)
     || normalized.includes("signalshare");
 }
 
@@ -245,84 +256,78 @@ function getPlaybackPriority(status) {
   }
 }
 
-function scoreSession(session) {
-  let score = 0;
-  const status = session.playback?.playbackStatus;
-  const priority = getPlaybackPriority(status);
-  score += priority * 100;
-  
-  const sourceAppId = `${session.sourceAppUserModelId || session.sourceAppId || ""}`.trim();
-  const title = `${session.media?.title || ""}`.trim().toLowerCase();
-  const album = `${session.media?.albumTitle || ""}`.trim().toLowerCase();
-  const preferredSource = session._preferredSource;
+function getSessionSourceText(session) {
+  const media = session?.media || {};
+  return [
+    session?.sourceAppUserModelId,
+    session?.sourceAppId,
+    session?.appId,
+    media.title,
+    media.artist,
+    media.albumArtist,
+    media.albumTitle,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
 
-  // Secondary check: if the app is a browser, it ONLY matches if title/album contains keywords
-  const appLabel = resolveMediaAppLabel(sourceAppId).toLowerCase();
-  const isBrowser = appLabel.includes("chrome") || appLabel.includes("edge") || appLabel.includes("firefox") || appLabel.includes("browser") || appLabel.includes("opera");
-  
-  if (preferredSource && preferredSource !== "all") {
-    if (isBrowser) {
-      if (preferredSource === "youtube") {
-        sourceMatched = (title.includes("youtube") || album.includes("youtube") || extractYoutubeVideoId(title) || extractYoutubeVideoId(album));
-      } else if (preferredSource === "spotify") {
-        sourceMatched = (title.includes("spotify") || album.includes("spotify"));
-      }
-    }
-  } else {
-    // If no preference, anything goes, but prioritize known ones
-    sourceMatched = isPreferredApp(sourceAppId, "all");
+function classifySessionProvider(session) {
+  const text = getSessionSourceText(session);
+  const sourceAppId = `${session?.sourceAppUserModelId || session?.sourceAppId || ""}`.toLowerCase();
+
+  if (sourceAppId.includes("spotify") || text.includes("open.spotify.com") || text.includes("spotify")) return "spotify";
+  if (
+    sourceAppId.includes("youtube")
+    || sourceAppId.includes("ytmusic")
+    || text.includes("youtube")
+    || text.includes("youtu.be")
+    || text.includes("music.youtube")
+  ) return "youtube";
+
+  return "";
+}
+
+function scoreSession(session, preferredSource = "") {
+  const preferred = normalizePreferredSource(preferredSource);
+  const sourceAppId = `${session?.sourceAppUserModelId || session?.sourceAppId || ""}`.trim();
+  const text = getSessionSourceText(session);
+  const provider = classifySessionProvider(session);
+  const priority = getPlaybackPriority(session?.playback?.playbackStatus);
+  const isBrowser = isBrowserLikeSource(sourceAppId);
+
+  let score = priority * 1000;
+
+  if (preferred) {
+    if (provider === preferred) score += 5000;
+    if (preferred === "spotify" && sourceAppId.toLowerCase().includes("spotify")) score += 3000;
+    if (preferred === "youtube" && /youtube|ytmusic|youtube\.music/i.test(sourceAppId)) score += 3000;
+
+    // Browser tabs do not always expose the URL through SMTC. Give browser sessions a smaller fallback boost
+    // for YouTube, but do not let an obvious Spotify session win the YouTube toggle, or vice versa.
+    if (preferred === "youtube" && isBrowser && provider !== "spotify") score += 500;
+    if (preferred === "spotify" && isBrowser && provider !== "youtube") score += 300;
+
+    if (provider && provider !== preferred) score -= 8000;
+  } else if (isPreferredApp(sourceAppId)) {
+    score += 500;
   }
 
-  if (sourceMatched) {
-    score += 1000; // Massive boost for user-selected toggle source
-  }
+  if (text.includes("spotify")) score += 120;
+  if (text.includes("youtube") || text.includes("youtu.be")) score += 120;
+  if (session?.media?.title && `${session.media.title}`.trim()) score += 80;
 
-  if (session.media?.title && session.media?.title.trim()) {
-    score += 100;
-  }
-
-  const updated = Number(session.lastUpdatedTime || 0);
-  score += (updated % 10000); // Small boost for recent updates
+  const updated = Number(session?.lastUpdatedTime || 0);
+  if (Number.isFinite(updated)) score += updated % 100;
 
   return score;
 }
 
 function pickBestSession(sessions = [], preferredSource = "") {
   if (!Array.isArray(sessions) || !sessions.length) return null;
-
-  // If a specific source is preferred, we MUST filter to only sessions that match that source
-  let candidates = sessions;
-  if (preferredSource && preferredSource !== "all") {
-    candidates = sessions.filter(s => {
-      s._preferredSource = preferredSource;
-      const sourceAppId = `${s.sourceAppUserModelId || s.sourceAppId || ""}`.trim().toLowerCase();
-      const title = `${s.media?.title || ""}`.trim().toLowerCase();
-      const album = `${s.media?.albumTitle || ""}`.trim().toLowerCase();
-      
-      const isNativeMatch = isPreferredApp(sourceAppId, preferredSource);
-      if (!isNativeMatch) return false;
-
-      const appLabel = resolveMediaAppLabel(sourceAppId).toLowerCase();
-      const isBrowser = appLabel.includes("chrome") || appLabel.includes("edge") || appLabel.includes("firefox") || appLabel.includes("browser") || appLabel.includes("opera");
-      
-      if (isBrowser) {
-        if (preferredSource === "youtube") {
-          return (title.includes("youtube") || album.includes("youtube") || extractYoutubeVideoId(title) || extractYoutubeVideoId(album));
-        } else if (preferredSource === "spotify") {
-          return (title.includes("spotify") || album.includes("spotify"));
-        }
-      }
-      
-      return true;
-    });
-    
-    if (candidates.length === 0) return null;
-  }
-
-  return candidates.reduce((best, session) => {
-    session._preferredSource = preferredSource;
+  return sessions.reduce((best, session) => {
     if (!best) return session;
-    return scoreSession(session) > scoreSession(best) ? session : best;
+    return scoreSession(session, preferredSource) > scoreSession(best, preferredSource) ? session : best;
   }, null);
 }
 
@@ -341,16 +346,7 @@ function safeGetMediaSessions() {
     const allSessions = SMTCMonitor.getMediaSessions();
     smtcFailureCount = 0;
     lastSmtcErrorMessage = "";
-    const sessions = Array.isArray(allSessions) ? allSessions.filter(Boolean) : [];
-    
-    if (sessions.length > 0) {
-      console.log(`[Bridge] Found ${sessions.length} media sessions:`);
-      sessions.forEach((s, i) => {
-        console.log(`  [${i}] App: ${s.sourceAppUserModelId || s.sourceAppId}, Title: ${s.media?.title}, Status: ${s.playback?.playbackStatus}`);
-      });
-    }
-
-    return sessions;
+    return Array.isArray(allSessions) ? allSessions.filter(Boolean) : [];
   } catch (error) {
     smtcFailureCount += 1;
     logSmtcError(error);
@@ -359,8 +355,7 @@ function safeGetMediaSessions() {
 }
 
 function selectPreferredMediaSession(preferredSource = "") {
-  const sessions = safeGetMediaSessions();
-  return pickBestSession(sessions, preferredSource);
+  return pickBestSession(safeGetMediaSessions(), preferredSource);
 }
 
 function resolveMediaAppLabel(sourceAppId = "") {
@@ -408,20 +403,23 @@ function getRecentGoodSnapshotFallback() {
 }
 
 function buildFreshSnapshotPayload(preferredSource = "") {
-  const base = getBaseSnapshot();
+  const preferred = normalizePreferredSource(preferredSource);
+  const base = getBaseSnapshot({ preferredSource: preferred });
 
   if (!isWindows) {
     return getBaseSnapshot({
+      preferredSource: preferred,
       unavailableReason: "This endpoint is only available on Windows.",
     });
   }
 
-  const session = selectPreferredMediaSession(preferredSource);
+  const session = selectPreferredMediaSession(preferred);
   if (!session) {
     const fallback = getRecentGoodSnapshotFallback();
-    if (fallback) return fallback;
+    if (fallback && (!preferred || fallback.preferredSource === preferred || fallback.sourceProvider === preferred)) return fallback;
 
     return getBaseSnapshot({
+      preferredSource: preferred,
       smtcHealthy: smtcFailureCount === 0,
       smtcFailureCount,
       smtcError: smtcFailureCount > 0 ? lastSmtcErrorMessage : "",
@@ -435,6 +433,7 @@ function buildFreshSnapshotPayload(preferredSource = "") {
     const title = `${session.media?.title || ""}`.trim();
     const artist = `${session.media?.artist || session.media?.albumArtist || ""}`.trim();
     const sanitizedMeta = sanitizeMediaMeta(artist, sourceAppId);
+    const sourceProvider = classifySessionProvider(session) || preferred;
 
     const meta = (appLabel && sanitizedMeta && appLabel.toLowerCase() !== sanitizedMeta.toLowerCase())
       ? `${appLabel} - ${sanitizedMeta}`
@@ -452,7 +451,7 @@ function buildFreshSnapshotPayload(preferredSource = "") {
     }
 
     let openUri = "";
-    if (sourceAppId.toLowerCase().includes("youtube") || title.toLowerCase().includes("youtube")) {
+    if (sourceProvider === "youtube" || sourceAppId.toLowerCase().includes("youtube") || title.toLowerCase().includes("youtube")) {
       const videoId = extractYoutubeVideoId(title) || extractYoutubeVideoId(session.media?.albumTitle);
       if (videoId) {
         openUri = `https://www.youtube.com/watch?v=${videoId}`;
@@ -469,6 +468,8 @@ function buildFreshSnapshotPayload(preferredSource = "") {
       appPackage: sourceAppId,
       artworkUri,
       openUri,
+      preferredSource: preferred,
+      sourceProvider,
       smtcHealthy: true,
       smtcFailureCount: 0,
       smtcError: "",
@@ -481,26 +482,23 @@ function buildFreshSnapshotPayload(preferredSource = "") {
     const message = error instanceof Error ? error.message : String(error || "Unknown snapshot parse error");
     console.warn(`[Bridge] Failed to build media snapshot from current session (${message}).`);
     const fallback = getRecentGoodSnapshotFallback();
-    return fallback || getBaseSnapshot({ smtcHealthy: false, smtcError: message });
+    return fallback || getBaseSnapshot({ preferredSource: preferred, smtcHealthy: false, smtcError: message });
   }
 }
 
-
 function buildSnapshotPayload({ force = false, preferredSource = "" } = {}) {
+  const preferred = normalizePreferredSource(preferredSource);
   const now = Date.now();
   if (!force && cachedSnapshotPayload && now - cachedSnapshotAt < SNAPSHOT_CACHE_TTL_MS) {
-    // If the preferred source changed, we must invalidate cache
-    if (cachedSnapshotPayload._preferredSource === preferredSource) {
-      return cachedSnapshotPayload;
-    }
+    if ((cachedSnapshotPayload.preferredSource || "") === preferred) return cachedSnapshotPayload;
   }
 
-  const payload = buildFreshSnapshotPayload(preferredSource);
-  payload._preferredSource = preferredSource;
+  const payload = buildFreshSnapshotPayload(preferred);
   cachedSnapshotPayload = payload;
   cachedSnapshotAt = now;
   return payload;
 }
+
 function invalidateSnapshotCache() {
   cachedSnapshotPayload = null;
   cachedSnapshotAt = 0;
@@ -515,17 +513,17 @@ $ErrorActionPreference = "Stop"
 $winRtSuccess = $false
 $targetApp = [string]$env:SIGNAL_SHARE_TARGET_APP
 $preferred = [string]$env:SIGNAL_SHARE_PREFERRED_SOURCE
-
 if ($null -eq $targetApp) { $targetApp = "" }
 if ($null -eq $preferred) { $preferred = "" }
 $targetApp = $targetApp.Trim()
-$preferred = $preferred.Trim().ToLower()
+$preferred = $preferred.Trim().ToLowerInvariant()
 
 function Normalize-AppId([string]$value) {
   if ([string]::IsNullOrWhiteSpace($value)) { return "" }
   $normalized = $value.Trim().ToLowerInvariant()
   $normalized = [regex]::Replace($normalized, "!.*$", "")
   $normalized = [regex]::Replace($normalized, "\\.[0-9]+$", "")
+  $normalized = [regex]::Replace($normalized, "\\.exe$", "")
   return $normalized
 }
 
@@ -536,36 +534,45 @@ function Matches-AppId([string]$candidate, [string]$target) {
   return ($candidateNorm -eq $targetNorm) -or ($candidateNorm.StartsWith($targetNorm)) -or ($targetNorm.StartsWith($candidateNorm))
 }
 
-function Is-Match-Source($s, $p) {
-  if ([string]::IsNullOrWhiteSpace($p) -or $p -eq "all") { return $true }
-  $id = Normalize-AppId $s.SourceAppUserModelId
-  $isBrowser = $id -match "chrome|edge|firefox|browser"
-  
-  if ($p -eq "youtube") {
-    if ($id -like "*spotify*") { return $false } # Strict exclusion
-    if ($id -match "youtube|ytmusic") { return $true }
-    if ($isBrowser) {
-       try {
-         $m = $s.TryGetMediaPropertiesAsync().GetResults()
-         if ($m.Title -match "spotify" -or $m.AlbumTitle -match "spotify") { return $false } # Strict exclusion
-         if ($m.Title -match "youtube" -or $m.AlbumTitle -match "youtube") { return $true }
-         if ($m.Title -match "[a-zA-Z0-9_-]{11}") { return $true }
-       } catch {}
-    }
-    return $false
+function Is-Browser-App([string]$id) {
+  $n = Normalize-AppId $id
+  return ($n -match "chrome|msedge|edge|firefox|opera|browser")
+}
+
+function Get-Session-Text($session) {
+  $parts = New-Object System.Collections.Generic.List[string]
+  try { if ($session.SourceAppUserModelId) { $parts.Add($session.SourceAppUserModelId) } } catch {}
+  try {
+    $mediaOp = $session.TryGetMediaPropertiesAsync()
+    $media = $mediaOp.GetResults()
+    if ($media.Title) { $parts.Add($media.Title) }
+    if ($media.Artist) { $parts.Add($media.Artist) }
+    if ($media.AlbumArtist) { $parts.Add($media.AlbumArtist) }
+    if ($media.AlbumTitle) { $parts.Add($media.AlbumTitle) }
+  } catch {}
+  return ([string]::Join(" ", $parts)).ToLowerInvariant()
+}
+
+function Is-Match-Source($session, [string]$source) {
+  if ([string]::IsNullOrWhiteSpace($source) -or $source -eq "all") { return $true }
+  $id = ""
+  try { $id = Normalize-AppId $session.SourceAppUserModelId } catch {}
+  $text = Get-Session-Text $session
+  $isBrowser = Is-Browser-App $id
+
+  if ($source -eq "spotify") {
+    if ($id -match "youtube|ytmusic" -or $text -match "youtube|youtu\\.be|music\\.youtube") { return $false }
+    if ($id -match "spotify" -or $text -match "spotify|open\\.spotify") { return $true }
+    return $isBrowser
   }
-  if ($p -eq "spotify") {
-    if ($id -match "youtube|ytmusic") { return $false } # Strict exclusion
-    if ($id -like "*spotify*") { return $true }
-    if ($isBrowser) {
-       try {
-         $m = $s.TryGetMediaPropertiesAsync().GetResults()
-         if ($m.Title -match "youtube" -or $m.AlbumTitle -match "youtube") { return $false } # Strict exclusion
-         if ($m.Title -match "spotify" -or $m.AlbumTitle -match "spotify") { return $true }
-       } catch {}
-    }
-    return $false
+
+  if ($source -eq "youtube") {
+    if ($id -match "spotify" -or $text -match "spotify|open\\.spotify") { return $false }
+    if ($id -match "youtube|ytmusic" -or $text -match "youtube|youtu\\.be|music\\.youtube") { return $true }
+    # Browser YouTube tabs often only expose the video title. Permit browser sessions as a YouTube fallback.
+    return $isBrowser
   }
+
   return $true
 }
 
@@ -573,7 +580,7 @@ try {
   Add-Type -AssemblyName System.Runtime.WindowsRuntime
   $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime]
   $asTaskMethod = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
-    $_.ToString() -eq 'System.Threading.Tasks.Task\`1[TResult] AsTask[TResult](Windows.Foundation.IAsyncOperation\`1[TResult])'
+    $_.ToString() -eq 'System.Threading.Tasks.Task\1[TResult] AsTask[TResult](Windows.Foundation.IAsyncOperation\1[TResult])'
   } | Select-Object -First 1
 
   if ($asTaskMethod -ne $null) {
@@ -584,24 +591,31 @@ try {
 
     if ($manager -ne $null) {
       $sessions = $manager.GetSessions()
+
       if (-not [string]::IsNullOrWhiteSpace($targetApp)) {
-        foreach ($s in $sessions) {
-          if (Matches-AppId $s.SourceAppUserModelId $targetApp) {
-            if (Is-Match-Source $s $preferred) {
-              $session = $s
+        foreach ($candidate in $sessions) {
+          if ($null -eq $candidate) { continue }
+          try {
+            if ((Matches-AppId $candidate.SourceAppUserModelId $targetApp) -and (Is-Match-Source $candidate $preferred)) {
+              $session = $candidate
               break
             }
-          }
+          } catch {}
         }
       }
+
       if ($session -eq $null -and -not [string]::IsNullOrWhiteSpace($preferred) -and $preferred -ne "all") {
-        foreach ($s in $sessions) {
-           if (Is-Match-Source $s $preferred) {
-             $session = $s
-             break
-           }
+        foreach ($candidate in $sessions) {
+          if ($null -eq $candidate) { continue }
+          try {
+            if (Is-Match-Source $candidate $preferred) {
+              $session = $candidate
+              break
+            }
+          } catch {}
         }
       }
+
       if ($session -eq $null -and ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all")) {
         $session = $manager.GetCurrentSession()
       }
@@ -620,65 +634,41 @@ try {
 
 if ($winRtSuccess) {
   Write-Output "ok"
-} else {
-  # WinRT failed. Try targeted Win32 PostMessage for known apps or fallback if allowed.
-  try {
-    Add-Type @"
-    using System;
-    using System.Runtime.InteropServices;
-    public static class MediaActionTarget {
-        [DllImport("user32.dll")]
-        public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
-        [DllImport("user32.dll", SetLastError = true)]
-        public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-        [DllImport("user32.dll", SetLastError=true)]
-        public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-    }
-"@
-    $WM_APPCOMMAND = 0x0319
-    $APPCOMMANDS = @{
-      "play_pause" = 14; "next" = 11; "previous" = 12; "stop" = 13;
-      "volume_up" = 10; "volume_down" = 9; "volume_mute" = 8
-    }
-    $cmd = $APPCOMMANDS["${action}"]
-    $lParam = [IntPtr]($cmd -shl 16)
-    
-    if ($preferred -eq "spotify") {
-      $hwnd = [MediaActionTarget]::FindWindow("SpotifyMainWindow", $null)
-      if ($hwnd -ne [IntPtr]::Zero) {
-        [MediaActionTarget]::PostMessage($hwnd, $WM_APPCOMMAND, [IntPtr]::Zero, $lParam)
-        Write-Output "ok-win32-spotify"
-        exit
-      }
-    }
-    
-    # Final fallback ONLY if NO specific source is preferred.
-    # If "youtube" or "spotify" is requested but WinRT failed to find a session, 
-    # we DO NOT want to broadcast a global key that might hit the WRONG app.
-    if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all") {
-      $KEYEVENTF_EXTENDEDKEY = 0x0001
-      $KEYEVENTF_KEYUP = 0x0002
-      [MediaActionTarget]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
-      Start-Sleep -Milliseconds 45
-      [MediaActionTarget]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
-      Write-Output "ok-global"
-    } else {
-      # If we are here, we had a preferred source but found no active targeted session
-      Write-Output "fail-source-not-active"
-    }
-  } catch {
-    Write-Output "fail-win32-error"
-  }
+  exit 0
 }
-`.trim();
+
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class MediaKeySender {
+  [DllImport("user32.dll", SetLastError=true)]
+  public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+}
+"@
+
+# Only use a global media key when no specific source is requested. This prevents the Spotify toggle
+# from controlling YouTube, and the YouTube toggle from controlling Spotify, when both are open.
+if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all") {
+  $KEYEVENTF_EXTENDEDKEY = 0x0001
+  $KEYEVENTF_KEYUP = 0x0002
+  [MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
+  Start-Sleep -Milliseconds 25
+  [MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
+  Write-Output "ok-global"
+  exit 0
+}
+
+Write-Output "fail-source-not-active"
+exit 0
+  `.trim().replace(/\u007f/g, '`');
 
   return new Promise((resolve) => {
     const child = spawn("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], {
       windowsHide: true,
-      env: { 
-        ...process.env, 
+      env: {
+        ...process.env,
         SIGNAL_SHARE_TARGET_APP: targetAppPackage,
-        SIGNAL_SHARE_PREFERRED_SOURCE: preferredSource
+        SIGNAL_SHARE_PREFERRED_SOURCE: normalizePreferredSource(preferredSource),
       },
     });
     let stdout = "";
@@ -694,7 +684,7 @@ if ($winRtSuccess) {
 
 app.get("/api/system-media/current", (req, res) => {
   try {
-    const preferredSource = `${req.query.source || ""}`.toLowerCase();
+    const preferredSource = normalizePreferredSource(req.query.source || "");
     res.json(buildSnapshotPayload({ preferredSource }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || "Unknown bridge error");
@@ -703,10 +693,10 @@ app.get("/api/system-media/current", (req, res) => {
   }
 });
 
-app.post("/api/system-media/action", rateLimitSystemMediaAction, async (req, res) => {
+app.post("/api/system-media/action", (req, res) => {
   const action = `${req.body?.action || ""}`.trim().toLowerCase();
   const appPackage = `${req.body?.appPackage || ""}`.trim();
-  const preferredSource = `${req.body?.preferredSource || ""}`.trim();
+  const preferredSource = normalizePreferredSource(req.body?.preferredSource || req.query.source || "");
 
   if (action === "open_uri") {
     if (!ALLOW_OPEN_URI) {
@@ -714,31 +704,35 @@ app.post("/api/system-media/action", rateLimitSystemMediaAction, async (req, res
     }
     const uri = `${req.body?.uri || ""}`.trim();
     if (!uri) return res.status(400).json({ ok: false });
-    // Use PowerShell to start the URI
     spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
-    return res.json({ ok: true });
+    return res.json({ ok: true, queued: true });
   }
+
   if (!MEDIA_KEY_CODES[action]) return res.status(400).json({ ok: false });
 
-  const actionKey = `${action}|${appPackage}`;
+  const actionKey = `${preferredSource || "all"}|${action}|${appPackage}`;
   const now = Date.now();
   const lastActionAt = lastMediaActionAtByKey.get(actionKey) || 0;
   if (now - lastActionAt < MEDIA_ACTION_COOLDOWN_MS) {
-    return res.json({ ok: true, skipped: true, reason: "duplicate-action-cooldown" });
+    return res.json({ ok: true, queued: false, skipped: true, reason: "duplicate-action-cooldown" });
   }
   lastMediaActionAtByKey.set(actionKey, now);
 
-  const ok = await sendSystemMediaKey(action, appPackage, preferredSource);
   invalidateSnapshotCache();
-  res.json({ ok });
+  res.json({ ok: true, queued: true });
 
-  // Let Windows update the media session, then refresh the cache without blocking the browser response.
-  setTimeout(() => {
-    try {
-      buildSnapshotPayload({ force: true });
-      void syncToSupabase();
-    } catch (_error) {}
-  }, 450);
+  mediaActionQueue = mediaActionQueue
+    .catch(() => { })
+    .then(() => sendSystemMediaKey(action, appPackage, preferredSource))
+    .then(() => {
+      invalidateSnapshotCache();
+      setTimeout(() => {
+        try {
+          buildSnapshotPayload({ force: true, preferredSource });
+          void syncToSupabase();
+        } catch (_error) { }
+      }, 250);
+    });
 });
 
 app.get("/security", (req, res) => { res.sendFile(path.join(projectRoot, "security.html")); });
@@ -798,7 +792,7 @@ function subscribeToMediaActions() {
         spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
       }
     } else {
-      await sendSystemMediaKey(action, app_package);
+      await sendSystemMediaKey(action, app_package, payload.new?.payload?.preferredSource || "");
     }
     await syncToSupabase();
   }).subscribe();
