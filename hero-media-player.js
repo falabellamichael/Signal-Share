@@ -535,29 +535,18 @@ The companion bridge is designed with several security layers to keep your PC sa
     const key = getExternalPostMetadataCacheKey(post);
     const cached = key ? externalHeaderMetadataCache.get(key) : null;
 
-    const isYouTube = post?.sourceKind === "youtube";
-
     if (cached) {
       const title = cached.title || fallback.title;
-      const creator = isYouTube ? "" : (cached.creator || fallback.creator);
+      const creator = cached.creator || fallback.creator;
       return {
         ...fallback,
         title,
         creator,
-        caption: isYouTube ? "" : (creator ? `${fallback.providerName} · ${creator}` : fallback.caption),
+        caption: creator ? `${fallback.providerName} · ${creator}` : fallback.caption,
       };
     }
 
     requestExternalHeaderMetadata(post);
-
-    if (isYouTube) {
-      return {
-        ...fallback,
-        creator: "",
-        caption: ""
-      };
-    }
-
     return fallback;
   }
 
@@ -2078,13 +2067,10 @@ The companion bridge is designed with several security layers to keep your PC sa
       nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
     }
 
-    const isYoutubeMode = getPreferredHeroControlSource() === "youtube" || post?.sourceKind === "youtube";
-    const finalCaption = isYoutubeMode ? "" : nextCaption;
-
     // Only touch the DOM if values have changed
     if (elements.heroPlayerHeader.textContent !== nextHeader) elements.heroPlayerHeader.textContent = nextHeader;
     if (elements.heroPlayerTitle.textContent !== nextTitle) elements.heroPlayerTitle.textContent = nextTitle;
-    if (elements.heroPlayerCaption.textContent !== finalCaption) elements.heroPlayerCaption.textContent = finalCaption;
+    if (elements.heroPlayerCaption.textContent !== nextCaption) elements.heroPlayerCaption.textContent = nextCaption;
     if (elements.heroPlayerStatus.textContent !== nextStatus) elements.heroPlayerStatus.textContent = nextStatus;
 
     const playPauseLabel = playbackState === "playing" ? "Pause" : "Play";
@@ -2117,14 +2103,13 @@ The companion bridge is designed with several security layers to keep your PC sa
         desktopSnapshot,
         matchedPost,
         showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot?.active,
-        active: mode !== "app", // Treat media modes as "active" to show info/matched player
-        hideMeta: isYoutubeMode
+        active: mode !== "app" // Treat media modes as "active" to show info/matched player
       }));
     }
 
     syncMediaSession({
       title: nextTitle,
-      artist: finalCaption,
+      artist: nextCaption,
       artwork: post ? resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl }) : (browserMetadata?.artwork || ""),
     });
     if (typeof renderMiniPlayer === "function") renderMiniPlayer();
