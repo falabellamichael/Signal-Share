@@ -636,7 +636,9 @@ export function renderHeroStagePreview(options = {}) {
   commitCard(stage, {
     badge: formatPostBadge(post, formatKind, getSignalLabel),
     title: externalMetadata?.title || post.title || "Now playing",
-    meta: externalMetadata?.creator ? `${externalMetadata.creator} · ${getSignalLabel("Live on feed", post)}` : formatPostMeta(post, creatorSummary, formatTimestamp),
-    artworkUrl,
+    meta: externalMetadata?.creator 
+      ? `${externalMetadata.creator} · ${getSignalLabel ? getSignalLabel("Live on feed", post) : "Live on feed"}` 
+      : formatPostMeta(post, creatorSummary, formatTimestamp),
+    artworkUrl: externalMetadata?.artworkUrl || artworkUrl,
   });
 }

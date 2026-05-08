@@ -1604,6 +1604,13 @@ The companion bridge is designed with several security layers to keep your PC sa
     let nextStatus = "App media standby";
     let externalMetadata = null;
 
+    // Resolve metadata for the prioritized active post
+    const activePost = mode === "app" ? post : (mode === "desktop" ? matchedPost : (mode === "device" ? nativeSnapshot : null));
+    if (activePost) {
+      const ext = getExternalPreviewMetadata(activePost);
+      externalMetadata = (ext instanceof Promise) ? null : ext;
+    }
+
     if (mode === "device") {
       nextHeader = nativeSnapshot?.meta ? `${nativeSnapshot.meta} / System Media` : "Device System Media";
       if (nativeSnapshot?.permissionRequired) {
@@ -1641,9 +1648,6 @@ The companion bridge is designed with several security layers to keep your PC sa
       const creatorSummary = getProfileSummaryForPost(post);
       const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
       
-      const ext = getExternalPreviewMetadata(post);
-      externalMetadata = (ext instanceof Promise) ? null : ext;
-
       const artist = externalMetadata?.creator || (post.sourceKind === "youtube" || post.sourceKind === "spotify" ? formatProviderName(post.sourceKind) : creatorName);
       nextHeader = `${artist} / ${getSignalLabel(post)}`;
       nextTitle = externalMetadata?.title || post.title || "Ready to play";
@@ -1670,7 +1674,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       renderHeroStagePreview(Object.assign({}, options, {
         stage: elements.heroPlayerStage,
         mode,
-        post: mode === "app" ? post : null,
+        post: mode === "app" ? post : (mode === "desktop" ? matchedPost : (mode === "device" ? nativeSnapshot : null)),
         fallbackMedia,
         desktopSnapshot,
         matchedPost,
