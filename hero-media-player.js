@@ -1434,6 +1434,11 @@ pause`.trim();
       hideSetupInstructions();
     });
 
+    document.getElementById("companionDownloadLink")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      downloadCompanion();
+    });
+
     document.getElementById("copySetupCommand")?.addEventListener("click", () => {
       const cmd = document.getElementById("setupCommand")?.textContent;
       if (cmd) {
