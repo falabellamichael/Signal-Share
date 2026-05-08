@@ -437,21 +437,18 @@ function createPostStandbyPreview(post, options = {}) {
     getSpotifyPreviewImageUrl,
   });
 
+  const isYouTube = post.sourceKind === "youtube";
+  const cardData = {
+    badge: isYouTube ? "" : `UP NEXT · ${providerLabel || "App Media"}`,
+    title: isYouTube ? "" : (post.title || "Next playable post"),
+    meta: isYouTube ? "" : meta,
+    note: isYouTube ? "" : "Press Play to start playback.",
+    artworkUrl,
+  };
+
   return {
-    key: getCardKey({
-      badge: `UP NEXT · ${providerLabel || "App Media"}`,
-      title: post.title || "Next playable post",
-      meta,
-      note: "Press Play to start playback.",
-      artworkUrl,
-    }),
-    node: createPreviewCard({
-      badge: `UP NEXT · ${providerLabel || "App Media"}`,
-      title: post.title || "Next playable post",
-      meta,
-      note: "Press Play to start playback.",
-      artworkUrl,
-    }),
+    key: getCardKey(cardData),
+    node: createPreviewCard(cardData),
   };
 }
 
@@ -552,10 +549,10 @@ export function renderHeroStagePreview(options = {}) {
 
       const isYouTube = matchedPost?.sourceKind === "youtube" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("youtube"));
       commitCard(stage, {
-        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA",
+        badge: isYouTube ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
         title: isYouTube ? "" : (nativeSnapshot.title || matchedPost?.title || "Now playing"),
-        meta: nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback"),
-        note: nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing",
+        meta: isYouTube ? "" : (nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback")),
+        note: isYouTube ? "" : (nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
         artworkUrl: artworkUrl,
       });
       return;
@@ -576,10 +573,10 @@ export function renderHeroStagePreview(options = {}) {
 
       const isYouTube = matchedPost?.sourceKind === "youtube" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("youtube"));
       commitCard(stage, {
-        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA",
+        badge: isYouTube ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
         title: isYouTube ? "" : (desktopSnapshot.title || matchedPost?.title || "Now playing"),
-        meta: desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback"),
-        note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
+        meta: isYouTube ? "" : (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback")),
+        note: isYouTube ? "" : (desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
         artworkUrl: artworkUrl,
       });
       return;
@@ -640,21 +637,23 @@ export function renderHeroStagePreview(options = {}) {
   // Handle async metadata resolution for preview card
   let resolvedMetadata = externalMetadata;
   if (externalMetadata instanceof Promise) {
+    const isYouTube = post?.sourceKind === "youtube";
     // Render initial card with fallback while metadata loads
     commitCard(stage, {
       badge: "",
-      title: post.title || "Now playing",
-      meta: formatPostMeta(post, creatorSummary),
+      title: isYouTube ? "" : (post.title || "Now playing"),
+      meta: isYouTube ? "" : formatPostMeta(post, creatorSummary),
       artworkUrl: artworkUrl,
     });
 
     // Fetch metadata and update card when available
     externalMetadata.then(metadata => {
       if (metadata) {
+        const isYouTube = post?.sourceKind === "youtube";
         commitCard(stage, {
           badge: "",
-          title: metadata?.title || post.title || "Now playing",
-          meta: metadata.creator || "",
+          title: isYouTube ? "" : (metadata?.title || post.title || "Now playing"),
+          meta: isYouTube ? "" : (metadata.creator || ""),
           artworkUrl: metadata?.artworkUrl || artworkUrl,
         });
       }
@@ -668,7 +667,7 @@ export function renderHeroStagePreview(options = {}) {
   commitCard(stage, {
     badge: "",
     title: isYouTube ? "" : (resolvedMetadata?.title || post.title || "Now playing"),
-    meta: resolvedMetadata?.creator || formatPostMeta(post, creatorSummary),
+    meta: isYouTube ? "" : (resolvedMetadata?.creator || formatPostMeta(post, creatorSummary)),
     artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
   });
 }
