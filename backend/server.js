@@ -440,6 +440,8 @@ app.get("/api/system-media/current", (req, res) => {
 app.post("/api/system-media/action", async (req, res) => {
   const action = `${req.body?.action || ""}`.trim().toLowerCase();
   const appPackage = `${req.body?.appPackage || ""}`.trim();
+  console.log(`[Bridge] Local action request: ${action} (${appPackage || 'no package'})`);
+  
   if (action === "open_uri") {
     const uri = `${req.body?.uri || ""}`.trim();
     if (!uri) return res.status(400).json({ ok: false });
