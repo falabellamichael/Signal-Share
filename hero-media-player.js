@@ -1695,7 +1695,7 @@ The companion bridge is designed with several security layers to keep your PC sa
               desktopSnapshot,
               matchedPost,
               externalMetadata: metadata,
-              showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot?.active,
+              showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot?.available,
               active: mode !== "app"
             }));
           }
@@ -1775,7 +1775,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         desktopSnapshot,
         matchedPost,
         externalMetadata,
-        showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot?.active,
+        showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot?.available,
         active: mode !== "app"
       }));
     }
