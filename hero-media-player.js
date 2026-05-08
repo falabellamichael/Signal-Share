@@ -22,6 +22,7 @@ export function createHeroMediaPlayerController(options) {
     renderMiniPlayer,
     postMessageToYouTubePlayer,
     getSpotifyPreviewImageUrl,
+    getExternalPreviewMetadata,
     parseYouTubeUrl,
     resolveActivePlayerSource,
     getHeroPost,
@@ -36,11 +37,11 @@ export function createHeroMediaPlayerController(options) {
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
   const NATIVE_ACTION_NEXT = "next";
   const NATIVE_ACTION_PREVIOUS = "previous";
-  const NATIVE_POLL_INTERVAL_MS = 2000;
+  const NATIVE_POLL_INTERVAL_MS = 1600;
   const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
-  const DESKTOP_POLL_INTERVAL_MS = 1500;
+  const DESKTOP_POLL_INTERVAL_MS = 1200;
   const LOCAL_NETWORK_PROMPT_COOLDOWN_MS = 30000;
 
   let listenersAttached = false;
@@ -62,7 +63,6 @@ export function createHeroMediaPlayerController(options) {
   let lastDesktopPollTime = 0;
   let lastNativePollTime = 0;
   let lastDesktopActionKey = "";
-  let lastHeroControlSource = "";
   let companionPromptDismissed = localStorage.getItem("ss_companion_dismissed") === "true";
   const DESKTOP_ACTION_COOLDOWN_MS = 280;
   const COMPANION_SETUP_SCRIPT = `@echo off
@@ -155,6 +155,8 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   const desktopArtworkFallbackCache = new Map();
   const resolvedArtworkMap = new Map();
+  const externalHeaderMetadataCache = new Map();
+  const externalHeaderMetadataInFlight = new Map();
 
   function isThenable(value) {
     return Boolean(value && typeof value.then === "function");
@@ -211,23 +213,344 @@ The companion bridge is designed with several security layers to keep your PC sa
     return value === "youtube" || value === "spotify" ? value : "";
   }
 
-  function isBrowserLikeAppPackage(value = "") {
-    const normalized = normalizeText(value);
-    return normalized.includes("chrome")
-      || normalized.includes("edge")
-      || normalized.includes("msedge")
-      || normalized.includes("firefox")
-      || normalized.includes("opera")
-      || normalized.includes("browser");
+  function getSystemMediaHeaderLabel() {
+    return "ON-DEVICE MEDIA";
+  }
+
+  function cleanSnapshotTitle(value = "") {
+    return cleanDisplayText(value) || "Now playing";
+  }
+
+  function cleanSnapshotCreator(snapshot = null, fallback = "") {
+    const appPackage = cleanDisplayText(snapshot?.appPackage || "");
+    let meta = sanitizeSnapshotMeta(snapshot?.meta || "", appPackage);
+    meta = cleanDisplayText(meta);
+    meta = meta.replace(/^(?:spotify|youtube|youtube music|chrome|edge|microsoft edge|firefox|opera)\s*(?:[-:|]\s*)?/i, "").trim();
+    meta = meta.replace(/^(?:playing from|now playing on)\s+/i, "").trim();
+    return meta || fallback;
+  }
+
+  function getPlaybackStatusLabel(value = "") {
+    const stateValue = normalizePlaybackState(value);
+    if (stateValue === "playing") return "Playing";
+    if (stateValue === "paused") return "Paused";
+    return "Ready";
+  }
+
+  function appendPreferredSourceToEndpoint(endpoint = "") {
+    const preferredSource = getPreferredHeroControlSource();
+    if (!preferredSource || !endpoint) return endpoint;
+
+    try {
+      const url = new URL(endpoint, window.location.href);
+      url.searchParams.set("source", preferredSource);
+      return url.toString();
+    } catch {
+      const separator = endpoint.includes("?") ? "&" : "?";
+      return `${endpoint}${separator}source=${encodeURIComponent(preferredSource)}`;
+    }
+  }
+
+  function syncHeroControlSourceChange(source = "") {
+    const normalized = normalizeText(source);
+    const nextSource = normalized === "youtube" || normalized === "spotify" ? normalized : "";
+    const previousSource = getPreferredHeroControlSource();
+
+    state.heroControlSource = nextSource || "all";
+    state.heroMediaSource = nextSource || "all";
+    state.systemMediaSource = nextSource || "all";
+
+    if (previousSource === nextSource) return;
+
+    desktopSnapshotEndpoint = "";
+    desktopActionEndpoint = "";
+    desktopSnapshotReadPromise = null;
+    lastDesktopSnapshotSignature = "none";
+    lastDesktopPollTime = 0;
+
+    if (canUseDesktopBridge()) {
+      void refreshDesktopSnapshot({ force: true });
+    }
+    render();
+  }
+
+  function getHeroSourceFromElement(target) {
+    if (!(target instanceof Element)) return "";
+    const control = target.closest("[data-hero-control-source], [data-hero-source], [data-media-source], [data-source], button, [role='button']");
+    if (!control) return "";
+
+    const rawSource = control.getAttribute("data-hero-control-source")
+      || control.getAttribute("data-hero-source")
+      || control.getAttribute("data-media-source")
+      || control.getAttribute("data-source")
+      || control.getAttribute("aria-label")
+      || control.textContent
+      || "";
+
+    const value = normalizeText(rawSource);
+    if (value.includes("spotify")) return "spotify";
+    if (value.includes("youtube") || value.includes("you tube")) return "youtube";
+    return "";
+  }
+
+  function handleHeroSourceToggleClick(event) {
+    const source = getHeroSourceFromElement(event.target);
+    if (!source) return;
+    syncHeroControlSourceChange(source);
+  }
+
+  function cleanDisplayText(value = "") {
+    return `${value || ""}`.replace(/\s+/g, " ").trim();
+  }
+
+  function isExternalUrlPost(post = null) {
+    return post?.sourceKind === "youtube" || post?.sourceKind === "spotify";
+  }
+
+  function getExternalProviderName(post = null) {
+    if (post?.sourceKind === "youtube") return "YouTube";
+    if (post?.sourceKind === "spotify") return "Spotify";
+    return "App";
+  }
+
+  function firstCleanValue(...values) {
+    for (const value of values) {
+      const clean = cleanDisplayText(value);
+      if (clean) return clean;
+    }
+    return "";
+  }
+
+  function getExternalPostMetadataCacheKey(post = null) {
+    if (!isExternalUrlPost(post)) return "";
+    return [
+      post.sourceKind,
+      post.externalId,
+      post.externalUrl,
+      post.originalUrl,
+      post.embedUrl,
+      post.mediaUrl,
+      post.src,
+      post.label,
+      post.title,
+    ].map(cleanDisplayText).join("|");
+  }
+
+  function inferSpotifyEntityTypeFromPost(post = null) {
+    const values = [post?.label, post?.externalUrl, post?.originalUrl, post?.embedUrl, post?.mediaUrl, post?.src];
+    for (const value of values) {
+      const clean = cleanDisplayText(value).toLowerCase();
+      const match = clean.match(/(?:spotify[:/]|open\.spotify\.com\/(?:intl-[a-z0-9-]+\/)?(?:embed\/)?)(track|album|playlist|artist|episode|show)/i);
+      if (match?.[1]) return match[1].toLowerCase();
+    }
+    return "track";
+  }
+
+  function buildSpotifyCanonicalUrlFromPost(post = null) {
+    const values = [post?.externalUrl, post?.originalUrl, post?.embedUrl, post?.mediaUrl, post?.src, post?.externalId];
+    for (const rawValue of values) {
+      const value = cleanDisplayText(rawValue);
+      if (!value) continue;
+
+      const uriMatch = value.match(/^spotify:(track|album|playlist|artist|episode|show):([A-Za-z0-9]+)$/i);
+      if (uriMatch) return `https://open.spotify.com/${uriMatch[1].toLowerCase()}/${uriMatch[2]}`;
+
+      const urlMatch = value.match(/open\.spotify\.com\/(?:intl-[a-z0-9-]+\/)?(?:embed\/)?(track|album|playlist|artist|episode|show)\/([A-Za-z0-9]+)/i);
+      if (urlMatch) return `https://open.spotify.com/${urlMatch[1].toLowerCase()}/${urlMatch[2]}`;
+    }
+
+    const externalId = cleanDisplayText(post?.externalId).replace(/[/?#].*$/, "");
+    if (/^[A-Za-z0-9]+$/.test(externalId)) {
+      return `https://open.spotify.com/${inferSpotifyEntityTypeFromPost(post)}/${externalId}`;
+    }
+    return "";
+  }
+
+  function resolveYouTubeMetadataUrlFromPost(post = null) {
+    const values = [post?.externalUrl, post?.originalUrl, post?.embedUrl, post?.mediaUrl, post?.src, post?.externalId, post?.label, post?.caption, post?.title];
+    for (const value of values) {
+      const clean = cleanDisplayText(value);
+      if (!clean) continue;
+      if (/^[a-zA-Z0-9_-]{11}$/.test(clean)) return `https://www.youtube.com/watch?v=${clean}`;
+      if (typeof parseYouTubeUrl === "function") {
+        try {
+          const parsed = parseYouTubeUrl(clean);
+          if (parsed?.externalId) return `https://www.youtube.com/watch?v=${parsed.externalId}`;
+        } catch { }
+      }
+      const match = clean.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/|vnd\.youtube:)([a-zA-Z0-9_-]{11})/i);
+      if (match?.[1]) return `https://www.youtube.com/watch?v=${match[1]}`;
+    }
+    return "";
+  }
+
+  function buildExternalMetadataSource(post = null) {
+    if (!isExternalUrlPost(post)) return null;
+    const sourceUrl = post.sourceKind === "spotify"
+      ? buildSpotifyCanonicalUrlFromPost(post)
+      : resolveYouTubeMetadataUrlFromPost(post);
+
+    return {
+      provider: post.sourceKind,
+      title: cleanDisplayText(post.title),
+      creator: cleanDisplayText(post.creator),
+      externalId: cleanDisplayText(post.externalId),
+      externalUrl: cleanDisplayText(post.externalUrl || sourceUrl),
+      originalUrl: cleanDisplayText(post.originalUrl || post.externalUrl || sourceUrl),
+      embedUrl: cleanDisplayText(post.embedUrl),
+      mediaUrl: cleanDisplayText(post.mediaUrl),
+      src: cleanDisplayText(post.src),
+      label: cleanDisplayText(post.label),
+      caption: cleanDisplayText(post.caption),
+    };
+  }
+
+  function normalizeExternalMetadata(metadata = null) {
+    if (!metadata || typeof metadata !== "object") return null;
+    const title = firstCleanValue(metadata.title, metadata.name);
+    const creator = firstCleanValue(metadata.creator, metadata.artist, metadata.author_name, metadata.authorName, metadata.channelTitle, metadata.ownerName);
+    const thumbnailUrl = firstCleanValue(metadata.thumbnailUrl, metadata.thumbnail_url, metadata.artworkUrl, metadata.image);
+    if (!title && !creator && !thumbnailUrl) return null;
+    return { title, creator, thumbnailUrl };
+  }
+
+  async function fetchYouTubeOEmbedMetadata(post) {
+    if (typeof window.fetch !== "function") return null;
+    const watchUrl = resolveYouTubeMetadataUrlFromPost(post);
+    if (!watchUrl) return null;
+    const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(watchUrl)}&format=json`;
+    const response = await window.fetch(endpoint, { method: "GET", cache: "force-cache" });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return normalizeExternalMetadata({
+      title: data?.title,
+      creator: data?.author_name,
+      thumbnailUrl: data?.thumbnail_url,
+    });
+  }
+
+  async function fetchSpotifyCatalogHeaderMetadata(post) {
+    const sourceUrl = buildSpotifyCanonicalUrlFromPost(post);
+    if (!sourceUrl || !state.supabase || state.backendMode !== "supabase" || !state.currentUser) return null;
+    const functionName = window.SIGNAL_SHARE_CONFIG?.spotifyPreviewFunctionName?.trim?.() || "spotify-preview-metadata";
+    if (!functionName) return null;
+    const locale = (Array.isArray(navigator.languages) && navigator.languages[0]) || navigator.language || navigator.userLanguage || "";
+    const marketMatch = `${locale}`.trim().match(/[-_]([A-Za-z]{2})$/);
+    const market = marketMatch ? marketMatch[1].toUpperCase() : "US";
+    const { data, error } = await state.supabase.functions.invoke(functionName, {
+      body: { url: sourceUrl, market },
+    });
+    if (error || !data || data.error) return null;
+    return normalizeExternalMetadata(data);
+  }
+
+  function getExternalHeaderFallback(post) {
+    const providerName = getExternalProviderName(post);
+    const directTitle = firstCleanValue(
+      post?.mediaTitle,
+      post?.externalTitle,
+      post?.sourceTitle,
+      post?.videoTitle,
+      post?.trackTitle,
+      post?.oembedTitle,
+      post?.metadata?.title,
+      post?.title,
+      "Ready to play"
+    );
+    let directCreator = firstCleanValue(
+      post?.mediaCreator,
+      post?.externalCreator,
+      post?.sourceCreator,
+      post?.channelTitle,
+      post?.author_name,
+      post?.authorName,
+      post?.artist,
+      post?.artistName,
+      post?.metadata?.creator,
+      post?.metadata?.artist,
+      post?.metadata?.author_name
+    );
+
+    let title = directTitle;
+    if (post?.sourceKind === "spotify" && !directCreator) {
+      const split = directTitle.match(/^(.{1,80}?)\s+-\s+(.+)$/);
+      if (split?.[1] && split?.[2] && !/^(audio|music|post|song|spotify|track|untitled)$/i.test(split[1].trim())) {
+        directCreator = split[1].trim();
+        title = split[2].trim();
+      }
+    }
+
+    return {
+      providerName,
+      title,
+      creator: directCreator,
+      caption: directCreator ? `${providerName} · ${directCreator}` : providerName,
+    };
+  }
+
+  function requestExternalHeaderMetadata(post) {
+    const key = getExternalPostMetadataCacheKey(post);
+    if (!key || externalHeaderMetadataCache.has(key) || externalHeaderMetadataInFlight.has(key)) return;
+
+    const source = buildExternalMetadataSource(post);
+    const request = (async () => {
+      let metadata = null;
+
+      if (typeof getExternalPreviewMetadata === "function" && source) {
+        try {
+          metadata = normalizeExternalMetadata(await getExternalPreviewMetadata(source));
+        } catch { }
+      }
+
+      if (!metadata && post?.sourceKind === "youtube") {
+        try { metadata = await fetchYouTubeOEmbedMetadata(post); } catch { }
+      }
+
+      if (!metadata && post?.sourceKind === "spotify") {
+        try { metadata = await fetchSpotifyCatalogHeaderMetadata(post); } catch { }
+      }
+
+      externalHeaderMetadataCache.set(key, metadata || null);
+      return metadata || null;
+    })();
+
+    externalHeaderMetadataInFlight.set(key, request);
+    request
+      .then((metadata) => {
+        if (metadata?.title || metadata?.creator) render();
+      })
+      .finally(() => {
+        externalHeaderMetadataInFlight.delete(key);
+      });
+  }
+
+  function getExternalHeaderDisplay(post = null) {
+    const fallback = getExternalHeaderFallback(post);
+    const key = getExternalPostMetadataCacheKey(post);
+    const cached = key ? externalHeaderMetadataCache.get(key) : null;
+
+    if (cached) {
+      const title = cached.title || fallback.title;
+      const creator = cached.creator || fallback.creator;
+      return {
+        ...fallback,
+        title,
+        creator,
+        caption: creator ? `${fallback.providerName} · ${creator}` : fallback.caption,
+      };
+    }
+
+    requestExternalHeaderMetadata(post);
+    return fallback;
   }
 
   function isPreferredNowPlayingAppPackage(value = "") {
     const normalized = normalizeText(value);
     if (!normalized) return false;
 
-    const preferred = getPreferredHeroControlSource();
-    if (preferred === "spotify") return normalized.includes("spotify");
-    if (preferred === "youtube") {
+    const preferredSource = getPreferredHeroControlSource();
+    if (preferredSource === "spotify") return normalized.includes("spotify");
+    if (preferredSource === "youtube") {
       return normalized.includes("youtube")
         || normalized.includes("ytmusic")
         || normalized.includes("youtube.music");
@@ -243,11 +566,11 @@ The companion bridge is designed with several security layers to keep your PC sa
     const normalized = normalizeText(value);
     if (!normalized) return false;
 
-    const preferred = getPreferredHeroControlSource();
-    if (preferred === "spotify") {
+    const preferredSource = getPreferredHeroControlSource();
+    if (preferredSource === "spotify") {
       return normalized.startsWith("spotify:") || normalized.includes("open.spotify.com");
     }
-    if (preferred === "youtube") {
+    if (preferredSource === "youtube") {
       return normalized.startsWith("vnd.youtube:")
         || normalized.includes("youtube.com")
         || normalized.includes("music.youtube.com")
@@ -264,66 +587,33 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   function isPreferredNowPlayingSnapshot(snapshot = null) {
     if (!snapshot) return false;
+    const preferredSource = getPreferredHeroControlSource();
 
-    if (isPreferredNowPlayingAppPackage(snapshot.appPackage) || isPreferredNowPlayingUri(snapshot.openUri)) {
-      return true;
+    if (!preferredSource) {
+      return isPreferredNowPlayingAppPackage(snapshot.appPackage)
+        || isPreferredNowPlayingUri(snapshot.openUri);
     }
-
-    const preferred = getPreferredHeroControlSource();
-    if (!preferred) return false;
 
     const app = normalizeText(snapshot.appPackage);
+    const uri = normalizeText(snapshot.openUri);
     const title = normalizeText(snapshot.title);
     const meta = normalizeText(snapshot.meta);
-    const uri = normalizeText(snapshot.openUri);
-    const haystack = `${app} ${title} ${meta} ${uri}`;
+    const combined = `${app} ${uri} ${title} ${meta}`;
 
-    if (preferred === "spotify") {
-      if (haystack.includes("youtube") || haystack.includes("youtu.be") || haystack.includes("music.youtube")) return false;
-      return haystack.includes("spotify") || haystack.includes("open.spotify.com");
+    if (preferredSource === "spotify") {
+      if (combined.includes("youtube") || combined.includes("youtu.be")) return false;
+      return combined.includes("spotify") || uri.includes("open.spotify.com") || uri.startsWith("spotify:");
     }
 
-    if (preferred === "youtube") {
-      if (haystack.includes("spotify") || haystack.includes("open.spotify")) return false;
-      return haystack.includes("youtube")
-        || haystack.includes("youtu.be")
-        || haystack.includes("ytmusic")
-        || (isBrowserLikeAppPackage(app) && /[a-zA-Z0-9_-]{11}/.test(`${snapshot.title || ""} ${snapshot.meta || ""}`));
+    if (preferredSource === "youtube") {
+      if (combined.includes("spotify") || uri.includes("open.spotify.com")) return false;
+      return combined.includes("youtube")
+        || combined.includes("ytmusic")
+        || uri.includes("youtu.be/")
+        || /[a-zA-Z0-9_-]{11}/.test(snapshot?.openUri || "");
     }
 
     return false;
-  }
-
-  function syncHeroControlSourceChange() {
-    const nextSource = getPreferredHeroControlSource() || "all";
-    if (nextSource === lastHeroControlSource) return false;
-
-    lastHeroControlSource = nextSource;
-    desktopSnapshotEndpoint = "";
-    desktopActionEndpoint = "";
-    desktopSnapshotReadPromise = null;
-    lastDesktopSnapshotSignature = "none";
-    lastDesktopPollTime = 0;
-    desktopSnapshot = null;
-
-    if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-    return true;
-  }
-
-  function withDesktopSourceParam(candidate = "") {
-    const source = getPreferredHeroControlSource();
-    if (!candidate || !source) return candidate;
-
-    try {
-      const url = new URL(candidate, window.location.href);
-      url.searchParams.delete("source");
-      url.searchParams.set("source", source);
-      return url.toString();
-    } catch {
-      const [base] = `${candidate}`.split("?");
-      const separator = base.includes("?") ? "&" : "?";
-      return `${base}${separator}source=${encodeURIComponent(source)}`;
-    }
   }
 
   function hasSnapshotPlaybackContext(snapshot = null) {
@@ -500,16 +790,17 @@ The companion bridge is designed with several security layers to keep your PC sa
       const resolved = new URL(url, window.location.href);
       const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
       if (addressSpace !== "local" && addressSpace !== "private" && addressSpace !== "loopback") return init;
-
       const secret = localStorage.getItem("ss_bridge_secret");
-      if (!secret) return init;
-
+      const headers = {
+        ...init.headers,
+        "target-address-space": addressSpace,
+      };
+      if (secret) {
+        headers["X-Bridge-Secret"] = secret;
+      }
       return {
         ...init,
-        headers: {
-          ...init.headers,
-          "X-Bridge-Secret": secret,
-        },
+        headers,
       };
     } catch {
       return init;
@@ -615,7 +906,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     // GitHub Pages / remote origins should not keep hammering loopback forever unless
     // the user explicitly opens Media mode or configured an endpoint/base URL.
     if (isRemoteOrigin && desktopPollFailureCount > 3 && state.heroControlMode !== "media") {
-      return candidates.map(withDesktopSourceParam);
+      return candidates;
     }
 
     // Loopback fallbacks. Match the current hostname first to avoid cross-origin noise.
@@ -627,7 +918,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
     }
 
-    return candidates.map(withDesktopSourceParam);
+    return candidates.map(appendPreferredSourceToEndpoint);
   }
 
   function deriveDesktopActionEndpoint(snapshotEndpoint) {
@@ -638,12 +929,10 @@ The companion bridge is designed with several security layers to keep your PC sa
     try {
       const url = new URL(snapshotEndpoint, window.location.href);
       url.pathname = url.pathname.replace(/\/current$/i, "/action");
-      url.search = "";
       return url.toString();
     } catch {
-      const [base] = `${snapshotEndpoint}`.split("?");
-      if (base.endsWith("/current")) {
-        return `${base.slice(0, -"/current".length)}/action`;
+      if (snapshotEndpoint.endsWith("/current")) {
+        return `${snapshotEndpoint.slice(0, -"/current".length)}/action`;
       }
       return "/api/system-media/action";
     }
@@ -939,10 +1228,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       return Promise.resolve(null);
     }
 
-    const sourceChanged = syncHeroControlSourceChange();
-    if (sourceChanged) force = true;
-
-    if (desktopSnapshotReadPromise && !force) return desktopSnapshotReadPromise;
+    if (desktopSnapshotReadPromise) return desktopSnapshotReadPromise;
 
     const now = Date.now();
     const isMediaMode = state.heroControlMode === "media";
@@ -1277,13 +1563,10 @@ The companion bridge is designed with several security layers to keep your PC sa
   function performDesktopAction(action, payload = {}) {
     if (!canUseDesktopBridge()) return Promise.resolve(false);
 
-    syncHeroControlSourceChange();
-
     const now = Date.now();
     const preferredSource = getPreferredHeroControlSource();
     const actionKey = `${preferredSource || "all"}|${action}|${JSON.stringify(payload || {})}`;
 
-    // Keep accidental double-taps from firing twice, but do not block normal Play -> Pause / Next clicks.
     if (desktopActionInFlight && actionKey === lastDesktopActionKey) return Promise.resolve(false);
     if (now - lastDesktopActionAt < DESKTOP_ACTION_COOLDOWN_MS && actionKey === lastDesktopActionKey) {
       return Promise.resolve(false);
@@ -1293,47 +1576,49 @@ The companion bridge is designed with several security layers to keep your PC sa
     lastDesktopActionKey = actionKey;
     desktopActionInFlight = true;
 
+    window.setTimeout(() => {
+      if (lastDesktopActionKey === actionKey) desktopActionInFlight = false;
+    }, DESKTOP_ACTION_COOLDOWN_MS);
+
     const isRemoteOrigin = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
     const isLocalEndpoint = desktopSnapshotEndpoint && desktopSnapshotEndpoint !== "supabase-sync" && !desktopSnapshotEndpoint.startsWith("/");
 
-    const clearActionLock = () => {
-      window.setTimeout(() => { desktopActionInFlight = false; }, DESKTOP_ACTION_COOLDOWN_MS);
-    };
-
-    const actionPayload = {
-      action,
-      appPackage: desktopSnapshot?.appPackage || "",
-      preferredSource,
-      ...payload,
-    };
-
     if (desktopSnapshotEndpoint === "supabase-sync" || (isRemoteOrigin && !isLocalEndpoint && state.currentUser?.id)) {
-      return performSupabaseDesktopAction(action, actionPayload).finally(clearActionLock);
+      return performSupabaseDesktopAction(action, { preferredSource, ...payload });
     }
 
     const actionEndpoint = getDesktopActionEndpoint();
-    if (!actionEndpoint) {
-      clearActionLock();
-      return Promise.resolve(false);
-    }
+    if (!actionEndpoint) return Promise.resolve(false);
+
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const abortTimer = controller ? window.setTimeout(() => controller.abort(), 2200) : 0;
 
     return window.fetch(actionEndpoint, withLocalNetworkFetchOptions(actionEndpoint, {
       method: "POST",
       credentials: "omit",
+      keepalive: true,
+      signal: controller?.signal,
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify(actionPayload),
+      body: JSON.stringify({
+        action,
+        appPackage: desktopSnapshot?.appPackage || "",
+        preferredSource,
+        ...payload
+      }),
     }))
-      .then((response) => response.ok ? response.json() : { ok: false })
-      .then((payload) => {
-        window.setTimeout(() => refreshDesktopSnapshot({ force: true }), 250);
-        window.setTimeout(() => refreshDesktopSnapshot({ force: true }), 1100);
-        return Boolean(payload?.ok || payload?.queued);
+      .then((response) => response.ok ? response.json().catch(() => ({ ok: true })) : { ok: false })
+      .then((responsePayload) => {
+        window.setTimeout(() => refreshDesktopSnapshot({ force: true }), 260);
+        window.setTimeout(() => refreshDesktopSnapshot({ force: true }), 950);
+        return Boolean(responsePayload?.ok);
       })
       .catch(() => false)
-      .finally(clearActionLock);
+      .finally(() => {
+        if (abortTimer) window.clearTimeout(abortTimer);
+      });
   }
 
   async function performSupabaseDesktopAction(action, payload = {}) {
@@ -1447,21 +1732,13 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     if (mode === "device") {
-      if (nativeSnapshot) {
-        nativeSnapshot.title = "Switching...";
-        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-        render();
-      }
+      if (nativeSnapshot) render();
       performNativeAction(NATIVE_ACTION_PREVIOUS);
       return;
     }
 
     if (mode === "desktop") {
-      if (desktopSnapshot) {
-        desktopSnapshot.title = "Switching track...";
-        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-        render();
-      }
+      if (desktopSnapshot) render();
       performDesktopAction(DESKTOP_ACTION_PREVIOUS);
       return;
     }
@@ -1491,21 +1768,13 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     if (mode === "device") {
-      if (nativeSnapshot) {
-        nativeSnapshot.title = "Switching...";
-        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-        render();
-      }
+      if (nativeSnapshot) render();
       performNativeAction(NATIVE_ACTION_NEXT);
       return;
     }
 
     if (mode === "desktop") {
-      if (desktopSnapshot) {
-        desktopSnapshot.title = "Switching track...";
-        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-        render();
-      }
+      if (desktopSnapshot) render();
       performDesktopAction(DESKTOP_ACTION_NEXT);
       return;
     }
@@ -1611,6 +1880,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
     });
     elements.heroPlayerVolumeSlider.addEventListener("input", handleVolumeInput);
+    document.addEventListener("click", handleHeroSourceToggleClick, true);
 
     window.addEventListener("signal:nativeBridgeReady", () => {
       startNativeSnapshotPolling();
@@ -1639,12 +1909,6 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   function render() {
     if (!hasUi()) return;
-
-    const sourceChanged = syncHeroControlSourceChange();
-    if (sourceChanged && canUseDesktopBridge()) {
-      void refreshDesktopSnapshot({ force: true, renderAfter: false });
-    }
-
     const heroPost = getHeroPost();
     const playablePosts = getHeroPlayablePosts();
     const playableCount = playablePosts.length;
@@ -1724,29 +1988,34 @@ The companion bridge is designed with several security layers to keep your PC sa
     let nextStatus = "";
 
     if (mode === "device") {
-      nextHeader = "Device System Media";
+      nextHeader = getSystemMediaHeaderLabel();
       if (nativeSnapshot?.permissionRequired) {
         nextTitle = "Enable device media access";
-        nextCaption = "Allow notification access so this panel can control what is playing on your device.";
-        nextStatus = "Access Required";
+        nextCaption = "Allow notification access to control playback.";
+        nextStatus = "Access required";
       } else if (nativeSnapshot?.active) {
-        nextTitle = nativeSnapshot.title || "Now playing";
-        nextCaption = nativeSnapshot.meta || "Device playback";
-        nextStatus = "Device system media";
+        nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
+        nextCaption = cleanSnapshotCreator(nativeSnapshot, "Device playback");
+        nextStatus = getPlaybackStatusLabel(nativeSnapshot.playbackState);
       } else {
         nextTitle = "Device media idle";
-        nextCaption = "Start playback in any media app to control it here.";
+        nextCaption = "Start playback in any media app.";
         nextStatus = "Device system media";
       }
     } else if (mode === "desktop") {
-      nextHeader = "PC System Media";
+      nextHeader = getSystemMediaHeaderLabel();
       if (desktopSnapshot?.active) {
-        nextTitle = desktopSnapshot.title || "Now playing";
-        nextCaption = desktopSnapshot.meta || "Desktop playback";
-        nextStatus = "PC system media";
+        nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
+        nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
+        nextStatus = getPlaybackStatusLabel(desktopSnapshot.playbackState);
       } else {
-        nextTitle = "PC media idle";
-        nextCaption = "Start playback in YouTube, Spotify, or another desktop app.";
+        const preferredSource = getPreferredHeroControlSource();
+        nextTitle = preferredSource ? `${preferredSource.charAt(0).toUpperCase()}${preferredSource.slice(1)} media idle` : "PC media idle";
+        nextCaption = preferredSource === "spotify"
+          ? "Start Spotify playback on this PC."
+          : preferredSource === "youtube"
+            ? "Start YouTube playback in your browser."
+            : "Start playback in YouTube, Spotify, or another desktop app.";
         nextStatus = "PC system media";
       }
     } else if (mode === "app" && !post && fallbackMedia instanceof HTMLMediaElement) {
@@ -1762,13 +2031,20 @@ The companion bridge is designed with several security layers to keep your PC sa
       nextCaption = "";
       nextStatus = "App media standby";
     } else {
-      const creatorSummary = getProfileSummaryForPost(post);
-      const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
-      const providerName = post?.sourceKind === "youtube" ? "YouTube" : (post?.sourceKind === "spotify" ? "Spotify" : "App");
-
+      const providerName = getExternalProviderName(post);
       nextHeader = `${providerName.toUpperCase()} PREVIEW`;
-      nextTitle = post?.title || "Ready to play";
-      nextCaption = post ? `${post.caption} · ${creatorName}` : "";
+
+      if (isExternalUrlPost(post)) {
+        const externalDisplay = getExternalHeaderDisplay(post);
+        nextTitle = externalDisplay.title || "Ready to play";
+        nextCaption = externalDisplay.caption || providerName;
+      } else {
+        const creatorSummary = getProfileSummaryForPost(post);
+        const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
+        nextTitle = post?.title || "Ready to play";
+        nextCaption = post ? `${post.caption} · ${creatorName}` : "";
+      }
+
       nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
     }
 
@@ -1834,14 +2110,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     handleNext,
     handlePrevious,
     handleVolumeInput,
-    setHeroControlSource: (source) => {
-      const normalized = normalizeText(source);
-      state.heroControlSource = normalized === "youtube" || normalized === "spotify" ? normalized : "all";
-      syncHeroControlSourceChange();
-      if (canUseDesktopBridge()) void refreshDesktopSnapshot({ force: true });
-      render();
-    },
-    getSnapshot: () => ({ desktop: desktopSnapshot, native: nativeSnapshot }),
+    setHeroControlSource: (source) => { syncHeroControlSourceChange(source); },
     openNowPlayingMediaApp: (packageName, uri) => {
       if (hasNativeActionBridge()) {
         try { getNativeBridge().openNowPlayingMediaApp(packageName, uri, true); return true; } catch { return false; }

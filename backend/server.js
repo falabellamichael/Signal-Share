@@ -42,12 +42,12 @@ const WINRT_ACTION_METHODS = {
 const MAX_ARTWORK_BYTES = Number(process.env.SIGNAL_SHARE_MAX_ARTWORK_BYTES || 160000);
 const SMTC_ERROR_LOG_COOLDOWN_MS = 30000;
 const LAST_GOOD_SNAPSHOT_MAX_AGE_MS = 15000;
-const SNAPSHOT_CACHE_TTL_MS = Number(process.env.SIGNAL_SHARE_SNAPSHOT_CACHE_TTL_MS || 900);
+const SNAPSHOT_CACHE_TTL_MS = Number(process.env.SIGNAL_SHARE_SNAPSHOT_CACHE_TTL_MS || 650);
 const SUPABASE_SYNC_INTERVAL_MS = Number(process.env.SIGNAL_SHARE_SYNC_INTERVAL_MS || 5000);
 const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true" || process.env.SIGNAL_SHARE_REMOTE_MEDIA === "true";
 const ALLOW_OPEN_URI = process.env.SIGNAL_SHARE_ALLOW_OPEN_URI === "true";
 const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
-const MEDIA_ACTION_COOLDOWN_MS = 280;
+const MEDIA_ACTION_COOLDOWN_MS = 220;
 const lastMediaActionAtByKey = new Map();
 
 // Rate limiting for system actions
@@ -70,7 +70,6 @@ let lastSmtcErrorLoggedAt = 0;
 let lastSupabaseSyncKey = "";
 let cachedSnapshotPayload = null;
 let cachedSnapshotAt = 0;
-let mediaActionQueue = Promise.resolve();
 
 const supabase = createClient(
   process.env.SUPABASE_URL || "",
@@ -721,17 +720,18 @@ app.post("/api/system-media/action", (req, res) => {
   invalidateSnapshotCache();
   res.json({ ok: true, queued: true });
 
-  mediaActionQueue = mediaActionQueue
-    .catch(() => { })
-    .then(() => sendSystemMediaKey(action, appPackage, preferredSource))
+  void sendSystemMediaKey(action, appPackage, preferredSource)
     .then(() => {
       invalidateSnapshotCache();
       setTimeout(() => {
         try {
           buildSnapshotPayload({ force: true, preferredSource });
           void syncToSupabase();
-        } catch (_error) { }
-      }, 250);
+        } catch (_error) {}
+      }, 180);
+    })
+    .catch(() => {
+      invalidateSnapshotCache();
     });
 });
 
