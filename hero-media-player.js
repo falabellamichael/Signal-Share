@@ -1066,18 +1066,6 @@ export function createHeroMediaPlayerController(options) {
     try {
       lastNativeActionAt = Date.now();
 
-      // Truly optimistic update
-      if (nativeSnapshot) {
-        if (action === NATIVE_ACTION_PLAY_PAUSE) {
-          nativeSnapshot.playbackState = (nativeSnapshot.playbackState === "playing") ? "paused" : "playing";
-        } else if (action === NATIVE_ACTION_NEXT || action === NATIVE_ACTION_PREVIOUS) {
-          nativeSnapshot.title = "Switching...";
-        }
-        // Force a key change in the preview stage
-        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-        render();
-      }
-
       const success = bridge.performNowPlayingAction(action);
       window.setTimeout(() => {
         if (Date.now() - lastNativeActionAt > 900) refreshNativeSnapshot();
@@ -1103,18 +1091,6 @@ export function createHeroMediaPlayerController(options) {
     lastDesktopActionAt = now;
     lastDesktopActionKey = actionKey;
     desktopActionInFlight = true;
-
-    // Truly optimistic update for UI responsiveness
-    if (desktopSnapshot) {
-      if (action === "play_pause") {
-        desktopSnapshot.playbackState = (desktopSnapshot.playbackState === "playing") ? "paused" : "playing";
-      } else if (action === "next" || action === "previous") {
-        desktopSnapshot.title = "Switching track...";
-      }
-      // Force a key change in the preview stage
-      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-      render();
-    }
 
     // If the active snapshot came from Supabase, or we are on a remote origin without a local bridge endpoint yet,
     // use Supabase to sync the action.
@@ -1217,6 +1193,10 @@ export function createHeroMediaPlayerController(options) {
         try { getNativeBridge().openNowPlayingAccessSettings(); } catch { }
         return;
       }
+      if (nativeSnapshot) {
+        nativeSnapshot.playbackState = (nativeSnapshot.playbackState === "playing") ? "paused" : "playing";
+        render();
+      }
       performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
       return;
     }
@@ -1261,11 +1241,21 @@ export function createHeroMediaPlayerController(options) {
     }
 
     if (mode === "device") {
+      if (nativeSnapshot) {
+        nativeSnapshot.title = "Switching...";
+        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+        render();
+      }
       performNativeAction(NATIVE_ACTION_PREVIOUS);
       return;
     }
 
     if (mode === "desktop") {
+      if (desktopSnapshot) {
+        desktopSnapshot.title = "Switching track...";
+        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+        render();
+      }
       performDesktopAction(DESKTOP_ACTION_PREVIOUS);
       return;
     }
@@ -1295,11 +1285,21 @@ export function createHeroMediaPlayerController(options) {
     }
 
     if (mode === "device") {
+      if (nativeSnapshot) {
+        nativeSnapshot.title = "Switching...";
+        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+        render();
+      }
       performNativeAction(NATIVE_ACTION_NEXT);
       return;
     }
 
     if (mode === "desktop") {
+      if (desktopSnapshot) {
+        desktopSnapshot.title = "Switching track...";
+        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+        render();
+      }
       performDesktopAction(DESKTOP_ACTION_NEXT);
       return;
     }
