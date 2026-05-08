@@ -40,7 +40,7 @@ export function createHeroMediaPlayerController(options) {
   const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
-  const DESKTOP_POLL_INTERVAL_MS = 2000;
+  const DESKTOP_POLL_INTERVAL_MS = 3000;
   const LOCAL_NETWORK_PROMPT_COOLDOWN_MS = 30000;
 
   let listenersAttached = false;
@@ -56,6 +56,8 @@ export function createHeroMediaPlayerController(options) {
   let pendingDesktopArtworkKey = "";
   const desktopArtworkFallbackCache = new Map();
   const resolvedArtworkMap = new Map();
+  let lastDesktopActionAt = 0;
+  let lastDesktopPollTime = 0;
 
   function isThenable(value) {
     return Boolean(value && typeof value.then === "function");
@@ -729,6 +731,11 @@ export function createHeroMediaPlayerController(options) {
       return Promise.resolve(desktopSnapshot);
     }
 
+    if (now - lastDesktopActionAt < 1500) {
+      // Skip polling briefly after an action to prevent UI jitter/reversion
+      return Promise.resolve(desktopSnapshot);
+    }
+
     lastDesktopPollTime = now;
 
     return readDesktopSnapshot()
@@ -1053,14 +1060,16 @@ export function createHeroMediaPlayerController(options) {
     }))
       .then((response) => response.ok ? response.json() : { ok: false })
       .then((payload) => {
-        if (payload?.ok && action === "play_pause" && desktopSnapshot) {
-          desktopSnapshot.playbackState = (desktopSnapshot.playbackState === "playing") ? "paused" : "playing";
-          render();
+        if (payload?.ok) {
+          lastDesktopActionAt = Date.now();
+          if (action === "play_pause" && desktopSnapshot) {
+            desktopSnapshot.playbackState = (desktopSnapshot.playbackState === "playing") ? "paused" : "playing";
+            render();
+          }
         }
         window.setTimeout(() => { 
-          lastDesktopPollTime = 0; // Force immediate refresh
           refreshDesktopSnapshot(); 
-        }, 500);
+        }, 1200);
         return Boolean(payload?.ok);
       })
       .catch(() => false);

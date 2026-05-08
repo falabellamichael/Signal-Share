@@ -496,7 +496,7 @@ app.listen(port, "0.0.0.0", () => {
   console.log(`[Bridge] Server on http://localhost:${port}`);
   if (isWindows && userId) {
     console.log(`[Bridge] User verified: ${userId}`);
-    setInterval(syncToSupabase, 1000);
+    setInterval(syncToSupabase, 2000);
     subscribeToMediaActions();
     syncToSupabase();
   } else if (!userId) {
