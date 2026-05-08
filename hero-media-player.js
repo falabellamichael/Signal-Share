@@ -24,6 +24,8 @@ export function createHeroMediaPlayerController(options) {
     getSpotifyPreviewImageUrl,
     parseYouTubeUrl,
     resolveActivePlayerSource,
+    getExternalPreviewMetadata,
+    formatProviderName,
     getHeroPost,
     setHeroPost,
     playHeroMedia,
@@ -1616,8 +1618,8 @@ The companion bridge is designed with several security layers to keep your PC sa
     let nextStatus = "";
 
     if (mode === "device") {
-      if (nativeSnapshot?.active && nativeSnapshot.title) {
-        nextHeader = `${nativeSnapshot.title} · ${nativeSnapshot.meta || "Device"}`;
+      if (nativeSnapshot?.active && nativeSnapshot.meta) {
+        nextHeader = `${nativeSnapshot.meta} / System Media`;
       } else {
         nextHeader = "Device System Media";
       }
@@ -1635,8 +1637,8 @@ The companion bridge is designed with several security layers to keep your PC sa
         nextStatus = "Device system media";
       }
     } else if (mode === "desktop") {
-      if (desktopSnapshot?.active && desktopSnapshot.title) {
-        nextHeader = `${desktopSnapshot.title} · ${desktopSnapshot.meta || "PC"}`;
+      if (desktopSnapshot?.active && desktopSnapshot.meta) {
+        nextHeader = `${desktopSnapshot.meta} / System Media`;
       } else {
         nextHeader = "PC System Media";
       }
@@ -1664,12 +1666,19 @@ The companion bridge is designed with several security layers to keep your PC sa
     } else {
       const creatorSummary = getProfileSummaryForPost(post);
       const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
-      const providerName = post?.sourceKind === "youtube" ? "YouTube" : (post?.sourceKind === "spotify" ? "Spotify" : "App");
-
-      if (post && post.title) {
-        nextHeader = `${post.title} · ${creatorName}`;
+      
+      if (post && (post.sourceKind === "youtube" || post.sourceKind === "spotify")) {
+        const metadata = getExternalPreviewMetadata(post);
+        const isFetching = metadata instanceof Promise;
+        const ext = isFetching ? null : metadata;
+        
+        const artist = ext?.creator || formatProviderName(post.sourceKind);
+        nextHeader = `${artist} / ${getSignalLabel(post)}`;
+        if (isFetching) metadata.then(() => render());
+      } else if (post) {
+        nextHeader = `${creatorName} / ${getSignalLabel(post)}`;
       } else {
-        nextHeader = `${providerName.toUpperCase()} PREVIEW`;
+        nextHeader = "App Media Standby";
       }
 
       nextTitle = post?.title || "Ready to play";

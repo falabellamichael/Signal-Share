@@ -368,14 +368,8 @@ export function createAppUi(context) {
     stepMiniPlayer,
     renderMiniPlayer,
     postMessageToYouTubePlayer,
-    getSpotifyPreviewImageUrl,
-    parseYouTubeUrl,
-    getHeroPost,
-    setHeroPost,
-    playHeroMedia,
-    stepHeroPlayer,
-    getHeroPlayablePosts,
-    resolveYouTubePreviewId,
+    getExternalPreviewMetadata,
+    formatProviderName,
     isNativeCapacitorApp,
   });
 
@@ -2127,13 +2121,28 @@ export function createAppUi(context) {
   async function getYouTubePreviewMetadata(source) {
     const externalId = resolveYouTubePreviewId(source, parseYouTubeUrl); if (!externalId) return null;
     const cacheKey = `youtube:preview:${externalId}`; const cached = externalPreviewCache.get(cacheKey); if (cached && !(cached instanceof Promise)) return cached; if (cached instanceof Promise) return cached;
-    const metadata = {
-      title: typeof source?.title === "string" ? source.title.trim() : "",
-      creator: "",
-      thumbnailUrl: "",
-    };
-    externalPreviewCache.set(cacheKey, metadata);
-    return metadata;
+    
+    const request = (async () => {
+      try {
+        const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${externalId}&format=json`);
+        if (response.ok) {
+          const data = await response.json();
+          const metadata = { title: data.title || "", creator: data.author_name || "YouTube", thumbnailUrl: data.thumbnail_url || "" };
+          externalPreviewCache.set(cacheKey, metadata);
+          return metadata;
+        }
+      } catch (e) {}
+      
+      const metadata = {
+        title: typeof source?.title === "string" ? source.title.trim() : "",
+        creator: "YouTube",
+        thumbnailUrl: "",
+      };
+      externalPreviewCache.set(cacheKey, metadata);
+      return metadata;
+    })();
+    
+    externalPreviewCache.set(cacheKey, request); return request;
   }
 
   function resolveYouTubePreviewSourceUrl(source) {
@@ -2303,9 +2312,14 @@ export function createAppUi(context) {
     elements.miniPlayer.setAttribute("aria-hidden", "false");
 
     syncOverlayBodyState();
+    const cachedExt = externalPreviewCache.get(post.sourceKind === "spotify" ? `spotify:preview:v10:${post.sourceUrl}` : (post.sourceKind === "youtube" ? `youtube:preview:${resolveYouTubePreviewId(post, parseYouTubeUrl)}` : null));
+    const isFetching = cachedExt instanceof Promise;
+    const ext = isFetching ? null : cachedExt;
+    
+    const artist = ext?.creator || (post.sourceKind === "youtube" || post.sourceKind === "spotify" ? formatProviderName(post.sourceKind) : creatorName);
+    elements.miniPlayerKind.textContent = `${artist} / ${getSignalLabel(post)}`;
+    if (isFetching) cachedExt.then(() => renderMiniPlayer());
 
-    const creatorName = creatorSummary?.displayName ?? post.creator;
-    elements.miniPlayerKind.textContent = post.title ? `${post.title} · ${creatorName}` : `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`;
     elements.miniPlayerTitle.textContent = post.title;
     elements.miniPlayerCaption.textContent = post.caption;
     elements.miniPlayerCreator.textContent = creatorSummary?.displayName ?? post.creator;
@@ -2353,9 +2367,15 @@ export function createAppUi(context) {
     }
     const post = getPostById(state.viewerPostId); if (!post) { closeViewer(); return; }
     const creatorSummary = getProfileSummaryForPost(post); clearViewerMedia(); elements.viewer.classList.add("is-open"); elements.viewer.setAttribute("aria-hidden", "false"); syncOverlayBodyState();
-    renderViewerMedia(elements.viewerStage, post); 
-    const viewerCreatorName = creatorSummary?.displayName ?? post.creator;
-    elements.viewerKind.textContent = post.title ? `${post.title} · ${viewerCreatorName}` : `${formatKind(post.mediaKind)} / ${getSignalLabel(post)}`; 
+    renderViewerMedia(elements.viewerStage, post);
+    const cachedViewerExt = externalPreviewCache.get(post.sourceKind === "spotify" ? `spotify:preview:v10:${post.sourceUrl}` : (post.sourceKind === "youtube" ? `youtube:preview:${resolveYouTubePreviewId(post, parseYouTubeUrl)}` : null));
+    const isViewerFetching = cachedViewerExt instanceof Promise;
+    const viewerExt = isViewerFetching ? null : cachedViewerExt;
+    
+    const viewerArtist = viewerExt?.creator || (post.sourceKind === "youtube" || post.sourceKind === "spotify" ? formatProviderName(post.sourceKind) : (creatorSummary?.displayName ?? post.creator));
+    elements.viewerKind.textContent = `${viewerArtist} / ${getSignalLabel(post)}`;
+    if (isViewerFetching) cachedViewerExt.then(() => renderViewer());
+
     elements.viewerTitle.textContent = post.title; 
     elements.viewerCaption.textContent = post.caption; 
     elements.viewerCreator.textContent = creatorSummary?.displayName ?? post.creator; 
