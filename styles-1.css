@@ -1815,6 +1815,8 @@ body[data-theme="ember"] .mode-toggle-button.is-active {
 
 .hero-player-controls .button {
   width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
 }
 
 .hero-player-volume {

@@ -1337,6 +1337,10 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
         active: mode !== "app" // Treat media modes as "active" to show info/matched player
       }));
     }
+    elements.heroPlayerVolumeSlider.disabled = !supportsVolume;
+    elements.heroPlayerVolumeSlider.value = volumePercent;
+    elements.heroPlayerVolumeValue.textContent = `${volumePercent}%`;
+
     syncMediaSession({
       title: elements.heroPlayerTitle.textContent,
       artist: elements.heroPlayerCaption.textContent,

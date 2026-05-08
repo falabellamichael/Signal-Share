@@ -908,3 +908,62 @@ begin
   end;
 end;
 $$;
+
+create table if not exists public.system_media (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  playback_state text,
+  title text,
+  meta text,
+  artwork_uri text,
+  open_uri text,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.system_media_actions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  action text not null,
+  app_package text,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.system_media enable row level security;
+alter table public.system_media_actions enable row level security;
+
+grant select, insert, update on table public.system_media to authenticated;
+grant select, insert, delete on table public.system_media_actions to authenticated;
+
+drop policy if exists "users can read own system_media" on public.system_media;
+create policy "users can read own system_media" on public.system_media
+for select to authenticated using (auth.uid() = user_id);
+
+drop policy if exists "users can upsert own system_media" on public.system_media;
+create policy "users can upsert own system_media" on public.system_media
+for insert to authenticated with check (auth.uid() = user_id);
+
+drop policy if exists "users can update own system_media" on public.system_media;
+create policy "users can update own system_media" on public.system_media
+for update to authenticated using (auth.uid() = user_id);
+
+drop policy if exists "users can read own system_media_actions" on public.system_media_actions;
+create policy "users can read own system_media_actions" on public.system_media_actions
+for select to authenticated using (auth.uid() = user_id);
+
+drop policy if exists "users can insert own system_media_actions" on public.system_media_actions;
+create policy "users can insert own system_media_actions" on public.system_media_actions
+for insert to authenticated with check (auth.uid() = user_id);
+
+drop policy if exists "users can delete own system_media_actions" on public.system_media_actions;
+create policy "users can delete own system_media_actions" on public.system_media_actions
+for delete to authenticated using (auth.uid() = user_id);
+
+do $$
+begin
+  begin
+    alter publication supabase_realtime add table public.system_media_actions;
+  exception
+    when duplicate_object then null;
+  end;
+end;
+$$;
