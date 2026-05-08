@@ -509,6 +509,7 @@ export function renderHeroStagePreview(options = {}) {
     resolveActivePlayerSource,
     getSpotifyPreviewImageUrl,
     matchedPost,
+    externalMetadata,
   } = options;
 
   if (!stage) return;
@@ -634,8 +635,8 @@ export function renderHeroStagePreview(options = {}) {
 
   commitCard(stage, {
     badge: formatPostBadge(post, formatKind, getSignalLabel),
-    title: post.title || "Now playing",
-    meta: formatPostMeta(post, creatorSummary, formatTimestamp),
+    title: externalMetadata?.title || post.title || "Now playing",
+    meta: externalMetadata?.creator ? `${externalMetadata.creator} · ${getSignalLabel("Live on feed", post)}` : formatPostMeta(post, creatorSummary, formatTimestamp),
     artworkUrl,
   });
 }
