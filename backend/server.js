@@ -681,8 +681,6 @@ exit 0
   });
 }
 
-app.get("/status", (req, res) => { res.json({ status: "ok" }); });
-
 app.get("/api/system-media/current", (req, res) => {
   try {
     const preferredSource = normalizePreferredSource(req.query.source || "");
@@ -729,7 +727,7 @@ app.post("/api/system-media/action", (req, res) => {
         try {
           buildSnapshotPayload({ force: true, preferredSource });
           void syncToSupabase();
-        } catch (_error) {}
+        } catch (_error) { }
       }, 180);
     })
     .catch(() => {
@@ -800,7 +798,7 @@ function subscribeToMediaActions() {
   }).subscribe();
 }
 
-app.listen(port, "0.0.0.0", () => {
+app.listen(port, "127.0.0.1", () => {
   console.log(`[Bridge] Server on http://localhost:${port}`);
   if (isWindows && enableRemoteMediaSync && userId) {
     console.log(`[Bridge] Remote media sync enabled for ${userId}.`);
