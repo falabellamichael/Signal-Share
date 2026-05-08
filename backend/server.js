@@ -588,6 +588,7 @@ Write-Output "ok"
   });
 }
 
+app.get("/api/system-media/current", (req, res) => {
   try {
     const preferredSource = `${req.query.source || ""}`.toLowerCase();
     res.json(buildSnapshotPayload({ preferredSource }));
