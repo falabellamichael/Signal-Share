@@ -515,6 +515,7 @@ export function renderHeroStagePreview(options = {}) {
   if (!stage) return;
 
   const isMediaYoutubeMode = state?.heroControlMode === "media" && (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube");
+  const isMediaSpotifyMode = state?.heroControlMode === "media" && (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify");
 
   // When the direct hero player owns the stage, do not let the normal preview render
   // snap it back to the latest feed item after Next/Previous or Play.
@@ -560,7 +561,7 @@ export function renderHeroStagePreview(options = {}) {
         if (videoId) artworkUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
       }
 
-      const shouldHideText = isYouTube && isMediaYoutubeMode;
+      const shouldHideText = (isYouTube && isMediaYoutubeMode) || (isMediaSpotifyMode);
       commitCard(stage, {
         badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
         title: shouldHideText ? "" : (nativeSnapshot.title || matchedPost?.title || "Now playing"),
@@ -571,7 +572,7 @@ export function renderHeroStagePreview(options = {}) {
       return;
     }
 
-    const shouldHideText = isMediaYoutubeMode;
+    const shouldHideText = isMediaYoutubeMode || isMediaSpotifyMode;
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: shouldHideText ? "" : "ON-DEVICE MEDIA",
       title: shouldHideText ? "" : "No active playback",
@@ -592,7 +593,7 @@ export function renderHeroStagePreview(options = {}) {
         if (videoId) artworkUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
       }
 
-      const shouldHideText = isYouTube && isMediaYoutubeMode;
+      const shouldHideText = (isYouTube && isMediaYoutubeMode) || (isMediaSpotifyMode);
       commitCard(stage, {
         badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
         title: shouldHideText ? "" : (desktopSnapshot.title || matchedPost?.title || "Now playing"),
@@ -609,7 +610,7 @@ export function renderHeroStagePreview(options = {}) {
       return;
     }
 
-    const shouldHideText = isMediaYoutubeMode;
+    const shouldHideText = isMediaYoutubeMode || isMediaSpotifyMode;
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: shouldHideText ? "" : "PC SYSTEM MEDIA",
       title: shouldHideText ? "" : "Waiting for playback",

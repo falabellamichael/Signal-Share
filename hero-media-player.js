@@ -607,16 +607,15 @@ The companion bridge is designed with several security layers to keep your PC sa
     const combined = `${app} ${uri} ${title} ${meta}`;
 
     if (preferredSource === "spotify") {
-      if (combined.includes("youtube") || combined.includes("youtu.be")) return false;
-      return combined.includes("spotify") || uri.includes("open.spotify.com") || uri.startsWith("spotify:");
+      const isDefinitelyYouTube = combined.includes("youtube") || combined.includes("youtu.be") || combined.includes("ytmusic") || /[a-zA-Z0-9_-]{11}/.test(uri);
+      if (isDefinitelyYouTube) return false;
+      return true;
     }
 
     if (preferredSource === "youtube") {
-      if (combined.includes("spotify") || uri.includes("open.spotify.com")) return false;
-      return combined.includes("youtube")
-        || combined.includes("ytmusic")
-        || uri.includes("youtu.be/")
-        || /[a-zA-Z0-9_-]{11}/.test(snapshot?.openUri || "");
+      const isDefinitelySpotify = combined.includes("spotify") || uri.includes("open.spotify.com") || uri.startsWith("spotify:");
+      if (isDefinitelySpotify) return false;
+      return true;
     }
 
     return false;
@@ -1083,8 +1082,10 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (!snapshot || snapshot.artworkUri) return;
     if (typeof getSpotifyPreviewImageUrl !== "function") return;
     const appPackage = normalizeText(snapshot.appPackage);
-    const isSpotify = appPackage.includes("spotify");
-    const isYouTube = appPackage.includes("youtube") || appPackage.includes("ytmusic");
+    const preferredSource = getPreferredHeroControlSource();
+
+    const isSpotify = appPackage.includes("spotify") || (preferredSource === "spotify" && !appPackage.includes("youtube"));
+    const isYouTube = appPackage.includes("youtube") || appPackage.includes("ytmusic") || (preferredSource === "youtube" && !appPackage.includes("spotify"));
 
     if (!isSpotify && !isYouTube) return;
 

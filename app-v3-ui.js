@@ -335,13 +335,20 @@ export function createAppUi(context) {
     return null;
   }
 
-  function getSpotifyPreviewImageUrl(source) {
+  async function getSpotifyPreviewImageUrl(source) {
     const sourceUrl = resolveSpotifyPreviewSourceUrl(source);
     if (!sourceUrl) return "";
     const cacheKey = `spotify:preview:v10:${sourceUrl}`;
     const cached = externalPreviewCache.get(cacheKey);
     if (cached && !(cached instanceof Promise)) return cached.thumbnailUrl || "";
-    return "";
+
+    // If not in cache or in progress, trigger a fetch
+    try {
+      const metadata = await getSpotifyPreviewMetadata(source);
+      return metadata?.thumbnailUrl || "";
+    } catch {
+      return "";
+    }
   }
 
   const heroMediaPlayerController = createHeroMediaPlayerController({
