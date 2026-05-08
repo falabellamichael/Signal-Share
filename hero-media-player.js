@@ -360,30 +360,40 @@ export function createHeroMediaPlayerController(options) {
       pushDesktopEndpointCandidate(candidates, `${baseUrl}/api/system-media/current`, seen);
     }
 
-    // Only try localhost/loopback if we are actually local OR if we have reason to believe a bridge is there.
-    // GitHub Pages / Remote Origins should not poll relative /api paths as they are guaranteed 404s.
-    const isRemoteOrigin = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
+    // Only use relative /api endpoints when the page itself is being served locally.
+    // Remote hosts such as GitHub Pages cannot serve /api/system-media/current.
+    const protocol = `${window.location.protocol || ""}`.toLowerCase();
+    const host = `${window.location.hostname || ""}`.trim().toLowerCase();
+    const originAddressSpace = getTargetAddressSpaceForHostname(host);
+    const isLoopbackOrigin = protocol === "file:"
+      || !host
+      || host === "localhost"
+      || host.endsWith(".localhost")
+      || host === "127.0.0.1"
+      || host === "::1"
+      || host === "[::1]";
+    const isLocalOrigin = isLoopbackOrigin || originAddressSpace === "private" || originAddressSpace === "local";
+    const isRemoteOrigin = !isLocalOrigin;
 
-    // GitHub Pages / Remote Origins should not poll relative /api paths as they are guaranteed 404s.
-    // We only try localhost/loopback if we have reason to believe a bridge is there or if in Media mode.
+    // GitHub Pages / remote origins should not keep hammering localhost forever unless
+    // the user explicitly opens Media mode or an endpoint/base URL was configured.
     if (isRemoteOrigin && desktopPollFailureCount > 3 && state.heroControlMode !== "media") {
-      // On remote, if it's failing, don't even try loopback unless user is looking for it
       return candidates;
     }
 
+    // The desktop bridge server listens on port 3000 by default. These are absolute
+    // loopback URLs, so they still work when the web app is hosted remotely, as long
+    // as the browser allows local/private-network access.
     pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
     pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
 
-    if (isLocalOrigin) {
+    // Relative /api only exists when the same local Express server is serving the page.
+    if (isLocalOrigin && protocol !== "file:") {
       try {
         pushDesktopEndpointCandidate(candidates, new URL("/api/system-media/current", window.location.href).toString(), seen);
       } catch {
         pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);
       }
-    }
-
-    if (!candidates.length && isLocalOrigin) {
-      pushDesktopEndpointCandidate(candidates, "/api/system-media/current", seen);
     }
     return candidates;
   }
@@ -672,7 +682,7 @@ export function createHeroMediaPlayerController(options) {
 
     const isRemoteOrigin = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
     if (permissionPromptEndpoint && !isRemoteOrigin) maybeTriggerLocalNetworkAccessPrompt(permissionPromptEndpoint);
-    
+
     return null;
   }
 
@@ -735,7 +745,7 @@ export function createHeroMediaPlayerController(options) {
           && (desktopPollFailureCount % 30 === 1);
 
         if (shouldWarn) {
-           console.warn("[Hero] Desktop media bridge not detected. Please ensure the Signal-Share companion app is running on your PC (backend/server.js).");
+          console.warn("[Hero] Desktop media bridge not detected. Run the Signal-Share desktop bridge on your PC with: node server.js");
         }
 
         if (renderAfter) render();
@@ -1258,7 +1268,7 @@ export function createHeroMediaPlayerController(options) {
     const playableCount = playablePosts.length;
     const canStep = playableCount > 1;
     const hasPost = Boolean(heroPost);
-    
+
     // Toggle Button Highlighting
     if (elements.heroModeFeed) {
       elements.heroModeFeed.classList.toggle("is-active", state.heroControlMode === "feed");
