@@ -700,7 +700,7 @@ export function createHeroMediaPlayerController(options) {
     return null;
   }
 
-  let lastDesktopPollTime = 0;
+
 
   function refreshDesktopSnapshot({ renderAfter = true } = {}) {
     if (!canUseDesktopBridge()) {
