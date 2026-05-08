@@ -258,14 +258,14 @@ export function createHeroMediaPlayerController(options) {
   function getTargetAddressSpaceForHostname(hostname = "") {
     const value = `${hostname || ""}`.trim().toLowerCase();
     if (!value) return "";
-    if (value === "localhost" || value.endsWith(".localhost")) return "loopback";
+    if (value === "localhost" || value.endsWith(".localhost")) return "local";
     if (value.endsWith(".local")) return "local";
-    if (value === "::1" || value === "[::1]") return "loopback";
+    if (value === "::1" || value === "[::1]") return "local";
     if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) {
       const octets = value.split(".").map((entry) => Number.parseInt(entry, 10));
       if (octets.some((entry) => Number.isNaN(entry) || entry < 0 || entry > 255)) return "";
       const [a, b] = octets;
-      if (a === 127) return "loopback";
+      if (a === 127) return "local";
       if (a === 10) return "private";
       if (a === 169 && b === 254) return "private";
       if (a === 172 && b >= 16 && b <= 31) return "private";
@@ -275,7 +275,7 @@ export function createHeroMediaPlayerController(options) {
     const bracketedIpv6 = value.match(/^\[([0-9a-f:.]+)\]$/i);
     const ipv6 = (bracketedIpv6?.[1] || value).toLowerCase();
     if (!ipv6.includes(":")) return "";
-    if (ipv6 === "::1") return "loopback";
+    if (ipv6 === "::1") return "local";
     if (ipv6.startsWith("fe80:")) return "private";
     if (ipv6.startsWith("fc") || ipv6.startsWith("fd")) return "private";
     return "";
