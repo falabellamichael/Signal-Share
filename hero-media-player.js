@@ -1610,6 +1610,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     );
 
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
+    const matchedPost = mode === "desktop" && desktopSnapshot?.active ? findMatchedPost(desktopSnapshot) : null;
 
     let nextHeader = "";
     let nextTitle = "";
