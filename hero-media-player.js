@@ -1122,10 +1122,8 @@ export function createHeroMediaPlayerController(options) {
     }
 
     if (mode === "desktop") {
-      const playbackStatus = normalizePlaybackState(desktopSnapshot?.playbackState);
-      const isPlaying = playbackStatus === "playing";
-      const action = isPlaying ? "pause" : "play";
-      performDesktopAction(action);
+      // Use the toggle action as it is generally more reliable for background apps
+      performDesktopAction("play_pause");
       return;
     }
 
