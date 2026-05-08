@@ -2092,9 +2092,9 @@ export function createAppUi(context) {
       // Helper to create and append the launchable preview card
       const createLaunchableCard = (metadata) => {
         const stage = createPreviewCard({
-          badge: formatPostBadge(post, formatKind, getSignalLabel),
+          badge: "",
           title: metadata?.title || post.title || "Now playing",
-          meta: metadata?.creator ? `${metadata.creator} · ${formatPostMeta(post, creatorSummary, formatTimestamp).split(" · ").slice(1).join(" · ")}` : formatPostMeta(post, creatorSummary, formatTimestamp),
+          meta: metadata?.creator || formatPostMeta(post, creatorSummary),
           note,
           artworkUrl: metadata?.artworkUrl || artworkUrl
         });
@@ -2149,9 +2149,9 @@ export function createAppUi(context) {
     
     const createFallbackCard = (metadata) => {
       return createPreviewCard({
-        badge: formatPostBadge(post, formatKind, getSignalLabel),
+        badge: "",
         title: metadata?.title || post.title || "Now playing",
-        meta: metadata?.creator ? `${metadata.creator} · (Live on feed)` : formatPostMeta(post, creatorSummary, formatTimestamp),
+        meta: metadata?.creator || formatPostMeta(post, creatorSummary),
         note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player.",
         artworkUrl: metadata?.artworkUrl || artworkUrl
       });
@@ -2173,16 +2173,12 @@ export function createAppUi(context) {
     }
   }
 
-  function formatPostBadge(post, formatKind, getSignalLabel) {
-    const kind = typeof formatKind === "function" ? formatKind(post?.mediaKind ? `${post.mediaKind} post` : "Media post", post?.mediaKind || "media") : "Media post";
-    const signal = typeof getSignalLabel === "function" ? getSignalLabel("Live on feed", post) : "Live on feed";
-    return [kind, signal].filter(Boolean).join(" / ");
+  function formatPostBadge() {
+    return "";
   }
 
-  function formatPostMeta(post, creatorSummary, formatTimestamp) {
-    const creator = creatorSummary?.displayName ?? post?.creator ?? "Signal Share";
-    const timestamp = typeof formatTimestamp === "function" ? formatTimestamp(post?.createdAt) : "";
-    return [creator, timestamp].filter(Boolean).join(" · ");
+  function formatPostMeta(post, creatorSummary) {
+    return creatorSummary?.displayName ?? post?.creator ?? "";
   }
 
   function formatExternalPreviewBadge(provider, creator = "") {
