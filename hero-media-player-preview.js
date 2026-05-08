@@ -547,14 +547,15 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     if (nativeSnapshot?.active) {
-      if (matchedPost && commitActivePlayer(stage, matchedPost, previewOptions)) return;
+      const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
+      const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
 
       commitCard(stage, {
-        badge: "Device media",
-        title: nativeSnapshot.title || "Now playing",
-        meta: nativeSnapshot.meta || "Current device playback",
+        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "Device media",
+        title: nativeSnapshot.title || matchedPost?.title || "Now playing",
+        meta: nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback"),
         note: nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing",
-        artworkUrl: nativeSnapshot.artworkUri || "",
+        artworkUrl: artworkUrl,
       });
       return;
     }
@@ -569,14 +570,15 @@ export function renderHeroStagePreview(options = {}) {
 
   if (mode === "desktop") {
     if (desktopSnapshot?.active) {
-      if (matchedPost && commitActivePlayer(stage, matchedPost, previewOptions)) return;
+      const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
+      const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
 
       commitCard(stage, {
-        badge: "PC system media",
-        title: desktopSnapshot.title || "Now playing",
-        meta: desktopSnapshot.meta || "Desktop playback",
+        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC system media",
+        title: desktopSnapshot.title || matchedPost?.title || "Now playing",
+        meta: desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback"),
         note: desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing",
-        artworkUrl: desktopSnapshot.artworkUri || "",
+        artworkUrl: artworkUrl,
       });
       return;
     }
@@ -623,8 +625,8 @@ export function renderHeroStagePreview(options = {}) {
     return;
   }
 
-  // Only mount the active iframe player if explicitly requested (e.g. for already active browser/device sessions)
-  if (options.active && commitActivePlayer(stage, post, previewOptions)) return;
+  // Always use static preview cards for hero mode
+  // if (options.active && commitActivePlayer(stage, post, previewOptions)) return;
 
   const creatorSummary = safeCall(getProfileSummaryForPost, null, post);
   const artworkUrl = resolveAppPreviewArtwork(post, {
