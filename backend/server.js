@@ -17,7 +17,6 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const isWindows = process.platform === "win32";
 const userId = process.env.SIGNAL_SHARE_USER_ID;
-const enableRemoteMedia = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true";
 
 const MEDIA_KEY_CODES = {
   play_pause: 0xb3,
@@ -40,9 +39,12 @@ const WINRT_ACTION_METHODS = {
   next: "TrySkipNextAsync",
   previous: "TrySkipPreviousAsync",
 };
-const MAX_ARTWORK_BYTES = 500000;
+const MAX_ARTWORK_BYTES = Number(process.env.SIGNAL_SHARE_MAX_ARTWORK_BYTES || 160000);
 const SMTC_ERROR_LOG_COOLDOWN_MS = 30000;
 const LAST_GOOD_SNAPSHOT_MAX_AGE_MS = 15000;
+const SNAPSHOT_CACHE_TTL_MS = Number(process.env.SIGNAL_SHARE_SNAPSHOT_CACHE_TTL_MS || 3500);
+const SUPABASE_SYNC_INTERVAL_MS = Number(process.env.SIGNAL_SHARE_SYNC_INTERVAL_MS || 15000);
+const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true" || process.env.SIGNAL_SHARE_REMOTE_MEDIA === "true";
 
 let lastGoodSnapshot = null;
 let lastGoodSnapshotAt = 0;
@@ -50,6 +52,8 @@ let smtcFailureCount = 0;
 let lastSmtcErrorMessage = "";
 let lastSmtcErrorLoggedAt = 0;
 let lastSupabaseSyncKey = "";
+let cachedSnapshotPayload = null;
+let cachedSnapshotAt = 0;
 
 const supabase = createClient(
   process.env.SUPABASE_URL || "",
@@ -276,7 +280,7 @@ function getRecentGoodSnapshotFallback() {
   };
 }
 
-function buildSnapshotPayload() {
+function buildFreshSnapshotPayload() {
   const base = getBaseSnapshot();
 
   if (!isWindows) {
@@ -354,6 +358,23 @@ function buildSnapshotPayload() {
   }
 }
 
+
+function buildSnapshotPayload({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && cachedSnapshotPayload && now - cachedSnapshotAt < SNAPSHOT_CACHE_TTL_MS) {
+    return cachedSnapshotPayload;
+  }
+
+  const payload = buildFreshSnapshotPayload();
+  cachedSnapshotPayload = payload;
+  cachedSnapshotAt = now;
+  return payload;
+}
+
+function invalidateSnapshotCache() {
+  cachedSnapshotPayload = null;
+  cachedSnapshotAt = 0;
+}
 function sendSystemMediaKey(action, targetAppPackage = "") {
   const vkCode = MEDIA_KEY_CODES[action];
   const appCommand = APP_COMMAND_CODES[action];
@@ -500,13 +521,22 @@ app.post("/api/system-media/action", async (req, res) => {
   }
   if (!MEDIA_KEY_CODES[action]) return res.status(400).json({ ok: false });
   const ok = await sendSystemMediaKey(action, appPackage);
+  invalidateSnapshotCache();
   res.json({ ok });
+
+  // Let Windows update the media session, then refresh the cache without blocking the browser response.
+  setTimeout(() => {
+    try {
+      buildSnapshotPayload({ force: true });
+      void syncToSupabase();
+    } catch (_error) {}
+  }, 450);
 });
 
 app.get("/", (req, res) => { res.sendFile(path.join(projectRoot, "index.html")); });
 
 async function syncToSupabase() {
-  if (!isWindows || !userId || !supabase) return;
+  if (!enableRemoteMediaSync || !isWindows || !userId || !supabase) return;
   try {
     const payload = buildSnapshotPayload();
     const syncKey = [
@@ -546,7 +576,7 @@ async function syncToSupabase() {
 }
 
 function subscribeToMediaActions() {
-  if (!isWindows || !userId) return;
+  if (!enableRemoteMediaSync || !isWindows || !userId) return;
   console.log(`[Bridge] Subscribing to actions for ${userId}...`);
   supabase.channel('media_actions').on('postgres_changes', {
     event: 'INSERT', schema: 'public', table: 'system_media_actions', filter: `user_id=eq.${userId}`
@@ -566,14 +596,14 @@ function subscribeToMediaActions() {
 
 app.listen(port, "0.0.0.0", () => {
   console.log(`[Bridge] Server on http://localhost:${port}`);
-  if (isWindows && userId && enableRemoteMedia) {
-    console.log(`[Bridge] Remote Media Enabled: ${userId}`);
-    setInterval(syncToSupabase, 5000);
+  if (isWindows && enableRemoteMediaSync && userId) {
+    console.log(`[Bridge] Remote media sync enabled for ${userId}.`);
+    setInterval(syncToSupabase, SUPABASE_SYNC_INTERVAL_MS);
     subscribeToMediaActions();
     syncToSupabase();
-  } else if (isWindows && userId) {
-    console.log(`[Bridge] Local Media only. Remote sync disabled.`);
+  } else if (isWindows && !enableRemoteMediaSync) {
+    console.log("[Bridge] Remote Supabase media sync disabled. Local controls stay faster. Set SIGNAL_SHARE_ENABLE_REMOTE_MEDIA=true to sync with the live site.");
   } else if (!userId) {
-    console.error("[Bridge] ERROR: No User ID found in .env");
+    console.warn("[Bridge] No User ID found in .env. Local bridge controls still work.");
   }
 });

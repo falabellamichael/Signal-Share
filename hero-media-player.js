@@ -36,11 +36,11 @@ export function createHeroMediaPlayerController(options) {
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
   const NATIVE_ACTION_NEXT = "next";
   const NATIVE_ACTION_PREVIOUS = "previous";
-  const NATIVE_POLL_INTERVAL_MS = 2000;
+  const NATIVE_POLL_INTERVAL_MS = 3000;
   const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
-  const DESKTOP_POLL_INTERVAL_MS = 2000;
+  const DESKTOP_POLL_INTERVAL_MS = 8000;
   const LOCAL_NETWORK_PROMPT_COOLDOWN_MS = 30000;
 
   let listenersAttached = false;
@@ -54,10 +54,14 @@ export function createHeroMediaPlayerController(options) {
   let localNetworkPromptInFlight = false;
   let localNetworkPromptLastAttemptAt = 0;
   let pendingDesktopArtworkKey = "";
+  let desktopSnapshotReadPromise = null;
+  let lastDesktopSnapshotSignature = "";
+  let desktopActionInFlight = false;
+  let lastDesktopActionAt = 0;
+  let lastDesktopActionKey = "";
+  const DESKTOP_ACTION_COOLDOWN_MS = 650;
   const desktopArtworkFallbackCache = new Map();
   const resolvedArtworkMap = new Map();
-  let lastDesktopActionAt = 0;
-  let lastDesktopPollTime = 0;
 
   function isThenable(value) {
     return Boolean(value && typeof value.then === "function");
@@ -292,10 +296,17 @@ export function createHeroMediaPlayerController(options) {
   }
 
   function withLocalNetworkFetchOptions(url, init = {}) {
-    // Do not force a targetAddressSpace value here. Chrome can classify localhost,
-    // 127.0.0.1, and LAN addresses itself, and forcing the wrong value causes the
-    // exact CORS / Private Network Access block shown in DevTools.
-    return init;
+    try {
+      const resolved = new URL(url, window.location.href);
+      const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
+      if (addressSpace !== "local" && addressSpace !== "private" && addressSpace !== "loopback") return init;
+      return {
+        ...init,
+        targetAddressSpace: addressSpace,
+      };
+    } catch {
+      return init;
+    }
   }
 
   function isLocalNetworkAccessPromptEligible() {
@@ -498,6 +509,18 @@ export function createHeroMediaPlayerController(options) {
     return `${app}|${title}|${meta}`;
   }
 
+  function getDesktopSnapshotSignature(snapshot = null) {
+    if (!snapshot) return "none";
+    return [
+      normalizePlaybackState(snapshot.playbackState),
+      normalizeText(snapshot.title),
+      normalizeText(snapshot.meta),
+      normalizeText(snapshot.appPackage),
+      snapshot.active ? "active" : "idle",
+      snapshot.available ? "available" : "unavailable",
+    ].join("|");
+  }
+
   function getSpotifyFallbackCandidates(snapshot, post) {
     const ranked = [];
     const seenIds = new Set();
@@ -668,7 +691,6 @@ export function createHeroMediaPlayerController(options) {
     const endpoints = resolveDesktopSnapshotEndpoints();
     for (const endpoint of endpoints) {
       try {
-        console.log(`[Hero] Probing bridge endpoint: ${endpoint}`);
         const response = await window.fetch(endpoint, withLocalNetworkFetchOptions(endpoint, {
           method: "GET",
           cache: "no-store",
@@ -679,12 +701,10 @@ export function createHeroMediaPlayerController(options) {
         }));
         if (!response.ok) throw new Error(`Desktop media endpoint returned ${response.status}.`);
         const payload = await response.json();
-        console.info(`[Hero] Successfully connected to bridge: ${endpoint}`);
         desktopSnapshotEndpoint = endpoint;
         desktopActionEndpoint = deriveDesktopActionEndpoint(endpoint);
         return normalizeDesktopSnapshot(payload);
       } catch (error) {
-        console.warn(`[Hero] Bridge probe failed for ${endpoint}:`, error.message);
         lastError = error;
       }
     }
@@ -700,65 +720,68 @@ export function createHeroMediaPlayerController(options) {
     return null;
   }
 
+  let lastDesktopPollTime = 0;
 
-
-  function refreshDesktopSnapshot({ renderAfter = true } = {}) {
+  function refreshDesktopSnapshot({ renderAfter = true, force = false } = {}) {
     if (!canUseDesktopBridge()) {
       desktopSnapshot = null;
+      desktopSnapshotReadPromise = null;
+      lastDesktopSnapshotSignature = "none";
       return Promise.resolve(null);
     }
+
+    if (desktopSnapshotReadPromise) return desktopSnapshotReadPromise;
 
     const now = Date.now();
     const isMediaMode = state.heroControlMode === "media";
 
-    // If suspended due to too many failures, only retry every 60 seconds unless in Media mode
-    if (state.desktopBridgeSuspended && !isMediaMode) {
+    if (!force && state.desktopBridgeSuspended && !isMediaMode) {
       if (now - lastDesktopPollTime < 60000) {
         return Promise.resolve(desktopSnapshot);
       }
     }
 
-    // Exponential back-off for failures
     let waitTime = DESKTOP_POLL_INTERVAL_MS;
     if (desktopPollFailureCount > 0) {
       waitTime = Math.min(30000, DESKTOP_POLL_INTERVAL_MS * Math.pow(1.5, Math.min(8, desktopPollFailureCount)));
     }
 
-    // In Media mode, we poll at least every 10 seconds to detect the bridge coming online
-    if (isMediaMode) waitTime = Math.min(10000, waitTime);
+    // Media mode can retry sooner, but avoid hammering the Windows SMTC bridge.
+    if (isMediaMode) waitTime = Math.min(12000, waitTime);
 
-    if (now - lastDesktopPollTime < waitTime) {
-      return Promise.resolve(desktopSnapshot);
-    }
-
-    if (now - lastDesktopActionAt < 1500) {
-      // Skip polling briefly after an action to prevent UI jitter/reversion
+    if (!force && now - lastDesktopPollTime < waitTime) {
       return Promise.resolve(desktopSnapshot);
     }
 
     lastDesktopPollTime = now;
 
-    return readDesktopSnapshot()
+    desktopSnapshotReadPromise = readDesktopSnapshot()
       .then((snapshot) => {
+        const nextSignature = getDesktopSnapshotSignature(snapshot);
+        const didChange = nextSignature !== lastDesktopSnapshotSignature;
+
         desktopSnapshot = snapshot;
+        lastDesktopSnapshotSignature = nextSignature;
         desktopPollFailureCount = 0;
         state.desktopBridgeSuspended = false;
+
         if (snapshot && snapshot.active && !snapshot.artworkUri) {
           hydrateDesktopSpotifyArtwork(snapshot, getControllablePlayerPost());
         }
-        if (renderAfter) render();
+
+        if (renderAfter && didChange) render();
         return desktopSnapshot;
       })
-      .catch((error) => {
+      .catch(() => {
+        const didChange = lastDesktopSnapshotSignature !== "none";
         desktopSnapshot = null;
+        lastDesktopSnapshotSignature = "none";
         desktopPollFailureCount += 1;
 
-        // Suspend frequent polling after 5 consecutive failures
         if (desktopPollFailureCount >= 5) {
           state.desktopBridgeSuspended = true;
         }
 
-        // Only warn occasionally, and never if suspended or on native app
         const shouldWarn = !state.desktopBridgeSuspended
           && !isNativeCapacitorApp()
           && (desktopPollFailureCount % 30 === 1);
@@ -767,9 +790,14 @@ export function createHeroMediaPlayerController(options) {
           console.warn("[Hero] Desktop media bridge not detected. Run the Signal-Share desktop bridge on your PC with: node server.js");
         }
 
-        if (renderAfter) render();
+        if (renderAfter && didChange) render();
         return null;
+      })
+      .finally(() => {
+        desktopSnapshotReadPromise = null;
       });
+
+    return desktopSnapshotReadPromise;
   }
 
   function startDesktopSnapshotPolling() {
@@ -1022,14 +1050,8 @@ export function createHeroMediaPlayerController(options) {
     if (!hasNativeActionBridge()) return false;
     const bridge = getNativeBridge();
     try {
-      // Optimistic update
-      if (action === NATIVE_ACTION_PLAY_PAUSE && nativeSnapshot) {
-        nativeSnapshot.playbackState = (nativeSnapshot.playbackState === "playing") ? "paused" : "playing";
-        render();
-      }
-
       const success = bridge.performNowPlayingAction(action);
-      window.setTimeout(() => { refreshNativeSnapshot(); }, 400);
+      window.setTimeout(() => { refreshNativeSnapshot(); }, 220);
       return Boolean(success);
     } catch {
       return false;
@@ -1039,17 +1061,37 @@ export function createHeroMediaPlayerController(options) {
   function performDesktopAction(action, payload = {}) {
     if (!canUseDesktopBridge()) return Promise.resolve(false);
 
+    const now = Date.now();
+    const actionKey = `${action}|${JSON.stringify(payload || {})}`;
+
+    // Prevent repeated clicks / slider spam from spawning multiple PowerShell processes.
+    if (desktopActionInFlight && actionKey === lastDesktopActionKey) return Promise.resolve(false);
+    if (now - lastDesktopActionAt < DESKTOP_ACTION_COOLDOWN_MS && actionKey === lastDesktopActionKey) {
+      return Promise.resolve(false);
+    }
+
+    lastDesktopActionAt = now;
+    lastDesktopActionKey = actionKey;
+    desktopActionInFlight = true;
+
     // If the active snapshot came from Supabase, or we are on a remote origin without a local bridge endpoint yet,
     // use Supabase to sync the action.
     const isRemoteOrigin = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
     const isLocalEndpoint = desktopSnapshotEndpoint && desktopSnapshotEndpoint !== "supabase-sync" && !desktopSnapshotEndpoint.startsWith("/");
 
+    const clearActionLock = () => {
+      window.setTimeout(() => { desktopActionInFlight = false; }, DESKTOP_ACTION_COOLDOWN_MS);
+    };
+
     if (desktopSnapshotEndpoint === "supabase-sync" || (isRemoteOrigin && !isLocalEndpoint && state.currentUser?.id)) {
-      return performSupabaseDesktopAction(action, payload);
+      return performSupabaseDesktopAction(action, payload).finally(clearActionLock);
     }
 
     const actionEndpoint = getDesktopActionEndpoint();
-    if (!actionEndpoint) return Promise.resolve(false);
+    if (!actionEndpoint) {
+      clearActionLock();
+      return Promise.resolve(false);
+    }
 
     return window.fetch(actionEndpoint, withLocalNetworkFetchOptions(actionEndpoint, {
       method: "POST",
@@ -1066,25 +1108,11 @@ export function createHeroMediaPlayerController(options) {
     }))
       .then((response) => response.ok ? response.json() : { ok: false })
       .then((payload) => {
-        if (payload?.ok) {
-          lastDesktopActionAt = Date.now();
-          if (desktopSnapshot) {
-            if (action === "play_pause") {
-              desktopSnapshot.playbackState = (desktopSnapshot.playbackState === "playing") ? "paused" : "playing";
-            } else if (action === "next" || action === "previous") {
-              // Show a loading/transition state
-              desktopSnapshot.title = "Switching track...";
-              desktopSnapshot.playbackState = "playing";
-            }
-            render();
-          }
-        }
-        window.setTimeout(() => { 
-          refreshDesktopSnapshot(); 
-        }, 800);
+        window.setTimeout(() => { refreshDesktopSnapshot({ force: true }); }, 420);
         return Boolean(payload?.ok);
       })
-      .catch(() => false);
+      .catch(() => false)
+      .finally(clearActionLock);
   }
 
   async function performSupabaseDesktopAction(action, payload = {}) {
@@ -1150,8 +1178,22 @@ export function createHeroMediaPlayerController(options) {
     }
 
     if (mode === "desktop") {
-      // Use the toggle action as it is generally more reliable for background apps
-      performDesktopAction("play_pause");
+      const playbackStatus = normalizePlaybackState(desktopSnapshot?.playbackState);
+      const isPlaying = playbackStatus === "playing";
+      const action = isPlaying ? "pause" : "play";
+
+      // Optimistic UI update so the button responds immediately instead of waiting on PowerShell/SMTC.
+      if (desktopSnapshot) {
+        desktopSnapshot = {
+          ...desktopSnapshot,
+          active: true,
+          playbackState: action === "play" ? "playing" : "paused",
+        };
+        lastDesktopSnapshotSignature = getDesktopSnapshotSignature(desktopSnapshot);
+        render();
+      }
+
+      performDesktopAction(action);
       return;
     }
 
@@ -1167,10 +1209,7 @@ export function createHeroMediaPlayerController(options) {
     const mode = getEffectiveHeroMode(controllablePost);
 
     if (mode === "app") {
-      const wasPlaying = getLocalPlaybackState() === "playing";
       stepHeroPlayer(-1);
-      if (wasPlaying) state.heroPlayerPlaybackState = "playing";
-      render();
       return;
     }
 
@@ -1200,9 +1239,8 @@ export function createHeroMediaPlayerController(options) {
     const mode = getEffectiveHeroMode(controllablePost);
 
     if (mode === "app") {
-      const wasPlaying = getLocalPlaybackState() === "playing";
       stepHeroPlayer(1);
-      if (wasPlaying) state.heroPlayerPlaybackState = "playing";
+      state.heroPlayerPlaybackState = "paused";
       render();
       return;
     }
@@ -1239,7 +1277,7 @@ export function createHeroMediaPlayerController(options) {
     savePlayerVolume(state.playerVolume);
 
     if (mode === "desktop" && desktopSnapshot?.available) {
-      performDesktopAction("set_volume", { volume: Math.round(volume * 100) });
+      // Windows SMTC does not expose reliable app volume control here; avoid flooding the bridge with unsupported set_volume requests.
     } else if (mode === "app") {
       applyPlayerVolumeToActiveElement();
       const fallbackMedia = getFallbackPageMediaElement();
@@ -1351,11 +1389,11 @@ export function createHeroMediaPlayerController(options) {
         ? normalizePlaybackState(desktopSnapshot?.playbackState)
         : getLocalPlaybackState();
 
-    const supportsVolume = (mode === "desktop" && desktopSnapshot?.available) || (mode === "app" && (
+    const supportsVolume = mode === "app" && (
       mediaElement instanceof HTMLMediaElement
       || fallbackMedia instanceof HTMLMediaElement
       || post?.sourceKind === "youtube"
-    ));
+    );
 
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
