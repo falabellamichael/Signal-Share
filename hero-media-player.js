@@ -1608,7 +1608,40 @@ The companion bridge is designed with several security layers to keep your PC sa
     const activePost = mode === "app" ? post : (mode === "desktop" ? matchedPost : (mode === "device" ? nativeSnapshot : null));
     if (activePost) {
       const ext = getExternalPreviewMetadata(activePost);
-      externalMetadata = (ext instanceof Promise) ? null : ext;
+      if (ext instanceof Promise) {
+        // Handle async metadata fetch and update UI when available
+        ext.then(metadata => {
+          if (metadata && mode === "app" && post && activePost === post) {
+            // Update header with actual YouTube/Spotify metadata
+            const creatorSummary = getProfileSummaryForPost(post);
+            const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
+            const artist = metadata?.creator || (post.sourceKind === "youtube" || post.sourceKind === "spotify" ? formatProviderName(post.sourceKind) : creatorName);
+            const newHeader = `${artist} / ${getSignalLabel(post)}`;
+            const newTitle = metadata?.title || post.title || "Ready to play";
+            const newCaption = `${metadata.creator} · ${getSignalLabel(post)}`;
+            
+            if (elements.heroPlayerHeader.textContent !== newHeader) elements.heroPlayerHeader.textContent = newHeader;
+            if (elements.heroPlayerTitle.textContent !== newTitle) elements.heroPlayerTitle.textContent = newTitle;
+            if (elements.heroPlayerCaption.textContent !== newCaption) elements.heroPlayerCaption.textContent = newCaption;
+            
+            renderHeroStagePreview(Object.assign({}, options, {
+              stage: elements.heroPlayerStage,
+              mode,
+              post,
+              fallbackMedia,
+              desktopSnapshot,
+              matchedPost,
+              externalMetadata: metadata,
+              showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot?.active,
+              active: mode !== "app"
+            }));
+          }
+        }).catch(() => {
+          // Silently ignore fetch errors, UI already has fallback values
+        });
+      } else {
+        externalMetadata = ext;
+      }
     }
 
     if (mode === "device") {
