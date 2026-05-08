@@ -1261,7 +1261,7 @@ pause`.trim();
     }
 
     if (mode === "desktop") {
-      if (!desktopSnapshot?.active && !companionPromptDismissed) {
+      if (!isNativeCapacitorApp && !desktopSnapshot?.active && !companionPromptDismissed) {
         showCompanionPrompt();
         return;
       }
@@ -1612,7 +1612,7 @@ pause`.trim();
         fallbackMedia,
         desktopSnapshot,
         matchedPost,
-        showCompanionCard: mode === "desktop" && !desktopSnapshot?.active,
+        showCompanionCard: !isNativeCapacitorApp && mode === "desktop" && !desktopSnapshot?.active,
         active: mode !== "app" // Treat media modes as "active" to show info/matched player
       }));
     }
