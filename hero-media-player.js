@@ -562,12 +562,12 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     // Loopback fallbacks. Match the current hostname first to avoid cross-origin noise.
-    if (host === "127.0.0.1") {
-      pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
+    if (host === "localhost" || host.endsWith(".localhost")) {
       pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
+      pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
     } else {
-      pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
       pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
+      pushDesktopEndpointCandidate(candidates, "http://localhost:3000/api/system-media/current", seen);
     }
 
     const sourceParam = state.heroControlSource ? `source=${state.heroControlSource}` : "";

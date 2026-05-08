@@ -43,7 +43,7 @@ const MAX_ARTWORK_BYTES = Number(process.env.SIGNAL_SHARE_MAX_ARTWORK_BYTES || 1
 const SMTC_ERROR_LOG_COOLDOWN_MS = 30000;
 const LAST_GOOD_SNAPSHOT_MAX_AGE_MS = 15000;
 const SNAPSHOT_CACHE_TTL_MS = Number(process.env.SIGNAL_SHARE_SNAPSHOT_CACHE_TTL_MS || 3500);
-const SUPABASE_SYNC_INTERVAL_MS = Number(process.env.SIGNAL_SHARE_SYNC_INTERVAL_MS || 15000);
+const SUPABASE_SYNC_INTERVAL_MS = Number(process.env.SIGNAL_SHARE_SYNC_INTERVAL_MS || 5000);
 const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true" || process.env.SIGNAL_SHARE_REMOTE_MEDIA === "true";
 const ALLOW_OPEN_URI = process.env.SIGNAL_SHARE_ALLOW_OPEN_URI === "true";
 const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
@@ -215,7 +215,12 @@ function isPreferredApp(sourceAppId = "", preferredSource = "") {
   const normalized = `${sourceAppId || ""}`.trim().toLowerCase();
   
   if (preferredSource === "youtube") {
-    return normalized.includes("youtube") || normalized.includes("ytmusic") || normalized.includes("youtube.music");
+    return normalized.includes("youtube") 
+      || normalized.includes("ytmusic") 
+      || normalized.includes("youtube.music")
+      || normalized.includes("chrome") 
+      || normalized.includes("edge")
+      || normalized.includes("browser");
   }
   if (preferredSource === "spotify") {
     return normalized.includes("spotify");
