@@ -934,36 +934,26 @@ alter table public.system_media_actions enable row level security;
 grant select, insert, update on table public.system_media to authenticated;
 grant select, insert, delete on table public.system_media_actions to authenticated;
 
-drop policy if exists "users can read own system_media" on public.system_media;
-create policy "users can read own system_media" on public.system_media
-for select to authenticated using (auth.uid() = user_id);
+drop policy if exists "Users can manage their own system media" on public.system_media;
+create policy "Users can manage their own system media"
+  on public.system_media for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
-drop policy if exists "users can upsert own system_media" on public.system_media;
-create policy "users can upsert own system_media" on public.system_media
-for insert to authenticated with check (auth.uid() = user_id);
-
-drop policy if exists "users can update own system_media" on public.system_media;
-create policy "users can update own system_media" on public.system_media
-for update to authenticated using (auth.uid() = user_id);
-
-drop policy if exists "users can read own system_media_actions" on public.system_media_actions;
-create policy "users can read own system_media_actions" on public.system_media_actions
-for select to authenticated using (auth.uid() = user_id);
-
-drop policy if exists "users can insert own system_media_actions" on public.system_media_actions;
-create policy "users can insert own system_media_actions" on public.system_media_actions
-for insert to authenticated with check (auth.uid() = user_id);
-
-drop policy if exists "users can delete own system_media_actions" on public.system_media_actions;
-create policy "users can delete own system_media_actions" on public.system_media_actions
-for delete to authenticated using (auth.uid() = user_id);
+drop policy if exists "Users can manage their own media actions" on public.system_media_actions;
+create policy "Users can manage their own media actions"
+  on public.system_media_actions for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 do $$
 begin
-  begin
+  if not exists (
+    select 1 from pg_publication_tables 
+    where pubname = 'supabase_realtime' 
+    and schemaname = 'public' 
+    and tablename = 'system_media_actions'
+  ) then
     alter publication supabase_realtime add table public.system_media_actions;
-  exception
-    when duplicate_object then null;
-  end;
-end;
-$$;
+  end if;
+end $$;

@@ -1027,18 +1027,27 @@ if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) ret
   }
 
   async function performSupabaseDesktopAction(action, payload = {}) {
-    if (!state.supabase || !state.currentUser?.id) return false;
+    const userId = state.currentUser?.id;
+    if (!state.supabase || !userId) {
+      console.warn("[Hero] Cannot send media action: Missing Supabase client or authenticated User ID.");
+      return false;
+    }
+
     try {
       const { error } = await state.supabase.from("system_media_actions").insert({
-        user_id: state.currentUser.id,
+        user_id: userId,
         action: action,
         app_package: desktopSnapshot?.appPackage || "",
         payload: payload
       });
-      if (error) throw error;
+
+      if (error) {
+        console.error("[Hero] Supabase media action error:", error.message, error.details);
+        throw error;
+      }
       return true;
     } catch (error) {
-      console.error("Failed to send media action via Supabase:", error);
+      console.error("[Hero] Failed to send media action via Supabase:", error);
       return false;
     }
   }
