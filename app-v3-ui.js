@@ -2994,47 +2994,33 @@ export function createAppUi(context) {
     heroMediaPlayerController.render();
   }
 
-  function getMiniPlayerPlaylist() {
-    // Current site-wide search and category filters define "the feed"
-    const visible = state.visiblePostIds.filter((id) => isPlayablePost(getPostById(id)));
-    if (visible.length > 0) return visible;
-
-    // Fallback: If current search has no playable results, cycle through all playable feed items
-    return sortPosts(healPosts(getAllPosts())).filter(isPlayablePost).map((p) => p.id);
-  }
-
   function handleMiniNext() {
     if (!checkMediaCooldown()) return;
-    const playlist = getMiniPlayerPlaylist();
-    if (playlist.length === 0) return;
-
     const wasPlaying = state.miniPlayerPlaybackState === "playing";
-    const currentIndex = playlist.indexOf(state.playerPostId);
-    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % playlist.length;
+    const oldId = state.playerPostId;
+    stepMiniPlayer(1);
 
-    state.playerPostId = playlist[nextIndex];
+    if (state.playerPostId === oldId) return;
+
     const post = getPostById(state.playerPostId);
-
     if (post) {
       if (wasPlaying) state.miniPlayerPlaybackState = "playing";
       mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
     }
     renderMiniPlayer();
+    // Also sync the global master controller so system media is updated
     heroMediaPlayerController.render();
   }
 
   function handleMiniPrevious() {
     if (!checkMediaCooldown()) return;
-    const playlist = getMiniPlayerPlaylist();
-    if (playlist.length === 0) return;
-
     const wasPlaying = state.miniPlayerPlaybackState === "playing";
-    const currentIndex = playlist.indexOf(state.playerPostId);
-    const prevIndex = currentIndex === -1 ? 0 : (currentIndex - 1 + playlist.length) % playlist.length;
+    const oldId = state.playerPostId;
+    stepMiniPlayer(-1);
 
-    state.playerPostId = playlist[prevIndex];
+    if (state.playerPostId === oldId) return;
+
     const post = getPostById(state.playerPostId);
-
     if (post) {
       if (wasPlaying) state.miniPlayerPlaybackState = "playing";
       mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
@@ -3044,14 +3030,25 @@ export function createAppUi(context) {
   }
 
   function getPlayableVisiblePostIds() {
-    return state.visiblePostIds.filter((id) => isPlayablePost(getPostById(id)));
+    const visible = state.visiblePostIds.filter((id) => isPlayablePost(getPostById(id)));
+    if (visible.length > 0) return visible;
+
+    // Fallback: If no visible posts are playable, use all playable posts from the feed
+    return getAllPosts().filter(isPlayablePost).map(p => p.id);
   }
 
   function stepMiniPlayer(delta) {
     if (!checkMediaCooldown()) return;
     const playableIds = getPlayableVisiblePostIds();
-    if (playableIds.length <= 1 || !state.playerPostId) return;
+    if (playableIds.length === 0) return;
+
+    if (playableIds.length === 1 && state.playerPostId === playableIds[0]) {
+      // Only one song available and it's the current one, nowhere to skip
+      return;
+    }
+
     const currentIndex = playableIds.indexOf(state.playerPostId);
+    // If not found in current list, start from beginning (index 0)
     const nextIndex = currentIndex === -1 ? 0 : (currentIndex + delta + playableIds.length) % playableIds.length;
     state.playerPostId = playableIds[nextIndex];
   }
