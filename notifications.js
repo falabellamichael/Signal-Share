@@ -521,23 +521,26 @@
     history.forEach((notification) => {
       const li = document.createElement("li");
       const isUnread = notification.read === false;
-      const bg = isUnread ? "rgba(0,0,0,0.06)" : "rgba(0,0,0,0.02)";
-      const opacity = isUnread ? "1" : "0.55";
-      const border = isUnread ? "4px solid #3b82f6" : "4px solid rgba(0,0,0,0.1)";
-      li.style.cssText = `padding:12px; margin-bottom:8px; border-radius:12px; background:${bg}; border-left:${border}; cursor:pointer; color:inherit; list-style:none; transition: all 0.2s; opacity:${opacity};`;
+      
+      // Use classes for styling instead of inline styles
+      li.className = "notification notification-history-item";
+      if (!isUnread) {
+        li.classList.add("read");
+      } else {
+        li.classList.add("unread");
+      }
+
+      // We still keep some layout styles if they aren't in CSS yet, 
+      // but we should prioritize classes.
+      // Based on the user's request, the .read class will handle the opacity.
+      
       li.innerHTML = `<strong style="color:inherit;">${notification.title}</strong><p style="margin:4px 0; font-size:0.9rem; opacity:0.8; color:inherit;">${notification.message}</p>`;
+      
       li.onclick = (event) => {
         event.stopPropagation();
         handleNotificationClick(notification);
       };
-      li.onmouseover = () => {
-        li.style.background = isUnread ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.04)";
-        li.style.opacity = "1";
-      };
-      li.onmouseout = () => {
-        li.style.background = bg;
-        li.style.opacity = opacity;
-      };
+      
       list.appendChild(li);
     });
   }
@@ -563,11 +566,15 @@
     }
     const el = document.createElement("div");
     el.className = `notification notification-${item.type}`;
+    if (item.read) el.classList.add("read");
+    
+    // Maintain some of the premium banner styling but allow the .read class to affect it
     el.style.cssText = "background:rgba(0,0,0,0.95); color:white; padding:15px; margin-bottom:10px; border-radius:10px; border-left:5px solid #3b82f6; box-shadow:0 5px 20px rgba(0,0,0,0.5); z-index:10001; position:relative; pointer-events:auto; cursor:pointer;";
     el.innerHTML = `<strong>${item.title}</strong><div style="font-size:0.9rem;">${item.message}</div>`;
     el.onclick = () => {
       handleNotificationClick(item);
-      el.remove();
+      el.classList.add("read"); // Visual feedback before removal
+      setTimeout(() => el.remove(), 200);
     };
     container.appendChild(el);
     setTimeout(() => {

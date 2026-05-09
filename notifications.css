@@ -31,7 +31,12 @@
   min-width: 300px;
   max-width: 100%;
   opacity: 1;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Style for read notifications with lower opacity */
+.notification.read {
+  opacity: 0.6; /* Lower opacity when read */
 }
 
 .notification-dismissing {
@@ -182,12 +187,31 @@
 /* History Panel Items */
 .notification-history-item {
   position: relative;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease-in-out;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  color: inherit;
+  list-style: none;
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 4px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none; /* Reset shadow from .notification class if applied */
+  min-width: auto; /* Reset min-width from .notification class if applied */
 }
 
 .notification-history-item.unread {
-  background: rgba(59, 130, 246, 0.1) !important;
-  border-left-width: 4px !important;
+  background: rgba(59, 130, 246, 0.08);
+  border-left-color: #3b82f6;
+}
+
+.notification-history-item.read {
+  opacity: 0.6;
+}
+
+.notification-history-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  opacity: 1 !important;
 }
 
 .notification-history-item.unread::after {
