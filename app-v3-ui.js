@@ -330,7 +330,7 @@ export function createAppUi(context) {
     if (post.sourceKind === "spotify") {
       const sourceUrl = resolveSpotifyPreviewSourceUrl(post);
       if (!sourceUrl) return null;
-      return getSpotifyPreviewMetadata(sourceUrl);
+      return getSpotifyPreviewMetadata(post);
     }
     return null;
   }
@@ -2080,28 +2080,39 @@ export function createAppUi(context) {
       && getCapacitorPlatform() === "android"
       && (post.sourceKind === "youtube" || post.sourceKind === "spotify");
 
-    // PC Extension: If the desktop bridge is available and active, we can also use the launchable preview.
     const isDesktopExternal = !isNativeCapacitorApp()
       && (post.sourceKind === "youtube" || post.sourceKind === "spotify")
-      && state.heroPlayerPlaybackState !== "none"; // Roughly check if bridge is alive
+      && state.heroPlayerPlaybackState !== "none";
 
-    // Fetch external metadata (YouTube/Spotify title and artist)
     const externalMetadata = getExternalPreviewMetadata(post);
+    const creatorSummary = getProfileSummaryForPost(post);
+    const artworkUrl = resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl });
+
+    // Proactively derive artist/title for Spotify if metadata is still pending
+    let derivedArtist = "";
+    let derivedTitle = post.title || "";
+    if (post.sourceKind === "spotify" && post.title) {
+      derivedArtist = deriveSpotifyCreatorFromSourceTitle(post);
+      if (derivedArtist && post.title.includes(derivedArtist)) {
+        derivedTitle = post.title.replace(derivedArtist, "").replace(/^[\s-·|]+|[\s-·|]+$/g, "").trim() || post.title;
+      }
+    }
 
     if ((isNativeAndroidExternal || isDesktopExternal) && (variant === "viewer" || variant === "mini")) {
       const note = post.sourceKind === "youtube"
         ? (isDesktopExternal ? "Click preview to open in YouTube Desktop." : "Tap preview to open in YouTube or YouTube Music.")
         : (isDesktopExternal ? "Click preview to open in Spotify Desktop." : "Tap preview to open in the Spotify app.");
 
-      const creatorSummary = getProfileSummaryForPost(post);
-      const artworkUrl = resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl });
-
-      // Helper to create and append the launchable preview card
       const createLaunchableCard = (metadata) => {
+        const displayTitle = metadata?.title || derivedTitle || "Now playing";
+        const displayArtist = metadata?.creator || derivedArtist;
+        const baseMeta = formatPostMeta(post, creatorSummary, formatTimestamp);
+        const timestampOnly = baseMeta.split(" · ").slice(1).join(" · ");
+
         const stage = createPreviewCard({
           badge: formatPostBadge(post, formatKind, getSignalLabel),
-          title: metadata?.title || post.title || "Now playing",
-          meta: metadata?.creator ? `${metadata.creator} · ${formatPostMeta(post, creatorSummary, formatTimestamp).split(" · ").slice(1).join(" · ")}` : formatPostMeta(post, creatorSummary, formatTimestamp),
+          title: displayTitle,
+          meta: displayArtist ? `${displayArtist} · ${timestampOnly || "(Live on feed)"}` : baseMeta,
           note,
           artworkUrl: metadata?.artworkUrl || artworkUrl
         });
@@ -2120,16 +2131,11 @@ export function createAppUi(context) {
       };
 
       if (externalMetadata instanceof Promise) {
-        // Render initial card and update when metadata arrives
         const card = createLaunchableCard(null);
         container.appendChild(card);
         externalMetadata.then(metadata => {
-          if (metadata) {
-            container.replaceChild(createLaunchableCard(metadata), card);
-          }
-        }).catch(() => {
-          // Silently ignore errors, card already rendered with fallback
-        });
+          if (metadata) container.replaceChild(createLaunchableCard(metadata), card);
+        }).catch(() => {});
       } else {
         container.appendChild(createLaunchableCard(externalMetadata));
       }
@@ -2150,31 +2156,27 @@ export function createAppUi(context) {
       }
     }
 
-    // Fallback preview card with external metadata
-    const creatorSummary = getProfileSummaryForPost(post);
-    const artworkUrl = resolveAppPreviewArtwork(post, { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl });
-
     const createFallbackCard = (metadata) => {
+      const displayTitle = metadata?.title || derivedTitle || "Now playing";
+      const displayArtist = metadata?.creator || derivedArtist;
+
       return createPreviewCard({
         badge: formatPostBadge(post, formatKind, getSignalLabel),
-        title: metadata?.title || post.title || "Now playing",
-        meta: metadata?.creator ? `${metadata.creator} · (Live on feed)` : formatPostMeta(post, creatorSummary, formatTimestamp),
+        title: displayTitle,
+        meta: displayArtist ? `${displayArtist} · (Live on feed)` : formatPostMeta(post, creatorSummary, formatTimestamp),
         note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player.",
         artworkUrl: metadata?.artworkUrl || artworkUrl
       });
     };
 
     if (externalMetadata instanceof Promise) {
-      // Render initial card and update when metadata arrives
       const card = createFallbackCard(null);
       container.appendChild(card);
       externalMetadata.then(metadata => {
         if (metadata) {
           container.replaceChild(createFallbackCard(metadata), card);
         }
-      }).catch(() => {
-        // Silently ignore errors, card already rendered with fallback
-      });
+      }).catch(() => {});
     } else {
       container.appendChild(createFallbackCard(externalMetadata));
     }
@@ -2198,14 +2200,21 @@ export function createAppUi(context) {
     return cleanCreator && cleanCreator !== providerName ? `${cleanCreator} / ${providerName}` : providerName;
   }
 
-  function deriveSpotifyCreatorFromSourceTitle(source) {
-    if (source?.provider !== "spotify") return "";
-    const sourceTitle = typeof source.title === "string" ? source.title.trim() : "";
+  function deriveSpotifyCreatorFromSourceTitle(source, providedTitle = "") {
+    const isSpotify = (typeof source === "string" && (source.includes("spotify") || source.startsWith("spotify:"))) ||
+      (source?.sourceKind === "spotify") ||
+      (source?.provider === "spotify");
+    if (!isSpotify) return "";
+
+    const sourceTitle = providedTitle || (typeof source === "object" ? source.title : "") || "";
     if (!sourceTitle) return "";
-    const match = sourceTitle.match(/^(.{1,80}?)\s+-\s+(.+)$/);
+
+    const match = sourceTitle.match(/^(.{1,80}?)\s+[-·|]\s+(.+)$/) || sourceTitle.match(/^(.+?)\s+by\s+(.+)$/i);
     if (!match) return "";
-    const candidate = match[1].trim();
-    const remainder = match[2].trim();
+
+    const candidate = sourceTitle.includes(" by ") ? match[2].trim() : match[1].trim();
+    const remainder = sourceTitle.includes(" by ") ? match[1].trim() : match[2].trim();
+
     if (!candidate || !remainder || isGenericSpotifyCreatorFallback(candidate)) return "";
     return candidate;
   }
@@ -2361,7 +2370,13 @@ export function createAppUi(context) {
   }
 
   function resolveSpotifyPreviewSourceUrl(source) {
-    const values = [source?.externalUrl, source?.originalUrl, source?.embedUrl, source?.mediaUrl, source?.src, source?.externalId];
+    if (!source) return "";
+    if (typeof source === "string") {
+      const val = source.trim();
+      if (val.startsWith("spotify:") || val.includes("spotify.com/")) return val;
+      return "";
+    }
+    const values = [source.externalUrl, source.originalUrl, source.embedUrl, source.mediaUrl, source.src, source.externalId];
 
     for (const rawValue of values) {
       if (typeof rawValue !== "string" || !rawValue.trim()) continue;
