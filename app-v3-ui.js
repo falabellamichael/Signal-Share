@@ -1132,7 +1132,7 @@ export function createAppUi(context) {
       const isCollapsed = !state.messengerExpanded;
       
       if (isCollapsed) {
-        emojis = emojis.slice(0, 12);
+        emojis = emojis.slice(0, 36);
       }
 
       const emojisHtml = emojis.map(emoji => `
