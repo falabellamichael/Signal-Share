@@ -2006,6 +2006,11 @@ The companion bridge is designed with several security layers to keep your PC sa
     let nextCaption = "";
     let nextStatus = "";
 
+    const isMediaSystemMode = state?.heroControlMode === "media" && (
+      (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube") ||
+      (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify")
+    );
+
     if (mode === "device") {
       nextHeader = getSystemMediaHeaderLabel();
       if (nativeSnapshot?.permissionRequired) {
@@ -2013,9 +2018,20 @@ The companion bridge is designed with several security layers to keep your PC sa
         nextCaption = "Allow notification access to control playback.";
         nextStatus = "Access required";
       } else if (nativeSnapshot?.active) {
-        nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
-        nextCaption = cleanSnapshotCreator(nativeSnapshot, "Device playback");
-        nextStatus = getPlaybackStatusLabel(nativeSnapshot.playbackState);
+        const isYouTube = nativeSnapshot.appPackage?.toLowerCase().includes("youtube") || matchedPost?.sourceKind === "youtube";
+        const isSpotify = nativeSnapshot.appPackage?.toLowerCase().includes("spotify") || matchedPost?.sourceKind === "spotify";
+        const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
+
+        if (shouldHideText) {
+          nextHeader = "";
+          nextTitle = "";
+          nextCaption = "";
+          nextStatus = "";
+        } else {
+          nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
+          nextCaption = cleanSnapshotCreator(nativeSnapshot, "Device playback");
+          nextStatus = getPlaybackStatusLabel(nativeSnapshot.playbackState);
+        }
       } else {
         nextTitle = "Device media idle";
         nextCaption = "Start playback in any media app.";
@@ -2024,9 +2040,20 @@ The companion bridge is designed with several security layers to keep your PC sa
     } else if (mode === "desktop") {
       nextHeader = getSystemMediaHeaderLabel();
       if (desktopSnapshot?.active) {
-        nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
-        nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
-        nextStatus = getPlaybackStatusLabel(desktopSnapshot.playbackState);
+        const isYouTube = desktopSnapshot.appPackage?.toLowerCase().includes("youtube") || matchedPost?.sourceKind === "youtube";
+        const isSpotify = desktopSnapshot.appPackage?.toLowerCase().includes("spotify") || matchedPost?.sourceKind === "spotify";
+        const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
+
+        if (shouldHideText) {
+          nextHeader = "";
+          nextTitle = "";
+          nextCaption = "";
+          nextStatus = "";
+        } else {
+          nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
+          nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
+          nextStatus = getPlaybackStatusLabel(desktopSnapshot.playbackState);
+        }
       } else {
         const preferredSource = getPreferredHeroControlSource();
         nextTitle = preferredSource ? `${preferredSource.charAt(0).toUpperCase()}${preferredSource.slice(1)} media idle` : "PC media idle";
@@ -2054,9 +2081,19 @@ The companion bridge is designed with several security layers to keep your PC sa
       nextHeader = `${providerName.toUpperCase()} PREVIEW`;
 
       if (isExternalUrlPost(post)) {
-        const externalDisplay = getExternalHeaderDisplay(post);
-        nextTitle = externalDisplay.title || "Ready to play";
-        nextCaption = externalDisplay.caption || providerName;
+        const isYouTube = post?.sourceKind === "youtube";
+        const isSpotify = post?.sourceKind === "spotify";
+        const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
+
+        if (shouldHideText) {
+          nextHeader = "";
+          nextTitle = "";
+          nextCaption = "";
+        } else {
+          const externalDisplay = getExternalHeaderDisplay(post);
+          nextTitle = externalDisplay.title || "Ready to play";
+          nextCaption = externalDisplay.caption || providerName;
+        }
       } else {
         const creatorSummary = getProfileSummaryForPost(post);
         const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
@@ -2065,6 +2102,10 @@ The companion bridge is designed with several security layers to keep your PC sa
       }
 
       nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
+      if (isMediaSystemMode && (post?.sourceKind === "youtube" || post?.sourceKind === "spotify")) {
+        nextHeader = "";
+        nextStatus = "";
+      }
     }
 
     // Only touch the DOM if values have changed

@@ -420,7 +420,7 @@ function createPostStandbyPreview(post, options = {}) {
     parseYouTubeUrl,
     resolveActivePlayerSource,
     getSpotifyPreviewImageUrl,
-    isMediaYoutubeMode,
+    isMediaSystemMode,
   } = options;
 
   const creatorSummary = safeCall(getProfileSummaryForPost, null, post);
@@ -439,7 +439,8 @@ function createPostStandbyPreview(post, options = {}) {
   });
 
   const isYouTube = post.sourceKind === "youtube";
-  const shouldHideText = isYouTube && isMediaYoutubeMode;
+  const isSpotify = post.sourceKind === "spotify";
+  const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
   const cardData = {
     badge: shouldHideText ? "" : `UP NEXT · ${providerLabel || "App Media"}`,
     title: shouldHideText ? "" : (post.title || "Next playable post"),
@@ -514,7 +515,10 @@ export function renderHeroStagePreview(options = {}) {
 
   if (!stage) return;
 
-  const isMediaYoutubeMode = state?.heroControlMode === "media" && (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube");
+  const isMediaSystemMode = state?.heroControlMode === "media" && (
+    (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube") ||
+    (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify")
+  );
 
   // When the direct hero player owns the stage, do not let the normal preview render
   // snap it back to the latest feed item after Next/Previous or Play.
@@ -531,7 +535,8 @@ export function renderHeroStagePreview(options = {}) {
     parseYouTubeUrl,
     resolveActivePlayerSource,
     getSpotifyPreviewImageUrl,
-    isMediaYoutubeMode,
+    getSpotifyPreviewImageUrl,
+    isMediaSystemMode,
   };
 
   const standbyPost = !post && typeof getStandbyPreviewPost === "function"
@@ -554,7 +559,8 @@ export function renderHeroStagePreview(options = {}) {
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
 
       const isYouTube = matchedPost?.sourceKind === "youtube" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("youtube"));
-      const shouldHideText = isYouTube && isMediaYoutubeMode;
+      const isSpotify = matchedPost?.sourceKind === "spotify" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("spotify"));
+      const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
       commitCard(stage, {
         badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
         title: shouldHideText ? "" : (nativeSnapshot.title || matchedPost?.title || "Now playing"),
@@ -579,7 +585,8 @@ export function renderHeroStagePreview(options = {}) {
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
 
       const isYouTube = matchedPost?.sourceKind === "youtube" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("youtube"));
-      const shouldHideText = isYouTube && isMediaYoutubeMode;
+      const isSpotify = matchedPost?.sourceKind === "spotify" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("spotify"));
+      const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
       commitCard(stage, {
         badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
         title: shouldHideText ? "" : (desktopSnapshot.title || matchedPost?.title || "Now playing"),
@@ -646,7 +653,8 @@ export function renderHeroStagePreview(options = {}) {
   let resolvedMetadata = externalMetadata;
   if (externalMetadata instanceof Promise) {
     const isYouTube = post?.sourceKind === "youtube";
-    const shouldHideText = isYouTube && isMediaYoutubeMode;
+    const isSpotify = post?.sourceKind === "spotify";
+    const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
     // Render initial card with fallback while metadata loads
     commitCard(stage, {
       badge: "",
@@ -659,7 +667,8 @@ export function renderHeroStagePreview(options = {}) {
     externalMetadata.then(metadata => {
       if (metadata) {
         const isYouTube = post?.sourceKind === "youtube";
-        const shouldHideText = isYouTube && isMediaYoutubeMode;
+        const isSpotify = post?.sourceKind === "spotify";
+        const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
         commitCard(stage, {
           badge: "",
           title: shouldHideText ? "" : (metadata?.title || post.title || "Now playing"),
@@ -674,7 +683,8 @@ export function renderHeroStagePreview(options = {}) {
   }
 
   const isYouTube = post?.sourceKind === "youtube";
-  const shouldHideText = isYouTube && isMediaYoutubeMode;
+  const isSpotify = post?.sourceKind === "spotify";
+  const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
   commitCard(stage, {
     badge: "",
     title: shouldHideText ? "" : (resolvedMetadata?.title || post.title || "Now playing"),
