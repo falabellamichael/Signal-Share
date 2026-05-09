@@ -33,8 +33,8 @@ export function handleOpenMediaAction(post, context) {
     const title = (desktopSnapshot.title || "").toLowerCase();
     const meta = (desktopSnapshot.meta || "").toLowerCase();
 
-    const isSpotify = appPackage.includes("spotify") || meta.includes("spotify");
-    const isYouTube = appPackage.includes("youtube") || meta.includes("youtube") || title.includes("youtube");
+    const isSpotify = appPackage.includes("spotify") || meta.includes("spotify") || (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify");
+    const isYouTube = appPackage.includes("youtube") || meta.includes("youtube") || title.includes("youtube") || (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube");
 
     if (isSpotify) {
       // Pop up the Spotify App on PC using open_uri with "spotify:"
@@ -48,10 +48,18 @@ export function handleOpenMediaAction(post, context) {
     if (isYouTube) {
       let youtubeUrl = desktopSnapshot.openUri;
 
-      // If openUri is missing but we have an artwork URL, try to extract the Video ID
-      if (!youtubeUrl && desktopSnapshot.artworkUri) {
-        const idMatch = desktopSnapshot.artworkUri.match(/\/vi\/([a-zA-Z0-9_-]{11})\//);
-        if (idMatch) youtubeUrl = `https://www.youtube.com/watch?v=${idMatch[1]}`;
+      // If openUri is missing, try to extract the Video ID from artwork or meta fields
+      if (!youtubeUrl) {
+        if (desktopSnapshot.artworkUri) {
+          const idMatch = desktopSnapshot.artworkUri.match(/\/vi\/([a-zA-Z0-9_-]{11})\//);
+          if (idMatch) youtubeUrl = `https://www.youtube.com/watch?v=${idMatch[1]}`;
+        }
+        
+        if (!youtubeUrl && meta) {
+          // Sometimes the ID is in the "album" or "artist" field on SMTC
+          const idMatch = meta.match(/([a-zA-Z0-9_-]{11})/);
+          if (idMatch) youtubeUrl = `https://www.youtube.com/watch?v=${idMatch[1]}`;
+        }
       }
 
       if (youtubeUrl) {
@@ -64,7 +72,16 @@ export function handleOpenMediaAction(post, context) {
   }
 
   if (!targetUrl) {
-    console.error("handleOpenMediaAction: Could not resolve target URL.");
+    // If we still have no URL but we have a post, try its own properties
+    targetUrl = post?.externalUrl || post?.src || post?.mediaUrl;
+  }
+
+  if (!targetUrl) {
+    console.error("handleOpenMediaAction: Could not resolve target URL.", {
+      post,
+      desktopSnapshot,
+      isYouTube: (desktopSnapshot?.appPackage || "").toLowerCase().includes("youtube") || (desktopSnapshot?.title || "").toLowerCase().includes("youtube")
+    });
     return;
   }
 
