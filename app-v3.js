@@ -1266,8 +1266,8 @@ async function subscribeMessagingChannels(options = {}) {
     isMessagingSubscribing = true;
     if (force) unsubscribeMessagingChannels();
 
-    if (!messengerRealtime) {
-      messengerRealtime = new MessengerRealtime(state);
+    if (!messengerRealtime && window.MessengerRealtime) {
+      messengerRealtime = new window.MessengerRealtime(state);
     }
     messengerRealtime.init();
 
