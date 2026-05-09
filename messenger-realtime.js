@@ -97,9 +97,13 @@ window.MessengerRealtime = class MessengerRealtime {
       this.processedMessageIds.delete(firstId);
     }
 
-    // Trigger sound (if not already handled by native push which also plays chime)
+    // Trigger sound (if not already handled by native push)
+    // We skip the chime if the user is actively viewing this specific thread.
+    const isActiveThread = message.threadId === state.activeThreadId && state.messengerOpen;
+    const shouldChime = !isActiveThread || document.visibilityState === "hidden";
+    
     try {
-      if (window.playIncomingMessageSound) window.playIncomingMessageSound();
+      if (shouldChime && window.playIncomingMessageSound) window.playIncomingMessageSound();
     } catch (e) {}
 
     // Show Notification

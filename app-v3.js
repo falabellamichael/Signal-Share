@@ -621,16 +621,21 @@ async function initializeNativePushNotifications() {
     await push.addListener("registrationError", (error) => console.error("Native push registration failed", error));
     await push.addListener("pushNotificationReceived", (notification) => {
       // If app is already active/focused, MessengerRealtime should handle the notification banner and chime.
-      // We skip most logic here to avoid double-processing and double-sound while app is open.
-      const isVisible = document.visibilityState === "visible";
+      // We skip processing here to avoid double-processing and double-sound while app is open.
+      if (document.visibilityState === "visible") return;
 
       if (notification?.data?.type === "direct-message") {
+        const messageId = String(notification?.data?.messageId ?? "").trim();
+        
+        // De-duplicate: If we already saw this message (e.g. via Realtime), skip.
+        if (messageId && window.notifications && window.notifications.hasSeenId(messageId)) return;
+
         if (window.notifications && typeof window.notifications.add === "function") {
           const threadId = notification?.data?.threadId ?? "";
-          const messageId = String(notification?.data?.messageId ?? "").trim();
           const title = trimNotificationText(notification?.title || notification?.data?.title || "New message", 80) || "New message";
           const body = trimNotificationText(notification?.body || notification?.data?.body || "New direct message", 160) || "New direct message";
-          window.notifications.add({
+          
+          const didAdd = window.notifications.add({
             id: messageId || `native-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
             type: "info",
             title,
@@ -639,13 +644,13 @@ async function initializeNativePushNotifications() {
             data: { type: "message", threadId },
             silent: true,
           });
-        }
 
-        if (!isVisible) {
-          playIncomingMessageSound();
+          // Only play sound and refresh if this is actually a new message to us.
+          if (didAdd) {
+            playIncomingMessageSound();
+            if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true });
+          }
         }
-
-        if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true });
       }
     });
     await push.addListener("pushNotificationActionPerformed", (action) => {

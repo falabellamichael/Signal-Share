@@ -389,10 +389,35 @@
     history.unshift(item);
     rememberSeenId(item.id, item.timestamp);
     if (opts.incrementCount !== false && !item.read) count = normalizeCount(count + 1);
-    if (!opts.silent) showBanner(item);
+    if (!opts.silent) {
+      showBanner(item);
+      showNativeNotification(item);
+    }
     save();
     dispatchCustomEvent("notification:show", item);
     return true;
+  }
+
+  function showNativeNotification(item) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    // Only show native toast if the tab is hidden to avoid duplicate alerting while active.
+    if (document.visibilityState === "visible") return;
+
+    try {
+      const n = new Notification(item.title, {
+        body: item.message,
+        icon: "/apple-touch-icon-180.png",
+        tag: item.id, // Prevent duplicate toasts for same message
+        renotify: true
+      });
+      n.onclick = () => {
+        window.focus();
+        handleNotificationClick(item);
+        n.close();
+      };
+    } catch (e) {
+      console.warn("[Notifications] Native notification failed", e);
+    }
   }
 
   function clearHistory() {
