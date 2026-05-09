@@ -3,6 +3,7 @@
  * A comprehensive list of emojis for the Direct Messenger.
  */
 
+export const EMOJI_CATEGORIES = [
   { id: "faces", label: "Faces", icon: "😀" },
   { id: "gestures", label: "Gestures", icon: "👍" },
   { id: "food", label: "Food", icon: "🍕" },
@@ -378,8 +379,8 @@ export const EMOJI_PACK = [
   { char: "🗻", label: "Mount Fuji", category: "places" },
   { char: "🏕️", label: "Camping", category: "places" },
   { char: "🏖️", label: "Beach with umbrella", category: "places" },
-  { char: " desert", label: "Desert", category: "places" },
-  { char: "🏜️", label: "Desert island", category: "places" },
+  { char: "🏜️", label: "Desert", category: "places" },
+  { char: "🏝️", label: "Desert island", category: "places" },
   { char: "🏝️", label: "National park", category: "places" },
   { char: "🏞️", label: "Stadium", category: "places" },
   { char: "🏟️", label: "Classical building", category: "places" },
@@ -502,7 +503,7 @@ export const EMOJI_PACK = [
   { char: "⌚", label: "Watch", category: "places" },
   { char: "⏰", label: "Alarm clock", category: "places" },
   { char: "⏱️", label: "Stopwatch", category: "places" },
-  { char: "Timer clock", label: "⏲️", category: "places" },
+  { char: "⏲️", label: "Timer clock", category: "places" },
   { char: "🕰️", label: "Mantelpiece clock", category: "places" },
   { char: "🕛", label: "Twelve o’clock", category: "places" },
   { char: "🕧", label: "Twelve-thirty", category: "places" },
