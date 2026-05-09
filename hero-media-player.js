@@ -1970,9 +1970,6 @@ The companion bridge is designed with several security layers to keep your PC sa
       stopDesktopSnapshotPolling();
     }
 
-    const controllablePost = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(controllablePost);
-
     // When in Media mode, we don't treat the internal "Hero Active" state as valid
     // unless it's explicitly matching the system media (unlikely for manual toggle).
     const isHeroActive = mode === "app"
