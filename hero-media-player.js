@@ -1837,20 +1837,9 @@ The companion bridge is designed with several security layers to keep your PC sa
     const isSpotify = post?.sourceKind === "spotify";
 
     if (isSpotify && isNativeCapacitorApp()) {
-      // Use the Spotify URI if available, or just open the home screen
-      const externalUrl = post.externalUrl || post.originalUrl || "";
-      let spotifyUri = "spotify:home";
+      // Open the Spotify app without specific track URI to avoid interrupting playback
+      const spotifyUri = "spotify:";
       
-      if (externalUrl) {
-        // Try to convert web URL to URI
-        const match = externalUrl.match(/spotify\.com\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/);
-        if (match) {
-          spotifyUri = `spotify:${match[1]}:${match[2]}`;
-        } else if (externalUrl.startsWith("spotify:")) {
-          spotifyUri = externalUrl;
-        }
-      }
-
       if (typeof window.Capacitor !== "undefined" && window.Capacitor.Plugins.App) {
         window.Capacitor.Plugins.App.openUrl({ url: spotifyUri });
       } else {
