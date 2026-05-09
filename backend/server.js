@@ -645,9 +645,10 @@ public static class MediaKeySender {
 }
 "@
 
-# Only use a global media key when no specific source is requested. This prevents the Spotify toggle
-# from controlling YouTube, and the YouTube toggle from controlling Spotify, when both are open.
-if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all") {
+# Only use a global media key when no specific source is requested, OR if the WinRT targeting failed.
+# This prevents the Spotify toggle from controlling YouTube when both are open, but allows
+# "best effort" control for skip actions if the targeted session is unresponsive.
+if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or ($winRtSuccess -eq $false -and ($action -eq "next" -or $action -eq "previous"))) {
   $KEYEVENTF_EXTENDEDKEY = 0x0001
   $KEYEVENTF_KEYUP = 0x0002
   [MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
