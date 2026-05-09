@@ -85,18 +85,19 @@ app.use((req, res, next) => {
   const isLocalhost = !origin || origin.includes("localhost") || origin.includes("127.0.0.1");
 
   if (isWhitelisted || isLocalhost) {
-    res.setHeader("Access-Control-Allow-Origin", origin || "*");
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  } else if (!origin) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
   }
 
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, Authorization");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, Authorization, target-address-space");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
   res.setHeader("Access-Control-Allow-Local-Network", "true");
   res.setHeader("Access-Control-Max-Age", "86400");
   res.setHeader("Vary", "Origin, Access-Control-Request-Headers");
 
   if (req.method === "OPTIONS") {
-    // Chrome PNA Preflight requires a 200 or 204 response with Allow-Local-Network: true
     return res.status(204).end();
   }
 
@@ -661,9 +662,24 @@ public static class MediaKeySender {
 if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or $winRtSuccess -eq $false -or $isSkipAction) {
   $KEYEVENTF_EXTENDEDKEY = 0x0001
   $KEYEVENTF_KEYUP = 0x0002
+
+  # Send global media key
   [MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
-  Start-Sleep -Milliseconds 35
+  Start-Sleep -Milliseconds 45
   [MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
+
+  # For Skip actions on YouTube, also try sending browser-specific shortcuts if a browser is focused or if preferred is youtube
+  if ($isSkipAction -and ($preferred -eq "youtube" -or $id -match "chrome|msedge|firefox")) {
+    try {
+      $wshell = New-Object -ComObject WScript.Shell
+      if ("${action}" -eq "next") {
+        $wshell.SendKeys("+(N)") # Shift + N
+      } else {
+        $wshell.SendKeys("+(P)") # Shift + P
+      }
+    } catch {}
+  }
+
   Write-Output "ok-global"
   exit 0
 }
