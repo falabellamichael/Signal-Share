@@ -3015,6 +3015,19 @@ export function createAppUi(context) {
     heroMediaPlayerController.render();
   }
 
+  function getPlayableVisiblePostIds() {
+    return state.visiblePostIds.filter((id) => isPlayablePost(getPostById(id)));
+  }
+
+  function stepMiniPlayer(delta) {
+    if (!checkMediaCooldown()) return;
+    const playableIds = getPlayableVisiblePostIds();
+    if (playableIds.length <= 1 || !state.playerPostId) return;
+    const currentIndex = playableIds.indexOf(state.playerPostId);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + delta + playableIds.length) % playableIds.length;
+    state.playerPostId = playableIds[nextIndex];
+  }
+
 
   function renderPreview(file) {
     if (state.previewUrl) URL.revokeObjectURL(state.previewUrl); state.previewUrl = URL.createObjectURL(file); elements.previewShell.hidden = false; elements.previewShell.innerHTML = "";
