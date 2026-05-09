@@ -2011,10 +2011,10 @@ The companion bridge is designed with several security layers to keep your PC sa
     let syncArtist = "";
     let syncArtwork = "";
 
-    const isMediaSystemMode = state?.heroControlMode === "media" && (
-      (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube") ||
-      (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify")
-    );
+    const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube");
+    const isSpotifyMode = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify");
+    const isFeedMode = state?.heroControlMode === "feed";
+    const isHardenedEnvironment = isFeedMode || state?.heroControlMode === "media";
 
     if (mode === "device") {
       nextHeader = getSystemMediaHeaderLabel();
@@ -2026,7 +2026,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         const snapshotTitle = (nativeSnapshot.title || "").toLowerCase();
         const isYouTube = nativeSnapshot.appPackage?.toLowerCase().includes("youtube") || snapshotTitle.includes("youtube") || matchedPost?.sourceKind === "youtube";
         const isSpotify = nativeSnapshot.appPackage?.toLowerCase().includes("spotify") || snapshotTitle.includes("spotify") || matchedPost?.sourceKind === "spotify";
-        const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
+        const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify || isYouTubeMode || isSpotifyMode);
 
           if (shouldHideText) {
             nextHeader = "";
@@ -2052,7 +2052,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         const snapshotTitle = (desktopSnapshot.title || "").toLowerCase();
         const isYouTube = desktopSnapshot.appPackage?.toLowerCase().includes("youtube") || snapshotTitle.includes("youtube") || matchedPost?.sourceKind === "youtube";
         const isSpotify = desktopSnapshot.appPackage?.toLowerCase().includes("spotify") || snapshotTitle.includes("spotify") || matchedPost?.sourceKind === "spotify";
-        const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
+        const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify || isYouTubeMode || isSpotifyMode);
 
           if (shouldHideText) {
             nextHeader = "";
@@ -2115,8 +2115,14 @@ The companion bridge is designed with several security layers to keep your PC sa
       }
 
       nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
-      if (isMediaSystemMode && (post?.sourceKind === "youtube" || post?.sourceKind === "spotify")) {
+      const isYouTube = post?.sourceKind === "youtube" || isYouTubeMode;
+      const isSpotify = post?.sourceKind === "spotify" || isSpotifyMode;
+      const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
+
+      if (shouldHideText) {
         nextHeader = "";
+        nextTitle = "";
+        nextCaption = "";
         nextStatus = "";
       }
       syncTitle = nextTitle || syncTitle;
