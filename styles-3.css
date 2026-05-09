@@ -683,7 +683,7 @@
     .page-shell {
       width: min(var(--shell-max-width), calc(100% - 16px));
       padding-top: calc(12px + var(--status-bar-safe-space));
-      padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(42px + env(safe-area-inset-bottom, 0px));
     }
 
     .site-header {

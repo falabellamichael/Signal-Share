@@ -742,7 +742,7 @@ body[data-theme="contrast"] .card-media::before {
 }
 
 body[data-density="compact"] .page-shell {
-  padding-bottom: 56px;
+  padding-bottom: 24px;
 }
 
 body[data-density="compact"] .site-header {
@@ -805,7 +805,7 @@ select {
   width: min(var(--shell-max-width), calc(100% - 32px));
   margin: 0 auto;
   padding:
-    calc(24px + var(--status-bar-safe-space)) 0 calc(72px + env(safe-area-inset-bottom, 0px));
+    calc(24px + var(--status-bar-safe-space)) 0 calc(32px + env(safe-area-inset-bottom, 0px));
 }
 
 .site-header {
