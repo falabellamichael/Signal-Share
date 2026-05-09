@@ -2096,7 +2096,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       if (isExternalUrlPost(post)) {
         const isYouTube = post?.sourceKind === "youtube";
         const isSpotify = post?.sourceKind === "spotify";
-        const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
+        const shouldHideText = (isYouTube || isSpotify) && isHardenedEnvironment;
 
         if (shouldHideText) {
           nextHeader = "";
