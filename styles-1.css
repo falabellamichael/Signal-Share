@@ -445,7 +445,7 @@ body[data-theme="contrast"] .theme-picker-menu,
 body[data-theme="contrast"] .theme-option-tile,
 body[data-theme="contrast"] .feed-page-button {
   background: #000000;
-  border: none !important;
+  border: 1px solid #ffffff !important;
   color: #ffffff;
 }
 
@@ -490,6 +490,32 @@ body[data-theme="ember"] .theme-option-tile {
   color: var(--text);
 }
 
+body[data-theme="contrast"] .site-header,
+body[data-theme="contrast"] .hero-stats div,
+body[data-theme="contrast"] .panel-card,
+body[data-theme="contrast"] .auth-state,
+body[data-theme="contrast"] .auth-account,
+body[data-theme="contrast"] .activation-panel,
+body[data-theme="contrast"] .admin-editor,
+body[data-theme="contrast"] .messenger-section,
+body[data-theme="contrast"] .messenger-card,
+body[data-theme="contrast"] .messenger-thread,
+body[data-theme="contrast"] .spotlight-card,
+body[data-theme="contrast"] .mini-panel,
+body[data-theme="contrast"] .feed-card,
+body[data-theme="contrast"] .viewer-dialog,
+body[data-theme="contrast"] .mini-player,
+body[data-theme="contrast"] .messenger-launcher,
+body[data-theme="contrast"] .admin-ban-launcher,
+body[data-theme="contrast"] .admin-ban-panel,
+body[data-theme="contrast"] .settings-dialog,
+body[data-theme="contrast"] .site-header,
+body[data-theme="contrast"] .hero-stats div,
+body[data-theme="contrast"] .panel-card,
+body[data-theme="contrast"] .auth-state,
+body[data-theme="contrast"] .auth-account,
+body[data-theme="contrast"] .activation-panel,
+body[data-theme="contrast"] .admin-editor,
 body[data-theme="contrast"] .messenger-section,
 body[data-theme="contrast"] .messenger-card,
 body[data-theme="contrast"] .messenger-thread,
@@ -514,19 +540,19 @@ body[data-theme="contrast"] .profile-badge,
 body[data-theme="contrast"] .activation-code,
 body[data-theme="contrast"] .brand-mark {
   background: rgba(0, 0, 0, 0.94);
-  border: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
 }
 
 /* High Contrast Messenger Bubbles */
 body[data-theme="contrast"] .message-bubble {
   background: #000000 !important;
-  border: none !important;
+  border: 1px solid #ffffff !important;
   color: #ffffff !important;
 }
 
 body[data-theme="contrast"] .message-row.is-self .message-bubble {
   background: linear-gradient(135deg, #fff200 0%, #00e5ff 100%) !important;
-  border: none !important;
+  border: 1px solid #000000 !important;
   color: #000000 !important;
 }
 
@@ -542,7 +568,7 @@ body[data-theme="contrast"] .message-bubble span {
 /* Explicit Black Background for Profiles in High Contrast */
 body[data-theme="contrast"] .profile-view-dialog {
   background: #000000 !important;
-  border: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
 }
 
 body[data-theme="ember"] .site-header,

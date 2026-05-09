@@ -1239,9 +1239,7 @@
 
     .emoji-panel-header {
       display: flex;
-      flex-direction: row;
       flex-wrap: nowrap;
-      align-items: center;
       gap: 8px;
       margin-bottom: 12px;
       padding-bottom: 10px;
@@ -1249,33 +1247,31 @@
       overflow-x: auto;
       overflow-y: hidden;
       scrollbar-width: none; /* Firefox */
-      -ms-overflow-style: none; /* IE and Edge */
-      -webkit-overflow-scrolling: touch;
+      -ms-overflow-style: none;  /* IE and Edge */
+      -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
       width: 100%;
-      scroll-snap-type: x mandatory;
+      min-width: 0;
     }
 
     .emoji-panel-header::-webkit-scrollbar {
-      height: 0;
-      width: 0;
       display: none;
     }
 
     .emoji-category-tab {
-      display: inline-flex;
-      flex: 0 0 auto;
+      display: flex;
       align-items: center;
       justify-content: center;
-      width: 42px;
-      height: 42px;
+      min-width: 38px;
+      flex-shrink: 0;
+      height: 38px;
+      scroll-snap-align: start;
       background: rgba(19, 33, 43, 0.05);
       border: 1px solid transparent;
-      border-radius: 12px;
+      border-radius: 10px;
       cursor: pointer;
-      font-size: 1.25rem;
+      font-size: 1.15rem;
       transition: all 0.2s ease;
       color: var(--text);
-      scroll-snap-align: start;
     }
 
     .emoji-category-tab:hover {
@@ -1295,22 +1291,11 @@
       overflow-y: auto;
       padding-right: 4px;
       scrollbar-width: none; /* Firefox */
-      -ms-overflow-style: none; /* IE and Edge */
+      -ms-overflow-style: none;  /* IE and Edge */
     }
 
     .emoji-panel-grid::-webkit-scrollbar {
-      width: 5px;
-    }
-
-    .emoji-panel-grid::-webkit-scrollbar-track,
-    .emoji-panel-grid::-webkit-scrollbar-button {
-      display: none;
-      background: transparent;
-    }
-
-    .emoji-panel-grid::-webkit-scrollbar-thumb {
-      background: transparent;
-      border-radius: 10px;
+      display: none; /* Chrome, Safari and Opera */
     }
 
     .emoji-panel-grid:hover {
@@ -1318,8 +1303,9 @@
       scrollbar-color: var(--scrollbar-thumb) transparent;
     }
 
-    .emoji-panel-grid:hover::-webkit-scrollbar-thumb {
-      background: var(--scrollbar-thumb);
+    .emoji-panel-grid:hover::-webkit-scrollbar {
+      display: block;
+      width: 5px;
     }
 
     .emoji-chip {
