@@ -50,11 +50,20 @@ export function handleOpenMediaAction(post, context) {
         window.open(desktopSnapshot.openUri, "_blank");
         return;
       }
-      // If we don't have a URL, at least try to search for the title
-      if (title) {
-        targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(title)}`;
+      if (title || meta) {
+        const query = [title, meta].filter(Boolean).join(" ");
+        targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
       }
+    } else if (title || meta) {
+      // Generic fallback for unknown desktop media
+      const query = [title, meta].filter(Boolean).join(" ");
+      targetUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
     }
+  }
+
+  if (!targetUrl) {
+    // If we still have no URL but we have a post, try its own properties
+    targetUrl = post?.externalUrl || post?.src || post?.mediaUrl;
   }
 
   if (!targetUrl) {
