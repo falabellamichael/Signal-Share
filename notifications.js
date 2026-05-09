@@ -411,8 +411,29 @@
     history.forEach((item) => {
       item.read = true;
     });
+    count = 0;
     save();
     queueRemoteStatePersist({ immediate: true });
+  }
+
+  function markThreadAsRead(threadId) {
+    if (!threadId) return;
+    let changed = false;
+    let unreadInThread = 0;
+
+    history.forEach((item) => {
+      if (String(item.threadId) === String(threadId) && !item.read) {
+        item.read = true;
+        unreadInThread++;
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      count = Math.max(0, count - unreadInThread);
+      save();
+      queueRemoteStatePersist({ immediate: true });
+    }
   }
 
   function handleNotificationClick(notification) {
@@ -666,6 +687,9 @@
     },
     markAllAsRead: () => {
       markAllAsRead();
+    },
+    markThreadAsRead: (threadId) => {
+      markThreadAsRead(threadId);
     },
     incrementUnreadCount: () => {
       count = normalizeCount(count + 1);

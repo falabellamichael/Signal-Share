@@ -112,7 +112,9 @@ window.MessengerRealtime = class MessengerRealtime {
 
     // 1. Try main notification system
     const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
-    console.log("[Realtime] Notification System Status:", window.notifications ? "Ready" : "Missing", "Mobile:", isMobile);
+    const isActiveThread = message.threadId === state.activeThreadId && state.messengerOpen;
+
+    console.log("[Realtime] Notification System Status:", window.notifications ? "Ready" : "Missing", "Mobile:", isMobile, "Active:", isActiveThread);
     
     if (window.notifications && typeof window.notifications.add === "function") {
       // Show notification (Centralized system handles banners, history, and browser alerts)
@@ -121,6 +123,9 @@ window.MessengerRealtime = class MessengerRealtime {
         type: 'info',
         title: `${senderName} sent a message`,
         message: messageBody,
+        read: isActiveThread,
+        silent: isActiveThread,
+        incrementCount: !isActiveThread,
         data: { type: "message", threadId: message.threadId }
       });
     } else {

@@ -1354,6 +1354,11 @@ async function openExistingThread(threadId) {
   state.pendingBlockUserId = "";
   state.pendingDeleteThreadId = "";
   state.activeThreadId = threadId;
+
+  if (window.notifications && typeof window.notifications.markThreadAsRead === "function") {
+    window.notifications.markThreadAsRead(threadId);
+  }
+
   if (!isMessagingEnabled(state)) {
     renderMessenger();
     return;
@@ -1433,6 +1438,11 @@ async function openOrCreateThread(partnerId) {
     }
     mergeThread(thread);
     state.activeThreadId = thread.id;
+
+    if (window.notifications && typeof window.notifications.markThreadAsRead === "function") {
+      window.notifications.markThreadAsRead(thread.id);
+    }
+
     state.activeMessages = await loadMessagesFromSupabase(thread.id);
     clearMessageAttachmentSelection({ preserveFeedback: true });
     showMessengerFeedback("");
