@@ -107,6 +107,44 @@ final class PhoneNowPlayingHelper {
         }
     }
 
+    static boolean setVolume(Context context, float volumePercent) {
+        MediaController controller = getBestActiveController(context);
+        if (controller == null) {
+            // Fallback: Adjust system music volume directly if no active media session
+            android.media.AudioManager am = (android.media.AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            if (am != null) {
+                int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                int target = Math.round(max * Math.max(0, Math.min(1, volumePercent)));
+                am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, target, 0);
+                return true;
+            }
+            return false;
+        }
+
+        try {
+            MediaController.PlaybackInfo info = controller.getPlaybackInfo();
+            if (info != null) {
+                int max = info.getMaxVolume();
+                if (max > 0) {
+                    int target = Math.round(max * Math.max(0, Math.min(1, volumePercent)));
+                    controller.setVolumeTo(target, 0);
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // Secondary fallback: System music volume
+        android.media.AudioManager am = (android.media.AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        if (am != null) {
+            int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+            int target = Math.round(max * Math.max(0, Math.min(1, volumePercent)));
+            am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, target, 0);
+            return true;
+        }
+
+        return false;
+    }
+
     private static boolean resumeLastMediaSession(Context context) {
         // 1. Try to trigger Spotify playback silently via its internal widget broadcast
         try {

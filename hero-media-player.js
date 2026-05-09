@@ -728,13 +728,30 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   function shouldUseNativeMode(post) {
     if (!nativeSnapshot) return false;
+    
+    // If the user has manually toggled a specific source (Spotify/YouTube), 
+    // we should prefer the native bridge for that mode even if nothing is currently playing,
+    // so that pressing 'Play' can wake up the app.
+    const preferredSource = getPreferredHeroControlSource();
+    if (preferredSource && hasNativeActionBridge()) {
+       // If we are in the feed and NOT currently playing a hosted video/audio,
+       // we should let the selected system source take over.
+       const hasLocalAppSession = Boolean(post)
+         || getActivePlayerMediaElement() instanceof HTMLMediaElement
+         || getFallbackPageMediaElement() instanceof HTMLMediaElement;
+       if (!hasLocalAppSession) return true;
+    }
+
     const preferredNativeSnapshot = isPreferredNowPlayingSnapshot(nativeSnapshot);
     if (preferredNativeSnapshot && hasSnapshotPlaybackContext(nativeSnapshot)) return true;
+    
     const hasAppPlaybackSession = Boolean(post)
       || getActivePlayerMediaElement() instanceof HTMLMediaElement
       || getFallbackPageMediaElement() instanceof HTMLMediaElement;
     const canBootstrapAppPlayback = !post && getPlayableVisiblePostIds().length > 0;
+    
     if (hasAppPlaybackSession || canBootstrapAppPlayback) return false;
+    
     if (nativeSnapshot.permissionRequired) return true;
     if (nativeSnapshot.active) return true;
     if (!post && hasNativeActionBridge()) return true;
@@ -1556,7 +1573,18 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (!playableIds.length) return null;
     if (typeof getPostById !== "function") return null;
 
-    // Prioritize the scroll-tracked active post if it's playable and visible
+    const preferredSource = getPreferredHeroControlSource();
+
+    // 1. Try to find a playable post that matches the preferred source (Spotify/YouTube)
+    // This allows the Hero Stage to show a relevant preview (e.g. "Spotify Preview")
+    // when the user has selected a platform but nothing is currently playing.
+    if (preferredSource) {
+      const posts = playableIds.map(id => getPostById(id));
+      const platformMatch = posts.find(p => p && p.sourceKind === preferredSource);
+      if (platformMatch) return platformMatch;
+    }
+
+    // 2. Prioritize the scroll-tracked active post if it's playable and visible
     if (state.activeFeedPostId && playableIds.includes(state.activeFeedPostId)) {
       return getPostById(state.activeFeedPostId);
     }

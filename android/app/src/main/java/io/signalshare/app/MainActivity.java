@@ -75,6 +75,15 @@ public class MainActivity extends BridgeActivity {
         public void openNowPlayingMediaApp(String preferredPackageName, String preferredUri, boolean explicit) {
             mainHandler.post(() -> MainActivity.this.openNowPlayingMediaApp(preferredPackageName, preferredUri, explicit));
         }
+
+        @android.webkit.JavascriptInterface
+        public boolean setNowPlayingVolume(float volume) {
+            try {
+                return PhoneNowPlayingHelper.setVolume(MainActivity.this, volume);
+            } catch (Exception ignored) {
+                return false;
+            }
+        }
     };
 
     @Override

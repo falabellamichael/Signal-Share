@@ -449,8 +449,13 @@ function createPostStandbyPreview(post, options = {}) {
     getSpotifyPreviewImageUrl,
   });
 
+  const isSelectedPlatform = (post.sourceKind === "spotify" && isSpotifyActive) || (post.sourceKind === "youtube" && isYouTubeMode);
+  const badge = isSelectedPlatform 
+    ? `${providerLabel.toUpperCase()} PREVIEW` 
+    : `UP NEXT · ${providerLabel || "App Media"}`;
+
   const cardData = {
-    badge: `UP NEXT · ${providerLabel || "App Media"}`,
+    badge: badge,
     title: post.title || "Next playable post",
     meta: meta,
     note: "Press Play to start playback.",
@@ -577,10 +582,16 @@ export function renderHeroStagePreview(options = {}) {
       return;
     }
 
+    const preferredSource = isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "");
+    const idleTitle = preferredSource ? `${preferredSource} idle` : "No active playback";
+    const idleMeta = isSpotifyActive 
+      ? "Start Spotify on this phone to control playback here."
+      : (isYouTubeMode ? "Start YouTube on this phone to control playback here." : "Start a track in any media app on this device.");
+
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "ON-DEVICE MEDIA",
-      title: "No active playback",
-      meta: "Start a track in any media app on this device.",
+      title: idleTitle,
+      meta: idleMeta,
     });
     return;
   }
@@ -606,10 +617,16 @@ export function renderHeroStagePreview(options = {}) {
       return;
     }
 
+    const preferredSource = isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "");
+    const idleTitle = preferredSource ? `${preferredSource} idle` : "Waiting for playback";
+    const idleMeta = isSpotifyActive 
+      ? "Start Spotify on this PC."
+      : (isYouTubeMode ? "Start YouTube on this PC." : "Start YouTube, Spotify, or another desktop app.");
+
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "PC SYSTEM MEDIA",
-      title: "Waiting for playback",
-      meta: "Start YouTube, Spotify, or another desktop app.",
+      title: idleTitle,
+      meta: idleMeta,
     });
     return;
   }
