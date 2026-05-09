@@ -56,8 +56,13 @@ export function handleOpenMediaAction(post, context) {
         }
         
         if (!youtubeUrl && meta) {
-          // Sometimes the ID is in the "album" or "artist" field on SMTC
           const idMatch = meta.match(/([a-zA-Z0-9_-]{11})/);
+          if (idMatch) youtubeUrl = `https://www.youtube.com/watch?v=${idMatch[1]}`;
+        }
+        
+        if (!youtubeUrl && title) {
+          // Check title for ID (sometimes in parens or at the end)
+          const idMatch = title.match(/([a-zA-Z0-9_-]{11})/);
           if (idMatch) youtubeUrl = `https://www.youtube.com/watch?v=${idMatch[1]}`;
         }
       }
@@ -67,7 +72,11 @@ export function handleOpenMediaAction(post, context) {
         return;
       }
       
-      // If we still have no URL but we have a matching post, it's handled by the fallback below
+      // If we still have no URL, last resort for YouTube is a search on YouTube
+      if (title || meta) {
+        const query = [title, meta].filter(Boolean).join(" ");
+        targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+      }
     }
   }
 
