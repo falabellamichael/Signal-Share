@@ -2158,8 +2158,8 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     const isAndroid = isNativeCapacitorApp() && getCapacitorPlatform() === "android";
-    const isSpotifyActive = post?.sourceKind === "spotify";
-    const showOpenPhone = isAndroid && isSpotifyActive;
+    const isSpotifyPost = post?.sourceKind === "spotify";
+    const showOpenPhone = isAndroid && isSpotifyPost;
 
     if (elements.heroPlayerOpenPhoneButton.hidden !== !showOpenPhone) {
       elements.heroPlayerOpenPhoneButton.hidden = !showOpenPhone;
