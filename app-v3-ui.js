@@ -1534,14 +1534,16 @@ export function createAppUi(context) {
     const cardElement = fragment.querySelector(".feed-card");
     if (cardElement) cardElement.dataset.postId = post.id;
 
-    const mediaContainer = fragment.querySelector(".card-media"); const kind = fragment.querySelector(".card-kind"); const signal = fragment.querySelector(".card-signal"); const title = fragment.querySelector(".card-title"); const caption = fragment.querySelector(".card-caption"); const creator = fragment.querySelector(".card-creator"); const time = fragment.querySelector(".card-time"); const tags = fragment.querySelector(".card-tags"); const openButton = fragment.querySelector(".open-button"); const saveButton = fragment.querySelector(".save-button"); const likeButton = fragment.querySelector(".like-button"); const deleteButton = fragment.querySelector(".delete-button"); const creatorSummary = getProfileSummaryForPost(post);
-    kind.textContent = formatKind(post.mediaKind); signal.textContent = getSignalLabel(post); title.textContent = post.title; caption.textContent = post.caption; creator.textContent = creatorSummary?.displayName ?? post.creator; time.textContent = formatTimestamp(post.createdAt); likeButton.textContent = `${getLikeCount(post)} likes`; saveButton.textContent = isPostSaved(post.id) ? "Saved" : "Save"; saveButton.setAttribute("aria-pressed", isPostSaved(post.id) ? "true" : "false"); saveButton.classList.toggle("is-saved", isPostSaved(post.id)); openButton.textContent = isPlayablePost(post) ? "Play" : "Open";
+    const mediaContainer = fragment.querySelector(".card-media"); const title = fragment.querySelector(".card-title"); const caption = fragment.querySelector(".card-caption"); const creator = fragment.querySelector(".card-creator"); const time = fragment.querySelector(".card-time"); const tags = fragment.querySelector(".card-tags"); const openButton = fragment.querySelector(".open-button"); const saveButton = fragment.querySelector(".save-button"); const likeButton = fragment.querySelector(".like-button"); const deleteButton = fragment.querySelector(".delete-button"); const creatorSummary = getProfileSummaryForPost(post);
+    title.textContent = post.title; caption.textContent = post.caption; creator.textContent = creatorSummary?.displayName ?? post.creator; time.textContent = formatTimestamp(post.createdAt); likeButton.textContent = `${getLikeCount(post)} likes`; saveButton.textContent = isPostSaved(post.id) ? "Saved" : "Save"; saveButton.setAttribute("aria-pressed", isPostSaved(post.id) ? "true" : "false"); saveButton.classList.toggle("is-saved", isPostSaved(post.id)); openButton.textContent = isPlayablePost(post) ? "Play" : "Open";
     const isLiked = state.likedPosts.includes(post.id); likeButton.setAttribute("aria-pressed", isLiked ? "true" : "false"); if (isLiked) likeButton.classList.add("is-liked");
     if (creatorSummary) creator.addEventListener("click", (event) => openProfileByKey(creatorSummary.key, event.currentTarget));
     openButton.addEventListener("click", (event) => { if (isPlayablePost(post)) openMiniPlayer(post.id, event.currentTarget); else openViewer(post.id, event.currentTarget); });
     saveButton.addEventListener("click", () => toggleSave(post.id)); likeButton.addEventListener("click", () => void toggleLike(post.id));
     if (canDeletePost(post)) { deleteButton.hidden = false; deleteButton.addEventListener("click", () => deletePost(post.id)); }
     post.tags.forEach((tag) => { const pill = document.createElement("span"); pill.className = "tag-pill"; pill.textContent = `#${tag}`; tags.appendChild(pill); });
+    const metaContainer = fragment.querySelector(".card-meta");
+    if (metaContainer) metaContainer.hidden = true;
     renderCardMedia(mediaContainer, post);
 
     // Resolve external metadata for rich card body display
@@ -2247,7 +2249,7 @@ export function createAppUi(context) {
         const timestampOnly = baseMeta.split(" · ").slice(1).join(" · ");
 
         const stage = createPreviewCard({
-          badge: formatPostBadge(post, formatKind, getSignalLabel),
+          badge: variant === "card" ? "" : formatPostBadge(post, formatKind, getSignalLabel),
           title: displayTitle,
           meta: displayArtist ? `${displayArtist} · ${timestampOnly || "(Live on feed)"}` : baseMeta,
           note,
@@ -2299,7 +2301,7 @@ export function createAppUi(context) {
       const originalCreator = creatorSummary?.displayName ?? post.creator;
 
       return createPreviewCard({
-        badge: formatPostBadge(post, formatKind, getSignalLabel),
+        badge: variant === "card" ? "" : formatPostBadge(post, formatKind, getSignalLabel),
         title: displayTitle,
         meta: displayArtist || "",
         user: variant === "card" ? originalCreator : "",
@@ -2323,7 +2325,7 @@ export function createAppUi(context) {
   }
 
   function formatPostBadge(post, formatKind, getSignalLabel) {
-    const kind = typeof formatKind === "function" ? formatKind(post?.mediaKind ? `${post.mediaKind} post` : "Media post", post?.mediaKind || "media") : "Media post";
+    const kind = typeof formatKind === "function" ? formatKind(post?.mediaKind || "media") : "Media post";
     const signal = typeof getSignalLabel === "function" ? getSignalLabel("Live on feed", post) : "Live on feed";
     return [kind, signal].filter(Boolean).join(" / ");
   }
