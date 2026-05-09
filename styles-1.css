@@ -509,9 +509,19 @@ body[data-theme="contrast"] .messenger-launcher,
 body[data-theme="contrast"] .admin-ban-launcher,
 body[data-theme="contrast"] .admin-ban-panel,
 body[data-theme="contrast"] .settings-dialog,
-body[data-theme="contrast"] .preview-card {
+body[data-theme="contrast"] .preview-card,
+body[data-theme="contrast"] .hero-player-stage,
+body[data-theme="contrast"] .hero-player-active-stage,
+body[data-theme="contrast"] .mini-player-stage,
+body[data-theme="contrast"] .external-preview-card,
+body[data-theme="contrast"] .status-pill,
+body[data-theme="contrast"] .person-row,
+body[data-theme="contrast"] .conversation-row,
+body[data-theme="contrast"] .profile-badge,
+body[data-theme="contrast"] .activation-code,
+body[data-theme="contrast"] .brand-mark {
   background: rgba(0, 0, 0, 0.94);
-  border-color: rgba(255, 255, 255, 0.5);
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
 }
 
 /* High Contrast Messenger Bubbles */
@@ -523,7 +533,7 @@ body[data-theme="contrast"] .message-bubble {
 
 body[data-theme="contrast"] .message-row.is-self .message-bubble {
   background: linear-gradient(135deg, #fff200 0%, #00e5ff 100%) !important;
-  border: none !important;
+  border: 1.5px solid #000000 !important;
   color: #000000 !important;
 }
 
@@ -539,7 +549,7 @@ body[data-theme="contrast"] .message-bubble span {
 /* Explicit Black Background for Profiles in High Contrast */
 body[data-theme="contrast"] .profile-view-dialog {
   background: #000000 !important;
-  border-color: rgba(255, 255, 255, 0.5) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.5) !important;
 }
 
 body[data-theme="ember"] .site-header,
@@ -583,7 +593,7 @@ body[data-theme="ember"] .settings-field select,
 body[data-theme="ember"] .settings-field input,
 body[data-theme="ember"] .message-form textarea {
   background: rgba(0, 0, 0, 0.78);
-  border-color: var(--line);
+  border: 1.5px solid var(--line);
   color: var(--text);
 }
 
@@ -599,13 +609,13 @@ body[data-theme="ember"] .open-button,
 body[data-theme="ember"] .feed-page-button.is-active {
   background: var(--surface-dark);
   color: #050505;
-  border-color: transparent;
+  border: 1.5px solid #000000;
 }
 
 body[data-theme="contrast"] .settings-switch-ui,
 body[data-theme="ember"] .settings-switch-ui {
   background: rgba(0, 0, 0, 0.86);
-  border-color: var(--line);
+  border: 1.5px solid var(--line);
 }
 
 body[data-theme="contrast"] .settings-switch-ui::after,
@@ -615,7 +625,7 @@ body[data-theme="ember"] .settings-switch-ui::after {
 
 body[data-theme="contrast"] .settings-switch input:checked+.settings-switch-ui {
   background: linear-gradient(135deg, rgba(255, 242, 0, 0.32), rgba(0, 229, 255, 0.26));
-  border-color: var(--accent);
+  border: 1.5px solid var(--accent);
 }
 
 body[data-theme="ember"] .settings-switch input:checked+.settings-switch-ui {
@@ -627,7 +637,7 @@ body[data-theme="contrast"] .dropzone {
   background:
     linear-gradient(145deg, rgba(255, 242, 0, 0.16), rgba(0, 229, 255, 0.14)),
     rgba(0, 0, 0, 0.72);
-  border-color: var(--line);
+  border: 1.5px solid var(--line);
 }
 
 body[data-theme="ember"] .dropzone {
@@ -712,7 +722,7 @@ body[data-theme="contrast"] .button-primary {
 
 body[data-theme="contrast"] .shortcut-item {
   background: #000000;
-  border-color: #ffffff;
+  border: 1.5px solid #ffffff;
 }
 
 body[data-theme="contrast"] .keyboard-key {
