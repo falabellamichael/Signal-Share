@@ -2137,7 +2137,7 @@ export function createAppUi(context) {
         container.appendChild(card);
         externalMetadata.then(metadata => {
           if (metadata) container.replaceChild(createLaunchableCard(metadata), card);
-        }).catch(() => {});
+        }).catch(() => { });
       } else {
         container.appendChild(createLaunchableCard(externalMetadata));
       }
@@ -2178,7 +2178,7 @@ export function createAppUi(context) {
         if (metadata) {
           container.replaceChild(createFallbackCard(metadata), card);
         }
-      }).catch(() => {});
+      }).catch(() => { });
     } else {
       container.appendChild(createFallbackCard(externalMetadata));
     }
