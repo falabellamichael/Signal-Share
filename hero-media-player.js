@@ -2081,17 +2081,9 @@ The companion bridge is designed with several security layers to keep your PC sa
       if (isExternalUrlPost(post)) {
         const isYouTube = post?.sourceKind === "youtube";
         const isSpotify = post?.sourceKind === "spotify";
-        const shouldHideText = (isYouTube || isSpotify) && isHardenedEnvironment;
-
-        if (shouldHideText) {
-          nextHeader = "";
-          nextTitle = "";
-          nextCaption = "";
-        } else {
-          const externalDisplay = getExternalHeaderDisplay(post);
-          nextTitle = externalDisplay.title || "Ready to play";
-          nextCaption = externalDisplay.caption || providerName;
-        }
+        const externalDisplay = getExternalHeaderDisplay(post);
+        nextTitle = externalDisplay.title || "Ready to play";
+        nextCaption = externalDisplay.caption || providerName;
       } else {
         const creatorSummary = getProfileSummaryForPost(post);
         const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
