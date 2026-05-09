@@ -1557,7 +1557,9 @@ export function createAppUi(context) {
         // Incorporate artist/creator into the creator line
         const originalCreator = creatorSummary?.displayName ?? post.creator;
         if (m.creator && m.creator !== originalCreator) {
-          creator.textContent = `${m.creator} · ${originalCreator}`;
+          creator.style.textAlign = "left";
+          creator.style.display = "block";
+          creator.innerHTML = `${m.creator}<br><span style="font-size: 0.85em; opacity: 0.8; font-weight: 400;">User: ${originalCreator}</span>`;
         }
       };
       if (externalMetadata instanceof Promise) {
@@ -2264,11 +2266,13 @@ export function createAppUi(context) {
     const createFallbackCard = (metadata) => {
       const displayTitle = metadata?.title || derivedTitle || "Now playing";
       const displayArtist = metadata?.creator || derivedArtist;
+      const originalCreator = creatorSummary?.displayName ?? post.creator;
 
       return createPreviewCard({
         badge: formatPostBadge(post, formatKind, getSignalLabel),
         title: displayTitle,
-        meta: displayArtist ? `${displayArtist} · (Live on feed)` : formatPostMeta(post, creatorSummary, formatTimestamp),
+        meta: displayArtist || "",
+        user: originalCreator,
         note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player.",
         artworkUrl: metadata?.artworkUrl || artworkUrl,
         showMetadata: variant === "card"
