@@ -1239,13 +1239,18 @@
 
     .emoji-panel-header {
       display: flex;
+      flex-wrap: nowrap;
       gap: 8px;
       margin-bottom: 12px;
       padding-bottom: 10px;
       border-bottom: 1px solid var(--line);
       overflow-x: auto;
+      overflow-y: hidden;
       scrollbar-width: none; /* Firefox */
       -ms-overflow-style: none;  /* IE and Edge */
+      -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+      width: 100%;
+      min-width: 0;
     }
 
     .emoji-panel-header::-webkit-scrollbar {
@@ -1259,6 +1264,7 @@
       min-width: 38px;
       flex-shrink: 0;
       height: 38px;
+      scroll-snap-align: start;
       background: rgba(19, 33, 43, 0.05);
       border: 1px solid transparent;
       border-radius: 10px;
