@@ -1398,6 +1398,12 @@ export function createAppUi(context) {
     const { restoreFocus = true } = options;
     if (!state.notificationsPanelOpen) return;
     state.notificationsPanelOpen = false;
+    
+    // Mark all as read when closing the panel so they appear greyed out next time
+    if (window.notifications && typeof window.notifications.markAllAsRead === "function") {
+      window.notifications.markAllAsRead();
+    }
+    
     render();
     if (restoreFocus && elements.notificationsLauncherButton) elements.notificationsLauncherButton.focus();
   }
