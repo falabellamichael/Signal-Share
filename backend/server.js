@@ -89,12 +89,14 @@ app.use((req, res, next) => {
   }
 
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, target-address-space");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, Authorization");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
+  res.setHeader("Access-Control-Allow-Local-Network", "true");
   res.setHeader("Access-Control-Max-Age", "86400");
   res.setHeader("Vary", "Origin, Access-Control-Request-Headers");
 
   if (req.method === "OPTIONS") {
+    // Chrome PNA Preflight requires a 200 or 204 response with Allow-Local-Network: true
     return res.status(204).end();
   }
 

@@ -796,17 +796,17 @@ The companion bridge is designed with several security layers to keep your PC sa
       const resolved = new URL(url, window.location.href);
       const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
       if (addressSpace !== "local" && addressSpace !== "private" && addressSpace !== "loopback") return init;
+      
       const secret = localStorage.getItem("ss_bridge_secret");
-      const headers = {
-        ...init.headers,
-        "target-address-space": addressSpace,
-      };
+      const headers = { ...init.headers };
       if (secret) {
         headers["X-Bridge-Secret"] = secret;
       }
+      
       return {
         ...init,
         headers,
+        targetAddressSpace: addressSpace === "loopback" ? "local" : addressSpace
       };
     } catch {
       return init;
