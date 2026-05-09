@@ -438,21 +438,19 @@ body[data-theme="contrast"] .admin-ban-item,
 body[data-theme="contrast"] .conversation-button,
 body[data-theme="contrast"] .conversation-delete-button,
 body[data-theme="contrast"] .conversation-delete-prompt,
-body[data-theme="contrast"] .emoji-chip,
-body[data-theme="contrast"] .emoji-category-tab,
-body[data-theme="contrast"] .theme-picker-trigger,
-body[data-theme="contrast"] .theme-picker-menu,
-body[data-theme="contrast"] .theme-option-tile,
-body[data-theme="contrast"] .feed-page-button {
-  background: #000000;
-  border: 1.5px solid #ffffff;
-  color: #ffffff;
+body[data-theme="contrast"] .emoji-category-tab {
+  background: rgba(40, 40, 40, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 0 !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  height: 50px !important;
 }
 
 body[data-theme="contrast"] .emoji-category-tab.is-active {
-  background: #fff200;
-  color: #000000;
-  border-color: #000000;
+  background: #000000 !important;
+  color: #ffffff !important;
+  border: 2.5px solid #ffffff !important;
+  opacity: 1 !important;
 }
 
 body[data-theme="contrast"] .button:disabled,
@@ -1639,6 +1637,27 @@ h1 {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
+}
+
+.emoji-panel-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.emoji-panel-grid::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+}
+
+.emoji-panel-grid::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.4);
+  border-radius: 4px;
+  border: 2px solid #1a1a1a;
+}
+
+body[data-theme="contrast"] .emoji-panel-grid::-webkit-scrollbar-thumb {
+  background: #ffffff !important;
+  border: 2px solid #000000 !important;
+  border-radius: 0 !important;
 }
 
 .hero-stats {
