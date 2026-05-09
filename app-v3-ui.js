@@ -238,6 +238,9 @@ export function createAppUi(context) {
     heroSourceSpotify: document.querySelector("#heroSourceSpotify"),
     heroPlayerOpenPhoneButton: document.querySelector("#heroPlayerOpenPhoneButton"),
   };
+  
+  let lastMediaActionAt = 0;
+  const MEDIA_ACTION_COOLDOWN_MS = 280;
 
   const OVERLAY_SCROLL_CONTAINER_SELECTOR = [
     ".settings-dialog",
@@ -1688,9 +1691,15 @@ export function createAppUi(context) {
     const post = getHeroPost();
     if (!post) return;
 
-    // If this post is already active and VISIBLE in the hero, toggle its playback
+    const now = Date.now();
     const isMounted = state.heroPlayerElement && elements.heroPlayerStage.contains(state.heroPlayerElement);
-    if (state.heroPlayerPostId === post.id && isMounted) {
+    const isActive = state.heroPlayerPostId === post.id && isMounted;
+
+    if (isActive && now - lastMediaActionAt < MEDIA_ACTION_COOLDOWN_MS) {
+      return;
+    }
+    
+    if (isActive) lastMediaActionAt = now;
       const media = state.heroPlayerElement instanceof HTMLMediaElement
         ? state.heroPlayerElement
         : (state.heroPlayerElement instanceof HTMLIFrameElement
@@ -2764,6 +2773,10 @@ export function createAppUi(context) {
   function handleMiniPlayerVolumeInput(event) { heroMediaPlayerController.handleVolumeInput(event); }
 
   function handleMiniPlayPause() {
+    const now = Date.now();
+    if (now - lastMediaActionAt < MEDIA_ACTION_COOLDOWN_MS) return;
+    lastMediaActionAt = now;
+
     if (!state.playerPostId) return;
     const post = getPostById(state.playerPostId);
     if (!post) return;

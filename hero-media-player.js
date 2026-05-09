@@ -63,6 +63,7 @@ export function createHeroMediaPlayerController(options) {
   let desktopSnapshotReadPromise = null;
   let lastDesktopSnapshotSignature = "";
   let desktopActionInFlight = false;
+  let nativeActionInFlight = false;
   let lastDesktopActionAt = 0;
   let lastNativeActionAt = 0;
   let lastDesktopPollTime = 0;
@@ -70,6 +71,7 @@ export function createHeroMediaPlayerController(options) {
   let lastDesktopActionKey = "";
   let companionPromptDismissed = localStorage.getItem("ss_companion_dismissed") === "true";
   const DESKTOP_ACTION_COOLDOWN_MS = 280;
+  const NATIVE_ACTION_COOLDOWN_MS = 280;
   const COMPANION_SETUP_SCRIPT = `@echo off
 setlocal
 title Signal Share Companion
@@ -1580,16 +1582,27 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   function performNativeAction(action) {
     if (!hasNativeActionBridge()) return false;
+    
+    const now = Date.now();
+    if (nativeActionInFlight && now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) {
+      return false;
+    }
+
     const bridge = getNativeBridge();
     try {
-      lastNativeActionAt = Date.now();
+      lastNativeActionAt = now;
+      nativeActionInFlight = true;
 
       const success = bridge.performNowPlayingAction(action);
+      
       window.setTimeout(() => {
+        nativeActionInFlight = false;
         if (Date.now() - lastNativeActionAt > 900) refreshNativeSnapshot();
       }, 1000);
+
       return Boolean(success);
     } catch {
+      nativeActionInFlight = false;
       return false;
     }
   }
@@ -1713,6 +1726,10 @@ The companion bridge is designed with several security layers to keep your PC sa
         try { getNativeBridge().openNowPlayingAccessSettings(); } catch { }
         return;
       }
+
+      const now = Date.now();
+      if (now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) return;
+
       if (nativeSnapshot) {
         nativeSnapshot.playbackState = (nativeSnapshot.playbackState === "playing") ? "paused" : "playing";
         render();
@@ -1769,6 +1786,9 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     if (mode === "device") {
+      const now = Date.now();
+      if (now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) return;
+
       if (nativeSnapshot) {
         nativeSnapshot.playbackState = "playing"; // Optimistic
         render();
@@ -1813,6 +1833,9 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     if (mode === "device") {
+      const now = Date.now();
+      if (now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) return;
+
       if (nativeSnapshot) {
         nativeSnapshot.playbackState = "playing"; // Optimistic
         render();
