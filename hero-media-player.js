@@ -806,7 +806,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       return {
         ...init,
         headers,
-        targetAddressSpace: addressSpace === "loopback" ? "local" : addressSpace
+        targetAddressSpace: addressSpace
       };
     } catch {
       return init;
