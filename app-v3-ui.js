@@ -52,6 +52,8 @@ export function createAppUi(context) {
     getAppConfig, updatePostLikeCount, createDemoGraphic,
   } = context;
 
+
+
   const elements = {
     siteHeader: document.querySelector(".site-header"),
     postForm: document.querySelector("#postForm"),
@@ -241,6 +243,14 @@ export function createAppUi(context) {
   
   let lastMediaActionAt = 0;
   const MEDIA_ACTION_COOLDOWN_MS = 280;
+
+  function checkMediaCooldown() {
+    const now = Date.now();
+    if (now - lastMediaActionAt < MEDIA_ACTION_COOLDOWN_MS) return false;
+    lastMediaActionAt = now;
+    return true;
+  }
+
 
   const OVERLAY_SCROLL_CONTAINER_SELECTOR = [
     ".settings-dialog",
@@ -1699,7 +1709,8 @@ export function createAppUi(context) {
       return;
     }
     
-    if (isActive) lastMediaActionAt = now;
+    if (isActive) {
+      lastMediaActionAt = now;
       const media = state.heroPlayerElement instanceof HTMLMediaElement
         ? state.heroPlayerElement
         : (state.heroPlayerElement instanceof HTMLIFrameElement
@@ -1951,7 +1962,12 @@ export function createAppUi(context) {
     }
   }
 
-  function postMessageToYouTubePlayer(frame, func, args = []) { if (!(frame instanceof HTMLIFrameElement) || !frame.contentWindow) return; frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args }), "*"); }
+  function postMessageToYouTubePlayer(frame, func, args = []) {
+    if (!checkMediaCooldown()) return;
+    if (!(frame instanceof HTMLIFrameElement) || !frame.contentWindow) return;
+    frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args }), "*");
+  }
+
 
   function syncPlayerVolumeFromMediaElement(event) { const mediaElement = event?.target; if (!(mediaElement instanceof HTMLMediaElement)) return; state.playerVolume = normalizePlayerVolume(mediaElement.muted ? 0 : mediaElement.volume, state.playerVolume); savePlayerVolume(state.playerVolume); renderMiniPlayerVolumeControl(); heroMediaPlayerController.render(); }
 
@@ -2017,6 +2033,8 @@ export function createAppUi(context) {
   }
 
   function mountPersistentPlayer(container, post, variant, options = {}) {
+    if (!checkMediaCooldown()) return;
+
     const { autoplay = false } = options;
     if (state.activePlayerPostId !== post.id || !state.activePlayerElement) {
       destroyActivePlayer();
@@ -2768,7 +2786,11 @@ export function createAppUi(context) {
     state.returnFocusElement = null;
   }
 
-  function handleMiniPlayerStageClick(event) { if (!event.target.closest("iframe, video, audio") && !state.miniPlayerExpanded) expandMiniPlayer(); }
+  function handleMiniPlayerStageClick(event) {
+    if (!checkMediaCooldown()) return;
+    if (!event.target.closest("iframe, video, audio") && !state.miniPlayerExpanded) expandMiniPlayer();
+  }
+
 
   function handleMiniPlayerVolumeInput(event) { heroMediaPlayerController.handleVolumeInput(event); }
 
@@ -2816,7 +2838,15 @@ export function createAppUi(context) {
 
   function getPlayableVisiblePostIds() { return state.visiblePostIds.filter((id) => isPlayablePost(getPostById(id))); }
 
-  function stepMiniPlayer(delta) { const playableIds = getPlayableVisiblePostIds(); if (playableIds.length <= 1 || !state.playerPostId) return; const currentIndex = playableIds.indexOf(state.playerPostId); const nextIndex = currentIndex === -1 ? 0 : (currentIndex + delta + playableIds.length) % playableIds.length; state.playerPostId = playableIds[nextIndex]; }
+  function stepMiniPlayer(delta) {
+    if (!checkMediaCooldown()) return;
+    const playableIds = getPlayableVisiblePostIds();
+    if (playableIds.length <= 1 || !state.playerPostId) return;
+    const currentIndex = playableIds.indexOf(state.playerPostId);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + delta + playableIds.length) % playableIds.length;
+    state.playerPostId = playableIds[nextIndex];
+  }
+
 
   function renderPreview(file) {
     if (state.previewUrl) URL.revokeObjectURL(state.previewUrl); state.previewUrl = URL.createObjectURL(file); elements.previewShell.hidden = false; elements.previewShell.innerHTML = "";
@@ -2904,7 +2934,7 @@ export function createAppUi(context) {
 
   function hideOverlay() { const overlay = document.getElementById('ban-overlay'); if (overlay) overlay.style.display = 'none'; }
 
-  return {
+  const ui = {
     elements, attachEventListeners, render, renderStats, renderAccountState,
     setMessengerStatus, renderMessengerDock, syncMessengerDockScrollState, renderMessenger, focusMessengerPrimaryControl,
     openMessengerDock, collapseMessengerDock, closeMessengerDock, toggleMessengerExpansion, handleMessengerLauncherClick,
@@ -2941,4 +2971,7 @@ export function createAppUi(context) {
     destroyActivePlayer, hydrateRememberedCreator, ensureOverlay, showOverlay, hideOverlay,
     heroMediaPlayerController,
   };
+
+  return ui;
 }
+
