@@ -1144,7 +1144,43 @@ export function createAppUi(context) {
         <div class="emoji-panel-header">${categoriesHtml}</div>
         <div class="emoji-panel-grid">${emojisHtml}</div>
       `;
+
+      initEmojiHeaderDragScroll();
     }
+  }
+
+  function initEmojiHeaderDragScroll() {
+    const header = elements.messageEmojiPanel.querySelector(".emoji-panel-header");
+    if (!header) return;
+
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+
+    header.addEventListener("mousedown", (e) => {
+      isDown = true;
+      header.classList.add("is-dragging");
+      startX = e.pageX - header.offsetLeft;
+      scrollLeft = header.scrollLeft;
+    });
+
+    header.addEventListener("mouseleave", () => {
+      isDown = false;
+      header.classList.remove("is-dragging");
+    });
+
+    header.addEventListener("mouseup", () => {
+      isDown = false;
+      header.classList.remove("is-dragging");
+    });
+
+    header.addEventListener("mousemove", (e) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - header.offsetLeft;
+      const walk = (x - startX) * 2; 
+      header.scrollLeft = scrollLeft - walk;
+    });
   }
 
   function toggleMessageEmojiPicker() { if (elements.messageEmojiButton.disabled) return; state.messageEmojiPickerOpen = !state.messageEmojiPickerOpen; renderMessageEmojiPanel(); if (!state.messageEmojiPickerOpen) elements.messageInput.focus(); }

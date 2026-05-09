@@ -1251,6 +1251,13 @@
       -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
       width: 100%;
       min-width: 0;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .emoji-panel-header:active,
+    .emoji-panel-header.is-dragging {
+      cursor: grabbing;
     }
 
     .emoji-panel-header::-webkit-scrollbar {
