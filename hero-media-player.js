@@ -1946,7 +1946,13 @@ The companion bridge is designed with several security layers to keep your PC sa
     const heroPost = getHeroPost();
     const playablePosts = getHeroPlayablePosts();
     const playableCount = playablePosts.length;
-    const canStep = playableCount > 1;
+    const controllablePost = getControllablePlayerPost();
+    const mode = getEffectiveHeroMode(controllablePost);
+    
+    // In Feed mode, stepping depends on having multiple posts.
+    // In Media mode, we always allow stepping because the external player (YouTube/Spotify)
+    // usually has its own queue or playlist.
+    const canStep = mode === "desktop" || mode === "device" || playableCount > 1;
 
     if (elements.heroPlayerPrevButton.disabled !== !canStep) {
       elements.heroPlayerPrevButton.disabled = !canStep;

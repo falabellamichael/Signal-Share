@@ -637,7 +637,11 @@ try {
   $winRtSuccess = $false
 }
 
-if ($winRtSuccess) {
+# Skip and toggle actions need aggressive fallback because WinRT can report success while browsers ignore the command.
+$isSkipAction = "${action}" -eq "next" -or "${action}" -eq "previous"
+$isToggleAction = "${action}" -eq "play_pause"
+
+if ($winRtSuccess -and -not $isSkipAction) {
   Write-Output "ok"
   exit 0
 }
@@ -651,13 +655,8 @@ public static class MediaKeySender {
 }
 "@
 
-# Fallback to global media keys if WinRT targeting failed or if no specific source was requested.
-# For YouTube in browsers, WinRT control can sometimes be unreliable depending on tab focus.
-# Global keys provide a reliable secondary path.
-$isSkipAction = "${action}" -eq "next" -or "${action}" -eq "previous"
-$isToggleAction = "${action}" -eq "play_pause"
-
-if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or ($winRtSuccess -eq $false -and ($isSkipAction -or $isToggleAction))) {
+# Fallback to global media keys if WinRT targeting failed or if it's a skip action (which needs extra kick).
+if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or $winRtSuccess -eq $false -or $isSkipAction -or $isToggleAction) {
   $KEYEVENTF_EXTENDEDKEY = 0x0001
   $KEYEVENTF_KEYUP = 0x0002
   [MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
