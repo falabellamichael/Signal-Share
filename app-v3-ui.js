@@ -606,9 +606,14 @@ export function createAppUi(context) {
   function setHeroControlMode(mode) {
     state.heroControlMode = mode;
 
-    // If switching to media, ensure bridge is active
+    // If switching to media, ensure bridge is active and restore the last chosen specific source if current is "all"
     if (mode === "media") {
       state.desktopBridgeSuspended = false;
+      if (state.heroControlSource === "all") {
+        const sourceToRestore = state.lastHeroControlSource || "youtube";
+        setHeroControlSource(sourceToRestore);
+        return; // setHeroControlSource calls render()
+      }
     }
 
     render();
@@ -617,6 +622,11 @@ export function createAppUi(context) {
   function setHeroControlSource(source) {
     const isFeedMode = state.heroControlMode === "feed";
     const currentSource = state.heroControlSource;
+
+    // Remember the last specific source chosen for future restoration in Media Mode
+    if (source === "youtube" || source === "spotify") {
+      state.lastHeroControlSource = source;
+    }
 
     // In Feed mode, clicking an already active source toggle turns it off (sets back to "all")
     let targetSource = source;

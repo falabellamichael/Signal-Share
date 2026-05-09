@@ -323,6 +323,7 @@ if (!window[globalStateKey]) {
     desktopBridgeSuspended: false,
     viewerUrl: "",
     heroControlSource: "all",
+    lastHeroControlSource: "youtube",
     returnFocusElement: null,
     profileReturnFocusElement: null,
     activeFeedPostId: null,
