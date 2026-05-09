@@ -2028,15 +2028,9 @@ The companion bridge is designed with several security layers to keep your PC sa
         const isYouTube = nativeSnapshot.appPackage?.toLowerCase().includes("youtube") || snapshotTitle.includes("youtube") || matchedPost?.sourceKind === "youtube";
         const shouldHideText = isHardenedEnvironment && (isYouTube || isYouTubeMode);
 
-          if (shouldHideText) {
-            nextTitle = "";
-            nextCaption = "";
-            nextStatus = "";
-          } else {
-            nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
-            nextCaption = cleanSnapshotCreator(nativeSnapshot, "Device playback");
-            nextStatus = getPlaybackStatusLabel(nativeSnapshot.playbackState);
-          }
+          nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
+          nextCaption = cleanSnapshotCreator(nativeSnapshot, "Device playback");
+          nextStatus = getPlaybackStatusLabel(nativeSnapshot.playbackState);
           syncTitle = cleanSnapshotTitle(nativeSnapshot.title);
           syncArtist = cleanSnapshotCreator(nativeSnapshot, "Device");
           syncArtwork = nativeSnapshot.artworkUri || "";
@@ -2052,15 +2046,9 @@ The companion bridge is designed with several security layers to keep your PC sa
         const isYouTube = desktopSnapshot.appPackage?.toLowerCase().includes("youtube") || snapshotTitle.includes("youtube") || matchedPost?.sourceKind === "youtube";
         const shouldHideText = isHardenedEnvironment && (isYouTube || isYouTubeMode);
 
-          if (shouldHideText) {
-            nextTitle = "";
-            nextCaption = "";
-            nextStatus = "";
-          } else {
-            nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
-            nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
-            nextStatus = getPlaybackStatusLabel(desktopSnapshot.playbackState);
-          }
+          nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
+          nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
+          nextStatus = getPlaybackStatusLabel(desktopSnapshot.playbackState);
           syncTitle = cleanSnapshotTitle(desktopSnapshot.title);
           syncArtist = cleanSnapshotCreator(desktopSnapshot, "Desktop");
           syncArtwork = desktopSnapshot.artworkUri || "";
@@ -2113,13 +2101,10 @@ The companion bridge is designed with several security layers to keep your PC sa
 
       nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
       const isYouTube = post?.sourceKind === "youtube" || isYouTubeMode;
-      const shouldHideText = isHardenedEnvironment && isYouTube;
+      // Above-stage text remains visible for all modes per user preference.
+      // Minimalism is handled 'On-Stage' in renderHeroStagePreview.
 
-      if (shouldHideText) {
-        nextTitle = "";
-        nextCaption = "";
-        nextStatus = "";
-      }
+      // Titles/Captions above the stage are now persistent.
       syncTitle = nextTitle || syncTitle;
       syncArtist = nextCaption || syncArtist;
     }
