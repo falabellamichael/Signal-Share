@@ -2014,8 +2014,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube");
     const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify");
     const isFeedMode = state?.heroControlMode === "feed";
-    // Minimalism applies to Feed and YouTube modes, but EXCLUDES Spotify per user request
-    const isHardenedEnvironment = (isFeedMode || state?.heroControlMode === "media") && !isSpotifyActive;
+    const isHardenedEnvironment = (isFeedMode || state?.heroControlMode === "media");
 
     if (mode === "device") {
       nextHeader = getSystemMediaHeaderLabel();
@@ -2025,15 +2024,16 @@ The companion bridge is designed with several security layers to keep your PC sa
         nextStatus = "Access required";
       } else if (nativeSnapshot?.active) {
         const snapshotTitle = (nativeSnapshot.title || "").toLowerCase();
-        const isYouTube = nativeSnapshot.appPackage?.toLowerCase().includes("youtube") || snapshotTitle.includes("youtube") || matchedPost?.sourceKind === "youtube";
-        const shouldHideText = isHardenedEnvironment && (isYouTube || isYouTubeMode);
+        const isYouTube = matchedPost?.sourceKind === "youtube" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("youtube")) || snapshotTitle.includes("youtube") || isYouTubeMode;
+        const isSpotify = matchedPost?.sourceKind === "spotify" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("spotify")) || snapshotTitle.includes("spotify") || isSpotifyActive;
+        const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
 
-          nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
-          nextCaption = cleanSnapshotCreator(nativeSnapshot, "Device playback");
-          nextStatus = getPlaybackStatusLabel(nativeSnapshot.playbackState);
-          syncTitle = cleanSnapshotTitle(nativeSnapshot.title);
-          syncArtist = cleanSnapshotCreator(nativeSnapshot, "Device");
-          syncArtwork = nativeSnapshot.artworkUri || "";
+        nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
+        nextCaption = cleanSnapshotCreator(nativeSnapshot, "Device playback");
+        nextStatus = getPlaybackStatusLabel(nativeSnapshot.playbackState);
+        syncTitle = cleanSnapshotTitle(nativeSnapshot.title);
+        syncArtist = cleanSnapshotCreator(nativeSnapshot, "Device");
+        syncArtwork = nativeSnapshot.artworkUri || "";
       } else {
         nextTitle = "Device media idle";
         nextCaption = "Start playback in any media app.";
@@ -2043,15 +2043,16 @@ The companion bridge is designed with several security layers to keep your PC sa
       nextHeader = getSystemMediaHeaderLabel();
       if (desktopSnapshot?.active) {
         const snapshotTitle = (desktopSnapshot.title || "").toLowerCase();
-        const isYouTube = desktopSnapshot.appPackage?.toLowerCase().includes("youtube") || snapshotTitle.includes("youtube") || matchedPost?.sourceKind === "youtube";
-        const shouldHideText = isHardenedEnvironment && (isYouTube || isYouTubeMode);
+        const isYouTube = matchedPost?.sourceKind === "youtube" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("youtube")) || snapshotTitle.includes("youtube") || isYouTubeMode;
+        const isSpotify = matchedPost?.sourceKind === "spotify" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("spotify")) || snapshotTitle.includes("spotify") || isSpotifyActive;
+        const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
 
-          nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
-          nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
-          nextStatus = getPlaybackStatusLabel(desktopSnapshot.playbackState);
-          syncTitle = cleanSnapshotTitle(desktopSnapshot.title);
-          syncArtist = cleanSnapshotCreator(desktopSnapshot, "Desktop");
-          syncArtwork = desktopSnapshot.artworkUri || "";
+        nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
+        nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
+        nextStatus = getPlaybackStatusLabel(desktopSnapshot.playbackState);
+        syncTitle = cleanSnapshotTitle(desktopSnapshot.title);
+        syncArtist = cleanSnapshotCreator(desktopSnapshot, "Desktop");
+        syncArtwork = desktopSnapshot.artworkUri || "";
       } else {
         const preferredSource = getPreferredHeroControlSource();
         nextTitle = preferredSource ? `${preferredSource.charAt(0).toUpperCase()}${preferredSource.slice(1)} media idle` : "PC media idle";
@@ -2093,8 +2094,8 @@ The companion bridge is designed with several security layers to keep your PC sa
 
       nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
       const isYouTube = post?.sourceKind === "youtube" || isYouTubeMode;
-      // Above-stage text remains visible for all modes per user preference.
-      // Minimalism is handled 'On-Stage' in renderHeroStagePreview.
+      const isSpotify = post?.sourceKind === "spotify" || isSpotifyActive;
+      const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
 
       // Titles/Captions above the stage are now persistent.
       syncTitle = nextTitle || syncTitle;
