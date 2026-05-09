@@ -1121,36 +1121,79 @@ export function createAppUi(context) {
     if (isOpen) {
       if (!state.activeEmojiCategory) state.activeEmojiCategory = "faces";
       
-      const categoriesHtml = EMOJI_CATEGORIES.map(cat => `
-        <button class="emoji-category-tab ${state.activeEmojiCategory === cat.id ? 'is-active' : ''}" 
-                type="button" data-emoji-category="${cat.id}" title="${cat.label}">
-          ${cat.icon}
-        </button>
-      `).join("");
+      const header = elements.messageEmojiPanel.querySelector(".emoji-panel-header");
+      if (!header) {
+        const categoriesHtml = EMOJI_CATEGORIES.map(cat => `
+          <button class="emoji-category-tab ${state.activeEmojiCategory === cat.id ? 'is-active' : ''}" 
+                  type="button" data-emoji-category="${cat.id}" title="${cat.label}">
+            ${cat.icon}
+          </button>
+        `).join("");
 
-      let emojis = EMOJI_PACK.filter(emoji => emoji.category === state.activeEmojiCategory);
-      const isCollapsed = !state.messengerExpanded;
-      
-      if (isCollapsed) {
-        emojis = emojis.slice(0, 36);
+        elements.messageEmojiPanel.innerHTML = `
+          <div class="emoji-panel-header">
+            <div class="emoji-search-container">
+              <input type="text" class="emoji-search-input" placeholder="Search..." value="${state.emojiSearchQuery || ''}">
+            </div>
+            <div class="emoji-categories-scroll">
+              ${categoriesHtml}
+            </div>
+          </div>
+          <div class="emoji-panel-grid"></div>
+        `;
+        
+        const searchInput = elements.messageEmojiPanel.querySelector(".emoji-search-input");
+        searchInput.addEventListener("input", (e) => {
+          state.emojiSearchQuery = e.target.value.toLowerCase();
+          renderEmojiGrid();
+        });
+
+        initEmojiHeaderDragScroll();
+      } else {
+        const scroll = header.querySelector(".emoji-categories-scroll");
+        if (scroll) {
+          scroll.querySelectorAll(".emoji-category-tab").forEach(tab => {
+            tab.classList.toggle("is-active", tab.dataset.emojiCategory === state.activeEmojiCategory && !state.emojiSearchQuery);
+          });
+        }
       }
 
-      const emojisHtml = emojis.map(emoji => `
-        <button class="emoji-chip" type="button" data-emoji="${emoji.char}" aria-label="Insert ${emoji.label.toLowerCase()}">${emoji.char}</button>
-      `).join("");
-
-      elements.messageEmojiPanel.classList.toggle("is-collapsed", isCollapsed);
-      elements.messageEmojiPanel.innerHTML = `
-        <div class="emoji-panel-header">${categoriesHtml}</div>
-        <div class="emoji-panel-grid">${emojisHtml}</div>
-      `;
-
-      initEmojiHeaderDragScroll();
+      renderEmojiGrid();
     }
   }
 
+  function renderEmojiGrid() {
+    const grid = elements.messageEmojiPanel.querySelector(".emoji-panel-grid");
+    if (!grid) return;
+
+    let emojis = EMOJI_PACK;
+    
+    if (state.emojiSearchQuery) {
+      const q = state.emojiSearchQuery;
+      emojis = emojis.filter(emoji => 
+        emoji.label.toLowerCase().includes(q) || 
+        (emoji.tags && emoji.tags.toLowerCase().includes(q)) ||
+        emoji.category.toLowerCase().includes(q)
+      );
+    } else {
+      emojis = emojis.filter(emoji => emoji.category === state.activeEmojiCategory);
+    }
+
+    const isCollapsed = !state.messengerExpanded;
+    if (isCollapsed) {
+      emojis = emojis.slice(0, 36);
+    }
+
+    const emojisHtml = emojis.map(emoji => `
+      <button class="emoji-chip" type="button" data-emoji="${emoji.char}" aria-label="Insert ${emoji.label.toLowerCase()}">${emoji.char}</button>
+    `).join("");
+
+    grid.innerHTML = emojisHtml || '<p class="emoji-search-empty">No emojis found.</p>';
+    elements.messageEmojiPanel.classList.toggle("is-collapsed", isCollapsed);
+  }
+
   function initEmojiHeaderDragScroll() {
-    const header = elements.messageEmojiPanel.querySelector(".emoji-panel-header");
+    const header = elements.messageEmojiPanel.querySelector(".emoji-categories-scroll");
     if (!header) return;
 
     let isDown = false;
