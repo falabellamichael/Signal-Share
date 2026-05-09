@@ -32,6 +32,7 @@ export function createHeroMediaPlayerController(options) {
     getHeroPlayablePosts,
     resolveYouTubePreviewId,
     isNativeCapacitorApp,
+    getCapacitorPlatform,
     onStatusChange
   } = options;
 
@@ -194,6 +195,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       && elements.heroPlayerNextButton
       && elements.heroPlayerVolumeSlider
       && elements.heroPlayerVolumeValue
+      && elements.heroPlayerOpenPhoneButton
       && document.getElementById("companionPromptOverlay")
     );
   }
@@ -1830,6 +1832,33 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
   }
 
+  function handleOpenPhone() {
+    const post = getControllablePlayerPost();
+    const isSpotify = post?.sourceKind === "spotify";
+
+    if (isSpotify && isNativeCapacitorApp()) {
+      // Use the Spotify URI if available, or just open the home screen
+      const externalUrl = post.externalUrl || post.originalUrl || "";
+      let spotifyUri = "spotify:home";
+      
+      if (externalUrl) {
+        // Try to convert web URL to URI
+        const match = externalUrl.match(/spotify\.com\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/);
+        if (match) {
+          spotifyUri = `spotify:${match[1]}:${match[2]}`;
+        } else if (externalUrl.startsWith("spotify:")) {
+          spotifyUri = externalUrl;
+        }
+      }
+
+      if (typeof window.Capacitor !== "undefined" && window.Capacitor.Plugins.App) {
+        window.Capacitor.Plugins.App.openUrl({ url: spotifyUri });
+      } else {
+        window.open(spotifyUri, "_system");
+      }
+    }
+  }
+
   function handleVolumeInput(event) {
     const post = getControllablePlayerPost();
     const mode = getEffectiveHeroMode(post);
@@ -1868,6 +1897,11 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     elements.heroPlayerPlayPauseButton.addEventListener("click", (event) => {
       handlePlayPause();
+      if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
+    });
+
+    elements.heroPlayerOpenPhoneButton.addEventListener("click", (event) => {
+      handleOpenPhone();
       if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
     });
 
@@ -2121,6 +2155,14 @@ The companion bridge is designed with several security layers to keep your PC sa
     const isPlayPauseDisabled = mode === "app" && !post;
     if (elements.heroPlayerPlayPauseButton.disabled !== isPlayPauseDisabled) {
       elements.heroPlayerPlayPauseButton.disabled = isPlayPauseDisabled;
+    }
+
+    const isAndroid = isNativeCapacitorApp() && getCapacitorPlatform() === "android";
+    const isSpotifyActive = post?.sourceKind === "spotify";
+    const showOpenPhone = isAndroid && isSpotifyActive;
+
+    if (elements.heroPlayerOpenPhoneButton.hidden !== !showOpenPhone) {
+      elements.heroPlayerOpenPhoneButton.hidden = !showOpenPhone;
     }
 
     if (elements.heroPlayerVolumeSlider.disabled !== !supportsVolume) {

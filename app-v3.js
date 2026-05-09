@@ -1280,38 +1280,38 @@ async function subscribeMessagingChannels(options = {}) {
       state.threadsChannel = state.supabase.channel(`direct-threads-${state.currentUser.id}-${sessionHash}`);
       state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "direct_threads" }, () => void refreshMessengerState({ preserveActiveThread: true }))
         .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => void refreshMessengerState({ preserveActiveThread: true }));
+
+      if (state.blockingAvailable) {
+        state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_blocks" }, () => void refreshMessengerState({ preserveActiveThread: true }));
+      }
+
+      if (state.banningAvailable) {
+        state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState().then(() => {
+          if (canAccessAdminBanPanel(state)) void refreshAdminBanState();
+          if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true });
+          else { clearMessengerState(); render(); }
+        }));
+      }
+      state.threadsChannel.subscribe();
+
+      state.likesChannel = state.supabase.channel(`likes-${state.currentUser.id}-${sessionHash}`).on("postgres_changes", { event: "INSERT", schema: "public", table: POST_LIKES_TABLE }, (payload) => {
+        const like = payload.new;
+        if (like.user_id === state.currentUser.id) return;
+        const likedPost = state.userPosts.find((p) => p.id === like.post_id);
+        const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
+        if (likedPost && likedPost.authorId === state.currentUser.id && window.notifications) {
+          const notificationId = `like-${like.post_id}-${like.user_id}`;
+          const message = `Someone liked your post: ${likedPost.title || "Untitled"}`;
+
+          window.notifications.success(message, "New Like!", {
+            id: notificationId,
+            silent: isMobile
+          });
+        }
+      }).subscribe();
     } else {
       console.warn("[Messenger] MessengerRealtime class not found. Realtime messaging will be unavailable.");
     }
-
-    if (state.blockingAvailable) {
-      state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_blocks" }, () => void refreshMessengerState({ preserveActiveThread: true }));
-    }
-
-    if (state.banningAvailable) {
-      state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState().then(() => {
-        if (canAccessAdminBanPanel(state)) void refreshAdminBanState();
-        if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true });
-        else { clearMessengerState(); render(); }
-      }));
-    }
-    state.threadsChannel.subscribe();
-
-    state.likesChannel = state.supabase.channel(`likes-${state.currentUser.id}-${sessionHash}`).on("postgres_changes", { event: "INSERT", schema: "public", table: POST_LIKES_TABLE }, (payload) => {
-      const like = payload.new;
-      if (like.user_id === state.currentUser.id) return;
-      const likedPost = state.userPosts.find((p) => p.id === like.post_id);
-      const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
-      if (likedPost && likedPost.authorId === state.currentUser.id && window.notifications) {
-        const notificationId = `like-${like.post_id}-${like.user_id}`;
-        const message = `Someone liked your post: ${likedPost.title || "Untitled"}`;
-
-        window.notifications.success(message, "New Like!", {
-          id: notificationId,
-          silent: isMobile
-        });
-      }
-    }).subscribe();
 
   } catch (error) {
     console.error("[Messenger] Fatal Subscription Error:", error);

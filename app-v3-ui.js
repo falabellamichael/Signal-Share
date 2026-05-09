@@ -235,6 +235,7 @@ export function createAppUi(context) {
     heroModeMedia: document.querySelector("#heroModeMedia"),
     heroSourceYoutube: document.querySelector("#heroSourceYoutube"),
     heroSourceSpotify: document.querySelector("#heroSourceSpotify"),
+    heroPlayerOpenPhoneButton: document.querySelector("#heroPlayerOpenPhoneButton"),
   };
 
   const OVERLAY_SCROLL_CONTAINER_SELECTOR = [
@@ -385,6 +386,7 @@ export function createAppUi(context) {
     getHeroPlayablePosts,
     resolveYouTubePreviewId,
     isNativeCapacitorApp,
+    getCapacitorPlatform,
     onStatusChange: render
   });
 
