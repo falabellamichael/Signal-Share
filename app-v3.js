@@ -826,15 +826,43 @@ async function initialize() {
         state.siteSettings = await loadSiteSettingsFromSupabase();
         applySiteSettings(state.siteSettings);
       } catch (settingsError) { console.error("Site settings could not be loaded", settingsError); }
-      const { data: { session } } = await state.supabase.auth.getSession();
+      let session = null;
+      try {
+        const { data: { session: currentSession } } = await state.supabase.auth.getSession();
+        session = currentSession;
+        
+        // Use getUser() for server-side verification if we have a session
+        if (session) {
+          const { data: { user }, error: userError } = await state.supabase.auth.getUser();
+          if (userError || !user) {
+            console.warn("Session found but user verification failed. Clearing session.", userError);
+            session = null;
+            await state.supabase.auth.signOut();
+          } else {
+            session = { ...session, user };
+          }
+        }
+      } catch (sessionError) {
+        console.error("Auth session retrieval failed", sessionError);
+        session = null;
+      }
+
       state.currentUser = session?.user ?? null;
       state.authRestoring = false;
-      await refreshCurrentUserBanState();
+
+      if (state.currentUser) {
+        await refreshCurrentUserBanState();
+      }
+
       if (isMessagingEnabled(state)) {
-        await refreshMessengerState();
-        await flushPendingNotificationThread();
-        if (window.notifications) {
-          await window.notifications.syncWithSupabase(state.supabase, state.currentUser.id);
+        try {
+          await refreshMessengerState();
+          await flushPendingNotificationThread();
+          if (window.notifications) {
+            await window.notifications.syncWithSupabase(state.supabase, state.currentUser.id);
+          }
+        } catch (messengerError) {
+          console.error("Initial messenger sync failed", messengerError);
         }
       }
       bindAuthStateListener();
@@ -1155,6 +1183,10 @@ async function syncCurrentProfileToSupabase(displayNameOverride = "") {
     };
     const { data, error } = await state.supabase.from("profiles").upsert(fullPayload, { onConflict: "id" }).select().single();
     if (error) {
+      if (error.code === "42501") {
+        console.error("[Profile Sync] RLS Policy Violation. Usually means JWT is invalid or UID mismatch.", error);
+        throw new Error(`Profile sync failed: ${error.message} (RLS). Please try signing out and back in.`);
+      }
       if (error.message?.includes("column") || error.code === "PGRST204" || error.code === "42703") {
         console.warn("[Profiles] Privacy columns missing, falling back to basic sync");
         const { data: fallbackData, error: fallbackError } = await state.supabase.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
@@ -1165,6 +1197,7 @@ async function syncCurrentProfileToSupabase(displayNameOverride = "") {
     }
     return finalizeProfileSync(data);
   } catch (error) {
+    console.error("[Profile Sync] Unexpected failure:", error);
     throw error;
   }
 }
@@ -1177,7 +1210,15 @@ function finalizeProfileSync(data) {
   return profile;
 }
 
-async function loadOwnProfileFromSupabase() { const { data, error } = await state.supabase.from("profiles").select("*").eq("id", state.currentUser.id).maybeSingle(); if (error) throw error; return data ? normalizeProfile(data) : null; }
+async function loadOwnProfileFromSupabase() {
+  if (!state.supabase || !state.currentUser?.id) return null;
+  const { data, error } = await state.supabase.from("profiles").select("*").eq("id", state.currentUser.id).maybeSingle();
+  if (error) {
+    console.error("[Profile Load] Failed to fetch own profile:", error);
+    throw error;
+  }
+  return data ? normalizeProfile(data) : null;
+}
 async function loadProfilesFromSupabase() { const { data, error } = await state.supabase.from("profiles").select("*").order("display_name", { ascending: true }); if (error) throw error; return data.map(normalizeProfile); }
 async function loadBlockedUsersFromSupabase() { const { data, error } = await state.supabase.from("user_blocks").select("*").eq("blocker_id", state.currentUser.id); if (error) throw error; return data.map(normalizeUserBlock); }
 async function loadUserBansFromSupabase() { const { data, error } = await state.supabase.from("user_bans").select("*").order("created_at", { ascending: false }); if (error) throw error; return data.map(normalizeUserBan); }
