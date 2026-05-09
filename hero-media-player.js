@@ -1705,7 +1705,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     if (mode === "desktop") {
-      if (!isNativeCapacitorApp() && !desktopSnapshot?.active && !companionPromptDismissed) {
+      if (!isNativeCapacitorApp() && !desktopSnapshot && !companionPromptDismissed) {
         showCompanionPrompt();
         return;
       }

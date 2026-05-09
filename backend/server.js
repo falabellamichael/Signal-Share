@@ -623,13 +623,19 @@ try {
     if ($session -ne $null) {
       $actionMethod = $session.GetType().GetMethod('${winrtMethodName}', [Type[]]@())
       if ($actionMethod -ne $null) {
-        $actionOp = $actionMethod.Invoke($session, @())
-        $resultTask = $asTaskMethod.MakeGenericMethod(@([bool])).Invoke($null, @($actionOp))
-        $winRtSuccess = [bool]$resultTask.Result
+        try {
+          $actionOp = $actionMethod.Invoke($session, @())
+          $resultTask = $asTaskMethod.MakeGenericMethod(@([bool])).Invoke($null, @($actionOp))
+          $winRtSuccess = [bool]$resultTask.Result
+        } catch {
+          $winRtSuccess = $false
+        }
       }
     }
   }
-} catch {}
+} catch {
+  $winRtSuccess = $false
+}
 
 if ($winRtSuccess) {
   Write-Output "ok"
@@ -645,15 +651,17 @@ public static class MediaKeySender {
 }
 "@
 
-# Only use a global media key when no specific source is requested, OR if the WinRT targeting failed.
-# This prevents the Spotify toggle from controlling YouTube when both are open, but allows
-# "best effort" control for skip actions if the targeted session is unresponsive.
+# Fallback to global media keys if WinRT targeting failed or if no specific source was requested.
+# For YouTube in browsers, WinRT control can sometimes be unreliable depending on tab focus.
+# Global keys provide a reliable secondary path.
 $isSkipAction = "${action}" -eq "next" -or "${action}" -eq "previous"
-if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or ($winRtSuccess -eq $false -and $isSkipAction)) {
+$isToggleAction = "${action}" -eq "play_pause"
+
+if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or ($winRtSuccess -eq $false -and ($isSkipAction -or $isToggleAction))) {
   $KEYEVENTF_EXTENDEDKEY = 0x0001
   $KEYEVENTF_KEYUP = 0x0002
   [MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
-  Start-Sleep -Milliseconds 25
+  Start-Sleep -Milliseconds 35
   [MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
   Write-Output "ok-global"
   exit 0
