@@ -2080,7 +2080,8 @@ The companion bridge is designed with several security layers to keep your PC sa
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
 
-    let nextHeader = "";
+    const playbackStateLabel = (playbackState === "playing" ? "NOW PLAYING" : "PAUSED");
+    let nextHeader = playbackStateLabel;
     let nextTitle = "";
     let nextCaption = "";
     let nextStatus = "";
@@ -2096,39 +2097,29 @@ The companion bridge is designed with several security layers to keep your PC sa
     const isHardenedEnvironment = (isFeedMode || state?.heroControlMode === "media");
 
     if (mode === "device") {
-      nextHeader = getSystemMediaHeaderLabel();
+      const modeLabel = getSystemMediaHeaderLabel();
       if (nativeSnapshot?.permissionRequired) {
         nextTitle = "Enable device media access";
         nextCaption = "Allow notification access to control playback.";
-        nextStatus = "Access required";
+        nextStatus = modeLabel;
       } else if (nativeSnapshot?.active) {
-        const snapshotTitle = (nativeSnapshot.title || "").toLowerCase();
-        const isYouTube = matchedPost?.sourceKind === "youtube" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("youtube")) || snapshotTitle.includes("youtube") || isYouTubeMode;
-        const isSpotify = matchedPost?.sourceKind === "spotify" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("spotify")) || snapshotTitle.includes("spotify") || isSpotifyActive;
-        const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
-
         nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
         nextCaption = cleanSnapshotCreator(nativeSnapshot, "Device playback");
-        nextStatus = getPlaybackStatusLabel(nativeSnapshot.playbackState);
+        nextStatus = modeLabel;
         syncTitle = cleanSnapshotTitle(nativeSnapshot.title);
         syncArtist = cleanSnapshotCreator(nativeSnapshot, "Device");
         syncArtwork = nativeSnapshot.artworkUri || "";
       } else {
         nextTitle = "Device media idle";
         nextCaption = "Start playback in any media app.";
-        nextStatus = "ON-DEVICE MEDIA";
+        nextStatus = modeLabel;
       }
     } else if (mode === "desktop") {
-      nextHeader = getSystemMediaHeaderLabel();
+      const modeLabel = getSystemMediaHeaderLabel();
       if (desktopSnapshot?.active) {
-        const snapshotTitle = (desktopSnapshot.title || "").toLowerCase();
-        const isYouTube = matchedPost?.sourceKind === "youtube" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("youtube")) || snapshotTitle.includes("youtube") || isYouTubeMode;
-        const isSpotify = matchedPost?.sourceKind === "spotify" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("spotify")) || snapshotTitle.includes("spotify") || isSpotifyActive;
-        const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
-
         nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
         nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
-        nextStatus = getPlaybackStatusLabel(desktopSnapshot.playbackState);
+        nextStatus = modeLabel;
         syncTitle = cleanSnapshotTitle(desktopSnapshot.title);
         syncArtist = cleanSnapshotCreator(desktopSnapshot, "Desktop");
         syncArtwork = desktopSnapshot.artworkUri || "";
@@ -2140,23 +2131,36 @@ The companion bridge is designed with several security layers to keep your PC sa
           : preferredSource === "youtube"
             ? "Start YouTube playback in your browser."
             : "Start playback in YouTube, Spotify, or another desktop app.";
-        nextStatus = "PC SYSTEM MEDIA";
+        nextStatus = modeLabel;
       }
     } else if (mode === "app" && !post && fallbackMedia instanceof HTMLMediaElement) {
-      nextHeader = "BROWSER MEDIA";
+      const modeLabel = "BROWSER MEDIA";
       const fallbackTitle = browserMetadata?.title || fallbackMedia.getAttribute("title") || "Now playing in this browser";
       const fallbackMeta = [browserMetadata?.artist, browserMetadata?.album].filter(Boolean).join(" · ");
       nextTitle = fallbackTitle;
       nextCaption = fallbackMeta || "Active browser media session";
-      nextStatus = fallbackMedia.paused ? "Paused in browser session" : "Playing in browser session";
+      nextStatus = modeLabel;
     } else if (mode === "app" && !post) {
-      nextHeader = "APP MEDIA";
       nextTitle = "Ready to play";
       nextCaption = "";
-      nextStatus = "App media standby";
+      nextStatus = "APP MEDIA";
     } else {
       const providerName = getExternalProviderName(post);
-      nextHeader = `${providerName.toUpperCase()} PREVIEW`;
+      const modeLabel = `${providerName.toUpperCase()} PREVIEW`;
+
+      if (isExternalUrlPost(post)) {
+        const externalDisplay = getExternalHeaderDisplay(post);
+        nextTitle = externalDisplay.title || "Ready to play";
+        nextCaption = externalDisplay.caption || providerName;
+      } else {
+        const creatorSummary = getProfileSummaryForPost(post);
+        const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
+        nextTitle = post?.title || "Ready to play";
+        nextCaption = post ? `${post.caption} · ${creatorName}` : "";
+      }
+
+      nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : modeLabel;
+      if (!post) nextStatus = modeLabel;
 
       if (isExternalUrlPost(post)) {
         const isYouTube = post?.sourceKind === "youtube";
@@ -2180,12 +2184,6 @@ The companion bridge is designed with several security layers to keep your PC sa
       syncTitle = nextTitle || syncTitle;
       syncArtist = nextCaption || syncArtist;
     }
-
-    // Harden the UI labels: Only show header, clear others
-    nextHeader = (playbackState === "playing" ? "NOW PLAYING" : "PAUSED");
-    nextTitle = "";
-    nextCaption = "";
-    nextStatus = "";
 
     // Only touch the DOM if values have changed
     if (elements.heroPlayerHeader.textContent !== nextHeader) elements.heroPlayerHeader.textContent = nextHeader;
