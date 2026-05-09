@@ -315,6 +315,7 @@ if (!window[globalStateKey]) {
     activePlayerElement: null,
     activePlayerUrl: "",
     heroPlayerPlaybackState: "none",
+    miniPlayerPlaybackState: "none",
     viewerPostId: null,
     viewerAttachment: null,
     miniPlayerUrl: "",
