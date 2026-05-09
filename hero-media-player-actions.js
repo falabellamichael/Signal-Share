@@ -4,12 +4,32 @@
  */
 
 export function handleOpenMediaAction(post, context) {
-  const { isNativeCapacitorApp, openViewer, desktopSnapshot, performDesktopAction } = context;
+  const { isNativeCapacitorApp, openViewer, desktopSnapshot, performDesktopAction, state } = context;
 
   if (!post && !desktopSnapshot?.available) {
     console.warn("handleOpenMediaAction: No active post or desktop session.");
     return;
   }
+
+  const resolveYouTubeUrl = (value) => {
+    if (!value) return "";
+    const sanitized = String(value).trim();
+    const idMatch = sanitized.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/|vnd\.youtube:)([A-Za-z0-9_-]{11})/i);
+    if (idMatch) return `https://www.youtube.com/watch?v=${idMatch[1]}`;
+    if (/^[A-Za-z0-9_-]{11}$/.test(sanitized)) return `https://www.youtube.com/watch?v=${sanitized}`;
+    return sanitized.startsWith("http") ? sanitized : "";
+  };
+
+  const resolvePostYouTubeUrl = (postValue) => {
+    if (!postValue) return "";
+    if (postValue?.sourceKind === "youtube") {
+      if (postValue.externalId) return `https://www.youtube.com/watch?v=${postValue.externalId}`;
+      if (postValue.externalUrl) return resolveYouTubeUrl(postValue.externalUrl);
+      if (postValue.src) return resolveYouTubeUrl(postValue.src);
+      if (postValue.mediaUrl) return resolveYouTubeUrl(postValue.mediaUrl);
+    }
+    return "";
+  };
 
   // Resolve the primary target URL fallback
   let targetUrl = post?.externalUrl || post?.src;
@@ -46,32 +66,24 @@ export function handleOpenMediaAction(post, context) {
     }
 
     if (isYouTube) {
-      let youtubeUrl = desktopSnapshot.openUri;
+      let youtubeUrl = resolveYouTubeUrl(desktopSnapshot.openUri) || resolvePostYouTubeUrl(post);
 
-      // If openUri is missing, try to extract the Video ID from artwork or meta fields
-      if (!youtubeUrl) {
-        if (desktopSnapshot.artworkUri) {
-          const idMatch = desktopSnapshot.artworkUri.match(/\/vi\/([a-zA-Z0-9_-]{11})\//);
-          if (idMatch) youtubeUrl = `https://www.youtube.com/watch?v=${idMatch[1]}`;
-        }
-        
-        if (!youtubeUrl && meta) {
-          const idMatch = meta.match(/([a-zA-Z0-9_-]{11})/);
-          if (idMatch) youtubeUrl = `https://www.youtube.com/watch?v=${idMatch[1]}`;
-        }
-        
-        if (!youtubeUrl && title) {
-          // Check title for ID (sometimes in parens or at the end)
-          const idMatch = title.match(/([a-zA-Z0-9_-]{11})/);
-          if (idMatch) youtubeUrl = `https://www.youtube.com/watch?v=${idMatch[1]}`;
-        }
+      // If we still do not have a direct YouTube URL, use snapshot artwork / metadata heuristics.
+      if (!youtubeUrl && desktopSnapshot.artworkUri) {
+        youtubeUrl = resolveYouTubeUrl(desktopSnapshot.artworkUri);
+      }
+      if (!youtubeUrl && desktopSnapshot.meta) {
+        youtubeUrl = resolveYouTubeUrl(desktopSnapshot.meta);
+      }
+      if (!youtubeUrl && desktopSnapshot.title) {
+        youtubeUrl = resolveYouTubeUrl(desktopSnapshot.title);
       }
 
       if (youtubeUrl) {
         window.open(youtubeUrl, "_blank");
         return;
       }
-      
+
       // If we still have no URL, last resort for YouTube is a search on YouTube
       if (title || meta) {
         const query = [title, meta].filter(Boolean).join(" ");
