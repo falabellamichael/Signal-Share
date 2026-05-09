@@ -509,7 +509,36 @@ body[data-theme="contrast"] .messenger-launcher,
 body[data-theme="contrast"] .admin-ban-launcher,
 body[data-theme="contrast"] .admin-ban-panel,
 body[data-theme="contrast"] .settings-dialog,
-body[data-theme="contrast"] .preview-card {
+body[data-theme="contrast"] .site-header,
+body[data-theme="contrast"] .hero-stats div,
+body[data-theme="contrast"] .panel-card,
+body[data-theme="contrast"] .auth-state,
+body[data-theme="contrast"] .auth-account,
+body[data-theme="contrast"] .activation-panel,
+body[data-theme="contrast"] .admin-editor,
+body[data-theme="contrast"] .messenger-section,
+body[data-theme="contrast"] .messenger-card,
+body[data-theme="contrast"] .messenger-thread,
+body[data-theme="contrast"] .spotlight-card,
+body[data-theme="contrast"] .mini-panel,
+body[data-theme="contrast"] .feed-card,
+body[data-theme="contrast"] .viewer-dialog,
+body[data-theme="contrast"] .mini-player,
+body[data-theme="contrast"] .messenger-launcher,
+body[data-theme="contrast"] .admin-ban-launcher,
+body[data-theme="contrast"] .admin-ban-panel,
+body[data-theme="contrast"] .settings-dialog,
+body[data-theme="contrast"] .preview-card,
+body[data-theme="contrast"] .hero-player-stage,
+body[data-theme="contrast"] .hero-player-active-stage,
+body[data-theme="contrast"] .mini-player-stage,
+body[data-theme="contrast"] .external-preview-card,
+body[data-theme="contrast"] .status-pill,
+body[data-theme="contrast"] .person-row,
+body[data-theme="contrast"] .conversation-row,
+body[data-theme="contrast"] .profile-badge,
+body[data-theme="contrast"] .activation-code,
+body[data-theme="contrast"] .brand-mark {
   background: rgba(0, 0, 0, 0.94);
   border: none !important;
 }
@@ -591,7 +620,12 @@ body[data-theme="contrast"] .filter-chip.is-active,
 body[data-theme="contrast"] .tag-chip.is-active,
 body[data-theme="contrast"] .like-button.is-liked,
 body[data-theme="contrast"] .open-button,
-body[data-theme="contrast"] .feed-page-button.is-active,
+body[data-theme="contrast"] .feed-page-button.is-active {
+  background: var(--surface-dark);
+  color: #050505;
+  border: 1px solid #000000 !important;
+}
+
 body[data-theme="ember"] .filter-chip.is-active,
 body[data-theme="ember"] .tag-chip.is-active,
 body[data-theme="ember"] .like-button.is-liked,
@@ -677,7 +711,7 @@ body[data-theme="contrast"] .button-primary {
   background: #fff200;
   color: #000000;
   font-weight: 700;
-  border: none !important;
+  border: 1px solid #000000 !important;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
 }
 
@@ -718,7 +752,7 @@ body[data-theme="contrast"] .shortcut-item {
 body[data-theme="contrast"] .keyboard-key {
   background: #000000;
   color: #ffffff;
-  border: none !important;
+  border: 1px solid #ffffff !important;
   box-shadow: none;
 }
 

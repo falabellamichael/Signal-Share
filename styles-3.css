@@ -1825,7 +1825,7 @@
     /* FORCE BLACK PROFILE BACKGROUND AT END OF FILE */
     body[data-theme='contrast'] .profile-view-dialog {
       background: #000000 !important;
-      border: none !important;
+      border: 1px solid rgba(255, 255, 255, 0.5) !important;
     }
 
     body[data-theme='contrast'] .profile-view {
@@ -1917,13 +1917,14 @@
     body[data-theme='contrast'] .profile-stat,
     body[data-theme='contrast'] .feed-page-button {
       background: #000000 !important;
-      border: none !important;
+      border: 1px solid rgba(255, 255, 255, 0.4) !important;
       color: #ffffff !important;
     }
 
     body[data-theme='contrast'] .feed-page-button.is-active {
       background: var(--accent) !important;
       color: #000000 !important;
+      border: 1px solid #000000 !important;
     }
 
     body[data-theme='ember'] .profile-stat,
