@@ -2081,6 +2081,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
 
     const playbackStateLabel = (playbackState === "playing" ? "NOW PLAYING" : "PAUSED");
+    const playbackStateLabel = (playbackState === "playing" ? "NOW PLAYING" : "PAUSED");
     let nextHeader = playbackStateLabel;
     let nextTitle = "";
     let nextCaption = "";
@@ -2106,8 +2107,8 @@ The companion bridge is designed with several security layers to keep your PC sa
         nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
         nextCaption = cleanSnapshotCreator(nativeSnapshot, "Device playback");
         nextStatus = modeLabel;
-        syncTitle = cleanSnapshotTitle(nativeSnapshot.title);
-        syncArtist = cleanSnapshotCreator(nativeSnapshot, "Device");
+        syncTitle = nextTitle;
+        syncArtist = nextCaption;
         syncArtwork = nativeSnapshot.artworkUri || "";
       } else {
         nextTitle = "Device media idle";
@@ -2120,8 +2121,8 @@ The companion bridge is designed with several security layers to keep your PC sa
         nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
         nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
         nextStatus = modeLabel;
-        syncTitle = cleanSnapshotTitle(desktopSnapshot.title);
-        syncArtist = cleanSnapshotCreator(desktopSnapshot, "Desktop");
+        syncTitle = nextTitle;
+        syncArtist = nextCaption;
         syncArtwork = desktopSnapshot.artworkUri || "";
       } else {
         const preferredSource = getPreferredHeroControlSource();
@@ -2162,27 +2163,8 @@ The companion bridge is designed with several security layers to keep your PC sa
       nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : modeLabel;
       if (!post) nextStatus = modeLabel;
 
-      if (isExternalUrlPost(post)) {
-        const isYouTube = post?.sourceKind === "youtube";
-        const isSpotify = post?.sourceKind === "spotify";
-        const externalDisplay = getExternalHeaderDisplay(post);
-        nextTitle = externalDisplay.title || "Ready to play";
-        nextCaption = externalDisplay.caption || providerName;
-      } else {
-        const creatorSummary = getProfileSummaryForPost(post);
-        const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
-        nextTitle = post?.title || "Ready to play";
-        nextCaption = post ? `${post.caption} · ${creatorName}` : "";
-      }
-
-      nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : "App media standby";
-      const isYouTube = post?.sourceKind === "youtube" || isYouTubeMode;
-      const isSpotify = post?.sourceKind === "spotify" || isSpotifyActive;
-      const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
-
-      // Titles/Captions above the stage are now persistent.
-      syncTitle = nextTitle || syncTitle;
-      syncArtist = nextCaption || syncArtist;
+      syncTitle = nextTitle;
+      syncArtist = nextCaption;
     }
 
     // Only touch the DOM if values have changed
