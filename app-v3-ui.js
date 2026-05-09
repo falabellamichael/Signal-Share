@@ -1,6 +1,6 @@
 import { createHeroMediaPlayerController } from "./hero-media-player.js";
 import { createPreviewCard, createActivePlayerStage, createActivePlayerDescriptor, resolveAppPreviewArtwork, resolveYouTubePreviewId } from "./hero-media-player-preview.js";
-import { EMOJI_PACK } from "./emojis.js";
+import { EMOJI_PACK, EMOJI_CATEGORIES } from "./emojis.js";
 
 export function createAppUi(context) {
   const {
@@ -1118,10 +1118,32 @@ export function createAppUi(context) {
     elements.messageForm.classList.toggle("is-emoji-open", isOpen);
     elements.messengerSection.classList.toggle("is-emoji-picker-open", isOpen);
 
-    if (isOpen && elements.messageEmojiPanel.children.length === 0) {
-      elements.messageEmojiPanel.innerHTML = EMOJI_PACK.map(emoji => `
+    if (isOpen) {
+      if (!state.activeEmojiCategory) state.activeEmojiCategory = "faces";
+      
+      const categoriesHtml = EMOJI_CATEGORIES.map(cat => `
+        <button class="emoji-category-tab ${state.activeEmojiCategory === cat.id ? 'is-active' : ''}" 
+                type="button" data-emoji-category="${cat.id}" title="${cat.label}">
+          ${cat.icon}
+        </button>
+      `).join("");
+
+      let emojis = EMOJI_PACK.filter(emoji => emoji.category === state.activeEmojiCategory);
+      const isCollapsed = !state.messengerExpanded;
+      
+      if (isCollapsed) {
+        emojis = emojis.slice(0, 12);
+      }
+
+      const emojisHtml = emojis.map(emoji => `
         <button class="emoji-chip" type="button" data-emoji="${emoji.char}" aria-label="Insert ${emoji.label.toLowerCase()}">${emoji.char}</button>
       `).join("");
+
+      elements.messageEmojiPanel.classList.toggle("is-collapsed", isCollapsed);
+      elements.messageEmojiPanel.innerHTML = `
+        <div class="emoji-panel-header">${categoriesHtml}</div>
+        <div class="emoji-panel-grid">${emojisHtml}</div>
+      `;
     }
   }
 
@@ -1129,7 +1151,22 @@ export function createAppUi(context) {
 
   function closeMessageEmojiPicker(options = {}) { const { restoreFocus = false } = options; if (!state.messageEmojiPickerOpen) return; state.messageEmojiPickerOpen = false; renderMessageEmojiPanel(); if (restoreFocus && !elements.messageInput.disabled) elements.messageInput.focus(); }
 
-  function handleMessageEmojiPanelClick(event) { const button = event.target instanceof Element ? event.target.closest("[data-emoji]") : null; if (!(button instanceof HTMLButtonElement)) return; insertEmojiIntoMessage(button.dataset.emoji ?? ""); }
+  function handleMessageEmojiPanelClick(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    const categoryButton = target.closest("[data-emoji-category]");
+    if (categoryButton) {
+      state.activeEmojiCategory = categoryButton.dataset.emojiCategory;
+      renderMessageEmojiPanel();
+      return;
+    }
+
+    const emojiButton = target.closest("[data-emoji]");
+    if (emojiButton instanceof HTMLButtonElement) {
+      insertEmojiIntoMessage(emojiButton.dataset.emoji ?? "");
+    }
+  }
 
   function insertEmojiIntoMessage(emoji) { if (!emoji || elements.messageInput.disabled) return; const start = elements.messageInput.selectionStart ?? elements.messageInput.value.length; const end = elements.messageInput.selectionEnd ?? start; const currentValue = elements.messageInput.value; elements.messageInput.value = `${currentValue.slice(0, start)}${emoji}${currentValue.slice(end)}`; const caretPosition = start + emoji.length; elements.messageInput.focus(); elements.messageInput.setSelectionRange(caretPosition, caretPosition); closeMessageEmojiPicker(); }
 

@@ -439,6 +439,7 @@ body[data-theme="contrast"] .conversation-button,
 body[data-theme="contrast"] .conversation-delete-button,
 body[data-theme="contrast"] .conversation-delete-prompt,
 body[data-theme="contrast"] .emoji-chip,
+body[data-theme="contrast"] .emoji-category-tab,
 body[data-theme="contrast"] .theme-picker-trigger,
 body[data-theme="contrast"] .theme-picker-menu,
 body[data-theme="contrast"] .theme-option-tile,
@@ -446,6 +447,12 @@ body[data-theme="contrast"] .feed-page-button {
   background: #000000;
   border: 1.5px solid #ffffff;
   color: #ffffff;
+}
+
+body[data-theme="contrast"] .emoji-category-tab.is-active {
+  background: #fff200;
+  color: #000000;
+  border-color: #000000;
 }
 
 body[data-theme="contrast"] .button:disabled,
