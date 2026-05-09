@@ -1964,27 +1964,7 @@
       color: #fff !important;
     }
 
-    /* High Contrast Messenger Refinement */
-    body[data-theme='contrast'] .message-bubble {
-      background: #000000 !important;
-      border: 1.5px solid #ffffff !important;
-      color: #ffffff !important;
-    }
-
-    body[data-theme='contrast'] .message-row.is-self .message-bubble {
-      background: linear-gradient(135deg, #FFD166 0%, #06D6A0 100%) !important;
-      border: none !important;
-      color: #000000 !important;
-    }
-
-    body[data-theme='contrast'] .message-row.is-self .message-bubble p,
-    body[data-theme='contrast'] .message-row.is-self .message-bubble span {
-      color: #000000 !important;
-    }
-
-    body[data-theme='contrast'] .message-bubble span {
-      color: rgba(255, 255, 255, 0.7) !important;
-    }
+    /* Messenger refinements handled globally in styles-1.css */
 
     /* Ember Red Messenger Refinement */
     body[data-theme='ember'] .message-bubble {

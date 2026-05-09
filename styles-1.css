@@ -507,6 +507,28 @@ body[data-theme="contrast"] .preview-card {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
+/* High Contrast Messenger Bubbles */
+body[data-theme="contrast"] .message-bubble {
+  background: #000000 !important;
+  border: 1.5px solid #ffffff !important;
+  color: #ffffff !important;
+}
+
+body[data-theme="contrast"] .message-row.is-self .message-bubble {
+  background: linear-gradient(135deg, #fff200 0%, #00e5ff 100%) !important;
+  border: none !important;
+  color: #000000 !important;
+}
+
+body[data-theme="contrast"] .message-row.is-self .message-bubble p,
+body[data-theme="contrast"] .message-row.is-self .message-bubble span {
+  color: #000000 !important;
+}
+
+body[data-theme="contrast"] .message-bubble span {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
 /* Explicit Black Background for Profiles in High Contrast */
 body[data-theme="contrast"] .profile-view-dialog {
   background: #000000 !important;
