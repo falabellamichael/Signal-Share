@@ -1705,7 +1705,10 @@ export function createAppUi(context) {
     const isMounted = state.heroPlayerElement && elements.heroPlayerStage.contains(state.heroPlayerElement);
     const isActive = state.heroPlayerPostId === post.id && isMounted;
 
+    console.log(`[HeroUI] playHeroMedia. Post: ${post.id}, IsActive: ${isActive}, Mounted: ${!!isMounted}`);
+
     if (isActive && now - lastMediaActionAt < MEDIA_ACTION_COOLDOWN_MS) {
+      console.warn("[HeroUI] playHeroMedia throttled by cooldown.");
       return;
     }
     
@@ -1719,9 +1722,11 @@ export function createAppUi(context) {
 
       if (media instanceof HTMLMediaElement) {
         if (media.paused) {
-          media.play().catch(() => { });
+          console.log("[HeroUI] Local media: Play");
+          media.play().catch((err) => { console.error("[HeroUI] Play failed", err); });
           state.heroPlayerPlaybackState = "playing";
         } else {
+          console.log("[HeroUI] Local media: Pause");
           media.pause();
           state.heroPlayerPlaybackState = "paused";
         }
@@ -1729,6 +1734,7 @@ export function createAppUi(context) {
         return;
       } else if (media instanceof HTMLIFrameElement && post.sourceKind === "youtube") {
         const isPlaying = state.heroPlayerPlaybackState === "playing";
+        console.log(`[HeroUI] YouTube media: ${isPlaying ? "Pause" : "Play"}`);
         postMessageToYouTubePlayer(media, isPlaying ? "pauseVideo" : "playVideo");
         state.heroPlayerPlaybackState = isPlaying ? "paused" : "playing";
         heroMediaPlayerController.render();
@@ -2066,6 +2072,7 @@ export function createAppUi(context) {
       video.controls = true;
       video.preload = "metadata";
       video.playsInline = true;
+      video.autoplay = autoplay;
       video.src = resolveActivePlayerSource(post);
       attachPersistentPlayerMediaListeners(video);
       return video;
@@ -2081,6 +2088,7 @@ export function createAppUi(context) {
     audio.dataset.audioPlayer = "true";
     audio.controls = true;
     audio.preload = "metadata";
+    audio.autoplay = autoplay;
     audio.src = resolveActivePlayerSource(post);
     attachPersistentPlayerMediaListeners(audio);
     audioStage.append(label, title);

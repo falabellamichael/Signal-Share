@@ -1715,9 +1715,14 @@ The companion bridge is designed with several security layers to keep your PC sa
   function handlePlayPause(forcePlay) {
     const controllablePost = getControllablePlayerPost();
     const mode = getEffectiveHeroMode(controllablePost);
+    console.log(`[Hero] handlePlayPause triggered. Mode: ${mode}, ForcePlay: ${forcePlay || "toggle"}`);
 
     if (mode === "app") {
-      playHeroMedia();
+      if (typeof playHeroMedia === "function") {
+        playHeroMedia();
+      } else {
+        console.error("[Hero] playHeroMedia function is not provided in options.");
+      }
       return;
     }
 
@@ -1728,7 +1733,10 @@ The companion bridge is designed with several security layers to keep your PC sa
       }
 
       const now = Date.now();
-      if (now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) return;
+      if (now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) {
+        console.warn("[Hero] Native action throttled by cooldown.");
+        return;
+      }
 
       if (nativeSnapshot) {
         nativeSnapshot.playbackState = (nativeSnapshot.playbackState === "playing") ? "paused" : "playing";
@@ -1746,10 +1754,8 @@ The companion bridge is designed with several security layers to keep your PC sa
 
       const playbackStatus = normalizePlaybackState(desktopSnapshot?.playbackState);
       const nextPlaybackState = playbackStatus === "playing" ? "paused" : "playing";
+      console.log(`[Hero] Desktop play/pause. Current: ${playbackStatus}, Next: ${nextPlaybackState}`);
 
-      // Use one toggle action only. Explicit play/pause actions are unreliable with some
-      // Windows/browser media sessions and can bounce YouTube between play and pause.
-      // The local snapshot is updated optimistically so the button does not require repeated clicks.
       if (desktopSnapshot) {
         desktopSnapshot = {
           ...desktopSnapshot,
@@ -1760,11 +1766,14 @@ The companion bridge is designed with several security layers to keep your PC sa
         render();
       }
 
-      performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
+      performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE).then(success => {
+        if (!success) {
+          console.warn("[Hero] Desktop action failed or was throttled.");
+        }
+      });
       return;
     }
 
-    // Fallback to local playback if for some reason we have no mode but have media
     if (getFallbackPageMediaElement() instanceof HTMLMediaElement) {
       toggleLocalPlayback(forcePlay);
       render();
