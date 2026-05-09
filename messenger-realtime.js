@@ -117,7 +117,6 @@ window.MessengerRealtime = class MessengerRealtime {
 
     // 1. Try main notification system
     const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
-    const isActiveThread = message.threadId === state.activeThreadId && state.messengerOpen;
 
     console.log("[Realtime] Notification System Status:", window.notifications ? "Ready" : "Missing", "Mobile:", isMobile, "Active:", isActiveThread);
     
