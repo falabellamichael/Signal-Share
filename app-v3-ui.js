@@ -615,12 +615,6 @@ export function createAppUi(context) {
   }
 
   function setHeroControlSource(source) {
-    // If not in media mode, auto-switch to it when a source is selected
-    if (state.heroControlMode !== "media") {
-      state.heroControlMode = "media";
-      state.desktopBridgeSuspended = false;
-    }
-
     if (heroMediaPlayerController && typeof heroMediaPlayerController.setHeroControlSource === "function") {
       heroMediaPlayerController.setHeroControlSource(source);
     } else {
@@ -658,7 +652,7 @@ export function createAppUi(context) {
     // Sync the source toggle group container
     const sourceToggleGroup = elements.heroSourceYoutube?.parentElement;
     if (sourceToggleGroup) {
-      sourceToggleGroup.classList.toggle("is-dimmed", !isHeroMediaMode);
+      sourceToggleGroup.classList.toggle("is-dimmed", false);
     }
 
     if (elements.heroSourceYoutube) {
@@ -1629,13 +1623,23 @@ export function createAppUi(context) {
   function getHeroPost() {
     const heroPostId = state.heroPlayerPostId || localStorage.getItem(HERO_POST_KEY);
     const heroPost = heroPostId ? getPostById(heroPostId) : null;
-    if (heroPost && isPlayablePost(heroPost)) return heroPost;
-    const latestPlayable = getVisiblePosts().find((post) => isPlayablePost(post));
+
+    const matchesSourceFilter = (post) => {
+      if (!post || !isPlayablePost(post)) return false;
+      if (!state.heroControlSource || state.heroControlSource === "all") return true;
+      return post.sourceKind === state.heroControlSource;
+    };
+
+    if (heroPost && matchesSourceFilter(heroPost)) return heroPost;
+
+    const playable = getHeroPlayablePosts();
+    const latestPlayable = playable[0] || null;
+
     if (latestPlayable) {
       state.heroPlayerPostId = latestPlayable.id;
       localStorage.setItem(HERO_POST_KEY, latestPlayable.id);
     }
-    return latestPlayable || null;
+    return latestPlayable;
   }
 
   function setHeroPost(post) {
