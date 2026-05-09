@@ -1542,7 +1542,32 @@ export function createAppUi(context) {
     saveButton.addEventListener("click", () => toggleSave(post.id)); likeButton.addEventListener("click", () => void toggleLike(post.id));
     if (canDeletePost(post)) { deleteButton.hidden = false; deleteButton.addEventListener("click", () => deletePost(post.id)); }
     post.tags.forEach((tag) => { const pill = document.createElement("span"); pill.className = "tag-pill"; pill.textContent = `#${tag}`; tags.appendChild(pill); });
-    renderCardMedia(mediaContainer, post); return fragment;
+    renderCardMedia(mediaContainer, post);
+
+    // Resolve external metadata for rich card body display
+    if (post.sourceKind === "youtube" || post.sourceKind === "spotify") {
+      const externalMetadata = getExternalPreviewMetadata(post);
+      const applyRichText = (m) => {
+        if (!m || !cardElement.isConnected) return;
+        // Update title if it's generic
+        const isGenericTitle = !post.title || post.title === "External content" || post.title.toLowerCase().includes("spotify") || post.title.toLowerCase().includes("youtube");
+        if (m.title && isGenericTitle) {
+          title.textContent = m.title;
+        }
+        // Incorporate artist/creator into the creator line
+        const originalCreator = creatorSummary?.displayName ?? post.creator;
+        if (m.creator && m.creator !== originalCreator) {
+          creator.textContent = `${m.creator} · ${originalCreator}`;
+        }
+      };
+      if (externalMetadata instanceof Promise) {
+        externalMetadata.then(applyRichText).catch(() => {});
+      } else {
+        applyRichText(externalMetadata);
+      }
+    }
+
+    return fragment;
   }
 
   function getFeedPageCount(totalPosts) { return Math.max(1, Math.ceil(totalPosts / FEED_POSTS_PER_PAGE)); }
@@ -2245,7 +2270,8 @@ export function createAppUi(context) {
         title: displayTitle,
         meta: displayArtist ? `${displayArtist} · (Live on feed)` : formatPostMeta(post, creatorSummary, formatTimestamp),
         note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player.",
-        artworkUrl: metadata?.artworkUrl || artworkUrl
+        artworkUrl: metadata?.artworkUrl || artworkUrl,
+        showMetadata: variant === "card"
       });
     };
 

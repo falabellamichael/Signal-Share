@@ -217,7 +217,7 @@ function attachArtwork(card, title, artworkUrl) {
  * Constructs the DOM element for the preview card.
  * Handles both synchronous image sources and asynchronous Promises.
  */
-export function createPreviewCard({ badge = "", title = "", meta = "", note = "", artworkUrl = "" }) {
+export function createPreviewCard({ badge = "", title = "", meta = "", note = "", artworkUrl = "", showMetadata = false }) {
   const card = document.createElement("article");
   card.className = "hero-player-preview";
 
@@ -229,6 +229,29 @@ export function createPreviewCard({ badge = "", title = "", meta = "", note = ""
     badgeNode.className = "hero-player-preview-badge";
     badgeNode.textContent = badge;
     copy.appendChild(badgeNode);
+  }
+
+  if (showMetadata) {
+    if (title) {
+      const titleNode = document.createElement("p");
+      titleNode.className = "hero-player-preview-title";
+      titleNode.textContent = title;
+      copy.appendChild(titleNode);
+    }
+
+    if (meta) {
+      const metaNode = document.createElement("p");
+      metaNode.className = "hero-player-preview-meta";
+      metaNode.textContent = meta;
+      copy.appendChild(metaNode);
+    }
+
+    if (note) {
+      const noteNode = document.createElement("p");
+      noteNode.className = "hero-player-preview-note";
+      noteNode.textContent = note;
+      copy.appendChild(noteNode);
+    }
   }
 
   card.appendChild(copy);
