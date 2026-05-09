@@ -558,8 +558,9 @@ export function renderHeroStagePreview(options = {}) {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
 
-      const isYouTube = matchedPost?.sourceKind === "youtube" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("youtube"));
-      const isSpotify = matchedPost?.sourceKind === "spotify" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("spotify"));
+      const snapshotTitle = (nativeSnapshot.title || "").toLowerCase();
+      const isYouTube = matchedPost?.sourceKind === "youtube" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("youtube")) || snapshotTitle.includes("youtube");
+      const isSpotify = matchedPost?.sourceKind === "spotify" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("spotify")) || snapshotTitle.includes("spotify");
       const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
       commitCard(stage, {
         badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
@@ -584,8 +585,9 @@ export function renderHeroStagePreview(options = {}) {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
 
-      const isYouTube = matchedPost?.sourceKind === "youtube" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("youtube"));
-      const isSpotify = matchedPost?.sourceKind === "spotify" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("spotify"));
+      const snapshotTitle = (desktopSnapshot.title || "").toLowerCase();
+      const isYouTube = matchedPost?.sourceKind === "youtube" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("youtube")) || snapshotTitle.includes("youtube");
+      const isSpotify = matchedPost?.sourceKind === "spotify" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("spotify")) || snapshotTitle.includes("spotify");
       const shouldHideText = (isYouTube || isSpotify) && isMediaSystemMode;
       commitCard(stage, {
         badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
