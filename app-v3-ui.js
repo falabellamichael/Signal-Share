@@ -1,5 +1,6 @@
 import { createHeroMediaPlayerController } from "./hero-media-player.js";
 import { createPreviewCard, createActivePlayerStage, createActivePlayerDescriptor, resolveAppPreviewArtwork, resolveYouTubePreviewId } from "./hero-media-player-preview.js";
+import { EMOJI_PACK } from "./emojis.js";
 
 export function createAppUi(context) {
   const {
@@ -1110,7 +1111,19 @@ export function createAppUi(context) {
 
   function showMessengerFeedback(message, isError = false) { elements.messengerFeedback.textContent = message; elements.messengerFeedback.classList.toggle("is-error", isError); }
 
-  function renderMessageEmojiPanel() { const isOpen = state.messageEmojiPickerOpen && !elements.messageEmojiButton.disabled; elements.messageEmojiPanel.hidden = !isOpen; elements.messageEmojiButton.setAttribute("aria-expanded", isOpen ? "true" : "false"); elements.messageForm.classList.toggle("is-emoji-open", isOpen); elements.messengerSection.classList.toggle("is-emoji-picker-open", isOpen); }
+  function renderMessageEmojiPanel() {
+    const isOpen = state.messageEmojiPickerOpen && !elements.messageEmojiButton.disabled;
+    elements.messageEmojiPanel.hidden = !isOpen;
+    elements.messageEmojiButton.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    elements.messageForm.classList.toggle("is-emoji-open", isOpen);
+    elements.messengerSection.classList.toggle("is-emoji-picker-open", isOpen);
+
+    if (isOpen && elements.messageEmojiPanel.children.length === 0) {
+      elements.messageEmojiPanel.innerHTML = EMOJI_PACK.map(emoji => `
+        <button class="emoji-chip" type="button" data-emoji="${emoji.char}" aria-label="Insert ${emoji.label.toLowerCase()}">${emoji.char}</button>
+      `).join("");
+    }
+  }
 
   function toggleMessageEmojiPicker() { if (elements.messageEmojiButton.disabled) return; state.messageEmojiPickerOpen = !state.messageEmojiPickerOpen; renderMessageEmojiPanel(); if (!state.messageEmojiPickerOpen) elements.messageInput.focus(); }
 
