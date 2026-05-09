@@ -231,27 +231,6 @@ export function createPreviewCard({ badge = "", title = "", meta = "", note = ""
     copy.appendChild(badgeNode);
   }
 
-  if (title) {
-    const titleNode = document.createElement("p");
-    titleNode.className = "hero-player-preview-title";
-    titleNode.textContent = title;
-    copy.appendChild(titleNode);
-  }
-
-  if (meta) {
-    const metaNode = document.createElement("p");
-    metaNode.className = "hero-player-preview-meta";
-    metaNode.textContent = meta;
-    copy.appendChild(metaNode);
-  }
-
-  if (note) {
-    const noteNode = document.createElement("p");
-    noteNode.className = "hero-player-preview-note";
-    noteNode.textContent = note;
-    copy.appendChild(noteNode);
-  }
-
   card.appendChild(copy);
   attachArtwork(card, title, artworkUrl);
   return card;
