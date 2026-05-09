@@ -48,6 +48,7 @@ const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "
 const ALLOW_OPEN_URI = process.env.SIGNAL_SHARE_ALLOW_OPEN_URI === "true";
 const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
 const MEDIA_ACTION_COOLDOWN_MS = 220;
+console.log(`[Bridge] Security configuration loaded. Bridge Secret: ${BRIDGE_SECRET ? "CONFIGURED" : "DISABLED"}`);
 const lastMediaActionAtByKey = new Map();
 
 // Rate limiting for system actions
@@ -104,7 +105,7 @@ app.use((req, res, next) => {
   if (BRIDGE_SECRET && req.path.startsWith("/api/system-media")) {
     const providedSecret = `${req.headers["x-bridge-secret"] || ""}`.trim();
     if (providedSecret !== BRIDGE_SECRET.trim()) {
-      console.warn(`[Security] Unauthorized media bridge request from ${req.ip}`);
+      console.warn(`[Security] Unauthorized media bridge request from ${req.ip}. Path: ${req.path}, ProvidedSecret: ${providedSecret ? "PRESENT" : "MISSING"}`);
       return res.status(403).json({ error: "Unauthorized: Invalid Bridge Secret" });
     }
   }

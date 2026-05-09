@@ -21,12 +21,12 @@ export function handleOpenMediaAction(post, context) {
 
   // 2. "Desktop Mode": If we are controlling a PC, handle YouTube/Spotify specifically
   if (desktopSnapshot && desktopSnapshot.available) {
-    const provider = (desktopSnapshot.providerName || "").toLowerCase();
     const appPackage = (desktopSnapshot.appPackage || "").toLowerCase();
-    const title = (desktopSnapshot.sourceTitle || "").toLowerCase();
+    const title = (desktopSnapshot.title || "").toLowerCase();
+    const meta = (desktopSnapshot.meta || "").toLowerCase();
     
-    const isSpotify = appPackage.includes("spotify") || provider.includes("spotify");
-    const isYouTube = appPackage.includes("youtube") || provider.includes("youtube") || title.includes("youtube");
+    const isSpotify = appPackage.includes("spotify") || meta.includes("spotify");
+    const isYouTube = appPackage.includes("youtube") || meta.includes("youtube") || title.includes("youtube");
 
     if (isSpotify) {
       // Pop up the Spotify App on PC using open_uri with "spotify:"
@@ -36,9 +36,9 @@ export function handleOpenMediaAction(post, context) {
       }
     }
 
-    if (isYouTube && desktopSnapshot.sourceUrl) {
+    if (isYouTube && desktopSnapshot.openUri) {
       // Open the YouTube page on the browser
-      window.open(desktopSnapshot.sourceUrl, "_blank");
+      window.open(desktopSnapshot.openUri, "_blank");
       return;
     }
   }
