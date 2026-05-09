@@ -1156,7 +1156,7 @@
       flex: 1;
       height: 50px;
       background: rgba(255,255,255,0.05);
-      border: 2px solid transparent;
+      border: 1.5px solid transparent;
       border-radius: 4px;
       cursor: pointer;
       font-size: 1.8rem;

@@ -438,18 +438,24 @@ body[data-theme="contrast"] .admin-ban-item,
 body[data-theme="contrast"] .conversation-button,
 body[data-theme="contrast"] .conversation-delete-button,
 body[data-theme="contrast"] .conversation-delete-prompt,
-body[data-theme="contrast"] .emoji-category-tab {
+body[data-theme="contrast"] .emoji-category-tab,
+body[data-theme="contrast"] .emoji-chip {
   background: rgba(40, 40, 40, 0.6) !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   border-radius: 0 !important;
   color: rgba(255, 255, 255, 0.5) !important;
+  height: auto;
+}
+
+body[data-theme="contrast"] .emoji-category-tab {
   height: 50px !important;
 }
 
-body[data-theme="contrast"] .emoji-category-tab.is-active {
+body[data-theme="contrast"] .emoji-category-tab.is-active,
+body[data-theme="contrast"] .emoji-chip:hover {
   background: #000000 !important;
   color: #ffffff !important;
-  border: 2.5px solid #ffffff !important;
+  border: 1.5px solid #ffffff !important;
   opacity: 1 !important;
 }
 
@@ -1656,7 +1662,7 @@ h1 {
 
 body[data-theme="contrast"] .emoji-panel-grid::-webkit-scrollbar-thumb {
   background: #ffffff !important;
-  border: 2px solid #000000 !important;
+  border: 1.5px solid #000000 !important;
   border-radius: 0 !important;
 }
 
