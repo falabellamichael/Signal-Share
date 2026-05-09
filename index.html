@@ -23,6 +23,16 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css?v=120" />
+    <style>
+      @keyframes optimistic-pulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.15); opacity: 0.8; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      .optimistic-pulse {
+        animation: optimistic-pulse 0.3s ease-out;
+      }
+    </style>
     <link rel="stylesheet" href="./notifications.css" />
     <script>
       // Early SDK placeholders for async script loading

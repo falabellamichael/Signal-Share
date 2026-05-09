@@ -41,7 +41,7 @@ export function createHeroMediaPlayerController(options) {
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
   const NATIVE_ACTION_NEXT = "next";
   const NATIVE_ACTION_PREVIOUS = "previous";
-  const NATIVE_POLL_INTERVAL_MS = 1600;
+  const NATIVE_POLL_INTERVAL_MS = 1200;
   const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
@@ -1399,16 +1399,27 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   function findMatchedPost(snapshot) {
     if (!snapshot || !snapshot.active) return null;
-    const title = normalizeText(snapshot.title);
-    const meta = normalizeText(snapshot.meta);
+    let title = normalizeText(snapshot.title);
+    let meta = normalizeText(snapshot.meta);
     if (!title) return null;
+
+    // Clean up common platform suffixes that interfere with matching
+    title = title.replace(/\s*[-:|]\s*(youtube|spotify|ytmusic|chrome|edge|firefox|opera|browser)$/i, "").trim();
+    title = title.replace(/\s*\(official (video|audio|music video|lyric video)\)$/i, "").trim();
+    title = title.replace(/\s*\[official (video|audio|music video|lyric video)\]$/i, "").trim();
 
     const posts = typeof getAllPosts === "function" ? getAllPosts() : [];
     return posts.find((p) => {
       const pTitle = normalizeText(p.title);
       const pCreator = normalizeText(p.creator);
+
+      // 1. Direct match (Cleaned)
       if (pTitle === title && (pCreator === meta || !meta)) return true;
-      if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) return true;
+
+      // 2. Contains match for longer titles
+      if (pTitle.length > 5 && (pTitle.includes(title) || title.includes(pTitle))) {
+        if (pCreator === meta || !meta || meta.includes(pCreator) || pCreator.includes(meta)) return true;
+      }
       return false;
     }) || null;
   }
@@ -1593,10 +1604,25 @@ The companion bridge is designed with several security layers to keep your PC sa
       lastNativeActionAt = now;
       nativeActionInFlight = true;
 
+      // Optimistic state update for Android to make Play/Pause feel instant
+      if (action === NATIVE_ACTION_PLAY_PAUSE && nativeSnapshot) {
+        const wasPlaying = nativeSnapshot.playbackState === "playing";
+        nativeSnapshot.playbackState = wasPlaying ? "paused" : "playing";
+        
+        // Find play button and add a quick feedback class if it exists
+        if (elements.heroPlayerPlayPauseButton) {
+           elements.heroPlayerPlayPauseButton.classList.add('optimistic-pulse');
+           setTimeout(() => elements.heroPlayerPlayPauseButton.classList.remove('optimistic-pulse'), 400);
+        }
+        
+        render();
+      }
+
       const success = bridge.performNowPlayingAction(action);
 
       window.setTimeout(() => {
         nativeActionInFlight = false;
+        // Delay the poll slightly so native state has time to update
         if (Date.now() - lastNativeActionAt > 900) refreshNativeSnapshot();
       }, 1000);
 
@@ -1945,6 +1971,26 @@ The companion bridge is designed with several security layers to keep your PC sa
       if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
     });
 
+    // Android: Disable pull-to-refresh while interacting with the Hero Stage
+    if (elements.heroPlayerStage && isNativeCapacitorApp()) {
+      elements.heroPlayerStage.addEventListener("touchstart", () => {
+        const bridge = getNativeBridge();
+        if (bridge && typeof bridge.setPullToRefreshEnabled === "function") {
+          bridge.setPullToRefreshEnabled(false);
+        }
+      }, { passive: true });
+
+      const reEnableRefresh = () => {
+        const bridge = getNativeBridge();
+        if (bridge && typeof bridge.setPullToRefreshEnabled === "function") {
+          bridge.setPullToRefreshEnabled(true);
+        }
+      };
+
+      elements.heroPlayerStage.addEventListener("touchend", reEnableRefresh, { passive: true });
+      elements.heroPlayerStage.addEventListener("touchcancel", reEnableRefresh, { passive: true });
+    }
+
     document.getElementById("companionPromptYes")?.addEventListener("click", () => {
       handleCompanionResponse(true);
     });
@@ -2109,8 +2155,10 @@ The companion bridge is designed with several security layers to keep your PC sa
         nextStatus = modeLabel;
       } else if (nativeSnapshot?.active) {
         nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
-        nextCaption = cleanSnapshotCreator(nativeSnapshot, "Device playback");
-        nextStatus = modeLabel;
+        nextCaption = (matchedPost && matchedPost.creator) ? matchedPost.creator : cleanSnapshotCreator(nativeSnapshot, "Device playback");
+        nextStatus = matchedPost ? "MATCHED FROM FEED" : modeLabel;
+        if (matchedPost) nextHeader = "SYNCED";
+        
         syncTitle = nextTitle;
         syncArtist = nextCaption;
         syncArtwork = nativeSnapshot.artworkUri || "";

@@ -20,11 +20,16 @@ $files = @(
   "hero-media-player-preview.js",
   "notifications.js",
   "profiles.js",
+  "profile.js",
+  "emojis.js",
+  "hero-media-player-actions.js",
   "messenger-realtime.js",
   "keyboard-bindings-v3.js",
   "notification-keyboard-integration.js",
   "site.webmanifest",
-  "service-worker.js"
+  "service-worker.js",
+  "banned_foul_language.txt",
+  "questions-guide.css"
 )
 
 $directories = @(

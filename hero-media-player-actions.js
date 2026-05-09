@@ -107,7 +107,15 @@ export function handleOpenMediaAction(post, context) {
 
   // Final launch
   if (isNativeCapacitorApp()) {
-    if (typeof window.Capacitor !== "undefined" && window.Capacitor.Plugins.App) {
+    const bridge = window.NativeBridge;
+    if (bridge && typeof bridge.openNowPlayingMediaApp === "function") {
+      // Use the smarter native bridge which knows about the last active media app
+      const isSpotify = targetUrl.startsWith("spotify:") || targetUrl.includes("spotify.com");
+      const isYouTube = targetUrl.includes("youtube.com") || targetUrl.includes("youtu.be");
+      
+      const pkg = isSpotify ? "com.spotify.music" : (isYouTube ? "com.google.android.youtube" : "");
+      bridge.openNowPlayingMediaApp(pkg, targetUrl, true);
+    } else if (typeof window.Capacitor !== "undefined" && window.Capacitor.Plugins.App) {
       window.Capacitor.Plugins.App.openUrl({ url: targetUrl });
     } else {
       window.open(targetUrl, "_system");
@@ -118,8 +126,24 @@ export function handleOpenMediaAction(post, context) {
 }
 
 export function handleOpenPhoneAction(post, context) {
-  const { isNativeCapacitorApp } = context;
+  const { isNativeCapacitorApp, state } = context;
   if (!isNativeCapacitorApp()) return;
+
+  const bridge = window.NativeBridge;
+  if (bridge && typeof bridge.openNowPlayingMediaApp === "function") {
+    // If we have a specific post (either passed in or from state), try to open its URI
+    const targetPost = post || (typeof context.getControllablePlayerPost === "function" ? context.getControllablePlayerPost() : null);
+    
+    if (targetPost) {
+       // We have a post, so try to open it explicitly
+       handleOpenMediaAction(targetPost, context);
+       return;
+    }
+
+    // Otherwise, open the last active media app on the phone without an explicit URI
+    bridge.openNowPlayingMediaApp("", "", false);
+    return;
+  }
 
   const isSpotify = post?.sourceKind === "spotify";
   if (isSpotify) {
