@@ -1554,13 +1554,9 @@ export function createAppUi(context) {
         if (m.title && isGenericTitle) {
           title.textContent = m.title;
         }
-        // Incorporate artist/creator into the creator line
+        // Just show the user attribution in the card body, keep artist on the overlay only
         const originalCreator = creatorSummary?.displayName ?? post.creator;
-        if (m.creator && m.creator !== originalCreator) {
-          creator.style.textAlign = "left";
-          creator.style.display = "block";
-          creator.innerHTML = `${m.creator}<br><span style="font-size: 0.85em; opacity: 0.8; font-weight: 400;">User: ${originalCreator}</span>`;
-        }
+        creator.innerHTML = `<span style="font-size: 1.1em; font-weight: 600; opacity: 0.95;">User: ${originalCreator}</span>`;
       };
       if (externalMetadata instanceof Promise) {
         externalMetadata.then(applyRichText).catch(() => {});
