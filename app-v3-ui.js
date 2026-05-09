@@ -81,8 +81,10 @@ export function createAppUi(context) {
     notificationsList: document.querySelector("#notificationsList"),
     notificationsEmptyState: document.querySelector("#notificationsEmptyState"),
     keyboardShortcutsButton: document.querySelector("#keyboardShortcutsButton"),
+    keyboardShortcutsPanel: document.querySelector("#keyboardShortcutsPanel"),
+    keyboardShortcutsBackdrop: document.querySelector("#keyboardShortcutsBackdrop"),
+    keyboardShortcutsCloseButton: document.querySelector("#keyboardShortcutsCloseButton"),
     settingsMainPage: document.querySelector("#settingsMainPage"),
-    settingsShortcutsPage: document.querySelector("#settingsShortcutsPage"),
     shortcutsList: document.querySelector("#shortcutsList"),
     themePicker: document.querySelector("#themePicker"),
     themePickerButton: document.querySelector("#themePickerButton"),
@@ -421,12 +423,15 @@ export function createAppUi(context) {
     elements.settingsCloseButton.addEventListener("click", closeSettingsPanel);
 
     // Listeners for bell button are now handled inline in index.html to prevent conflicts
-    if (elements.keyboardShortcutsButton) elements.keyboardShortcutsButton.addEventListener("click", () => window.showSettingsPage && window.showSettingsPage('shortcuts'));
+    if (elements.keyboardShortcutsButton) elements.keyboardShortcutsButton.addEventListener("click", () => window.openKeyboardShortcutsPanel && window.openKeyboardShortcutsPanel());
+    if (elements.keyboardShortcutsBackdrop) elements.keyboardShortcutsBackdrop.addEventListener("click", () => window.closeKeyboardShortcutsPanel && window.closeKeyboardShortcutsPanel());
+    if (elements.keyboardShortcutsCloseButton) elements.keyboardShortcutsCloseButton.addEventListener("click", () => window.closeKeyboardShortcutsPanel && window.closeKeyboardShortcutsPanel());
+
     if (elements.notificationsBackdrop) elements.notificationsBackdrop.addEventListener("click", handleNotificationsBackdropClick);
     if (elements.notificationsCloseButton) elements.notificationsCloseButton.addEventListener("click", closeNotificationsPanel);
     if (elements.clearNotificationsButton) elements.clearNotificationsButton.addEventListener("click", () => {
       if (window.notifications) window.notifications.clearHistory();
-      renderNotificationsHistory();
+      if (window.renderNotificationsHistory) window.renderNotificationsHistory();
     });
     elements.themePickerButton?.addEventListener("click", toggleThemePicker);
     elements.themePickerMenu?.addEventListener("click", handleThemeOptionClick);
@@ -659,6 +664,7 @@ export function createAppUi(context) {
     renderMessenger();
     renderSettingsPanel();
     if (window.renderNotificationsPanel) window.renderNotificationsPanel();
+    if (window.renderKeyboardShortcutsPanel) window.renderKeyboardShortcutsPanel();
     renderAdminEditor();
     renderAdminBanPanel();
     renderTagCloud();
@@ -1338,9 +1344,6 @@ export function createAppUi(context) {
   window.showSettingsPage = function (page) {
     state.settingsActivePage = page;
     renderSettingsPanel();
-    if (page === 'shortcuts') {
-      renderKeyboardShortcuts();
-    }
   };
 
   function renderSettingsPanel() {
@@ -1356,19 +1359,15 @@ export function createAppUi(context) {
     syncOverlayBodyState();
 
     if (isOpen) {
-      const isMain = state.settingsActivePage === 'main';
-      if (elements.settingsMainPage) elements.settingsMainPage.style.display = isMain ? 'block' : 'none';
-      if (elements.settingsShortcutsPage) elements.settingsShortcutsPage.style.display = isMain ? 'none' : 'block';
+      if (elements.settingsMainPage) elements.settingsMainPage.style.display = 'block';
 
-      if (isMain) {
-        if (elements.densitySelect) elements.densitySelect.value = state.preferences.density;
-        if (elements.motionSelect) elements.motionSelect.value = state.preferences.motion;
-        if (elements.statusBarStripToggle) elements.statusBarStripToggle.checked = state.preferences.statusBarStrip;
-        if (elements.notificationHideSenderToggle) elements.notificationHideSenderToggle.checked = state.preferences.notificationHideSender;
-        if (elements.notificationHideBodyToggle) elements.notificationHideBodyToggle.checked = state.preferences.notificationHideBody;
-        if (elements.showEmailToggle) elements.showEmailToggle.checked = state.preferences.showEmail;
-        renderThemePicker();
-      }
+      if (elements.densitySelect) elements.densitySelect.value = state.preferences.density;
+      if (elements.motionSelect) elements.motionSelect.value = state.preferences.motion;
+      if (elements.statusBarStripToggle) elements.statusBarStripToggle.checked = state.preferences.statusBarStrip;
+      if (elements.notificationHideSenderToggle) elements.notificationHideSenderToggle.checked = state.preferences.notificationHideSender;
+      if (elements.notificationHideBodyToggle) elements.notificationHideBodyToggle.checked = state.preferences.notificationHideBody;
+      if (elements.showEmailToggle) elements.showEmailToggle.checked = state.preferences.showEmail;
+      renderThemePicker();
     }
   }
 
@@ -1417,6 +1416,32 @@ export function createAppUi(context) {
 
     if (event) { event.preventDefault(); event.stopPropagation(); }
     if (state.notificationsPanelOpen) closeNotificationsPanel(); else openNotificationsPanel();
+  }
+
+  window.openKeyboardShortcutsPanel = function() {
+    state.keyboardShortcutsPanelOpen = true;
+    setMobileHeaderHidden(false);
+    render();
+    requestAnimationFrame(() => elements.keyboardShortcutsCloseButton?.focus?.());
+  }
+
+  window.closeKeyboardShortcutsPanel = function(options = {}) {
+    const { restoreFocus = true } = options;
+    if (!state.keyboardShortcutsPanelOpen) return;
+    state.keyboardShortcutsPanelOpen = false;
+    render();
+    if (restoreFocus && elements.keyboardShortcutsButton) elements.keyboardShortcutsButton.focus();
+  }
+
+  window.renderKeyboardShortcutsPanel = function() {
+    const isOpen = state.keyboardShortcutsPanelOpen;
+    if (elements.keyboardShortcutsPanel) {
+      elements.keyboardShortcutsPanel.hidden = !isOpen;
+      elements.keyboardShortcutsPanel.classList.toggle("is-open", isOpen);
+      elements.keyboardShortcutsPanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+      if (isOpen) renderKeyboardShortcuts();
+    }
+    syncOverlayBodyState();
   }
 
   // Initial setup for the notification bell
@@ -1718,7 +1743,7 @@ export function createAppUi(context) {
   let lastModalOverlayOpen = null;
 
   function syncOverlayBodyState() {
-    const modalOverlayOpen = Boolean(state.viewerPostId || state.viewerAttachment || state.activeProfileKey || state.settingsPanelOpen || state.notificationsPanelOpen || state.adminBanPanelOpen);
+    const modalOverlayOpen = Boolean(state.viewerPostId || state.viewerAttachment || state.activeProfileKey || state.settingsPanelOpen || state.notificationsPanelOpen || state.keyboardShortcutsPanelOpen || state.adminBanPanelOpen);
     const scrollOverlayOpen = Boolean(modalOverlayOpen || state.messengerOpen || state.playerPostId);
 
     if (scrollOverlayOpen !== lastScrollOverlayOpen) {
@@ -3238,7 +3263,7 @@ export function createAppUi(context) {
     createMessageAttachmentNode, createMessageAttachmentTrigger, openMessageAttachmentViewer, createMessageFileNode, getMessageAttachmentKind,
     formatAttachmentTypeLabel, syncComposerCreatorWithAccount, updateComposerAccess, setStatusPill, showAuthFeedback,
     applyUserPreferences, openSettingsPanel, closeSettingsPanel, toggleSettingsPanel, renderSettingsPanel,
-    openNotificationsPanel, closeNotificationsPanel, renderKeyboardShortcuts, handleThemeOptionClick, handleDensityChange,
+    openNotificationsPanel, closeNotificationsPanel, openKeyboardShortcutsPanel, closeKeyboardShortcutsPanel, renderKeyboardShortcutsPanel, renderKeyboardShortcuts, handleThemeOptionClick, handleDensityChange,
     handleMotionChange, handleStatusBarStripToggle, handleNotificationHideSenderToggle, handleNotificationHideBodyToggle, resetPlayerDockPosition,
     resetPlayerVolume, resetUserPreferences, syncSourceHelp, applyMiniPlayerPosition, beginMiniPlayerDrag,
     handleMiniPlayerDrag, endMiniPlayerDrag, handleViewportResize, isMobileHeaderViewport, isMobileMessengerViewport,

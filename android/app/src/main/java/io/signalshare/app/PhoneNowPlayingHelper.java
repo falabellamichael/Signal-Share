@@ -10,6 +10,7 @@ import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
 import android.net.Uri;
+import android.os.Build;
 import android.provider.Settings;
 import android.text.TextUtils;
 
@@ -196,7 +197,7 @@ final class PhoneNowPlayingHelper {
     static boolean hasNotificationListenerAccess(Context context) {
         ComponentName listenerComponent = new ComponentName(context, PhoneNowPlayingNotificationListenerService.class);
         NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
-        if (notificationManager != null) {
+        if (notificationManager != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             try {
                 return notificationManager.isNotificationListenerAccessGranted(listenerComponent);
             } catch (Exception ignored) {

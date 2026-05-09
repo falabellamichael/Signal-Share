@@ -32,8 +32,55 @@
 
     <script src="https://www.youtube.com/iframe_api" async></script>
     <script src="https://sdk.scdn.co/spotify-player.js" async></script>
+    <script>
+      // Visible error reporter for Android debugging
+      window.onerror = function(msg, url, lineNo, columnNo, error) {
+        const errorDiv = document.getElementById('debug-error-reporter');
+        if (errorDiv) {
+          errorDiv.style.display = 'block';
+          const pre = document.createElement('pre');
+          pre.textContent = `[Error] ${msg}\nAt: ${url}:${lineNo}:${columnNo}\nStack: ${error?.stack || 'No stack'}`;
+          errorDiv.appendChild(pre);
+        }
+        return false;
+      };
+      window.onunhandledrejection = function(event) {
+        const errorDiv = document.getElementById('debug-error-reporter');
+        if (errorDiv) {
+          errorDiv.style.display = 'block';
+          const pre = document.createElement('pre');
+          pre.textContent = `[Unhandled Rejection] ${event.reason?.message || event.reason}\nStack: ${event.reason?.stack || 'No stack'}`;
+          errorDiv.appendChild(pre);
+        }
+      };
+    </script>
+    <style>
+      #debug-error-reporter {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.9);
+        color: #ff5555;
+        padding: 20px;
+        z-index: 10000000;
+        overflow: auto;
+        font-family: monospace;
+        font-size: 12px;
+        pointer-events: auto;
+      }
+      #debug-error-reporter h3 { color: white; margin-top: 0; }
+      #debug-error-reporter pre { background: #1a1a1a; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-all; margin-bottom: 10px; border: 1px solid #333; }
+      #debug-error-reporter button { background: white; color: black; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; margin-bottom: 10px; }
+    </style>
   </head>
   <body>
+    <div id="debug-error-reporter">
+      <h3>Runtime Error Detected</h3>
+      <button onclick="this.parentElement.style.display='none'">Dismiss</button>
+    </div>
     <div class="page-shell">
       <header class="site-header">
         <a class="brand" href="#top" aria-label="Signal Share home">
@@ -267,37 +314,12 @@
                 class="button button-secondary button-full"
                 id="keyboardShortcutsButton"
                 type="button"
-                onclick="window.showSettingsPage && window.showSettingsPage('shortcuts')"
               >
                 Keyboard shortcuts
               </button>
             </div>
           </div>
 
-          <div id="settingsShortcutsPage" style="display: none;">
-            <div class="settings-head">
-              <p class="eyebrow">Accessibility</p>
-              <h2>Keyboard shortcuts</h2>
-              <p>Use these keys to navigate Signal Share faster.</p>
-            </div>
-            
-            <div class="settings-section" style="padding-top: 0;">
-              <div id="shortcutsList" style="display: flex; flex-direction: column; gap: 10px; max-height: 50vh; overflow-y: auto; margin-bottom: 20px;">
-                <!-- Shortcuts will be injected here -->
-              </div>
-            </div>
-
-            <div class="settings-actions">
-              <button
-                class="button button-secondary"
-                type="button"
-                style="width: 100%;"
-                onclick="window.showSettingsPage && window.showSettingsPage('main')"
-              >
-                Back to preferences
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -1296,9 +1318,9 @@
     <script type="module" src="./config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.2.3/dist/tus.min.js"></script>
-    <script type="module" src="./notifications.js"></script>
-    <script type="module" src="./keyboard-bindings-v3.js"></script>
-    <script type="module" src="./notification-keyboard-integration.js"></script>
+    <script src="notifications.js"></script>
+    <script src="keyboard-bindings-v3.js"></script>
+    <script src="notification-keyboard-integration.js"></script>
     <!-- Global Overlay Panels -->
     <section class="settings-panel" id="notificationsPanel" aria-hidden="true" hidden>
       <div class="settings-backdrop" id="notificationsBackdrop"></div>
@@ -1317,6 +1339,23 @@
             <!-- Notifications will be injected here -->
           </ul>
           <p id="notificationsEmptyState">No new notifications</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-panel" id="keyboardShortcutsPanel" aria-hidden="true" hidden>
+      <div class="settings-backdrop" id="keyboardShortcutsBackdrop"></div>
+      <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
+        <button class="settings-close" id="keyboardShortcutsCloseButton" type="button" aria-label="Close shortcuts">Close</button>
+        <div class="settings-head">
+          <p class="eyebrow">Accessibility</p>
+          <h2 id="shortcutsTitle">Keyboard shortcuts</h2>
+          <p>Use these keys to navigate Signal Share faster.</p>
+        </div>
+        <div class="settings-section" style="padding-top: 0;">
+          <div id="shortcutsList" style="display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; margin-bottom: 10px;">
+            <!-- Shortcuts will be injected here -->
+          </div>
         </div>
       </div>
     </section>

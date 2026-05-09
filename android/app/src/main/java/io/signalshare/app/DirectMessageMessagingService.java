@@ -11,9 +11,11 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.text.TextUtils;
+import android.Manifest;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
 
 import com.capacitorjs.plugins.pushnotifications.MessagingService;
 import com.google.firebase.messaging.RemoteMessage;
@@ -80,7 +82,12 @@ public class DirectMessageMessagingService extends MessagingService {
         int notificationId = !TextUtils.isEmpty(messageId)
                 ? messageId.hashCode()
                 : (!TextUtils.isEmpty(threadId) ? threadId.hashCode() : (int) System.currentTimeMillis());
-        NotificationManagerCompat.from(this).notify(notificationId, builder.build());
+        
+        // Check if we have permission to post notifications (required for Android 13+)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            NotificationManagerCompat.from(this).notify(notificationId, builder.build());
+        }
     }
 
     private PendingIntent createContentIntent(String threadId) {

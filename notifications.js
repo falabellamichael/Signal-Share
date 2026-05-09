@@ -433,12 +433,19 @@
   }
 
   function markAllAsRead() {
+    let changed = false;
     history.forEach((item) => {
-      item.read = true;
+      if (!item.read) {
+        item.read = true;
+        changed = true;
+      }
     });
-    count = 0;
-    save();
-    queueRemoteStatePersist({ immediate: true });
+    if (changed) {
+      count = 0;
+      save();
+      renderUI();
+      queueRemoteStatePersist({ immediate: true });
+    }
   }
 
   function markThreadAsRead(threadId) {
