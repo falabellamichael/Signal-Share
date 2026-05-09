@@ -104,14 +104,14 @@
   }
 
   function rememberSeenId(id, timestamp = Date.now()) {
-    const normalizedId = String(id ?? "");
+    const normalizedId = String(id ?? "").trim().toLowerCase();
     if (!normalizedId) return;
     seenIds.set(normalizedId, toFiniteNumber(timestamp, Date.now()));
     trimSeenIds();
   }
 
   function hasSeenId(id) {
-    const normalizedId = String(id ?? "");
+    const normalizedId = String(id ?? "").trim().toLowerCase();
     return normalizedId ? seenIds.has(normalizedId) : false;
   }
 
@@ -124,7 +124,13 @@
   function load() {
     seenIds = parseSeenIds(localStorage.getItem(SEEN_KEY));
     history = parseHistory(localStorage.getItem(HISTORY_KEY));
-    history.forEach((item) => rememberSeenId(item.id, item.timestamp));
+    // Ensure history items are also in seenIds for consistency
+    history.forEach((item) => {
+      const nid = String(item.id ?? "").trim().toLowerCase();
+      if (nid && !seenIds.has(nid)) {
+        seenIds.set(nid, item.timestamp);
+      }
+    });
     trimHistory();
     count = normalizeCount(localStorage.getItem(COUNT_KEY));
     saveSeenIds();
@@ -665,6 +671,7 @@
       count = normalizeCount(count + 1);
       save();
     },
+    hasSeenId: (id) => hasSeenId(id),
     syncWithSupabase: (supabase, userId, options) => syncWithSupabase(supabase, userId, options),
     setUnreadCount: (nextCount) => {
       count = normalizeCount(nextCount);

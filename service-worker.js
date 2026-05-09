@@ -102,7 +102,17 @@ self.addEventListener("push", (event) => {
     options.body = payload.body.trim();
   }
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  // Check if any client is already focused
+  const showPush = self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+    const isAnyFocused = clients.some((client) => client.focused);
+    if (isAnyFocused) {
+      console.log("[ServiceWorker] App is focused, skipping system notification.");
+      return;
+    }
+    return self.registration.showNotification(title, options);
+  });
+
+  event.waitUntil(showPush);
 });
 
 self.addEventListener("notificationclick", (event) => {

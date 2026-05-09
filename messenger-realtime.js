@@ -70,23 +70,34 @@ window.MessengerRealtime = class MessengerRealtime {
     console.log("[Realtime] New message data arrived.");
     const message = this.normalize(rawData);
     
+    if (!message.id) return;
     if (message.senderId === state.currentUser?.id) return;
     if (state.blockedUserIds?.includes(message.senderId)) return;
     if (state.bannedUserIds?.includes(message.senderId)) return;
-    
+
+    const normalizedId = String(message.id).trim().toLowerCase();
+
     // Prevent double processing (Broadcast + Postgres changes)
-    if (this.processedMessageIds.has(message.id)) {
-      console.log("[Realtime] Skipping already processed message:", message.id);
+    if (this.processedMessageIds.has(normalizedId)) {
+      console.log("[Realtime] Skipping already processed message:", normalizedId);
       return;
     }
-    this.processedMessageIds.add(message.id);
+
+    // Also check the main notification system's seen set
+    if (window.notifications && typeof window.notifications.hasSeenId === "function") {
+      if (window.notifications.hasSeenId(normalizedId)) {
+        console.log("[Realtime] Skipping message already seen in notification system:", normalizedId);
+        return;
+      }
+    }
+
+    this.processedMessageIds.add(normalizedId);
     if (this.processedMessageIds.size > 100) {
-      // Keep set size reasonable
       const firstId = this.processedMessageIds.values().next().value;
       this.processedMessageIds.delete(firstId);
     }
 
-    // Trigger sound
+    // Trigger sound (if not already handled by native push which also plays chime)
     try {
       if (window.playIncomingMessageSound) window.playIncomingMessageSound();
     } catch (e) {}

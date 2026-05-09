@@ -620,6 +620,10 @@ async function initializeNativePushNotifications() {
     });
     await push.addListener("registrationError", (error) => console.error("Native push registration failed", error));
     await push.addListener("pushNotificationReceived", (notification) => {
+      // If app is already active/focused, MessengerRealtime should handle the notification banner and chime.
+      // We skip most logic here to avoid double-processing and double-sound while app is open.
+      const isVisible = document.visibilityState === "visible";
+
       if (notification?.data?.type === "direct-message") {
         if (window.notifications && typeof window.notifications.add === "function") {
           const threadId = notification?.data?.threadId ?? "";
@@ -636,7 +640,11 @@ async function initializeNativePushNotifications() {
             silent: true,
           });
         }
-        playIncomingMessageSound();
+
+        if (!isVisible) {
+          playIncomingMessageSound();
+        }
+
         if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true });
       }
     });
