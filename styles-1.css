@@ -572,11 +572,13 @@ body[data-theme="contrast"] .message-row.is-self .message-bubble {
   background: linear-gradient(135deg, #fff200 0%, #00e5ff 100%) !important;
   border: 1px solid #000000 !important;
   color: #000000 !important;
+  font-weight: 700 !important;
 }
 
 body[data-theme="contrast"] .message-row.is-self .message-bubble p,
 body[data-theme="contrast"] .message-row.is-self .message-bubble span {
   color: #000000 !important;
+  font-weight: 700 !important;
 }
 
 body[data-theme="contrast"] .message-bubble span {
