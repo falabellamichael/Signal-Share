@@ -440,14 +440,11 @@ function createPostStandbyPreview(post, options = {}) {
     getSpotifyPreviewImageUrl,
   });
 
-  const isYouTube = post.sourceKind === "youtube" || isYouTubeMode;
-  const isSpotify = post.sourceKind === "spotify" || isSpotifyActive;
-  const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
   const cardData = {
     badge: `UP NEXT · ${providerLabel || "App Media"}`,
-    title: shouldHideText ? "" : (post.title || "Next playable post"),
-    meta: shouldHideText ? "" : meta,
-    note: shouldHideText ? "" : "Press Play to start playback.",
+    title: post.title || "Next playable post",
+    meta: meta,
+    note: "Press Play to start playback.",
     artworkUrl,
   };
 
@@ -561,15 +558,11 @@ export function renderHeroStagePreview(options = {}) {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
 
-      const snapshotTitle = (nativeSnapshot.title || "").toLowerCase();
-      const isYouTube = matchedPost?.sourceKind === "youtube" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("youtube")) || snapshotTitle.includes("youtube") || isYouTubeMode;
-      const isSpotify = matchedPost?.sourceKind === "spotify" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("spotify")) || snapshotTitle.includes("spotify") || isSpotifyActive;
-      const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
       commitCard(stage, {
         badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
-        title: shouldHideText ? "" : (nativeSnapshot.title || matchedPost?.title || "Now playing"),
-        meta: shouldHideText ? "" : (nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback")),
-        note: shouldHideText ? "" : (nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
+        title: (nativeSnapshot.title || matchedPost?.title || "Now playing"),
+        meta: (nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback")),
+        note: (nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
         artworkUrl: artworkUrl,
       });
       return;
@@ -588,15 +581,11 @@ export function renderHeroStagePreview(options = {}) {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
 
-      const snapshotTitle = (desktopSnapshot.title || "").toLowerCase();
-      const isYouTube = matchedPost?.sourceKind === "youtube" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("youtube")) || snapshotTitle.includes("youtube") || isYouTubeMode;
-      const isSpotify = matchedPost?.sourceKind === "spotify" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("spotify")) || snapshotTitle.includes("spotify") || isSpotifyActive;
-      const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
       commitCard(stage, {
         badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
-        title: shouldHideText ? "" : (desktopSnapshot.title || matchedPost?.title || "Now playing"),
-        meta: shouldHideText ? "" : (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback")),
-        note: shouldHideText ? "" : (desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
+        title: (desktopSnapshot.title || matchedPost?.title || "Now playing"),
+        meta: (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback")),
+        note: (desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
         artworkUrl: artworkUrl,
       });
       return;
@@ -657,27 +646,20 @@ export function renderHeroStagePreview(options = {}) {
   // Handle async metadata resolution for preview card
   let resolvedMetadata = externalMetadata;
   if (externalMetadata instanceof Promise) {
-    const isYouTube = post?.sourceKind === "youtube" || isYouTubeMode;
-    const isSpotify = post?.sourceKind === "spotify" || isSpotifyActive;
-    const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
-    // Render initial card with fallback while metadata loads
     commitCard(stage, {
       badge: "NOW PLAYING",
-      title: shouldHideText ? "" : (post.title || "Now playing"),
-      meta: shouldHideText ? "" : formatPostMeta(post, creatorSummary),
+      title: post.title || "Now playing",
+      meta: formatPostMeta(post, creatorSummary),
       artworkUrl: artworkUrl,
     });
 
     // Fetch metadata and update card when available
     externalMetadata.then(metadata => {
       if (metadata) {
-        const isYouTube = post?.sourceKind === "youtube" || isYouTubeMode;
-        const isSpotify = post?.sourceKind === "spotify" || isSpotifyActive;
-        const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
         commitCard(stage, {
           badge: "NOW PLAYING",
-          title: shouldHideText ? "" : (metadata?.title || post.title || "Now playing"),
-          meta: shouldHideText ? "" : (metadata.creator || ""),
+          title: metadata?.title || post.title || "Now playing",
+          meta: metadata.creator || "",
           artworkUrl: metadata?.artworkUrl || artworkUrl,
         });
       }
@@ -687,13 +669,12 @@ export function renderHeroStagePreview(options = {}) {
     return;
   }
 
-  const isYouTube = post?.sourceKind === "youtube" || isYouTubeMode;
-  const isSpotify = post?.sourceKind === "spotify" || isSpotifyActive;
-  const shouldHideText = isHardenedEnvironment && (isYouTube || isSpotify);
   commitCard(stage, {
     badge: "NOW PLAYING",
-    title: shouldHideText ? "" : (resolvedMetadata?.title || post.title || "Now playing"),
-    meta: shouldHideText ? "" : (resolvedMetadata?.creator || formatPostMeta(post, creatorSummary)),
-    artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
+    title: resolvedMetadata?.title || post.title || "Now playing",
+    meta: resolvedMetadata?.creator || formatPostMeta(post, creatorSummary),
+    artworkUrl: artworkUrl,
+  });
+ata?.artworkUrl || artworkUrl,
   });
 }

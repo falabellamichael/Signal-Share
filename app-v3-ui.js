@@ -1754,10 +1754,18 @@ export function createAppUi(context) {
       typeof getPlayableVisiblePostIds === "function"
         ? getPlayableVisiblePostIds()
         : [];
+
+    const matchesSourceFilter = (post) => {
+      if (!state.heroControlSource || state.heroControlSource === "all") return true;
+      return post.sourceKind === state.heroControlSource;
+    };
+
     const visiblePosts = visibleIds
       .map((id) => (typeof getPostById === "function" ? getPostById(id) : null))
       .filter(Boolean)
       .filter((post) => {
+        if (!matchesSourceFilter(post)) return false;
+
         return (
           post.mediaKind === "video" ||
           post.mediaKind === "audio" ||
@@ -1765,20 +1773,23 @@ export function createAppUi(context) {
           post.sourceKind === "spotify"
         );
       });
+
     if (visiblePosts.length) return visiblePosts;
+
     const allPosts =
       typeof getAllPosts === "function"
         ? getAllPosts()
         : [];
+
     return allPosts.filter((post) => {
+      if (!post) return false;
+      if (!matchesSourceFilter(post)) return false;
+
       return (
-        post &&
-        (
-          post.mediaKind === "video" ||
-          post.mediaKind === "audio" ||
-          post.sourceKind === "youtube" ||
-          post.sourceKind === "spotify"
-        )
+        post.mediaKind === "video" ||
+        post.mediaKind === "audio" ||
+        post.sourceKind === "youtube" ||
+        post.sourceKind === "spotify"
       );
     });
   }
