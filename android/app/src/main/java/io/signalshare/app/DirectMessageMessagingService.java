@@ -1,5 +1,6 @@
 package io.signalshare.app;
 
+import android.app.ActivityManager;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -23,12 +24,23 @@ public class DirectMessageMessagingService extends MessagingService {
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
-        if (!isDirectMessage(remoteMessage)) {
-            super.onMessageReceived(remoteMessage);
-            return;
-        }
+        // Always call super to ensure Capacitor JS listeners receive the event
+        super.onMessageReceived(remoteMessage);
 
-        showDirectMessageNotification(remoteMessage);
+        if (isDirectMessage(remoteMessage)) {
+            // Only show native notification if the app is NOT in the foreground.
+            // When in foreground, the Web/JS layer handles the notification UI.
+            if (!isAppInForeground()) {
+                showDirectMessageNotification(remoteMessage);
+            }
+        }
+    }
+
+    private boolean isAppInForeground() {
+        ActivityManager.RunningAppProcessInfo appProcessInfo = new ActivityManager.RunningAppProcessInfo();
+        ActivityManager.getMyMemoryState(appProcessInfo);
+        return (appProcessInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND ||
+                appProcessInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE);
     }
 
     @Override
