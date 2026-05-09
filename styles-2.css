@@ -1252,10 +1252,13 @@
       -ms-overflow-style: none; /* IE and Edge */
       -webkit-overflow-scrolling: touch;
       width: 100%;
+      scroll-snap-type: x mandatory;
     }
 
     .emoji-panel-header::-webkit-scrollbar {
-      display: none; /* Chrome, Safari and Opera */
+      height: 0;
+      width: 0;
+      display: none;
     }
 
     .emoji-category-tab {
@@ -1272,6 +1275,7 @@
       font-size: 1.25rem;
       transition: all 0.2s ease;
       color: var(--text);
+      scroll-snap-align: start;
     }
 
     .emoji-category-tab:hover {
@@ -1291,11 +1295,22 @@
       overflow-y: auto;
       padding-right: 4px;
       scrollbar-width: none; /* Firefox */
-      -ms-overflow-style: none;  /* IE and Edge */
+      -ms-overflow-style: none; /* IE and Edge */
     }
 
     .emoji-panel-grid::-webkit-scrollbar {
-      display: none; /* Chrome, Safari and Opera */
+      width: 5px;
+    }
+
+    .emoji-panel-grid::-webkit-scrollbar-track,
+    .emoji-panel-grid::-webkit-scrollbar-button {
+      display: none;
+      background: transparent;
+    }
+
+    .emoji-panel-grid::-webkit-scrollbar-thumb {
+      background: transparent;
+      border-radius: 10px;
     }
 
     .emoji-panel-grid:hover {
@@ -1303,9 +1318,8 @@
       scrollbar-color: var(--scrollbar-thumb) transparent;
     }
 
-    .emoji-panel-grid:hover::-webkit-scrollbar {
-      display: block;
-      width: 5px;
+    .emoji-panel-grid:hover::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
     }
 
     .emoji-chip {
