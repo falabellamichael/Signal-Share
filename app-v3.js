@@ -1269,15 +1269,20 @@ async function subscribeMessagingChannels(options = {}) {
     if (!messengerRealtime && window.MessengerRealtime) {
       messengerRealtime = new window.MessengerRealtime(state);
     }
-    messengerRealtime.init();
+    
+    if (messengerRealtime) {
+      messengerRealtime.init();
+      if (messengerRealtime.channel) state.messagesChannel = messengerRealtime.channel;
+      
+      console.log("[Messenger] Realtime system initialized.");
+      const sessionHash = messengerRealtime.sessionHash;
 
-    if (messengerRealtime.channel) state.messagesChannel = messengerRealtime.channel;
-    console.log("[Messenger] Realtime system initialized.");
-    const sessionHash = messengerRealtime.sessionHash;
-
-    state.threadsChannel = state.supabase.channel(`direct-threads-${state.currentUser.id}-${sessionHash}`);
-    state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "direct_threads" }, () => void refreshMessengerState({ preserveActiveThread: true }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => void refreshMessengerState({ preserveActiveThread: true }));
+      state.threadsChannel = state.supabase.channel(`direct-threads-${state.currentUser.id}-${sessionHash}`);
+      state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "direct_threads" }, () => void refreshMessengerState({ preserveActiveThread: true }))
+        .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => void refreshMessengerState({ preserveActiveThread: true }));
+    } else {
+      console.warn("[Messenger] MessengerRealtime class not found. Realtime messaging will be unavailable.");
+    }
 
     if (state.blockingAvailable) {
       state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_blocks" }, () => void refreshMessengerState({ preserveActiveThread: true }));

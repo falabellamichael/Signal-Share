@@ -5,6 +5,7 @@
 
 window.MessengerRealtime = class MessengerRealtime {
   constructor(appState) {
+    console.log("[Realtime] MessengerRealtime class instantiated.");
     this.state = appState;
     this.channel = null;
     this.sessionHash = Math.random().toString(36).substring(2, 10);
