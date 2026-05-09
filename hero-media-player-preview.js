@@ -561,7 +561,7 @@ export function renderHeroStagePreview(options = {}) {
         if (videoId) artworkUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
       }
 
-      const shouldHideText = (isYouTube && isMediaYoutubeMode) || (isMediaSpotifyMode);
+      const shouldHideText = isMediaYoutubeMode || isMediaSpotifyMode;
       commitCard(stage, {
         badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
         title: shouldHideText ? "" : (nativeSnapshot.title || matchedPost?.title || "Now playing"),
@@ -593,7 +593,7 @@ export function renderHeroStagePreview(options = {}) {
         if (videoId) artworkUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
       }
 
-      const shouldHideText = (isYouTube && isMediaYoutubeMode) || (isMediaSpotifyMode);
+      const shouldHideText = isMediaYoutubeMode || isMediaSpotifyMode;
       commitCard(stage, {
         badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
         title: shouldHideText ? "" : (desktopSnapshot.title || matchedPost?.title || "Now playing"),
@@ -698,7 +698,7 @@ export function renderHeroStagePreview(options = {}) {
   }
 
   const isYouTube = post?.sourceKind === "youtube";
-  const shouldHideText = isYouTube && isMediaYoutubeMode;
+  const shouldHideText = (isYouTube && isMediaYoutubeMode) || isMediaSpotifyMode;
   commitCard(stage, {
     badge: "",
     title: shouldHideText ? "" : (resolvedMetadata?.title || post.title || "Now playing"),
