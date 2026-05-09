@@ -803,6 +803,11 @@ The companion bridge is designed with several security layers to keep your PC sa
         headers["X-Bridge-Secret"] = secret;
       }
       
+      // Ensure we do NOT send 'target-address-space' as a header, as it's a restricted 
+      // fetch option property, not a header. Sending it as a header triggers CORS failures.
+      delete headers["target-address-space"];
+      delete headers["Target-Address-Space"];
+      
       return {
         ...init,
         headers,

@@ -85,9 +85,9 @@ app.use((req, res, next) => {
   const isLocalhost = !origin || origin.includes("localhost") || origin.includes("127.0.0.1");
 
   if (isWhitelisted || isLocalhost) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  } else if (!origin) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Origin", origin || "*");
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "https://falabellamichael.github.io");
   }
 
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
