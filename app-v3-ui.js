@@ -584,9 +584,16 @@ export function createAppUi(context) {
           }
 
           // Update global state if this matches our active hero or mini player
-          if (state.heroPlayerPlaybackState !== newState) {
-            state.heroPlayerPlaybackState = newState;
-            heroMediaPlayerController.render();
+          if (state.heroPlayerElement?.contains(event.source?.frameElement) || state.heroPlayerElement === event.source?.frameElement) {
+            if (state.heroPlayerPlaybackState !== newState) {
+              state.heroPlayerPlaybackState = newState;
+              heroMediaPlayerController.render();
+            }
+          } else if (state.activePlayerElement?.contains(event.source?.frameElement) || state.activePlayerElement === event.source?.frameElement) {
+            if (state.miniPlayerPlaybackState !== newState) {
+              state.miniPlayerPlaybackState = newState;
+              renderMiniPlayer();
+            }
           }
 
           // Also update the dataset on the iframe itself for mini-player logic
@@ -2677,6 +2684,8 @@ export function createAppUi(context) {
     elements.miniPlayer.setAttribute("aria-hidden", "false");
 
     syncOverlayBodyState();
+
+    // Artwork/Metadata resolution
     const spotifyUrl = post.sourceKind === "spotify" ? resolveSpotifyPreviewSourceUrl(post) : null;
     const cachedExt = externalPreviewCache.get(post.sourceKind === "spotify" ? `spotify:preview:v10:${spotifyUrl}` : (post.sourceKind === "youtube" ? `youtube:preview:${resolveYouTubePreviewId(post, parseYouTubeUrl)}` : null));
     const isFetching = cachedExt instanceof Promise;
@@ -2708,9 +2717,20 @@ export function createAppUi(context) {
     const canStep = playableIds.length > 1;
     elements.miniPrevButton.disabled = !canStep;
     elements.miniNextButton.disabled = !canStep;
-    renderMiniPlayerPlaybackButton(post);
 
-    renderMiniPlayerMedia(elements.miniPlayerStage, post);
+    // Sync Media - ensure the media is mounted if needed
+    // We use a flag to prevent infinite loops if renderMiniPlayer calls mountPersistentPlayer
+    if (!state.__mini_rendering) {
+      state.__mini_rendering = true;
+      try {
+        const wasPlaying = state.miniPlayerPlaybackState === "playing";
+        mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
+      } finally {
+        state.__mini_rendering = false;
+      }
+    }
+
+    renderMiniPlayerPlaybackButton(post);
     renderMiniPlayerVolumeControl();
     applyMiniPlayerPosition();
   }
@@ -2943,35 +2963,64 @@ export function createAppUi(context) {
     }
 
     renderMiniPlayer();
+    heroMediaPlayerController.render();
   }
 
   function handleMiniNext() {
     if (!checkMediaCooldown()) return;
     const wasPlaying = state.miniPlayerPlaybackState === "playing";
+    const oldId = state.playerPostId;
     stepMiniPlayer(1);
+
+    if (state.playerPostId === oldId) return;
+
     const post = getPostById(state.playerPostId);
-    if (post) mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
-    if (wasPlaying) state.miniPlayerPlaybackState = "playing";
+    if (post) {
+      if (wasPlaying) state.miniPlayerPlaybackState = "playing";
+      mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
+    }
     renderMiniPlayer();
+    // Also sync the global master controller so system media is updated
+    heroMediaPlayerController.render();
   }
 
   function handleMiniPrevious() {
     if (!checkMediaCooldown()) return;
     const wasPlaying = state.miniPlayerPlaybackState === "playing";
+    const oldId = state.playerPostId;
     stepMiniPlayer(-1);
+
+    if (state.playerPostId === oldId) return;
+
     const post = getPostById(state.playerPostId);
-    if (post) mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
-    if (wasPlaying) state.miniPlayerPlaybackState = "playing";
+    if (post) {
+      if (wasPlaying) state.miniPlayerPlaybackState = "playing";
+      mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
+    }
     renderMiniPlayer();
+    heroMediaPlayerController.render();
   }
 
-  function getPlayableVisiblePostIds() { return state.visiblePostIds.filter((id) => isPlayablePost(getPostById(id))); }
+  function getPlayableVisiblePostIds() {
+    const visible = state.visiblePostIds.filter((id) => isPlayablePost(getPostById(id)));
+    if (visible.length > 0) return visible;
+
+    // Fallback: If no visible posts are playable, use all playable posts from the feed
+    return getAllPosts().filter(isPlayablePost).map(p => p.id);
+  }
 
   function stepMiniPlayer(delta) {
     if (!checkMediaCooldown()) return;
     const playableIds = getPlayableVisiblePostIds();
-    if (playableIds.length <= 1 || !state.playerPostId) return;
+    if (playableIds.length === 0) return;
+
+    if (playableIds.length === 1 && state.playerPostId === playableIds[0]) {
+      // Only one song available and it's the current one, nowhere to skip
+      return;
+    }
+
     const currentIndex = playableIds.indexOf(state.playerPostId);
+    // If not found in current list, start from beginning (index 0)
     const nextIndex = currentIndex === -1 ? 0 : (currentIndex + delta + playableIds.length) % playableIds.length;
     state.playerPostId = playableIds[nextIndex];
   }
