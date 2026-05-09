@@ -673,8 +673,6 @@ export function renderHeroStagePreview(options = {}) {
     badge: "NOW PLAYING",
     title: resolvedMetadata?.title || post.title || "Now playing",
     meta: resolvedMetadata?.creator || formatPostMeta(post, creatorSummary),
-    artworkUrl: artworkUrl,
-  });
-ata?.artworkUrl || artworkUrl,
+    artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
   });
 }
