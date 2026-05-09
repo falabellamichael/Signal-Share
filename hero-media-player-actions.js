@@ -4,16 +4,27 @@
  */
 
 export function handleOpenMediaAction(post, context) {
-  const { isNativeCapacitorApp, openViewer, desktopSnapshot, performDesktopAction, state } = context;
+  const { isNativeCapacitorApp, openViewer, desktopSnapshot, performDesktopAction, parseYouTubeUrl, state } = context;
 
   if (!post && !desktopSnapshot?.available) {
     console.warn("handleOpenMediaAction: No active post or desktop session.");
     return;
   }
+  const normalizeText = (value = "") => `${value || ""}`.trim().toLowerCase();
+  const preferredSource = normalizeText(state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "");
+  const prefersYouTube = preferredSource === "youtube";
+  const prefersSpotify = preferredSource === "spotify";
 
   const resolveYouTubeUrl = (value) => {
     if (!value) return "";
     const sanitized = String(value).trim();
+
+    if (typeof parseYouTubeUrl === "function") {
+      const parsed = parseYouTubeUrl(sanitized);
+      if (parsed?.externalId) return `https://www.youtube.com/watch?v=${parsed.externalId}`;
+      if (parsed?.originalUrl) return parsed.originalUrl;
+      if (parsed?.embedUrl) return parsed.embedUrl;
+    }
     const idMatch = sanitized.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/|vnd\.youtube:)([A-Za-z0-9_-]{11})/i);
     if (idMatch) return `https://www.youtube.com/watch?v=${idMatch[1]}`;
     if (/^[A-Za-z0-9_-]{11}$/.test(sanitized)) return `https://www.youtube.com/watch?v=${sanitized}`;
@@ -24,9 +35,7 @@ export function handleOpenMediaAction(post, context) {
     if (!postValue) return "";
     if (postValue?.sourceKind === "youtube") {
       if (postValue.externalId) return `https://www.youtube.com/watch?v=${postValue.externalId}`;
-      if (postValue.externalUrl) return resolveYouTubeUrl(postValue.externalUrl);
-      if (postValue.src) return resolveYouTubeUrl(postValue.src);
-      if (postValue.mediaUrl) return resolveYouTubeUrl(postValue.mediaUrl);
+      return resolveYouTubeUrl(postValue.externalUrl || postValue.src || postValue.mediaUrl);
     }
     return "";
   };
@@ -53,10 +62,12 @@ export function handleOpenMediaAction(post, context) {
     const title = (desktopSnapshot.title || "").toLowerCase();
     const meta = (desktopSnapshot.meta || "").toLowerCase();
 
-    const isSpotify = appPackage.includes("spotify") || meta.includes("spotify") || (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify");
-    const isYouTube = appPackage.includes("youtube") || meta.includes("youtube") || title.includes("youtube") || (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube");
+    const isSpotify = appPackage.includes("spotify") || meta.includes("spotify") || prefersSpotify;
+    const isYouTube = appPackage.includes("youtube") || meta.includes("youtube") || title.includes("youtube") || prefersYouTube;
+    const wantSpotify = prefersSpotify || (!isYouTube && isSpotify);
+    const wantYouTube = prefersYouTube || isYouTube;
 
-    if (isSpotify) {
+    if (wantSpotify && !wantYouTube) {
       // Pop up the Spotify App on PC using open_uri with "spotify:"
       if (typeof performDesktopAction === "function") {
         performDesktopAction("open_uri", { uri: "spotify:" });
@@ -65,7 +76,7 @@ export function handleOpenMediaAction(post, context) {
       targetUrl = "spotify:";
     }
 
-    if (isYouTube) {
+    if (wantYouTube) {
       let youtubeUrl = resolveYouTubeUrl(desktopSnapshot.openUri) || resolvePostYouTubeUrl(post);
 
       // If we still do not have a direct YouTube URL, use snapshot artwork / metadata heuristics.

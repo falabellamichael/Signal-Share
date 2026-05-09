@@ -1891,7 +1891,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       post = findMatchedPost(nativeSnapshot);
     }
 
-    handleOpenMediaAction(post, { isNativeCapacitorApp, state, openViewer, desktopSnapshot, performDesktopAction });
+    handleOpenMediaAction(post, { isNativeCapacitorApp, state, openViewer, desktopSnapshot, performDesktopAction, parseYouTubeUrl });
   }
 
   function handleVolumeInput(event) {
