@@ -1805,6 +1805,20 @@ export function createAppUi(context) {
         state.heroPlayerPlaybackState = isPlaying ? "paused" : "playing";
         heroMediaPlayerController.render();
         return;
+      } else if (post.sourceKind === "spotify") {
+        // SPECIAL CASE: For Spotify in Feed mode, "Pause" unmounts the active player and returns to preview
+        console.log("[HeroUI] Spotify media: Reverting to preview (pause)");
+        if (state.heroPlayerElement) {
+          const frame = state.heroPlayerElement instanceof HTMLIFrameElement
+            ? state.heroPlayerElement
+            : state.heroPlayerElement.querySelector?.("iframe");
+          if (frame) frame.src = "about:blank";
+          state.heroPlayerElement.remove();
+        }
+        state.heroPlayerElement = null;
+        state.heroPlayerPlaybackState = "paused";
+        heroMediaPlayerController.render();
+        return;
       }
     }
 
