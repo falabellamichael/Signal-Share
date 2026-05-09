@@ -2053,7 +2053,10 @@ The companion bridge is designed with several security layers to keep your PC sa
       && !!state.heroPlayerElement
       && elements.heroPlayerStage.contains(state.heroPlayerElement);
 
-    const post = mode === "app" ? getHeroPost() : controllablePost;
+    // Prioritize the post that is actually active in the stage for metadata
+    const post = (mode === "app" && isHeroActive)
+      ? getPostById(state.heroPlayerPostId)
+      : (mode === "app" ? getHeroPost() : controllablePost);
 
     const mediaElement = getActivePlayerMediaElement();
     const fallbackMedia = getFallbackPageMediaElement();
