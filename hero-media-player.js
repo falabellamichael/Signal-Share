@@ -2053,11 +2053,6 @@ The companion bridge is designed with several security layers to keep your PC sa
       && !!state.heroPlayerElement
       && elements.heroPlayerStage.contains(state.heroPlayerElement);
 
-    // Prioritize the post that is actually active in the stage for metadata
-    const post = (mode === "app" && isHeroActive)
-      ? getPostById(state.heroPlayerPostId)
-      : (mode === "app" ? getHeroPost() : controllablePost);
-
     const mediaElement = getActivePlayerMediaElement();
     const fallbackMedia = getFallbackPageMediaElement();
     const browserMetadata = getBrowserMediaMetadata();
@@ -2073,6 +2068,13 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (mode === "app" && !isHeroActive) {
       playbackState = "paused";
     }
+
+    // LOCK HEADER: If we are actively playing a post in the hero player,
+    // lock the header to that post's metadata regardless of filter changes.
+    const isPlayingHeroPost = mode === "app" && isHeroActive && playbackState === "playing";
+    const post = isPlayingHeroPost
+      ? getPostById(state.heroPlayerPostId)
+      : (mode === "app" ? getHeroPost() : controllablePost);
 
     const supportsVolume = mode === "app" && (
       mediaElement instanceof HTMLMediaElement
