@@ -5,7 +5,7 @@
 
 export function handleOpenMediaAction(post, context) {
   const { isNativeCapacitorApp, openViewer, desktopSnapshot, performDesktopAction } = context;
-  
+
   if (!post && !desktopSnapshot?.available) {
     console.warn("handleOpenMediaAction: No active post or desktop session.");
     return;
@@ -32,7 +32,7 @@ export function handleOpenMediaAction(post, context) {
     const appPackage = (desktopSnapshot.appPackage || "").toLowerCase();
     const title = (desktopSnapshot.title || "").toLowerCase();
     const meta = (desktopSnapshot.meta || "").toLowerCase();
-    
+
     const isSpotify = appPackage.includes("spotify") || meta.includes("spotify");
     const isYouTube = appPackage.includes("youtube") || meta.includes("youtube") || title.includes("youtube");
 
@@ -46,24 +46,21 @@ export function handleOpenMediaAction(post, context) {
     }
 
     if (isYouTube) {
-      if (desktopSnapshot.openUri) {
-        window.open(desktopSnapshot.openUri, "_blank");
+      let youtubeUrl = desktopSnapshot.openUri;
+
+      // If openUri is missing but we have an artwork URL, try to extract the Video ID
+      if (!youtubeUrl && desktopSnapshot.artworkUri) {
+        const idMatch = desktopSnapshot.artworkUri.match(/\/vi\/([a-zA-Z0-9_-]{11})\//);
+        if (idMatch) youtubeUrl = `https://www.youtube.com/watch?v=${idMatch[1]}`;
+      }
+
+      if (youtubeUrl) {
+        window.open(youtubeUrl, "_blank");
         return;
       }
-      if (title || meta) {
-        const query = [title, meta].filter(Boolean).join(" ");
-        targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-      }
-    } else if (title || meta) {
-      // Generic fallback for unknown desktop media
-      const query = [title, meta].filter(Boolean).join(" ");
-      targetUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+      
+      // If we still have no URL but we have a matching post, it's handled by the fallback below
     }
-  }
-
-  if (!targetUrl) {
-    // If we still have no URL but we have a post, try its own properties
-    targetUrl = post?.externalUrl || post?.src || post?.mediaUrl;
   }
 
   if (!targetUrl) {
@@ -84,14 +81,14 @@ export function handleOpenMediaAction(post, context) {
 
 export function handleOpenPhoneAction(post, context) {
   const { isNativeCapacitorApp } = context;
-  
+
   if (!isNativeCapacitorApp()) return;
 
   const isSpotify = post?.sourceKind === "spotify";
-  
+
   if (isSpotify) {
     const spotifyUri = "spotify:";
-    
+
     if (typeof window.Capacitor !== "undefined" && window.Capacitor.Plugins.App) {
       window.Capacitor.Plugins.App.openUrl({ url: spotifyUri });
     } else {
