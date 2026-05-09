@@ -11,6 +11,14 @@ export function handleOpenMediaAction(post, context) {
     return;
   }
 
+  // Resolve the primary target URL fallback
+  let targetUrl = post?.externalUrl || post?.src;
+  if (post?.sourceKind === "youtube" && post?.externalId) {
+    targetUrl = `https://www.youtube.com/watch?v=${post.externalId}`;
+  } else if (post?.sourceKind === "spotify") {
+    targetUrl = "spotify:"; // Prioritize app URI for Spotify
+  }
+
   // 1. "Feed Mode": If we have a Signal Share hosted post, open it in the viewer
   if (post && post.sourceKind === "hosted") {
     if (typeof openViewer === "function") {
@@ -34,23 +42,13 @@ export function handleOpenMediaAction(post, context) {
         performDesktopAction("open_uri", { uri: "spotify:" });
         return;
       }
+      targetUrl = "spotify:";
     }
 
     if (isYouTube && desktopSnapshot.openUri) {
-      // Open the YouTube page on the browser
       window.open(desktopSnapshot.openUri, "_blank");
       return;
     }
-  }
-
-  // 3. Fallback: Resolve the best URL for opening the media externally
-  let targetUrl = post?.externalUrl || post?.src;
-
-  // Handle YouTube/Spotify specific canonicalization if it's an embed
-  if (post?.sourceKind === "youtube" && post?.externalId) {
-    targetUrl = `https://www.youtube.com/watch?v=${post.externalId}`;
-  } else if (post?.sourceKind === "spotify" && post?.externalId) {
-    targetUrl = `https://open.spotify.com/${post.mediaKind || "track"}/${post.externalId}`;
   }
 
   if (!targetUrl) {

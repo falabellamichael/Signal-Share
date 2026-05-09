@@ -2166,6 +2166,12 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (elements.heroPlayerCaption.textContent !== nextCaption) elements.heroPlayerCaption.textContent = nextCaption;
     if (elements.heroPlayerStatus.textContent !== nextStatus) elements.heroPlayerStatus.textContent = nextStatus;
 
+    const isSpotifySelected = post?.sourceKind === "spotify" || isSpotifyActive;
+    const openMediaLabel = isSpotifySelected ? "Open Spotify" : (post?.sourceKind === "youtube" ? "Open YouTube" : "Open Media");
+    if (elements.heroPlayerOpenMediaButton.textContent !== openMediaLabel) {
+      elements.heroPlayerOpenMediaButton.textContent = openMediaLabel;
+    }
+
     const playPauseLabel = playbackState === "playing" ? "Pause" : "Play";
     if (elements.heroPlayerPlayPauseButton.textContent !== playPauseLabel) {
       elements.heroPlayerPlayPauseButton.textContent = playPauseLabel;
@@ -2180,8 +2186,8 @@ The companion bridge is designed with several security layers to keep your PC sa
     const isSpotifyPost = post?.sourceKind === "spotify";
     const showOpenPhone = isAndroid && isSpotifyPost;
 
-    if (elements.heroPlayerOpenPhoneButton.hidden !== !showOpenPhone) {
-      elements.heroPlayerOpenPhoneButton.hidden = !showOpenPhone;
+    if (elements.heroPlayerOpenPhoneButton.hidden !== true) {
+      elements.heroPlayerOpenPhoneButton.hidden = true;
     }
 
     if (elements.heroPlayerVolumeSlider.disabled !== !supportsVolume) {
