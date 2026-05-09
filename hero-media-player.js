@@ -2181,6 +2181,12 @@ The companion bridge is designed with several security layers to keep your PC sa
       syncArtist = nextCaption || syncArtist;
     }
 
+    // Harden the UI labels: Only show header, clear others
+    nextHeader = (playbackState === "playing" ? "NOW PLAYING" : "PAUSED");
+    nextTitle = "";
+    nextCaption = "";
+    nextStatus = "";
+
     // Only touch the DOM if values have changed
     if (elements.heroPlayerHeader.textContent !== nextHeader) elements.heroPlayerHeader.textContent = nextHeader;
     if (elements.heroPlayerTitle.textContent !== nextTitle) elements.heroPlayerTitle.textContent = nextTitle;

@@ -441,10 +441,10 @@ function createPostStandbyPreview(post, options = {}) {
   });
 
   const cardData = {
-    badge: `UP NEXT · ${providerLabel || "App Media"}`,
-    title: post.title || "Next playable post",
-    meta: meta,
-    note: "Press Play to start playback.",
+    badge: "PAUSED",
+    title: "",
+    meta: "",
+    note: "",
     artworkUrl,
   };
 
@@ -546,46 +546,44 @@ export function renderHeroStagePreview(options = {}) {
   if (mode === "device") {
     if (nativeSnapshot?.permissionRequired) {
       commitCard(stage, {
-        badge: "ON-DEVICE MEDIA",
-        title: "Enable access",
-        meta: "Allow media access to control this device.",
-        note: "Use Play to open settings.",
+        badge: "PAUSED",
+        title: "",
+        meta: "",
+        note: "",
       });
       return;
     }
 
     if (nativeSnapshot?.active) {
-      const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
 
       commitCard(stage, {
-        badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
-        title: (nativeSnapshot.title || matchedPost?.title || "Now playing"),
-        meta: (nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback")),
-        note: (nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
+        badge: (nativeSnapshot.playbackState === "paused" ? "PAUSED" : "NOW PLAYING"),
+        title: "",
+        meta: "",
+        note: "",
         artworkUrl: artworkUrl,
       });
       return;
     }
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "ON-DEVICE MEDIA",
-      title: "No active playback",
-      meta: "Start a track in any media app on this device.",
+      badge: "PAUSED",
+      title: "",
+      meta: "",
     });
     return;
   }
 
   if (mode === "desktop") {
     if (desktopSnapshot?.active) {
-      const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
       const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
 
       commitCard(stage, {
-        badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
-        title: (desktopSnapshot.title || matchedPost?.title || "Now playing"),
-        meta: (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback")),
-        note: (desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
+        badge: (desktopSnapshot.playbackState === "paused" ? "PAUSED" : "NOW PLAYING"),
+        title: "",
+        meta: "",
+        note: "",
         artworkUrl: artworkUrl,
       });
       return;
@@ -598,36 +596,29 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "PC SYSTEM MEDIA",
-      title: "Waiting for playback",
-      meta: "Start YouTube, Spotify, or another desktop app.",
+      badge: "PAUSED",
+      title: "",
+      meta: "",
     });
     return;
   }
 
   if (!post && canUseFallbackMedia(fallbackMedia)) {
-    const metadata = safeCall(getBrowserMediaMetadata, null);
-    const fallbackTitle = metadata?.title || fallbackMedia.getAttribute("title") || "Browser playback";
-    const fallbackMetaRaw = [metadata?.artist, metadata?.album].filter(Boolean).join(" · ");
-    const fallbackMeta = typeof sanitizeSnapshotMeta === "function"
-      ? safeCall(sanitizeSnapshotMeta, fallbackMetaRaw, fallbackMetaRaw, "")
-      : fallbackMetaRaw;
-
     commitCard(stage, {
-      badge: "",
-      title: fallbackTitle,
-      meta: metadata?.artist || "Active media",
+      badge: (fallbackMedia.paused ? "PAUSED" : "NOW PLAYING"),
+      title: "",
+      meta: "",
       note: "",
-      artworkUrl: metadata?.artworkUrl || "",
+      artworkUrl: "",
     });
     return;
   }
 
   if (!post) {
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "",
-      title: "Ready",
-      meta: "Select media to begin",
+      badge: "PAUSED",
+      title: "",
+      meta: "",
       note: "",
     });
     return;
@@ -648,8 +639,8 @@ export function renderHeroStagePreview(options = {}) {
   if (externalMetadata instanceof Promise) {
     commitCard(stage, {
       badge: "NOW PLAYING",
-      title: post.title || "Now playing",
-      meta: formatPostMeta(post, creatorSummary),
+      title: "",
+      meta: "",
       artworkUrl: artworkUrl,
     });
 
@@ -658,8 +649,8 @@ export function renderHeroStagePreview(options = {}) {
       if (metadata) {
         commitCard(stage, {
           badge: "NOW PLAYING",
-          title: metadata?.title || post.title || "Now playing",
-          meta: metadata.creator || "",
+          title: "",
+          meta: "",
           artworkUrl: metadata?.artworkUrl || artworkUrl,
         });
       }
@@ -671,8 +662,8 @@ export function renderHeroStagePreview(options = {}) {
 
   commitCard(stage, {
     badge: "NOW PLAYING",
-    title: resolvedMetadata?.title || post.title || "Now playing",
-    meta: resolvedMetadata?.creator || formatPostMeta(post, creatorSummary),
-    artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
+    title: "",
+    meta: "",
+    artworkUrl: artworkUrl,
   });
 }
