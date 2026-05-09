@@ -2304,7 +2304,6 @@ export function createAppUi(context) {
         badge: variant === "card" ? "" : formatPostBadge(post, formatKind, getSignalLabel),
         title: displayTitle,
         meta: displayArtist || "",
-        user: variant === "card" ? originalCreator : "",
         note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player.",
         artworkUrl: metadata?.artworkUrl || artworkUrl,
         showMetadata: variant === "card" || variant === "spotlight"
