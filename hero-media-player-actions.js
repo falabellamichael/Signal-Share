@@ -45,9 +45,15 @@ export function handleOpenMediaAction(post, context) {
       targetUrl = "spotify:";
     }
 
-    if (isYouTube && desktopSnapshot.openUri) {
-      window.open(desktopSnapshot.openUri, "_blank");
-      return;
+    if (isYouTube) {
+      if (desktopSnapshot.openUri) {
+        window.open(desktopSnapshot.openUri, "_blank");
+        return;
+      }
+      // If we don't have a URL, at least try to search for the title
+      if (title) {
+        targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(title)}`;
+      }
     }
   }
 
