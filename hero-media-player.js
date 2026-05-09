@@ -1,4 +1,5 @@
 import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js";
+import { handleOpenMediaAction, handleOpenPhoneAction } from "./hero-media-player-actions.js";
 
 
 
@@ -33,6 +34,7 @@ export function createHeroMediaPlayerController(options) {
     resolveYouTubePreviewId,
     isNativeCapacitorApp,
     getCapacitorPlatform,
+    openViewer,
     onStatusChange
   } = options;
 
@@ -45,6 +47,7 @@ export function createHeroMediaPlayerController(options) {
   const DESKTOP_ACTION_PREVIOUS = "previous";
   const DESKTOP_POLL_INTERVAL_MS = 800;
   const LOCAL_NETWORK_PROMPT_COOLDOWN_MS = 30000;
+  const SNAPSHOT_INGEST_DELAY_MS = 2400;
 
   let listenersAttached = false;
   let nativeSnapshot = null;
@@ -191,6 +194,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       && elements.heroPlayerStatus
       && elements.heroPlayerStage
       && elements.heroPlayerPlayPauseButton
+      && elements.heroPlayerOpenMediaButton
       && elements.heroPlayerPrevButton
       && elements.heroPlayerNextButton
       && elements.heroPlayerVolumeSlider
@@ -1268,6 +1272,12 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     desktopSnapshotReadPromise = readDesktopSnapshot()
       .then((snapshot) => {
+        // Prevent optimistic state flicker: Ignore incoming snapshots if an action was just performed
+        if (Date.now() - lastDesktopActionAt < SNAPSHOT_INGEST_DELAY_MS) {
+          desktopSnapshotReadPromise = null;
+          return desktopSnapshot;
+        }
+
         const nextSignature = getDesktopSnapshotSignature(snapshot);
         const didChange = nextSignature !== lastDesktopSnapshotSignature;
 
@@ -1833,19 +1843,11 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function handleOpenPhone() {
-    const post = getControllablePlayerPost();
-    const isSpotify = post?.sourceKind === "spotify";
+    handleOpenPhoneAction(getControllablePlayerPost(), { isNativeCapacitorApp, state, openViewer, desktopSnapshot, performDesktopAction });
+  }
 
-    if (isSpotify && isNativeCapacitorApp()) {
-      // Open the Spotify app without specific track URI to avoid interrupting playback
-      const spotifyUri = "spotify:";
-      
-      if (typeof window.Capacitor !== "undefined" && window.Capacitor.Plugins.App) {
-        window.Capacitor.Plugins.App.openUrl({ url: spotifyUri });
-      } else {
-        window.open(spotifyUri, "_system");
-      }
-    }
+  function handleOpenMedia() {
+    handleOpenMediaAction(getControllablePlayerPost(), { isNativeCapacitorApp, state, openViewer, desktopSnapshot, performDesktopAction });
   }
 
   function handleVolumeInput(event) {
@@ -1886,6 +1888,11 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     elements.heroPlayerPlayPauseButton.addEventListener("click", (event) => {
       handlePlayPause();
+      if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
+    });
+
+    elements.heroPlayerOpenMediaButton.addEventListener("click", (event) => {
+      handleOpenMedia();
       if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
     });
 

@@ -228,6 +228,7 @@ export function createAppUi(context) {
     heroPlayerPlayPauseButton: document.querySelector("#heroPlayerPlayPauseButton"),
     heroPlayerPrevButton: document.querySelector("#heroPlayerPrevButton"),
     heroPlayerNextButton: document.querySelector("#heroPlayerNextButton"),
+    heroPlayerOpenMediaButton: document.querySelector("#heroPlayerOpenMediaButton"),
     heroPlayerVolumeSlider: document.querySelector("#heroPlayerVolumeSlider"),
     heroPlayerVolumeValue: document.querySelector("#heroPlayerVolumeValue"),
     heroPlayerOpenMiniButton: document.querySelector("#heroPlayerOpenMiniButton"),
@@ -387,6 +388,7 @@ export function createAppUi(context) {
     resolveYouTubePreviewId,
     isNativeCapacitorApp,
     getCapacitorPlatform,
+    openViewer,
     onStatusChange: render
   });
 
