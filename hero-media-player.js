@@ -804,18 +804,18 @@ The companion bridge is designed with several security layers to keep your PC sa
       const resolved = new URL(url, window.location.href);
       const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
       if (addressSpace !== "local" && addressSpace !== "private" && addressSpace !== "loopback") return init;
-      
+
       const secret = localStorage.getItem("ss_bridge_secret");
       const headers = { ...init.headers };
       if (secret) {
         headers["X-Bridge-Secret"] = secret;
       }
-      
+
       // Ensure we do NOT send 'target-address-space' as a header, as it's a restricted 
       // fetch option property, not a header. Sending it as a header triggers CORS failures.
       delete headers["target-address-space"];
       delete headers["Target-Address-Space"];
-      
+
       return {
         ...init,
         headers,
@@ -1582,7 +1582,7 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   function performNativeAction(action) {
     if (!hasNativeActionBridge()) return false;
-    
+
     const now = Date.now();
     if (nativeActionInFlight && now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) {
       return false;
@@ -1594,7 +1594,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       nativeActionInFlight = true;
 
       const success = bridge.performNowPlayingAction(action);
-      
+
       window.setTimeout(() => {
         nativeActionInFlight = false;
         if (Date.now() - lastNativeActionAt > 900) refreshNativeSnapshot();
@@ -2027,7 +2027,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     const playableCount = playablePosts.length;
     const controllablePost = getControllablePlayerPost();
     const mode = getEffectiveHeroMode(controllablePost);
-    
+
     const canStep = playableCount > 1;
 
     if (elements.heroPlayerPrevButton.disabled !== !canStep) {
