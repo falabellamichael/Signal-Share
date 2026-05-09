@@ -1141,87 +1141,6 @@
       z-index: 1000;
     }
 
-    body[data-theme="contrast"] .message-emoji-panel {
-      border: none !important;
-      background: #000000 !important;
-    }
-
-    .emoji-panel-header {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .emoji-category-tab {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid transparent;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 1.2rem;
-      transition: all 0.2s ease;
-    }
-
-    .emoji-category-tab:hover {
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .emoji-category-tab.is-active {
-      background: var(--accent);
-      border-color: #000;
-      color: #000;
-    }
-
-    .emoji-panel-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-      gap: 6px;
-      max-height: 240px;
-      overflow-y: auto;
-      padding-right: 4px;
-      scrollbar-width: thin;
-      scrollbar-color: transparent transparent;
-    }
-
-    .emoji-panel-grid:hover {
-      scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
-    }
-
-    .emoji-panel-grid::-webkit-scrollbar {
-      width: 5px;
-    }
-
-    .emoji-panel-grid::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .emoji-panel-grid::-webkit-scrollbar-thumb {
-      background: transparent;
-      border-radius: 10px;
-    }
-
-    .emoji-panel-grid:hover::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .message-emoji-panel.is-collapsed .emoji-panel-grid {
-      overflow-y: hidden;
-      max-height: none;
-    }
-
-    .emoji-chip {
-      min-width: 40px;
-      min-height: 40px;
-      border-radius: 12px;
-      font-size: 1.1rem;
-    }
-
     .message-form-actions {
       align-items: end;
     }
@@ -1906,7 +1825,7 @@
     /* FORCE BLACK PROFILE BACKGROUND AT END OF FILE */
     body[data-theme='contrast'] .profile-view-dialog {
       background: #000000 !important;
-      border-color: rgba(255, 255, 255, 0.5) !important;
+      border: none !important;
     }
 
     body[data-theme='contrast'] .profile-view {
@@ -1998,7 +1917,7 @@
     body[data-theme='contrast'] .profile-stat,
     body[data-theme='contrast'] .feed-page-button {
       background: #000000 !important;
-      border-color: rgba(255, 255, 255, 0.4) !important;
+      border: none !important;
       color: #ffffff !important;
     }
 

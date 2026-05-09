@@ -445,7 +445,7 @@ body[data-theme="contrast"] .theme-picker-menu,
 body[data-theme="contrast"] .theme-option-tile,
 body[data-theme="contrast"] .feed-page-button {
   background: #000000;
-  border: 1px solid #ffffff;
+  border: none !important;
   color: #ffffff;
 }
 
@@ -511,13 +511,13 @@ body[data-theme="contrast"] .admin-ban-panel,
 body[data-theme="contrast"] .settings-dialog,
 body[data-theme="contrast"] .preview-card {
   background: rgba(0, 0, 0, 0.94);
-  border-color: rgba(255, 255, 255, 0.5);
+  border: none !important;
 }
 
 /* High Contrast Messenger Bubbles */
 body[data-theme="contrast"] .message-bubble {
   background: #000000 !important;
-  border: 1px solid #ffffff !important;
+  border: none !important;
   color: #ffffff !important;
 }
 
@@ -539,7 +539,7 @@ body[data-theme="contrast"] .message-bubble span {
 /* Explicit Black Background for Profiles in High Contrast */
 body[data-theme="contrast"] .profile-view-dialog {
   background: #000000 !important;
-  border-color: rgba(255, 255, 255, 0.5) !important;
+  border: none !important;
 }
 
 body[data-theme="ember"] .site-header,
@@ -627,7 +627,7 @@ body[data-theme="contrast"] .dropzone {
   background:
     linear-gradient(145deg, rgba(255, 242, 0, 0.16), rgba(0, 229, 255, 0.14)),
     rgba(0, 0, 0, 0.72);
-  border-color: var(--line);
+  border: none !important;
 }
 
 body[data-theme="ember"] .dropzone {
@@ -677,7 +677,7 @@ body[data-theme="contrast"] .button-primary {
   background: #fff200;
   color: #000000;
   font-weight: 700;
-  border: 1px solid #000000;
+  border: none !important;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
 }
 
@@ -718,8 +718,7 @@ body[data-theme="contrast"] .shortcut-item {
 body[data-theme="contrast"] .keyboard-key {
   background: #000000;
   color: #ffffff;
-  border: 1px solid #ffffff;
-  border-bottom-width: 1px;
+  border: none !important;
   box-shadow: none;
 }
 
