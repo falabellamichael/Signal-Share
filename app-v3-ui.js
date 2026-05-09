@@ -1308,33 +1308,11 @@ export function createAppUi(context) {
 
     shortcuts.forEach(([key, info]) => {
       const item = document.createElement("div");
-      item.style.display = "flex";
-      item.style.justifyContent = "space-between";
-      item.style.alignItems = "center";
-      item.style.padding = "12px 16px";
-      item.style.background = "var(--surface, rgba(255, 250, 242, 0.5))";
-      item.style.borderRadius = "12px";
-      item.style.border = "1px solid var(--line, rgba(19, 33, 43, 0.1))";
+      item.className = "shortcut-item";
 
       item.innerHTML = `
-        <span style="font-size: 0.95rem; font-weight: 500; color: var(--text, #13212b);">${info.description}</span>
-        <kbd style="
-          background: #fff;
-          color: #081017;
-          padding: 4px 10px;
-          border-radius: 8px;
-          border: 1px solid var(--line, rgba(19, 33, 43, 0.2));
-          border-bottom: 3px solid var(--line, rgba(19, 33, 43, 0.3));
-          font-family: inherit;
-          font-weight: 700;
-          font-size: 0.8rem;
-          min-width: 32px;
-          text-align: center;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        ">${key}</kbd>
+        <span style="font-size: 0.95rem; font-weight: 500; color: var(--text);">${info.description}</span>
+        <kbd class="keyboard-key">${key}</kbd>
       `;
       elements.shortcutsList.appendChild(item);
     });
