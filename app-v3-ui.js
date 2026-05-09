@@ -1184,9 +1184,10 @@ export function createAppUi(context) {
       emojis = emojis.slice(0, 36);
     }
 
-    const emojisHtml = emojis.map(emoji => `
-      <button class="emoji-chip" type="button" data-emoji="${emoji.char}" aria-label="Insert ${emoji.label.toLowerCase()}">${emoji.char}</button>
-    `).join("");
+    const emojisHtml = emojis.map(emoji => {
+      const tooltip = emoji.tags ? `${emoji.label} (${emoji.tags})` : emoji.label;
+      return `<button class="emoji-chip" type="button" data-emoji="${emoji.char}" title="${tooltip}" aria-label="Insert ${emoji.label.toLowerCase()}">${emoji.char}</button>`;
+    }).join("");
 
     grid.innerHTML = emojisHtml || '<p class="emoji-search-empty">No emojis found.</p>';
     elements.messageEmojiPanel.classList.toggle("is-collapsed", isCollapsed);
