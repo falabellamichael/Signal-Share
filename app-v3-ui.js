@@ -1634,11 +1634,31 @@ export function createAppUi(context) {
     elements.spotlightCard.innerHTML = ""; if (posts.length === 0) { const empty = document.createElement("div"); empty.className = "spotlight-empty"; empty.innerHTML = "<p class=\"eyebrow\">Spotlight</p><h3>No active spotlight</h3><p>Change the filter or publish a new post to refresh the board.</p>"; elements.spotlightCard.appendChild(empty); return; }
     const post = getSpotlightPost(posts); const creatorSummary = getProfileSummaryForPost(post); const copy = document.createElement("div"); copy.className = "spotlight-copy";
     const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow"; eyebrow.textContent = "Spotlight"; const title = document.createElement("h3"); title.className = "spotlight-title"; title.textContent = post.title; const caption = document.createElement("p"); caption.className = "spotlight-caption"; caption.textContent = post.caption;
-    const meta = document.createElement("div"); meta.className = "spotlight-meta"; const creator = document.createElement("button"); creator.type = "button"; creator.className = "profile-trigger"; creator.textContent = creatorSummary?.displayName ?? post.creator; if (creatorSummary) creator.addEventListener("click", (event) => openProfileByKey(creatorSummary.key, event.currentTarget));
+    const meta = document.createElement("div"); meta.className = "spotlight-meta"; const creator = document.createElement("button"); creator.type = "button"; creator.className = "profile-trigger";
+    const originalCreator = creatorSummary?.displayName ?? post.creator;
+    creator.innerHTML = `<span style="font-size: 1.15em; font-weight: 600;">User: ${originalCreator}</span>`;
+    if (creatorSummary) creator.addEventListener("click", (event) => openProfileByKey(creatorSummary.key, event.currentTarget));
     const info = document.createElement("span"); info.textContent = `${formatKind(post.mediaKind)} / ${getLikeCount(post)} likes`; meta.append(creator, info);
     const actions = document.createElement("div"); actions.className = "spotlight-actions"; const openButton = document.createElement("button"); openButton.className = "button button-primary"; openButton.type = "button"; openButton.textContent = isPlayablePost(post) ? "Open player" : "Open spotlight"; openButton.addEventListener("click", (event) => { if (isPlayablePost(post)) openMiniPlayer(post.id, event.currentTarget); else openViewer(post.id, event.currentTarget); });
     const saveButton = document.createElement("button"); saveButton.className = "button button-secondary"; saveButton.type = "button"; saveButton.textContent = isPostSaved(post.id) ? "Saved locally" : "Save post"; saveButton.addEventListener("click", () => toggleSave(post.id)); actions.append(openButton, saveButton); copy.append(eyebrow, title, caption, meta, actions);
     const media = document.createElement("div"); media.className = "spotlight-media"; renderSpotlightMedia(media, post); elements.spotlightCard.append(copy, media);
+
+    // Resolve external metadata for rich spotlight display
+    if (post.sourceKind === "youtube" || post.sourceKind === "spotify") {
+      const externalMetadata = getExternalPreviewMetadata(post);
+      const applyRichSpotlight = (m) => {
+        if (!m || !elements.spotlightCard.contains(copy)) return;
+        const isGenericTitle = !post.title || post.title === "External content" || post.title.toLowerCase().includes("spotify") || post.title.toLowerCase().includes("youtube");
+        if (m.title && isGenericTitle) {
+          title.textContent = m.title;
+        }
+      };
+      if (externalMetadata instanceof Promise) {
+        externalMetadata.then(applyRichSpotlight).catch(() => {});
+      } else {
+        applyRichSpotlight(externalMetadata);
+      }
+    }
   }
 
   function renderCreatorBoard(posts) {
@@ -2271,7 +2291,7 @@ export function createAppUi(context) {
         user: originalCreator,
         note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player.",
         artworkUrl: metadata?.artworkUrl || artworkUrl,
-        showMetadata: variant === "card"
+        showMetadata: variant === "card" || variant === "spotlight"
       });
     };
 
