@@ -443,7 +443,7 @@ function createPostStandbyPreview(post, options = {}) {
   const isYouTube = post.sourceKind === "youtube" || isYouTubeMode;
   const shouldHideText = isHardenedEnvironment && isYouTube;
   const cardData = {
-    badge: shouldHideText ? "" : `UP NEXT · ${providerLabel || "App Media"}`,
+    badge: `UP NEXT · ${providerLabel || "App Media"}`,
     title: shouldHideText ? "" : (post.title || "Next playable post"),
     meta: shouldHideText ? "" : meta,
     note: shouldHideText ? "" : "Press Play to start playback.",
@@ -564,7 +564,7 @@ export function renderHeroStagePreview(options = {}) {
       const isYouTube = matchedPost?.sourceKind === "youtube" || (nativeSnapshot?.appPackage && nativeSnapshot.appPackage.toLowerCase().includes("youtube")) || snapshotTitle.includes("youtube") || isYouTubeMode;
       const shouldHideText = isHardenedEnvironment && isYouTube;
       commitCard(stage, {
-        badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
+        badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
         title: shouldHideText ? "" : (nativeSnapshot.title || matchedPost?.title || "Now playing"),
         meta: shouldHideText ? "" : (nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback")),
         note: shouldHideText ? "" : (nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
@@ -590,7 +590,7 @@ export function renderHeroStagePreview(options = {}) {
       const isYouTube = matchedPost?.sourceKind === "youtube" || (desktopSnapshot?.appPackage && desktopSnapshot.appPackage.toLowerCase().includes("youtube")) || snapshotTitle.includes("youtube") || isYouTubeMode;
       const shouldHideText = isHardenedEnvironment && isYouTube;
       commitCard(stage, {
-        badge: shouldHideText ? "" : (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
+        badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
         title: shouldHideText ? "" : (desktopSnapshot.title || matchedPost?.title || "Now playing"),
         meta: shouldHideText ? "" : (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback")),
         note: shouldHideText ? "" : (desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
@@ -658,7 +658,7 @@ export function renderHeroStagePreview(options = {}) {
     const shouldHideText = isHardenedEnvironment && isYouTube;
     // Render initial card with fallback while metadata loads
     commitCard(stage, {
-      badge: "",
+      badge: "NOW PLAYING",
       title: shouldHideText ? "" : (post.title || "Now playing"),
       meta: shouldHideText ? "" : formatPostMeta(post, creatorSummary),
       artworkUrl: artworkUrl,
@@ -670,7 +670,7 @@ export function renderHeroStagePreview(options = {}) {
         const isYouTube = post?.sourceKind === "youtube" || isYouTubeMode;
         const shouldHideText = isHardenedEnvironment && isYouTube;
         commitCard(stage, {
-          badge: "",
+          badge: "NOW PLAYING",
           title: shouldHideText ? "" : (metadata?.title || post.title || "Now playing"),
           meta: shouldHideText ? "" : (metadata.creator || ""),
           artworkUrl: metadata?.artworkUrl || artworkUrl,
@@ -685,7 +685,7 @@ export function renderHeroStagePreview(options = {}) {
   const isYouTube = post?.sourceKind === "youtube" || isYouTubeMode;
   const shouldHideText = isHardenedEnvironment && isYouTube;
   commitCard(stage, {
-    badge: "",
+    badge: "NOW PLAYING",
     title: shouldHideText ? "" : (resolvedMetadata?.title || post.title || "Now playing"),
     meta: shouldHideText ? "" : (resolvedMetadata?.creator || formatPostMeta(post, creatorSummary)),
     artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,

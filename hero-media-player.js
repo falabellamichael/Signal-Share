@@ -2029,7 +2029,6 @@ The companion bridge is designed with several security layers to keep your PC sa
         const shouldHideText = isHardenedEnvironment && (isYouTube || isYouTubeMode);
 
           if (shouldHideText) {
-            nextHeader = "";
             nextTitle = "";
             nextCaption = "";
             nextStatus = "";
@@ -2054,7 +2053,6 @@ The companion bridge is designed with several security layers to keep your PC sa
         const shouldHideText = isHardenedEnvironment && (isYouTube || isYouTubeMode);
 
           if (shouldHideText) {
-            nextHeader = "";
             nextTitle = "";
             nextCaption = "";
             nextStatus = "";
@@ -2118,7 +2116,6 @@ The companion bridge is designed with several security layers to keep your PC sa
       const shouldHideText = isHardenedEnvironment && isYouTube;
 
       if (shouldHideText) {
-        nextHeader = "";
         nextTitle = "";
         nextCaption = "";
         nextStatus = "";
