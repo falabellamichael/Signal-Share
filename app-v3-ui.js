@@ -615,10 +615,19 @@ export function createAppUi(context) {
   }
 
   function setHeroControlSource(source) {
+    const isFeedMode = state.heroControlMode === "feed";
+    const currentSource = state.heroControlSource;
+
+    // In Feed mode, clicking an already active source toggle turns it off (sets back to "all")
+    let targetSource = source;
+    if (isFeedMode && currentSource === source) {
+      targetSource = "all";
+    }
+
     if (heroMediaPlayerController && typeof heroMediaPlayerController.setHeroControlSource === "function") {
-      heroMediaPlayerController.setHeroControlSource(source);
+      heroMediaPlayerController.setHeroControlSource(targetSource);
     } else {
-      state.heroControlSource = source;
+      state.heroControlSource = targetSource;
     }
 
     render();
