@@ -1636,7 +1636,7 @@ export function createAppUi(context) {
     const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow"; eyebrow.textContent = "Spotlight"; const title = document.createElement("h3"); title.className = "spotlight-title"; title.textContent = post.title; const caption = document.createElement("p"); caption.className = "spotlight-caption"; caption.textContent = post.caption;
     const meta = document.createElement("div"); meta.className = "spotlight-meta"; const creator = document.createElement("button"); creator.type = "button"; creator.className = "profile-trigger";
     const originalCreator = creatorSummary?.displayName ?? post.creator;
-    creator.innerHTML = `<span style="font-size: 1.15em; font-weight: 600;">User: ${originalCreator}</span>`;
+    creator.innerHTML = `<span style="font-size: 1.15em; font-weight: 600;">${originalCreator}</span>`;
     if (creatorSummary) creator.addEventListener("click", (event) => openProfileByKey(creatorSummary.key, event.currentTarget));
     const info = document.createElement("span"); info.textContent = `${formatKind(post.mediaKind)} / ${getLikeCount(post)} likes`; meta.append(creator, info);
     const actions = document.createElement("div"); actions.className = "spotlight-actions"; const openButton = document.createElement("button"); openButton.className = "button button-primary"; openButton.type = "button"; openButton.textContent = isPlayablePost(post) ? "Open player" : "Open spotlight"; openButton.addEventListener("click", (event) => { if (isPlayablePost(post)) openMiniPlayer(post.id, event.currentTarget); else openViewer(post.id, event.currentTarget); });
@@ -2288,7 +2288,7 @@ export function createAppUi(context) {
         badge: formatPostBadge(post, formatKind, getSignalLabel),
         title: displayTitle,
         meta: displayArtist || "",
-        user: originalCreator,
+        user: variant === "card" ? originalCreator : "",
         note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player.",
         artworkUrl: metadata?.artworkUrl || artworkUrl,
         showMetadata: variant === "card" || variant === "spotlight"
