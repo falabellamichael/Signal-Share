@@ -445,8 +445,28 @@ body[data-theme="contrast"] .theme-picker-menu,
 body[data-theme="contrast"] .theme-option-tile,
 body[data-theme="contrast"] .feed-page-button {
   background: #000000;
-  border: 1px solid #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
   color: #ffffff;
+  box-shadow: none !important;
+}
+
+body[data-theme="contrast"] .conversation-button.is-active,
+body[data-theme="contrast"] .person-button.is-active {
+  background: #fff200 !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+body[data-theme="contrast"] .conversation-button.is-active strong,
+body[data-theme="contrast"] .conversation-button.is-active span,
+body[data-theme="contrast"] .person-button.is-active strong,
+body[data-theme="contrast"] .person-button.is-active span {
+  color: #000000 !important;
+}
+
+body[data-theme="contrast"] .conversation-button span,
+body[data-theme="contrast"] .person-button span {
+  color: rgba(255, 255, 255, 0.7) !important;
 }
 
 body[data-theme="contrast"] .emoji-category-tab.is-active {
@@ -534,8 +554,6 @@ body[data-theme="contrast"] .hero-player-active-stage,
 body[data-theme="contrast"] .mini-player-stage,
 body[data-theme="contrast"] .external-preview-card,
 body[data-theme="contrast"] .status-pill,
-body[data-theme="contrast"] .person-row,
-body[data-theme="contrast"] .conversation-row,
 body[data-theme="contrast"] .profile-badge,
 body[data-theme="contrast"] .activation-code,
 body[data-theme="contrast"] .brand-mark {
