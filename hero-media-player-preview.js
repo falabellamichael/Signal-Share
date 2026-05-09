@@ -422,7 +422,7 @@ function createPostStandbyPreview(post, options = {}) {
     getSpotifyPreviewImageUrl,
     isHardenedEnvironment,
     isYouTubeMode,
-    isSpotifyMode,
+    isSpotifyActive,
   } = options;
 
   const creatorSummary = safeCall(getProfileSummaryForPost, null, post);
@@ -538,7 +538,7 @@ export function renderHeroStagePreview(options = {}) {
     getSpotifyPreviewImageUrl,
     isHardenedEnvironment,
     isYouTubeMode,
-    isSpotifyMode,
+    isSpotifyActive,
   };
 
   const standbyPost = !post && typeof getStandbyPreviewPost === "function"
