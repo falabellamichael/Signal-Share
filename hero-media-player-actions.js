@@ -126,18 +126,45 @@ export function handleOpenMediaAction(post, context) {
 }
 
 export function handleOpenPhoneAction(post, context) {
-  const { isNativeCapacitorApp, state } = context;
-  if (!isNativeCapacitorApp()) return;
+  const { isNativeCapacitorApp, state, performDesktopAction, parseYouTubeUrl } = context;
 
+  // 1. Android Native App -> "Open PC" Action
+  if (isNativeCapacitorApp()) {
+    const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+
+    let targetUri = "";
+    if (preferredSource === "youtube") {
+      // Prioritize the currently active feed post
+      if (post?.sourceKind === "youtube") {
+        targetUri = post.externalUrl || post.src || (post.externalId ? `https://www.youtube.com/watch?v=${post.externalId}` : "");
+      } else {
+        targetUri = "https://www.youtube.com";
+      }
+    } else if (preferredSource === "spotify") {
+      if (post?.sourceKind === "spotify") {
+        targetUri = post.externalUrl || post.src || "spotify:";
+      } else {
+        targetUri = "spotify:";
+      }
+    }
+
+    if (targetUri && typeof performDesktopAction === "function") {
+      console.log(`[Hero] Open PC triggered for ${preferredSource}. URI: ${targetUri}`);
+      performDesktopAction("open_uri", { uri: targetUri });
+    }
+    return;
+  }
+
+  // 2. PC Browser -> "Open Phone" Action
   const bridge = window.NativeBridge;
   if (bridge && typeof bridge.openNowPlayingMediaApp === "function") {
     // If we have a specific post (either passed in or from state), try to open its URI
     const targetPost = post || (typeof context.getControllablePlayerPost === "function" ? context.getControllablePlayerPost() : null);
-    
+
     if (targetPost) {
-       // We have a post, so try to open it explicitly
-       handleOpenMediaAction(targetPost, context);
-       return;
+      // We have a post, so try to open it explicitly
+      handleOpenMediaAction(targetPost, context);
+      return;
     }
 
     // Otherwise, open the last active media app on the phone without an explicit URI

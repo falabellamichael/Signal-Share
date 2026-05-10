@@ -1817,6 +1817,12 @@ The companion bridge is designed with several security layers to keep your PC sa
           playbackState: nextPlaybackState,
         };
         lastDesktopSnapshotSignature = getDesktopSnapshotSignature(desktopSnapshot);
+
+        if (elements.heroPlayerPlayPauseButton) {
+          elements.heroPlayerPlayPauseButton.classList.add('optimistic-pulse');
+          setTimeout(() => elements.heroPlayerPlayPauseButton.classList.remove('optimistic-pulse'), 400);
+        }
+
         render();
       }
 
@@ -1958,7 +1964,12 @@ The companion bridge is designed with several security layers to keep your PC sa
     state.playerVolume = volume;
     savePlayerVolume(state.playerVolume);
 
-    if (mode === "desktop" && desktopSnapshot?.available) {
+    if (mode === "device") {
+      const bridge = getNativeBridge();
+      if (bridge && typeof bridge.setNowPlayingVolume === "function") {
+        bridge.setNowPlayingVolume(volume);
+      }
+    } else if (mode === "desktop" && desktopSnapshot?.available) {
       // Windows SMTC does not expose reliable app volume control here; avoid flooding the bridge with unsupported set_volume requests.
     } else if (mode === "app") {
       applyPlayerVolumeToActiveElement();
@@ -2150,11 +2161,11 @@ The companion bridge is designed with several security layers to keep your PC sa
       ? getPostById(state.heroPlayerPostId)
       : (mode === "app" ? getHeroPost() : controllablePost);
 
-    const supportsVolume = mode === "app" && (
+    const supportsVolume = (mode === "app" && (
       mediaElement instanceof HTMLMediaElement
       || fallbackMedia instanceof HTMLMediaElement
       || post?.sourceKind === "youtube"
-    );
+    )) || (mode === "device" && isNativeCapacitorApp());
 
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
@@ -2270,11 +2281,16 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     const isAndroid = isNativeCapacitorApp() && getCapacitorPlatform() === "android";
-    const isSpotifyPost = post?.sourceKind === "spotify";
-    const showOpenPhone = isAndroid && isSpotifyPost;
+    const specialActionLabel = isAndroid ? "Open PC" : "Open Phone";
+    if (elements.heroPlayerOpenPhoneButton.textContent !== specialActionLabel) {
+      elements.heroPlayerOpenPhoneButton.textContent = specialActionLabel;
+    }
 
-    if (elements.heroPlayerOpenPhoneButton.hidden !== true) {
-      elements.heroPlayerOpenPhoneButton.hidden = true;
+    // Show special action button if we are not already in that mode
+    const showSpecialAction = isAndroid ? (mode !== "desktop") : (mode !== "device");
+
+    if (elements.heroPlayerOpenPhoneButton.hidden !== !showSpecialAction) {
+      elements.heroPlayerOpenPhoneButton.hidden = !showSpecialAction;
     }
 
     if (elements.heroPlayerVolumeSlider.disabled !== !supportsVolume) {
