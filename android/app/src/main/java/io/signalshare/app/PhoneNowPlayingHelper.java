@@ -393,6 +393,22 @@ final class PhoneNowPlayingHelper {
         int score = 0;
         String packageName = controller.getPackageName();
         PlaybackState playbackState = controller.getPlaybackState();
+
+        boolean isMatch = false;
+        if (!TextUtils.isEmpty(preferredSource) && ! "all".equalsIgnoreCase(preferredSource)) {
+            if ("spotify".equalsIgnoreCase(preferredSource)) {
+                isMatch = SPOTIFY_PACKAGE_NAME.equals(packageName);
+            } else if ("youtube".equalsIgnoreCase(preferredSource)) {
+                isMatch = YOUTUBE_PACKAGE_NAME.equals(packageName) || YOUTUBE_MUSIC_PACKAGE_NAME.equals(packageName);
+            }
+
+            if (isMatch) {
+                score += 10000;
+            } else {
+                score -= 20000;
+            }
+        }
+
         if (playbackState != null) {
             switch (playbackState.getState()) {
                 case PlaybackState.STATE_PLAYING:
@@ -401,18 +417,8 @@ final class PhoneNowPlayingHelper {
                 case PlaybackState.STATE_BUFFERING:
                     score += 320;
                     break;
-                case PlaybackState.STATE_CONNECTING:
-                    score += 240;
-                    break;
                 case PlaybackState.STATE_PAUSED:
                     score += 180;
-                    break;
-                case PlaybackState.STATE_FAST_FORWARDING:
-                case PlaybackState.STATE_REWINDING:
-                case PlaybackState.STATE_SKIPPING_TO_NEXT:
-                case PlaybackState.STATE_SKIPPING_TO_PREVIOUS:
-                case PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM:
-                    score += 140;
                     break;
                 default:
                     score += 40;
@@ -424,23 +430,8 @@ final class PhoneNowPlayingHelper {
             score += 100;
         }
 
-        if (!TextUtils.isEmpty(packageName)) {
-            score += 25;
-        }
-
         if (isPreferredNowPlayingPackage(packageName)) {
-            // Prefer Spotify/YouTube/YouTube Music snapshots even over generic feed/browser sessions.
             score += 400;
-        }
-
-        // BOOST specifically requested source to the top
-        if (!TextUtils.isEmpty(preferredSource)) {
-            if ("spotify".equalsIgnoreCase(preferredSource) && SPOTIFY_PACKAGE_NAME.equals(packageName)) {
-                score += 2000;
-            } else if ("youtube".equalsIgnoreCase(preferredSource) && 
-                (YOUTUBE_PACKAGE_NAME.equals(packageName) || YOUTUBE_MUSIC_PACKAGE_NAME.equals(packageName))) {
-                score += 2000;
-            }
         }
 
         return score;

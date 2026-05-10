@@ -287,11 +287,17 @@ export function handlePlayPauseAction(context, forcePlay) {
     if (controllablePost?.sourceKind === "youtube" && typeof toggleLocalPlayback === "function") {
       toggleLocalPlayback(forcePlay, { target });
     }
+    render();
     return;
   }
   // Source Isolation: If Spotify mode is active, don't talk to YouTube
   if (preferredSource === "spotify" && systemIsYouTube && !systemIsSpotify) {
     console.log("[Hero] Spotify mode active. Ignoring system YouTube session.");
+    // Fallback: Control local Spotify preview if available
+    if (controllablePost?.sourceKind === "spotify" && typeof toggleLocalPlayback === "function") {
+      toggleLocalPlayback(forcePlay, { target });
+    }
+    render();
     return;
   }
 

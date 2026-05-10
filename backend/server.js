@@ -322,16 +322,17 @@ function scoreSession(session, preferredSource = "") {
   let score = priority * 1000;
 
   if (preferred) {
-    if (provider === preferred) score += 5000;
-    if (preferred === "spotify" && sourceAppId.toLowerCase().includes("spotify")) score += 3000;
-    if (preferred === "youtube" && /youtube|ytmusic|youtube\.music/i.test(sourceAppId)) score += 3000;
+    const isMatch = (provider === preferred)
+      || (preferred === "spotify" && sourceAppId.toLowerCase().includes("spotify"))
+      || (preferred === "youtube" && /youtube|ytmusic|youtube\.music/i.test(sourceAppId))
+      || (preferred === "youtube" && isBrowser && provider !== "spotify" && text.includes("youtube"))
+      || (preferred === "spotify" && isBrowser && provider !== "youtube" && text.includes("spotify"));
 
-    // Browser tabs do not always expose the URL through SMTC. Give browser sessions a smaller fallback boost
-    // for YouTube, but do not let an obvious Spotify session win the YouTube toggle, or vice versa.
-    if (preferred === "youtube" && isBrowser && provider !== "spotify") score += 500;
-    if (preferred === "spotify" && isBrowser && provider !== "youtube") score += 300;
-
-    if (provider && provider !== preferred) score -= 8000;
+    if (isMatch) {
+      score += 10000; // Heavy boost for matching source
+    } else {
+      score -= 20000; // Heavy penalty for non-matching source when preferred is set
+    }
   } else if (isPreferredApp(sourceAppId)) {
     score += 500;
   }
@@ -345,10 +346,8 @@ function scoreSession(session, preferredSource = "") {
     score -= 2000;
   }
 
-  // Give a small boost to recently updated sessions to help break ties between multiple browser tabs
   const updated = Number(session?.lastUpdatedTime || 0);
   if (Number.isFinite(updated) && updated > 0) {
-    // We use a small fraction of the timestamp to prioritize the most recent one without overpowering the status bits
     score += (updated % 1000) / 100;
   }
 
@@ -359,23 +358,15 @@ function pickBestSession(sessions = [], preferredSource = "") {
   if (!Array.isArray(sessions) || !sessions.length) return null;
   const preferred = normalizePreferredSource(preferredSource);
   
-  // 1. Try to find a perfect match first
   const best = sessions.reduce((best, session) => {
     if (!best) return session;
     return scoreSession(session, preferredSource) > scoreSession(best, preferredSource) ? session : best;
   }, null);
 
   if (best && preferred) {
-    const provider = classifySessionProvider(best);
-    // If the top-scored session is a DIFFERENT platform, we check if it's playing
-    // If it's playing, we might want to return null to show 'Idle' for the requested mode
-    // BUT we should still return it if the user wants to 'take over' control.
-    if (provider && provider !== preferred) {
-       // In media mode specifically, if the best session doesn't match the requested platform 
-       // AND it's not currently playing, we return null to avoid showing "old data" from 
-       // a different app on the specialized tab.
-       if (mapPlaybackState(best.playback?.playbackStatus) !== "playing") return null;
-    }
+    const score = scoreSession(best, preferredSource);
+    // If the score is negative, it means we definitely didn't find a match for the preferred source
+    if (score < 0) return null;
   }
 
   return best;
@@ -659,9 +650,12 @@ try {
             $isTarget = [string]::IsNullOrWhiteSpace($targetApp) -or (Matches-AppId $candidateId $targetApp)
             $isPreferred = [string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or (Is-Match-Source $candidate $preferred)
             
-            if ($isTarget -and $isPreferred) { $score += 2000 }
-            elseif ($isTarget) { $score += 1000 }
-            elseif ($isPreferred) { $score += 500 }
+            if (![string]::IsNullOrWhiteSpace($preferred) -and $preferred -ne "all") {
+              if ($isPreferred) { $score += 10000 }
+              else { $score -= 20000 }
+            }
+
+            if ($isTarget) { $score += 1000 }
 
             if ($candidate.PlaybackInfo.PlaybackStatus -eq [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus]::Playing) {
               $score += 5000
