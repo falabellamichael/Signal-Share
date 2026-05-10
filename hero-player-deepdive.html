@@ -8,8 +8,77 @@
     <link rel="stylesheet" href="./questions-guide.css"> 
     <link rel="icon" href="./icons/icon.svg?v=5" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=5" />
+    <style>
+        .deepdive-index {
+            position: sticky;
+            top: calc(10px + var(--status-bar-safe-space, 0px));
+            z-index: 100;
+            margin: 24px auto;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border-color: rgba(255,255,255,0.12);
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+            width: fit-content;
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .deepdive-index::-webkit-scrollbar {
+            display: none;
+        }
+        .deepdive-index ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.88rem;
+            white-space: nowrap;
+        }
+        .deepdive-index a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 999px;
+            transition: background 180ms ease;
+        }
+        .deepdive-index a:hover {
+            background: rgba(255,255,255,0.08);
+            color: #fff !important;
+        }
+        .deepdive-index .top-link {
+            margin-left: 4px;
+            border-left: 1px solid rgba(255,255,255,0.1);
+            padding-left: 10px;
+        }
+        .deepdive-index .top-link a {
+            color: #4682b4;
+            font-weight: 600;
+            padding: 8px 10px;
+        }
+
+        @media (max-width: 760px) {
+            .deepdive-index {
+                width: calc(100% + 32px);
+                border-radius: 0;
+                margin: 18px -16px;
+                padding: 10px 16px;
+                background: rgba(8, 8, 11, 0.94);
+                border-left: none;
+                border-right: none;
+                border-bottom: 1px solid rgba(255,255,255,0.08);
+                top: var(--status-bar-safe-space, 0px);
+                box-sizing: border-box;
+            }
+        }
+    </style>
 </head>
-<body class="questions-page">
+<body class="questions-page" style="overflow-x: hidden; position: relative; width: 100%;">
     <main class="questions-page-shell">
         <!-- Link back to the main guide page -->
         <a class="questions-back-link" href="./how-to-guide.html">← Back to How To Guide</a>
@@ -21,25 +90,18 @@
         </p>
 
         <!-- Index/Table of Contents (Sticky Pill Nav) -->
-        <nav class="questions-page-card" style="position: sticky; top: 16px; z-index: 100; margin: 24px auto; padding: 8px 12px; border-radius: 999px; border-color: rgba(255,255,255,0.12); background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(24px); box-shadow: 0 16px 40px rgba(0,0,0,0.4); width: fit-content; max-width: 100%; overflow-x: auto;">
-            <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; align-items: center; gap: 4px; font-size: 0.88rem; white-space: nowrap;">
-                <li><a href="#section-state" style="color: rgba(255,255,255,0.8); text-decoration: none; padding: 8px 14px; border-radius: 999px; transition: background 180ms ease;">Architecture</a></li>
-                <li><a href="#section-media" style="color: rgba(255,255,255,0.8); text-decoration: none; padding: 8px 14px; border-radius: 999px; transition: background 180ms ease;">Sources</a></li>
-                <li><a href="#section-bridge" style="color: rgba(255,255,255,0.8); text-decoration: none; padding: 8px 14px; border-radius: 999px; transition: background 180ms ease;">Bridge</a></li>
-                <li><a href="#section-llm" style="color: rgba(255,255,255,0.8); text-decoration: none; padding: 8px 14px; border-radius: 999px; transition: background 180ms ease;">Local LLM</a></li>
-                <li><a href="#section-debug" style="color: rgba(255,255,255,0.8); text-decoration: none; padding: 8px 14px; border-radius: 999px; transition: background 180ms ease;">Debug</a></li>
-                <li style="margin-left: 4px; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 10px;">
-                    <a href="#hero-player-architecture" style="color: #4682b4; text-decoration: none; font-weight: 600; padding: 8px 10px;">↑ Top</a>
+        <nav class="deepdive-index">
+            <ul>
+                <li><a href="#section-state">Architecture</a></li>
+                <li><a href="#section-media">Sources</a></li>
+                <li><a href="#section-bridge">Bridge</a></li>
+                <li><a href="#section-llm">Local LLM</a></li>
+                <li><a href="#section-debug">Debug</a></li>
+                <li class="top-link">
+                    <a href="#hero-player-architecture">↑ Top</a>
                 </li>
             </ul>
         </nav>
-
-        <style>
-            .questions-page-card nav a:hover {
-                background: rgba(255,255,255,0.08);
-                color: #fff !important;
-            }
-        </style>
 
 
         <!-- Section 1: Core Component -->

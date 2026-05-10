@@ -47,13 +47,13 @@ export function createHeroMediaPlayerController(options) {
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
   const NATIVE_ACTION_NEXT = "next";
   const NATIVE_ACTION_PREVIOUS = "previous";
-  const NATIVE_POLL_INTERVAL_MS = 1200;
+  const NATIVE_POLL_INTERVAL_MS = 50;
   const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
-  const DESKTOP_POLL_INTERVAL_MS = 800;
+  const DESKTOP_POLL_INTERVAL_MS = 50;
   const LOCAL_NETWORK_PROMPT_COOLDOWN_MS = 30000;
-  const SNAPSHOT_INGEST_DELAY_MS = 2400;
+  const SNAPSHOT_INGEST_DELAY_MS = 50;
 
   let listenersAttached = false;
   let nativeSnapshot = null;
@@ -76,8 +76,8 @@ export function createHeroMediaPlayerController(options) {
   let lastNativePollTime = 0;
   let lastDesktopActionKey = "";
   let companionPromptDismissed = localStorage.getItem("ss_companion_dismissed") === "true";
-  const DESKTOP_ACTION_COOLDOWN_MS = 150;
-  const NATIVE_ACTION_COOLDOWN_MS = 150;
+  const DESKTOP_ACTION_COOLDOWN_MS = 50;
+  const NATIVE_ACTION_COOLDOWN_MS = 50;
   const COMPANION_SETUP_SCRIPT = `@echo off
 setlocal
 title Signal Share Companion
@@ -734,8 +734,8 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     const now = Date.now();
     if (state._mediaActionLockoutUntil && now < state._mediaActionLockoutUntil) return nativeSnapshot;
-    if (now - lastNativeActionAt < 2500) return nativeSnapshot;
-    if (now - lastNativePollTime < NATIVE_POLL_INTERVAL_MS - 200) return nativeSnapshot;
+    if (now - lastNativeActionAt < 50) return nativeSnapshot;
+    if (now - lastNativePollTime < NATIVE_POLL_INTERVAL_MS) return nativeSnapshot;
     lastNativePollTime = now;
 
     const rawSnapshot = readNativeSnapshot();
@@ -1321,7 +1321,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     // Media mode can retry sooner, but avoid hammering the Windows SMTC bridge.
-    if (isMediaMode) waitTime = Math.min(500, waitTime);  // More aggressive polling in Media mode
+    if (isMediaMode) waitTime = 50;  // More aggressive polling in Media mode
 
     if (!force && now - lastDesktopPollTime < waitTime) {
       return Promise.resolve(desktopSnapshot);

@@ -11,7 +11,7 @@
  * @param {number} cooldownLimit Threshold in milliseconds
  * @returns {boolean} True if throttled
  */
-export function debounceAction(state, actionName, cooldownLimit = 500) {
+export function debounceAction(state, actionName, cooldownLimit = 50) {
   const now = Date.now();
   if (state._lastActionAt && (now - state._lastActionAt < cooldownLimit)) {
     console.warn(`[Hero] Action "${actionName}" is throttled.`);
@@ -39,7 +39,7 @@ export function memoGet(key, factory, ttl = 1000) {
  * Shared debounce gate using ActionCache.
  * Returns true if the action should be throttled.
  */
-export function debounce(actionName, ttl = 600) {
+export function debounce(actionName, ttl = 50) {
   const now = Date.now();
   const key = `debounce_${actionName}`;
   const entry = ActionCache.get(key);
@@ -55,7 +55,7 @@ export function handleOpenMediaAction(context) {
     getControllablePlayerPost, getEffectiveHeroMode, getNativeBridge
   } = context;
 
-  if (debounceAction(state, "open_media", 800)) return;
+  if (debounceAction(state, "open_media", 50)) return;
 
   const controllablePost = memoGet(`controllable_post`, () => getControllablePlayerPost(), 100);
   const mode = getEffectiveHeroMode(controllablePost);
@@ -325,11 +325,11 @@ export async function handlePlayPauseAction(context, forcePlay) {
   } = context;
 
   // 1. AUTHORITATIVE COOLDOWN
-  if (debounce("play-pause", 600)) return;
+  if (debounce("play-pause", 50)) return;
 
   // 2. STABILIZATION LOCKOUT
   const now = Date.now();
-  state._mediaActionLockoutUntil = now + 2800;
+  state._mediaActionLockoutUntil = now + 50;
 
   // Identify modes and sources
   const isFeedMode = state.heroControlMode === "feed";
@@ -447,10 +447,10 @@ export function handlePreviousAction(context) {
     isNativeCapacitorApp
   } = context;
 
-  if (debounce("previous", 500)) return;
+  if (debounce("previous", 50)) return;
 
   const now = Date.now();
-  state._mediaActionLockoutUntil = now + 1500;
+  state._mediaActionLockoutUntil = now + 50;
 
   // Mode Resolution
   const isFeedMode = state.heroControlMode === "feed";
@@ -527,10 +527,10 @@ export function handleNextAction(context) {
     isNativeCapacitorApp
   } = context;
 
-  if (debounce("next", 500)) return;
+  if (debounce("next", 50)) return;
 
   const now = Date.now();
-  state._mediaActionLockoutUntil = now + 1500;
+  state._mediaActionLockoutUntil = now + 50;
 
   // Mode Resolution
   const isFeedMode = state.heroControlMode === "feed";
