@@ -447,7 +447,7 @@ export function handlePreviousAction(context) {
     isNativeCapacitorApp
   } = context;
 
-  if (debounce("step", 500)) return;
+  if (debounce("previous", 500)) return;
 
   const now = Date.now();
   state._mediaActionLockoutUntil = now + 1500;
@@ -496,7 +496,7 @@ export function handlePreviousAction(context) {
 
     // If source is locked, we ALWAYS want to send the command to the bridge so it can target the correct app independently.
     // If source is not locked ("All"), and system is idle, we fall back to local stepping.
-    const shouldSendToBridge = isSourceLocked || snapshot?.active;
+    const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube;
 
     if (!shouldSendToBridge) {
        // Fallback to local feed stepping
@@ -527,7 +527,7 @@ export function handleNextAction(context) {
     isNativeCapacitorApp
   } = context;
 
-  if (debounce("step", 500)) return;
+  if (debounce("next", 500)) return;
 
   const now = Date.now();
   state._mediaActionLockoutUntil = now + 1500;
@@ -576,7 +576,7 @@ export function handleNextAction(context) {
 
     // If source is locked, we ALWAYS want to send the command to the bridge so it can target the correct app independently.
     // If source is not locked ("All"), and system is idle, we fall back to local stepping.
-    const shouldSendToBridge = isSourceLocked || snapshot?.active;
+    const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube;
 
     if (!shouldSendToBridge) {
        // Fallback to local feed stepping
