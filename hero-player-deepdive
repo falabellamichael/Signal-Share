@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hero Player Deep Dive | Signal Share</title>
+    <!-- Assuming you use questions-guide.css for styling consistency -->
+    <link rel="stylesheet" href="./questions-guide.css"> 
+</head>
+<body class="questions-page">
+    <main class="questions-page-shell">
+        <!-- Link back to the main guide page -->
+        <a class="questions-back-link" href="./how-to-guide.html">← Back to How To Guide</a>
+
+        <p class="questions-page-topline">Technical Deep Dive</p>
+        <h1>The Signal Share Hero Player Architecture</h1>
+        <p class="questions-page-lede">
+            This document details the underlying mechanisms, state management, and cross-device communication protocols used by the Hero Media Player. This guide is intended for developers integrating or debugging media playback features.
+        </p>
+
+        <!-- Section 1: Core Component -->
+        <section class="questions-page-card">
+            <h2>1. Component Overview & State Management</h2>
+            <p>The Hero Player acts as the primary, unified media viewport. Its core responsibility is to abstract away the source complexity (YouTube embed vs. Spotify widget vs. local file upload) into a single, controllable playback interface.</p>
+            
+            <h3>State Variables (Client-Side Focus):</h3>
+            <ul>
+                <li><strong>`currentMediaSource`</strong>: Determines the active playback mode ('youtube', 'spotify', 'local'). This dictates which embed/API is initialized.</li>
+                <li><strong>`isPlaying`</strong>: Boolean state tracking whether playback is currently active or paused.</li>
+                <li><strong>`playbackContextId`</strong>: A unique identifier generated upon loading a post, used to ensure that subsequent API calls target the correct session data within Supabase or locally.</li>
+                <li><strong>`isDesktopBridgeActive`</strong>: Tracks connectivity status with the local desktop bridge service.</li>
+            </ul>
+
+            <h3>Playback Lifecycle Flow:</h3>
+            <ol>
+                <li><strong>Initialization:</strong> On page load, the component listens for initial state from the global store (or URL parameters). The player defaults to a neutral/placeholder view.</li>
+                <li><strong>Source Loading:</strong> When `loadMedia(postData)` is called, it first validates `postData.type` and `postData.url`. It then calls source-specific handlers (`initializeYoutubePlayer`, `initializeSpotifyClient`).</li>
+                <li><strong>State Update:</strong> Successful initialization updates the local state variables mentioned above, triggering a re-render of the player element.</li>
+            </ol>
+        </section>
+
+        <!-- Section 2: Source Specific Implementations -->
+        <section class="questions-page-card">
+            <h2>2. Media Source Integration Details</h2>
+            
+            <h3>YouTube Player Module:</h3>
+            <p>Uses the standard YouTube IFrame API (or embedded player object). The key interaction point is calling <code>player.playVideo()</code> and listening to <code>onStateChange</code> events (e.g., YT.PlayerState.ENDED) for state synchronization.</p>
+            <div class="code-snippet">
+                <strong>Key Functionality:</strong> Must handle API quota limits and gracefully degrade if the iframe cannot load metadata initially.
+            </div>
+
+            <h3>Spotify Integration Module:</h3>
+            <p>Relies on either a direct embedded widget or, for advanced control (e.g., track progress bar synchronization), requires interaction with an external Spotify Web API wrapper service.</p>
+            <div class="code-snippet">
+                <strong>Cross-Platform Concern:</strong> If using the official SDK, ensure session tokens are managed correctly upon page reload to prevent immediate disconnections from the music stream metadata.
+            </div>
+
+            <h3>Local/Uploaded Media:</h3>
+            <p>For uploaded files, the player defaults to a standard HTML5 `<video>` element. Playback control is handled directly via JavaScript DOM manipulation (e.g., <code>videoElement.play()</code>). This path is the most resilient against external API changes.</p>
+        </section>
+
+        <!-- Section 3: Desktop Bridge Communication Protocol -->
+        <section class="questions-page-card">
+            <h2>3. Desktop Bridge IPC (Inter-Process Communication)</h2>
+            <p>When `isDesktopBridgeActive` is true, the player switches control logic from client-side DOM controls to sending standardized commands over a local WebSocket connection established with the bridge service.</p>
+
+            <h3>Protocol Details:</h3>
+            <p>The communication uses JSON payloads sent over the local endpoint (typically <code>ws://localhost:PORT</code>).</p>
+            <h4>Outgoing Commands (Client -> Bridge):</h4>
+            <ul>
+                <li><strong>Play Command:</strong> <code>{ "command": "PLAY", "mediaId": "..." }</code></li>
+                <li><strong>Pause Command:</strong> <code>{ "command": "PAUSE" }</code></li>
+                <li><strong>Next/Previous:</strong> <code>{ "command": "SEEK_ADJACENT", "direction": "next" | "prev" }</code></li>
+            </ul>
+
+            <h4>Incoming Events (Bridge -> Client):</h4>
+            <p>The client must listen for status updates from the bridge. Example event:</p>
+            <pre style="background-color: #eee; padding: 10px;">{ "event": "STATE_UPDATED", "status": "PLAYING", "timeRemaining": 25 }</code></pre>
+
+            <h3>Security Note:</h3>
+            <p>The optional <strong>Bridge Secret</strong> must be validated server-side (if using a dedicated backend endpoint to relay commands) or strictly checked against client input on the page level to prevent unauthorized control hijacking.</p>
+        </section>
+        
+        <!-- Section 4: Debugging Checklist -->
+        <section class="questions-page-card">
+            <h2>🐞 Hero Player Debugging Checklist</h2>
+            <ul style="list-style-type: disc;">
+                <li><strong>[INIT]</strong> Did the component successfully read the `playbackContextId` from the session state?</li>
+                <li><strong>[SOURCE VALIDATION]</strong> For YouTube/Spotify, is the source URL fully validated before attempting connection? (Check for malformed embed IDs).</li>
+                <li><strong>[STATE DRIFT]</strong> If playback seems stuck, manually force a state refresh by re-calling <code>loadMedia</code> with the current post data.</li>
+                <li><strong>[BRIDGE CHECK]</strong> Is the local desktop bridge running and accessible via WebSocket *before* attempting to send a command? Check console logs for connection errors on the client side.</li>
+            </ul>
+        </section>
+
+        <div class="questions-page-actions" style="margin-top: 30px;">
+            <a class="questions-page-button" href="./how-to-guide.html">← Back to How To Guide</a>
+        </div>
+    </main>
+</body>
+</html>
