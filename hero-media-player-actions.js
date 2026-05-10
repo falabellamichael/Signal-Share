@@ -156,20 +156,10 @@ export function handleOpenPhoneAction(post, context) {
   }
 
   // 2. PC Browser -> "Open Phone" Action
-  const bridge = window.NativeBridge;
-  if (bridge && typeof bridge.openNowPlayingMediaApp === "function") {
-    // If we have a specific post (either passed in or from state), try to open its URI
-    const targetPost = post || (typeof context.getControllablePlayerPost === "function" ? context.getControllablePlayerPost() : null);
-
-    if (targetPost) {
-      // We have a post, so try to open it explicitly
-      handleOpenMediaAction(targetPost, context);
-      return;
-    }
-
-    // Otherwise, open the last active media app on the phone without an explicit URI
-    bridge.openNowPlayingMediaApp("", "", false);
-    return;
+  // Launch the local Windows Phone Link app
+  if (!isNativeCapacitorApp() && typeof performDesktopAction === "function") {
+    console.log("[Hero] Launching Windows Phone Link app locally.");
+    performDesktopAction("open_uri", { uri: "mobilephonelink:" });
   }
 
   // Cross-Device Handoff: PC -> Phone (via Supabase)
