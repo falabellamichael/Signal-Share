@@ -174,28 +174,38 @@ export function handleOpenPhoneAction(post, context) {
 
   // Cross-Device Handoff: PC -> Phone (via Supabase)
   if (state.supabase && state.currentUser?.id && typeof context.performSupabaseDesktopAction === "function") {
-    const targetPost = post || (typeof context.getControllablePlayerPost === "function" ? context.getControllablePlayerPost() : null);
+    const source = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
     
+    // 1. Resolve the most relevant post for the current mode
+    let targetPost = post;
+    if (!targetPost) {
+       const bestPost = (typeof context.getControllablePlayerPost === "function" ? context.getControllablePlayerPost() : null);
+       // ONLY fallback to the controllable post if it matches our active source kind
+       // This prevents "Open Phone" in YouTube mode from launching a random Spotify post from the feed.
+       if (bestPost && bestPost.sourceKind === source) {
+          targetPost = bestPost;
+       }
+    }
+
     let uri = "";
     if (targetPost) {
       uri = targetPost.externalUrl || targetPost.embedUrl || targetPost.src;
     }
 
-    // Fallback to source-specific landing pages if no post
+    // 2. Fallback to source-specific landing pages if no post matches the mode
     if (!uri) {
-      const source = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
       if (source === "spotify") uri = "spotify:";
       if (source === "youtube") uri = "https://www.youtube.com";
     }
 
     if (uri) {
-      console.log(`[Hero] Sending remote open command to phone. URI: ${uri}`);
+      console.log(`[Hero] Sending remote open command to phone. URI: ${uri}, Source: ${source}`);
       context.performSupabaseDesktopAction("open_uri", { uri });
       
       if (typeof window.showNotification === "function") {
         window.showNotification({
           title: "Cross-device handoff",
-          body: "Opening content on your phone...",
+          body: `Opening ${source || 'media'} on your phone...`,
           kind: "info"
         });
       }
