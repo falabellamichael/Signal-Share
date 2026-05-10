@@ -4,14 +4,47 @@
  * and System Media control (Play/Pause, Next, Previous).
  */
 
+/**
+ * Throttles high-frequency actions to prevent hardware/bridge flooding.
+ * @param {Object} state The global app state
+ * @param {string} actionName Descriptive name for logging
+ * @param {number} cooldownLimit Threshold in milliseconds
+ * @returns {boolean} True if throttled
+ */
+export function debounceAction(state, actionName, cooldownLimit = 500) {
+  const now = Date.now();
+  if (state._lastActionAt && (now - state._lastActionAt < cooldownLimit)) {
+    console.warn(`[Hero] Action "${actionName}" is throttled.`);
+    return true;
+  }
+  state._lastActionAt = now;
+  return false;
+}
+
+const ActionCache = new Map();
+
+/**
+ * Simple memoization helper for expensive lookups or repeated calls within an action.
+ */
+export function memoGet(key, factory, ttl = 1000) {
+  const now = Date.now();
+  const entry = ActionCache.get(key);
+  if (entry && (now - entry.timestamp < ttl)) return entry.value;
+  const value = factory();
+  ActionCache.set(key, { value, timestamp: now });
+  return value;
+}
+
 export function handleOpenMediaAction(context) {
   const {
     isNativeCapacitorApp, openViewer, desktopSnapshot, nativeSnapshot,
     performDesktopAction, parseYouTubeUrl, state, findMatchedPost,
-    getControllablePlayerPost, getEffectiveHeroMode
+    getControllablePlayerPost, getEffectiveHeroMode, getNativeBridge
   } = context;
 
-  const controllablePost = getControllablePlayerPost();
+  if (debounceAction(state, "open_media", 800)) return;
+
+  const controllablePost = memoGet(`controllable_post`, () => getControllablePlayerPost(), 100);
   const mode = getEffectiveHeroMode(controllablePost);
   let post = null;
 
@@ -282,24 +315,18 @@ export function handlePlayPauseAction(context, forcePlay) {
 
   const mode = target === "mini" ? "app" : heroMode;
 
-  // Resolve the most relevant post for the current target.
-  // Priority: explicitly active player post, then general controllable post.
-  const activePostId = target === "mini" ? (state.activePlayerPostId || state.playerPostId) : (state.heroPlayerPostId || state.activePlayerPostId);
-  const activePost = (activePostId && typeof context.getPostById === "function") ? context.getPostById(activePostId) : null;
-  const controllablePost = activePost || getControllablePlayerPost();
+  // Resolve the most relevant post for the current target with memoization
+  const controllablePost = memoGet(`controllable_post_${target}`, () => {
+    const activePostId = target === "mini" ? (state.activePlayerPostId || state.playerPostId) : (state.heroPlayerPostId || state.activePlayerPostId);
+    const activePost = (activePostId && typeof context.getPostById === "function") ? context.getPostById(activePostId) : null;
+    return activePost || getControllablePlayerPost();
+  }, 50);
 
   const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
 
-  console.log(`[Hero] handlePlayPause. Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}, Post: ${controllablePost?.id || 'none'}`);
+  if (debounceAction(state, "play_pause", mode === "device" ? (NATIVE_ACTION_COOLDOWN_MS || 500) : 500)) return;
 
-  // 1. Cooldown Protection
-  const now = Date.now();
-  const cooldownLimit = (mode === "device" ? NATIVE_ACTION_COOLDOWN_MS : 500) || 500;
-  if (state._lastPlayPauseAt && (now - state._lastPlayPauseAt < cooldownLimit)) {
-    console.warn("[Hero] Action throttled.");
-    return;
-  }
-  state._lastPlayPauseAt = now;
+  console.log(`[Hero] handlePlayPause. Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}, Post: ${controllablePost?.id || 'none'}`);
 
   // 2. High Priority: Local Player control
   if (typeof toggleLocalPlayback === "function") {
@@ -430,15 +457,9 @@ export function handlePreviousAction(context) {
 
   const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   
-  console.log(`[Hero] handlePrevious. Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}`);
+  if (debounceAction(state, "previous", 500)) return;
 
-  // Cooldown to prevent double-skipping glitches
-  const now = Date.now();
-  if (state._lastStepAt && (now - state._lastStepAt < 500)) {
-    console.warn("[Hero] Step throttled.");
-    return;
-  }
-  state._lastStepAt = now;
+  console.log(`[Hero] handlePrevious. Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}`);
 
   if (mode === "app") {
     if (target === "mini") {
@@ -521,15 +542,9 @@ export function handleNextAction(context) {
 
   const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
 
-  console.log(`[Hero] handleNext. Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}`);
+  if (debounceAction(state, "next", 500)) return;
 
-  // Cooldown to prevent double-skipping glitches
-  const now = Date.now();
-  if (state._lastStepAt && (now - state._lastStepAt < 500)) {
-    console.warn("[Hero] Step throttled.");
-    return;
-  }
-  state._lastStepAt = now;
+  console.log(`[Hero] handleNext. Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}`);
 
   if (mode === "app") {
     if (target === "mini") {
@@ -603,6 +618,8 @@ export function handleVolumeAction(context, event) {
 
   const mode = target === "mini" ? "app" : getEffectiveHeroMode(getControllablePlayerPost());
 
+  if (debounceAction(state, "volume", 100)) return;
+
   const rawValue = Number(event.target?.value);
   const volume = normalizePlayerVolume(rawValue / 100, state.playerVolume);
 
@@ -639,6 +656,8 @@ export function handleRefreshAction(context) {
     refreshNativeSnapshot, canUseDesktopBridge, refreshDesktopSnapshot,
     isNativeCapacitorApp, getNativeBridge
   } = context;
+
+  if (debounceAction(state, "refresh", 1000)) return;
 
   const post = getControllablePlayerPost();
 
