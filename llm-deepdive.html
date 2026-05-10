@@ -127,155 +127,171 @@
         <nav class="deepdive-index">
             <ul>
                 <li><a href="#section-llm-basics">Fundamentals</a></li>
-                <li><a href="#section-execution-modes">Execution</a></li>
-                <li><a href="#section-local-vs-cloud">Analysis</a></li>
-                <li><a href="#section-lmstudio">LM Studio</a></li>
-                <li><a href="#section-architecture">Flow</a></li>
-                <li class="top-link">
-                    <a href="#llm-architecture">↑ Top</a>
-                </li>
+                <li><a href="#section-architecture">Architecture & Mechanics</a></li>
+                <li><a href="#section-execution-modes">Execution Modes</a></li>
+                <li><a href="#section-local-vs-cloud">Comparative Analysis</a></li>
+                <li><a href="#section-lmstudio">LM Studio Integration</a></li>
+                <li><a href="#section-coding-guide">Coding with Local LLMs</a></li>
             </ul>
+            <li class="top-link">
+                <a href="#llm-architecture">↑ Top</a>
+            </li>
         </nav>
 
 
         <!-- Section 1: LLM Fundamentals -->
         <section class="questions-page-card" id="section-llm-basics">
             <h2>1. LLM Fundamentals</h2>
-            <p>A Large Language Model (LLM) is a type of artificial intelligence program capable of understanding, generating, and manipulating human language. They are typically based on the Transformer architecture, which relies heavily on self-attention mechanisms to weigh the importance of different words in a sequence.</p>
+            <p>A Large Language Model (LLM) is a type of artificial intelligence program capable of understanding, generating, and manipulating human language. They are typically based on the **Transformer architecture**, which relies heavily on **self-attention mechanisms** to weigh the importance of different words in a sequence.</p>
             
-            <h3>Key Concepts:</h3>
+            <h3>Core Concepts:</h3>
             <ul>
-                <li><strong>Parameters:</strong> The vast number of weights learned during training that define the model's knowledge and ability to generate coherent text.</li>
-                <li><strong>Tokens:</strong> The basic units of text the model processes (words, sub-words, or characters).</li>
-                <li><strong>Training Data:</strong> Massive, diverse datasets used to teach the model the patterns, grammar, and facts of human language.</li>
-                <li><strong>Inference:</strong> The process of feeding a prompt (input) into the trained model to generate an output (response).</li>
+                <li><strong>Parameters:</strong> The vast number of weights learned during training that define the model's knowledge and ability to generate coherent text. More parameters generally correlate with greater capacity for complex reasoning, but require more computational power.</li>
+                <li><strong>Tokens:</strong> The basic units of text the model processes (words, sub-words, or characters). Tokenization methods (like BPE) are crucial for efficient language representation.</li>
+                <li><strong>Training Data:</strong> Massive, diverse datasets (e.g., Common Crawl, books, Wikipedia) used to teach the model the patterns, grammar, semantics, and factual knowledge of human language.</li>
+                <li><strong>Inference:</strong> The process of feeding a prompt (input) into the trained model to generate an output (response). This is where the model generates new text based on its learned probabilities.</li>
             </ul>
 
-            <h3>Model Types:</h3>
-            <p>Models are generally categorized by their size and training methodology:</p>
+            <h3>Model Architectures:</h3>
+            <p>The dominant architecture is the <strong>Transformer</strong>, which consists of stacked encoder and decoder layers.</p>
             <ul>
-                <li><strong>Generative Models:</strong> Focus on predicting the next token in a sequence (e.g., GPT, Llama).</li>
-                <li><strong>Encoder-Decoder Models:</strong> Used for sequence-to-sequence tasks (e.g., T5).</li>
-                <li><strong>Parameter Count:</strong> Measured in billions or trillions of parameters (e.g., 7B, 70B). Larger models generally exhibit better reasoning but require significantly more computational resources.</li>
+                <li><strong>Self-Attention Mechanism:</strong> Allows the model to weigh the relevance of different words in the input sequence when processing a specific word. This captures long-range dependencies in text far more effectively than previous RNN/LSTM models.</li>
+                <li><strong>Feed-Forward Networks:</strong> Process the information gathered by the attention mechanism to perform non-linear transformations on the data.</li>
             </ul>
         </section>
 
-        <!-- Section 2: Execution Modes -->
+        <!-- Section 2: Architecture & Mechanics -->
+        <section class="questions-page-card" id="section-architecture">
+            <h2>2. LLM Architecture & Mechanics</h2>
+            <p>Understanding how a Transformer functions is key to understanding LLMs.</p>
+
+            <h3>The Transformer Block:</h3>
+            <p>Each layer in the model is composed of two main sub-layers:</p>
+            <ul>
+                <li><strong>Multi-Head Self-Attention Layer:</strong> This layer processes the input sequence, calculating attention scores between all tokens. Multi-Head Attention allows the model to simultaneously focus on different aspects (or "heads") of the input context.</li>
+                <li><strong>Feed-Forward Network (FFN):</strong> A standard fully connected layer applied independently to each position in the sequence, allowing the model to process the contextual information gathered by the attention layer non-linearly.</li>
+            </ul>
+
+            <h3>Pre-training vs. Fine-tuning:</h3>
+            <ul>
+                <li><strong>Pre-training:</strong> The initial phase where the model learns general language patterns from massive, unlabeled data (Self-supervised learning). This establishes a broad understanding of grammar and world knowledge.</li>
+                <li><strong>Fine-tuning (Supervised Fine-Tuning - SFT):</strong> Adapting the pre-trained model to follow instructions and specific tasks by training it on smaller, high-quality, instruction-response pairs.</li>
+                <li><strong>Alignment (RLHF/DPO):</strong> Reinforcement Learning from Human Feedback (RLHF) or Direct Preference Optimization (DPO) is used post-SFT to align the model's outputs with human preferences, safety guidelines, and desired conversational style.</li>
+            </ul>
+        </section>
+
+        <!-- Section 3: Execution Modes -->
         <section class="questions-page-card" id="section-execution-modes">
-            <h2>2. Execution Modes: Local vs. Cloud/API</h2>
-            <p>The decision between running an LLM locally on personal hardware versus leveraging a cloud API is a trade-off between privacy, control, latency, cost, and performance.</p>
+            <h2>3. Execution Modes: Local vs. Cloud/API</h2>
+            <p>The decision between running an LLM locally (On-Premise) versus using a remote API (Cloud Inference) involves complex trade-offs across performance, security, and economics.</p>
 
             <h3>Local Execution (On-Premise):</h3>
             <ul>
-                <li><strong>Control & Privacy:</strong> Maximum control over data; no input or output data leaves the user's machine. Ideal for highly sensitive data.</li>
-                <li><strong>Latency:</strong> Dependent entirely on the user's hardware (GPU/CPU). Can be fast if the hardware is powerful, but slow otherwise.</li>
-                <li><strong>Cost:</strong> High upfront capital expenditure (expensive GPUs) and ongoing electricity costs. Free to run once hardware is purchased.</li>
-                <li><strong>Requirements:</strong> Requires significant local VRAM (Video RAM) or sufficient CPU power for acceptable performance.</li>
+                <li><strong>Control & Privacy:</strong> Maximum control over data; no input or output data leaves the user's machine. Ideal for highly sensitive data processing (e.g., proprietary code, personal notes).</li>
+                <li><strong>Latency:</strong> Dependent entirely on the user's hardware (GPU/CPU). Can be fast if the hardware is powerful, but slow otherwise. Latency also includes the time taken for model loading into VRAM.</li>
+                <li><strong>Cost:</strong> High upfront capital expenditure (expensive, high-VRAM GPUs) and ongoing electricity costs. The operational cost per token is effectively zero after the initial investment.</li>
+                <li><strong>Requirements:</strong> Requires significant local VRAM (Video RAM) or sufficient CPU power for acceptable real-time performance.</li>
             </ul>
 
             <h3>Cloud/API Execution (Remote Inference):</h3>
             <ul>
-                <li><strong>Control & Privacy:</strong> Data must be transmitted to a third-party server; privacy is dependent on the provider's policies.</li>
-                <li><strong>Latency:</strong> Highly variable, depending on network conditions and server load. Generally fast for large providers.</li>
-                <li><strong>Cost:</strong> Pay-as-you-go model (API calls or subscription fees). Predictable operational cost but potentially high usage costs.</li>
-                <li><strong>Requirements:</strong> Minimal local hardware requirements; relies on robust internet connectivity.</li>
+                <li><strong>Control & Privacy:</strong> Data must be transmitted to a third-party server; privacy is dependent entirely on the provider's security policies and data retention agreements.</li>
+                <li><strong>Latency:</strong> Highly variable, depending on network conditions, the complexity of the request, and the load on the remote server. Generally fast for large providers with optimized infrastructure.</li>
+                <li><strong>Cost:</strong> Pay-as-you-go model (API calls or subscription fees). This shifts cost from CapEx to OpEx, making it highly scalable but incurring variable per-token costs.</li>
+                <li><strong>Requirements:</strong> Minimal local hardware requirements; relies only on robust internet connectivity and a valid API key.</li></li>
             </ul>
         </section>
 
-        <!-- Section 3: Comparative Analysis -->
+        <!-- Section 4: Comparative Analysis -->
         <section class="questions-page-card" id="section-local-vs-cloud">
-            <h2>3. Comparative Analysis</h2>
-            <table>
+            <h2>4. Comparative Analysis</h2>
+            <table style="margin: 20px 0;">
                 <thead>
                     <tr>
                         <th>Factor</th>
-                        <th>Local Execution (Self-Hosted)</th>
-                        <th>Cloud/API Access (e.g., OpenAI, Gemini)</th>
+                        <th style="background-color: #f2f2f2;">Local Execution (Self-Hosted)</th>
+                        <th style="background-color: #f2f2f2;">Cloud/API Access (e.g., OpenAI, Gemini)</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
                         <td><strong>Data Privacy</strong></td>
-                        <td>Excellent (On-device processing)</td>
-                        <td>Depends entirely on provider's security policies</td>
+                        <td>Excellent (On-device processing); Data remains local.</td>
+                        <td>Depends entirely on provider's security policies and data retention agreements.</td>
                     </tr>
                     <tr>
                         <td><strong>Latency</strong></td>
-                        <td>Varies (Hardware dependent)</td>
-                        <td>Generally low and consistent (network dependent)</td>
+                        <td>Varies (Hardware dependent, includes loading time).</td>
+                        <td>Generally low and consistent (network latency dependent).</td>
                     </tr>
                     <tr>
                         <td><strong>Cost Structure</strong></td>
-                        <td>High initial hardware cost; Low operational cost</td>
-                        <td>Low upfront cost; High operational (per-token) cost</td>
+                        <td>High initial capital expenditure (expensive hardware); Low operational cost.</td>
+                        <td>Low upfront cost; High operational cost (per-token usage).</td>
                     </tr>
                     <tr>
-                        <td><strong>Customization</strong></td>
-                        <td>Full control over model, quantization, and fine-tuning</td>
-                        <td>Limited to provided API parameters</td>
+                        <td><strong>Customization & Fine-Tuning</strong></td>
+                        <td>Full control over model weights, quantization, and fine-tuning methods (e.g., LoRA).</td>
+                        <td>Limited to provided API parameters and available fine-tuning services.</td>
                     </tr>
                     <tr>
                         <td><strong>Hardware Barrier</strong></td>
-                        <td>High (Requires powerful GPU/RAM)</td>
-                        <td>Low (Requires only an internet connection)</td>
+                        <td>High (Requires powerful, dedicated GPU/RAM).</td>
+                        <td>Low (Requires only an internet connection).</td>
                     </tr>
                 </tbody>
             </table>
-            <p><strong>Conclusion:</strong> Local execution is favored for privacy-sensitive, high-volume, or offline tasks. Cloud APIs are superior for rapid prototyping, handling massive scale with minimal hardware investment, and accessing state-of-the-art, multi-trillion parameter models.</p>
+            <p><strong style="margin-top: 20px;">Conclusion:</strong> Local execution is favored for privacy-sensitive, high-volume, or offline tasks where data security is paramount. Cloud APIs are superior for rapid prototyping, handling massive scale with minimal hardware investment, and accessing state-of-the-art, multi-trillion parameter models.</p>
         </section>
 
-        <!-- Section 4: LM Studio Integration -->
+        <!-- Section 5: LM Studio Integration -->
         <section class="questions-page-card" id="section-lmstudio">
-            <h2>4. Using LM Studio for Local Inference</h2>
-            <p>LM Studio serves as an excellent, user-friendly Graphical User Interface (GUI) that abstracts the complex technical steps required to run LLMs locally using frameworks like llama.cpp.</p>
+            <h2>5. Using LM Studio for Local Inference</h2>
+            <p>LM Studio serves as an excellent, user-friendly Graphical User Interface (GUI) that abstracts the complex technical steps required to run LLMs locally using optimized inference frameworks like <strong style="color: #ff9800;">llama.cpp</strong>.</p>
 
             <h3>The LM Studio Workflow:</h3>
             <ol>
-                <li><strong>Model Acquisition:</strong> Navigate to LM Studio and use the built-in search feature to find desired model weights, typically in the <strong>GGUF</strong> format (which is optimized for CPU/GPU inference).</li>
-                <li><strong>Model Download:</strong> Select a quantized version based on your hardware's memory capacity (e.g., Q4_K_M) and download the file.</li>
-                <li><strong>Model Loading:</strong> Load the downloaded GGUF file into LM Studio's session manager. This process handles loading the necessary libraries and setting up the inference engine.</li>
-                <li><strong>Chat/Inference Setup:</strong> Use the built-in chat interface or API server within LM Studio to interact with the loaded model directly.</li>
+                <li><strong>Model Acquisition:</strong> Navigate to LM Studio and use the built-in search feature to find desired model weights, typically in the optimized <strong style="color: #ff9800;">GGUF</strong> format (which is specifically designed for efficient CPU/GPU inference on consumer hardware).</li>
+                <li><strong>Model Download:</strong> Select a quantized version based on your hardware's memory capacity (e.g., Q4_K_M or Q8_0) and download the file. Quantization reduces model size with minimal loss in accuracy.</li>
+                <li><strong>Model Loading:</strong> Load the downloaded GGUF file into LM Studio's session manager. This process handles loading the necessary libraries and setting up the inference engine, often automatically utilizing available GPU acceleration (CUDA/Metal).</li>
+                <li><strong>Chat/Inference Setup:</strong> Use the built-in chat interface or API server within LM Studio to interact with the loaded model directly, providing a seamless experience for prompt testing.</li>
             </ol>
 
-            <h3>Technical Role of LM Studio:</h3>
-            <p>LM Studio acts as a local server, binding an inference engine (like llama.cpp) to a local port (e.g., 12345). This means that while you use a friendly GUI, the underlying heavy computational lifting—the actual matrix multiplications—is being performed by your local machine's hardware.</p>
+            <h3>Technical Role of LM Studio in System Integration:</h3>
+            <p>LM Studio acts as a local inference server, binding an optimized engine (like llama.cpp) to a local network port (e.g., 12345). This setup allows external applications (like the Signal Share frontend) to communicate with the LLM via standard protocols (HTTP/WebSocket), effectively mimicking a cloud API call but executing all matrix multiplications locally on your machine.</p>
             <div class="code-snippet">
-                <strong style="color: #f8f8f2;">Conceptual API Interaction:</strong><br>
-                The LLM inside LM Studio exposes an HTTP or WebSocket endpoint. A client application (like the Signal Share frontend) connects to this local host to send prompts and receive generated text, mimicking a cloud API call but executing locally.<br>
-                <code style="color: #ff79c6;">POST /v1/chat/completions</code> (or similar endpoint)<br>
-                &nbsp;&nbsp;&nbsp;&nbsp;Body: <code style="color: #50fa7b;">{"prompt": "Explain LLM vs. API", "stream": true}</code>
+                <strong style="color: #f8f8f2;">Conceptual API Interaction Example (Local Server):</strong><br>
+                The LLM inside LM Studio exposes an endpoint. A client application connects to this local host.<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;Client sends a request to the local server:<br>
+                <code style="color: #50fa7b;">POST /v1/chat/completions</code><br>
+                &nbsp;&nbsp;&nbsp;&nbsp;Body: <code style="color: #8be9fd;">{"model": "path/to/your/model.gguf", "messages": [{"role": "user", "content": "What is the role of self-attention?"}]}</code><br>
+                The server processes this locally and streams the response back.<br>
             </div>
         </section>
 
-        <!-- Section 5: System Architecture Flow -->
+        <!-- Section 6: System Architecture Flow -->
         <section class="questions-page-card" id="section-architecture">
-            <h2>5. System Architecture Flow</h2>
-            <p>The integration of a local LLM into the Signal Share architecture follows an IPC (Inter-Process Communication) pattern, similar to how the Desktop Bridge works.</p>
+            <h2>6. System Architecture Flow (Local LLM Integration)</h2>
+            <p>The integration of a local, self-hosted LLM into an application like Signal Share follows an **IPC (Inter-Process Communication) pattern**, where the frontend handles communication with a dedicated local inference server.</p>
 
             <div class="code-snippet">
-                <strong>Flow Diagram Conceptualization:</strong>
+                <strong>Flow Diagram Conceptualization:</strong><br>
                 <ol>
-                    <li><strong>Client (Web App):</strong> User inputs prompt.</li>
-                    <li><strong>Client JS:</strong> Packages the prompt and sends it over WebSocket/HTTP to the local LLM server (e.g., LM Studio running on port 12345).</li>
-                    <li><strong>LLM Server (LM Studio):</strong> Receives the request, runs the prompt through the loaded GGUF model using the local GPU/CPU.</li>
-                    <li><strong>LLM Server:</strong> Generates the response tokens and streams them back over the same connection.</li>
-                    <li><strong>Client JS:</strong> Receives the streamed tokens and renders the result in the UI.</li>
+                    <li><strong style="color: #007bff;">Client (Web App):</strong> User inputs a prompt via the UI.</li>
+                    <li><strong style="color: #dc3545;">Client JS:</strong> Packages the prompt and sends it over an established connection (e.g., WebSocket or HTTP) to the local LLM server running LM Studio.</li>
+                    <li><strong style="color: #28a745;">LLM Server (LM Studio):</strong> Receives the request, loads the appropriate GGUF model into VRAM/CPU memory, performs tokenization, runs the prompt through the self-attention layers and FFNs, and generates the output.</li>
+                    <li><strong style="color: #ffc107;">LLM Server:</strong> Generates the response tokens and streams them back over the same connection to the client.</li>
+                    <li><strong style="color: #17a2b8;">Client JS:</strong> Receives the streamed tokens and renders the result in the UI, providing real-time feedback to the user.</li>
                 </ol>
             </div>
 
-            <h3>Key Takeaways for Implementation:</h3>
+            <h3>Key Architectural Takeaways:</h3>
             <ul>
-                <li><strong>Decoupling:</strong> The client is decoupled from the heavy model execution; it only handles I/O communication.</li>
-                <li><strong>Efficiency:</strong> By keeping the model local, you eliminate latency associated with network transit and reduce recurring per-token costs.</li>
-                <li><strong>Security Note:</strong> Since this runs locally, all security concerns shift to securing the host machine itself, as no external server is involved for the inference step.</li>
+                <li><strong style="color: #007bff;">Decoupling:</strong> The front-end application is decoupled from the heavy model execution; it only handles I/O communication and UI rendering.</li>
+                <li><strong style="color: #28a745;">Efficiency & Cost:</strong> By keeping the model local, you eliminate external network latency and recurring per-token costs associated with cloud APIs.</li>
+                <li><strong style="color: #dc3545;">Security Note:</strong> Since this process runs entirely on the host machine, security concerns shift to securing the physical device itself, as no external server is involved for the core inference step.</li></li>
             </ul>
         </section>
-
-        <div class="questions-page-actions" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
-            <a class="questions-page-button" href="./index.html" style="background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6);">Back to Site</a>
-            <a class="questions-page-button" href="./how-to-guide.html" style="background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6);">Back to How To Guide</a>
-            <a class="questions-page-button" href="./hero-player-deepdive.html" style="background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6);">Back to Dev Tools</a>
-        </div>
 
     </main>
 </body>

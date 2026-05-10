@@ -4,21 +4,21 @@ export default [
     label: "Thumbs up",
     category: "gestures",
     tags: ["yes good okay like"],
-    style: { icon: "🎉" }
+    style: { icon: "✨" }
   },
   { 
     char: "👎", 
     label: "Thumbs down", 
     category: "gestures",
     tags: ["no bad dislike"],
-    style: { icon: "←-" }
+    style: { icon: "❌" }
   },
   {
     char: "👌", 
     label: "OK hand",
     category: "gestures",
-    tags: ["ok good fine"],
-    style: { icon: "👍" }
+    tags: ["ok good fine perfect"],
+    style: { icon: "✅" }
   },
   {
     char: "✌️",
@@ -31,162 +31,288 @@ export default [
     char: "🤞",
     label: "Crossed fingers",
     category: "gestures",
-    tags: ["luck hope"]
+    tags: ["luck hope pray"]
   },
   {
     char: "🤟",
     label: "Love-you gesture",
     category: "gestures",
-    tags: ["love you"]
+    tags: ["love you affection"]
   },
   {
     char: "🤘",
     label: "Sign of the horns",
     category: "gestures",
-    tags: ["rock metal music"]
+    tags: ["rock metal music cool"]
   },
   {
     char: "🤙",
     label: "Call me hand",
     category: "gestures",
-    tags: ["call phone shaka"]
+    tags: ["call phone shaka hang ten"]
   },
   {
-    char: "👊",
-    label: "Oncoming fist",
+    char: "👈",
+    label: "Backhand index pointing left",
     category: "gestures",
-    tags: ["punch fist"]
+    tags: ["left point direction"]
   },
   {
-    char: "👏",
-    label: "Clapping hands",
+    char: "👉",
+    label: "Backhand index pointing right",
     category: "gestures",
-    tags: ["clap bravo well done"]
+    tags: ["right point direction"]
   },
   {
-    char: "🙌",
-    label: "Raising hands",
+    char: "👆",
+    label: "Backhand index pointing up",
     category: "gestures",
-    tags: ["praise celebrate joy"]
+    tags: ["up point direction"]
   },
   {
-    char: "👐",
-    label: "Open hands",
+    char: "👇",
+    label: "Backhand index pointing down",
     category: "gestures",
-    tags: ["open"]
+    tags: ["down point direction"]
   },
   {
-    char: "🤲",
-    label: "Palms up together",
+    char: "☝️",
+    label: "Index pointing up",
     category: "gestures",
-    tags: ["prayer palms"]
+    tags: ["up point direction one"]
   },
   {
-    char: "🙏",
-    label: "Folded hands",
+    char: "✋",
+    label: "Raised hand",
     category: "gestures",
-    tags: ["pray please thanks"]
+    tags: ["stop high five wait"]
   },
   {
-    char: "🤝",
-    label: "Handshake",
+    char: "🤚",
+    label: "Raised back of hand",
     category: "gestures",
-    tags: ["deal agree meet"]
+    tags: ["back hand raise"]
+  },
+  {
+    char: "🖐️",
+    label: "Hand with fingers splayed",
+    category: "gestures",
+    tags: ["hand splay five"]
+  },
+  {
+    char: "🖖",
+    label: "Vulcan salute",
+    category: "gestures",
+    tags: ["spock vulcan space trek"]
+  },
+  {
+    char: "👋",
+    label: "Waving hand",
+    category: "gestures",
+    tags: ["wave hello goodbye hi"]
+  },
+  {
+    char: "🤙",
+    label: "Call me hand",
+    category: "gestures",
+    tags: ["call shaka phone"]
   },
   {
     char: "💪",
     label: "Flexed biceps",
     category: "gestures",
-    tags: ["strong muscle power"]
+    tags: ["strong muscle power fitness"]
   },
   {
-    char: "🦾",
-    label: "Mechanical arm",
+    char: "👊",
+    label: "Oncoming fist",
     category: "gestures",
-    tags: ["robot arm"]
+    tags: ["punch fist hit"]
   },
   {
-    char: "🧠",
-    label: "Brain",
+    char: "✊",
+    label: "Raised fist",
     category: "gestures",
-    tags: ["brain smart think"]
+    tags: ["power fist solidarity"]
   },
   {
-    char: "👀",
-    label: "Eyes",
+    char: "🤛",
+    label: "Left-facing fist",
     category: "gestures",
-    tags: ["look see watch"]
+    tags: ["fist bump left"]
   },
   {
-    char: "🖕",
-    label: "Middle finger",
+    char: "🤜",
+    label: "Right-facing fist",
     category: "gestures",
-    tags: ["rude"]
+    tags: ["fist bump right"]
   },
   {
-    char: "💅",
-    label: "Nail polish",
+    char: "👏",
+    label: "Clapping hands",
     category: "gestures",
-    tags: ["beauty style"]
+    tags: ["clap bravo well done praise"]
   },
   {
-    char: "🤳",
-    label: "Selfie",
+    char: "🙌",
+    label: "Raising hands",
     category: "gestures",
-    tags: ["photo selfie"]
+    tags: ["praise celebrate joy celebration"]
   },
   {
-    char: "🦶",
-    label: "Foot",
+    char: "👐",
+    label: "Open hands",
     category: "gestures",
-    tags: ["foot walk"]
+    tags: ["open hands hug"]
   },
   {
-    char: "🦵",
-    label: "Leg",
+    char: "🤲",
+    label: "Palms up together",
     category: "gestures",
-    tags: ["leg run"]
+    tags: ["prayer palms offer"]
   },
   {
-    char: "🦿",
-    label: "Mechanical leg",
+    char: "🙏",
+    label: "Folded hands",
     category: "gestures",
-    tags: ["robot leg"]
+    tags: ["pray please thanks respect"]
+  },
+  {
+    char: "🤝",
+    label: "Handshake",
+    category: "gestures",
+    tags: ["deal agree meet partnership"]
   },
   {
     char: "✍️",
     label: "Writing hand",
     category: "gestures",
-    tags: ["write write"]
+    tags: ["write pen note"]
   },
   {
-    char: "🫂",
-    label: "People hugging",
+    char: "💅",
+    label: "Nail polish",
     category: "gestures",
-    tags: ["hug love care"]
+    tags: ["beauty style nails care"]
+  },
+  {
+    char: "🤳",
+    label: "Selfie",
+    category: "gestures",
+    tags: ["photo selfie phone camera"]
+  },
+  {
+    char: "🦾",
+    label: "Mechanical arm",
+    category: "gestures",
+    tags: ["robot arm cyborg tech"]
+  },
+  {
+    char: "🦿",
+    label: "Mechanical leg",
+    category: "gestures",
+    tags: ["robot leg cyborg tech"]
+  },
+  {
+    char: "🦵",
+    label: "Leg",
+    category: "gestures",
+    tags: ["leg run walk limb"]
+  },
+  {
+    char: "🦶",
+    label: "Foot",
+    category: "gestures",
+    tags: ["foot walk step kick"]
   },
   {
     char: "👂",
     label: "Ear",
     category: "gestures",
-    tags: ["hear listen"]
+    tags: ["hear listen sound"]
   },
   {
     char: "👃",
     label: "Nose",
     category: "gestures",
-    tags: ["smell"]
+    tags: ["smell sniff"]
+  },
+  {
+    char: "🧠",
+    label: "Brain",
+    category: "gestures",
+    tags: ["brain smart think intelligence"]
+  },
+  {
+    char: "🫀",
+    label: "Anatomical heart",
+    category: "gestures",
+    tags: ["heart health medical life"]
+  },
+  {
+    char: "🫁",
+    label: "Lungs",
+    category: "gestures",
+    tags: ["lungs breathe health medical"]
+  },
+  {
+    char: "🦷",
+    label: "Tooth",
+    category: "gestures",
+    tags: ["tooth dental health"]
+  },
+  {
+    char: "🦴",
+    label: "Bone",
+    category: "gestures",
+    tags: ["bone skeleton body"]
+  },
+  {
+    char: "👀",
+    label: "Eyes",
+    category: "gestures",
+    tags: ["look see watch observer"]
+  },
+  {
+    char: "👁️",
+    label: "Eye",
+    category: "gestures",
+    tags: ["eye vision look"]
   },
   {
     char: "👅",
     label: "Tongue",
     category: "gestures",
-    tags: ["taste tongue"]
+    tags: ["taste tongue lick"]
   },
   {
     char: "👄",
     label: "Mouth",
     category: "gestures",
-    tags: ["mouth kiss talk"]
+    tags: ["mouth kiss talk speak"]
+  },
+  {
+    char: "🖕",
+    label: "Middle finger",
+    category: "gestures",
+    tags: ["rude middle finger insult"]
+  },
+  {
+    char: "🫂",
+    label: "People hugging",
+    category: "gestures",
+    tags: ["hug love care support"]
+  },
+  {
+    char: "🤏",
+    label: "Pinching hand",
+    category: "gestures",
+    tags: ["pinch small tiny"]
+  },
+  {
+    char: "🤌",
+    label: "Pinched fingers",
+    category: "gestures",
+    tags: ["chef kiss italian wait"]
   }
 ];

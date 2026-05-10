@@ -1233,9 +1233,6 @@ export function createAppUi(context) {
     }
 
     const isCollapsed = !state.messengerExpanded;
-    if (isCollapsed) {
-      emojis = emojis.slice(0, 12);
-    }
 
     const emojisHtml = emojis.map(emoji => {
       const displayTags = Array.isArray(emoji.tags) ? emoji.tags.join(", ") : emoji.tags;
