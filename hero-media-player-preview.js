@@ -685,7 +685,6 @@ export function renderHeroStagePreview(options = {}) {
   let resolvedMetadata = externalMetadata;
   if (externalMetadata instanceof Promise) {
     commitCard(stage, {
-    commitCard(stage, {
       badge: "NOW PLAYING",
       title: post.title || "Now playing",
       meta: formatPostMeta(post, creatorSummary),
