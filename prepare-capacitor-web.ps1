@@ -65,8 +65,8 @@ foreach ($file in $files) {
   $src = Join-Path $root $file
   $dest = Join-Path $dist $file
   if (Test-Path -LiteralPath $src) {
-    Copy-Item -LiteralPath $src -Destination $dest -Force
-    Write-Host "✓ [File] $file"
+    Copy-Item -Path $src -Destination $dest -Force
+    Write-Host "[File] $file"
   } else {
     Write-Warning "File missing: $file"
   }
@@ -77,12 +77,12 @@ foreach ($directory in $directories) {
   $src = Join-Path $root $directory
   $dest = Join-Path $dist $directory
   if (Test-Path -LiteralPath $src) {
-    Copy-Item -LiteralPath $src -Destination $dest -Recurse -Force
-    Write-Host "✓ [Dir]  $directory"
+    # Ensure the destination parent exists
+    Copy-Item -Path $src -Destination $dist -Recurse -Force
+    Write-Host "[Dir]  $directory"
   } else {
     Write-Warning "Directory missing: $directory"
   }
 }
 
 Write-Host "`nReady for Capacitor Sync."
-
