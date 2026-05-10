@@ -307,28 +307,23 @@ export function handlePlayPauseAction(context, forcePlay) {
     render, nativeSnapshot, performNativeAction,
     NATIVE_ACTION_PLAY_PAUSE, desktopSnapshot,
     performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE, isNativeCapacitorApp,
-    companionPromptDismissed, showCompanionPrompt, normalizePlaybackState,
-    getDesktopSnapshotSignature, toggleLocalPlayback,
-    setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
-    playHeroMedia, getNativeBridge, target
+    companionPromptDismissed, showCompanionPrompt,
+    toggleLocalPlayback, playHeroMedia, getNativeBridge, target
   } = context;
 
-  // 1. Context Resolution
+  const now = Date.now();
   const mode = target === "mini" ? "app" : heroMode;
-  const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
-  
-  const controllablePost = memoGet(`play_pause_post_${target}`, () => {
-    const activeId = target === "mini" ? (state.activePlayerPostId || state.playerPostId) : (state.heroPlayerPostId || state.activePlayerPostId);
-    const post = (activeId && typeof context.getPostById === "function") ? context.getPostById(activeId) : null;
-    return post || getControllablePlayerPost();
-  }, 50);
 
-  // 2. Hardware-Friendly Throttling
-  if (debounceAction(state, "play_pause", 100)) return;
+  // Simple cooldown: prevent multiple executions within 500ms
+  if ((state._lastPlayPauseAt) && (now - state._lastPlayPauseAt < 500)) {
+    console.debug("[Hero] Play/Pause action throttled.");
+    return;
+  }
+  state._lastPlayPauseAt = now;
 
-  console.log(`[Hero] Play/Pause Action. Mode: ${mode}, Source: ${preferredSource}, Target: ${target}`);
+  console.log(`[Hero] Play/Pause Action. Mode: ${mode}, Target: ${target}`);
 
-  // 3. Local Priority: Control active website media elements
+  // 1. Try local playback first (website media elements)
   if (typeof toggleLocalPlayback === "function") {
     if (toggleLocalPlayback(forcePlay, { target })) {
       render();
@@ -336,7 +331,7 @@ export function handlePlayPauseAction(context, forcePlay) {
     }
   }
 
-  // 4. App Mode: Mount or resume the local player stage
+  // 2. App Mode: Mount or resume the local player stage
   if (mode === "app") {
     if (target === "mini" && state.playerPostId) {
       const p = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
@@ -351,70 +346,22 @@ export function handlePlayPauseAction(context, forcePlay) {
     return;
   }
 
-  // 5. System Bridge Control
-  const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
-  
-  // Parse session metadata for source isolation
-  const app = (snapshot?.appPackage || "").toLowerCase();
-  const meta = (snapshot?.meta || "").toLowerCase();
-  const title = (snapshot?.title || "").toLowerCase();
-  
-  const isSpotify = app.includes("spotify") || meta.includes("spotify") || title.includes("spotify");
-  const isYouTube = app.includes("youtube") || app.includes("ytmusic") || meta.includes("youtube") || title.includes("youtube") || title.includes("ytmusic");
-
-  // Enforce Source Isolation
-  let sourceMismatch = false;
-  if (preferredSource === "youtube" && isSpotify && !isYouTube) sourceMismatch = true;
-  else if (preferredSource === "spotify" && isYouTube && !isSpotify) sourceMismatch = true;
-
-  if (sourceMismatch) {
-    console.log(`[Hero] Play/Pause: Source mismatch (${preferredSource} mode vs ${isSpotify ? 'Spotify' : 'YouTube'} session). Ignoring bridge command.`);
-    
-    // If we have a local post matching the preferred mode, we can "wake up" to it
-    if (controllablePost && controllablePost.sourceKind === preferredSource && typeof playHeroMedia === "function" && target !== "mini") {
-        console.log(`[Hero] Waking up local ${preferredSource} player instead.`);
-        playHeroMedia();
-    }
-    render();
-    return;
-  }
-
-  // Bridge Execution
+  // 3. Desktop Mode: Send command directly to system
   if (mode === "desktop") {
     if (!isNativeCapacitorApp() && !companionPromptDismissed && !desktopSnapshot) {
       if (typeof showCompanionPrompt === "function") showCompanionPrompt();
       return;
     }
-
-    console.log(`[Hero] Sending Desktop Play/Pause. SnapshotActive: ${!!snapshot?.active}`);
-    
-    // Optimistic state update if a snapshot exists
-    if (desktopSnapshot) {
-      const currentStatus = normalizePlaybackState(desktopSnapshot.playbackState);
-      const nextStatus = (typeof forcePlay === "boolean") ? (forcePlay ? "playing" : "paused") : (currentStatus === "playing" ? "paused" : "playing");
-      if (typeof setDesktopSnapshot === "function") {
-        const updated = { ...desktopSnapshot, active: true, playbackState: nextStatus };
-        setDesktopSnapshot(updated);
-        if (typeof setDesktopSnapshotSignature === "function") setDesktopSnapshotSignature(getDesktopSnapshotSignature(updated));
-      }
-    }
-
+    console.log(`[Hero] Sending Desktop Play/Pause.`);
     performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
-  } else if (mode === "device") {
+  } 
+  // 4. Device Mode: Send command to native bridge
+  else if (mode === "device") {
     if (nativeSnapshot?.permissionRequired) {
       if (typeof getNativeBridge === "function") getNativeBridge()?.openNowPlayingAccessSettings();
       return;
     }
-    
-    console.log(`[Hero] Sending Native Play/Pause. SnapshotActive: ${!!snapshot?.active}`);
-
-    if (nativeSnapshot) {
-      const currentStatus = normalizePlaybackState(nativeSnapshot.playbackState);
-      const nextStatus = (typeof forcePlay === "boolean") ? (forcePlay ? "playing" : "paused") : (currentStatus === "playing" ? "paused" : "playing");
-      if (typeof setNativeSnapshot === "function") {
-        setNativeSnapshot({ ...nativeSnapshot, active: true, playbackState: nextStatus });
-      }
-    }
+    console.log(`[Hero] Sending Native Play/Pause.`);
     performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
   }
 
