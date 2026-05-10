@@ -319,7 +319,10 @@ export function handlePlayPauseAction(context, forcePlay) {
     console.debug("[Hero] Play/Pause action throttled.");
     return;
   }
+  // Flag this timestamp globally to suppress incoming "stutter" sync messages
+  // from YouTube/Spotify iframes and bridge polls for the next 2.5 seconds.
   state._lastPlayPauseAt = now;
+  state._mediaActionLockoutUntil = now + 2500;
 
   console.log(`[Hero] Play/Pause Action. Mode: ${mode}, Target: ${target}`);
 

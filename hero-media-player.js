@@ -726,6 +726,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (!hasNativeSnapshotBridge()) return null;
 
     const now = Date.now();
+    if (state._mediaActionLockoutUntil && now < state._mediaActionLockoutUntil) return nativeSnapshot;
     if (now - lastNativeActionAt < 2500) return nativeSnapshot;
     if (now - lastNativePollTime < NATIVE_POLL_INTERVAL_MS - 200) return nativeSnapshot;
     lastNativePollTime = now;
@@ -1323,8 +1324,10 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     desktopSnapshotReadPromise = readDesktopSnapshot({ force })
       .then((snapshot) => {
-        // Prevent optimistic state flicker: Ignore incoming snapshots if an action was just performed
-        if (Date.now() - lastDesktopActionAt < SNAPSHOT_INGEST_DELAY_MS) {
+        // Prevent optimistic state flicker: Ignore incoming snapshots if an action was just performed.
+        // We check BOTH the global lockout (shared with UI) and the local bridge lockout.
+        const lockoutAt = Math.max(state._mediaActionLockoutUntil || 0, lastDesktopActionAt + SNAPSHOT_INGEST_DELAY_MS);
+        if (Date.now() < lockoutAt) {
           desktopSnapshotReadPromise = null;
           return desktopSnapshot;
         }

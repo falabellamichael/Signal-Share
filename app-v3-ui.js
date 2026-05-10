@@ -610,13 +610,24 @@ export function createAppUi(context) {
           // Update global state if this matches our active hero or mini player
           if (state.heroPlayerElement?.contains(event.source?.frameElement) || state.heroPlayerElement === event.source?.frameElement) {
             if (state.heroPlayerPlaybackState !== newState) {
-              state.heroPlayerPlaybackState = newState;
-              heroMediaPlayerController.render();
+              // MIXING/STUTTER FIX: Ignore incoming status messages from iframes during the lockout window
+              // following a user action. This prevents "state echoes" where the iframe reports its OLD
+              // state immediately after a command, causing a stutter.
+              if (state._mediaActionLockoutUntil && Date.now() < state._mediaActionLockoutUntil) {
+                console.log(`[Hero] Ignoring YouTube state sync during lockout (${newState}).`);
+              } else {
+                state.heroPlayerPlaybackState = newState;
+                heroMediaPlayerController.render();
+              }
             }
           } else if (state.activePlayerElement?.contains(event.source?.frameElement) || state.activePlayerElement === event.source?.frameElement) {
             if (state.miniPlayerPlaybackState !== newState) {
-              state.miniPlayerPlaybackState = newState;
-              renderMiniPlayer();
+              if (state._mediaActionLockoutUntil && Date.now() < state._mediaActionLockoutUntil) {
+                console.log(`[Hero] Ignoring YouTube Mini state sync during lockout (${newState}).`);
+              } else {
+                state.miniPlayerPlaybackState = newState;
+                renderMiniPlayer();
+              }
             }
           }
 
@@ -2199,8 +2210,13 @@ export function createAppUi(context) {
       }
     } else {
       const nextState = mediaElement.paused ? "paused" : "playing";
-      if (isHero) state.heroPlayerPlaybackState = nextState;
-      if (isMini) state.miniPlayerPlaybackState = nextState;
+      // STUTTER FIX: Respect the action lockout for local media events too.
+      if (state._mediaActionLockoutUntil && Date.now() < state._mediaActionLockoutUntil) {
+        console.log(`[Hero] Ignoring local media sync during lockout (${nextState}).`);
+      } else {
+        if (isHero) state.heroPlayerPlaybackState = nextState;
+        if (isMini) state.miniPlayerPlaybackState = nextState;
+      }
     }
 
     heroMediaPlayerController.render();
