@@ -43,6 +43,8 @@ $files = @(
   "hero-player-deepdive.html",
   "llm-deepdive.html",
   "llm-deepdive-2.html",
+  "snake-game.html",
+  "Calculator.html",
   "apple-touch-icon-180.png",
   "icon-192.png",
   "icon-512.png",
