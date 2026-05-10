@@ -2402,7 +2402,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         fallbackMedia,
         desktopSnapshot,
         matchedPost,
-        showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot?.active,
+        showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot,
         active: mode !== "app" // Treat media modes as "active" to show info/matched player
       }));
     }

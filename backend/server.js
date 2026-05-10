@@ -197,7 +197,7 @@ function sanitizeMediaMeta(rawMeta = "", sourceAppId = "") {
     }
   }
 
-  const genericPrefixPattern = /^(?:spotify[a-z0-9._!-]*|operasoftware\.[a-z0-9._!-]*|msedge(?:\.exe)?|chrome(?:\.exe)?|firefox(?:\.exe)?)\s*(?:[-:|]\s*)?/i;
+  const genericPrefixPattern = /^(?:spotify[a-z0-9._!-]*|operasoftware\.[a-z0-9._!-]*|msedge(?:\.exe)?|chrome(?:\.exe)?|firefox(?:\.exe)?|bluetooth|phone link)\s*(?:[-:|]\s*)?/i;
   const genericStripped = meta.replace(genericPrefixPattern, "").trim();
   if (genericStripped) meta = genericStripped;
 
@@ -243,7 +243,9 @@ function isPreferredApp(sourceAppId = "", preferredSource = "") {
     || normalized.includes("youtube")
     || normalized.includes("ytmusic")
     || isBrowserLikeSource(normalized)
-    || normalized.includes("signalshare");
+    || normalized.includes("signalshare")
+    || normalized.includes("phone link")
+    || normalized.includes("bluetooth");
 }
 
 function getPlaybackPriority(status) {
@@ -288,6 +290,8 @@ function classifySessionProvider(session) {
     || text.includes("music.youtube")
   ) return "youtube";
 
+  if (sourceAppId.includes("phone link") || sourceAppId.includes("bluetooth") || text.includes("phone link") || text.includes("bluetooth")) return "phone_link";
+
   return "";
 }
 
@@ -328,10 +332,19 @@ function scoreSession(session, preferredSource = "") {
 
 function pickBestSession(sessions = [], preferredSource = "") {
   if (!Array.isArray(sessions) || !sessions.length) return null;
-  return sessions.reduce((best, session) => {
+  const best = sessions.reduce((best, session) => {
     if (!best) return session;
     return scoreSession(session, preferredSource) > scoreSession(best, preferredSource) ? session : best;
   }, null);
+
+  const preferred = normalizePreferredSource(preferredSource);
+  if (preferred && best) {
+    const provider = classifySessionProvider(best);
+    // If we are strictly targeting a provider and we found a DIFFERENT one, 
+    // ignore it and return null (which translates to 'Idle' for the requested mode).
+    if (provider && provider !== preferred) return null;
+  }
+  return best;
 }
 
 function logSmtcError(error) {
@@ -366,6 +379,7 @@ function resolveMediaAppLabel(sourceAppId = "") {
   const normalized = sourceAppId.toLowerCase();
   if (normalized.includes("spotify")) return "Spotify";
   if (normalized.includes("youtube")) return "YouTube";
+  if (normalized.includes("phone link") || normalized.includes("bluetooth")) return "Phone Link";
   if (normalized.includes("chrome")) return "Chrome";
   if (normalized.includes("msedge")) return "Edge";
   if (normalized.includes("firefox")) return "Firefox";
