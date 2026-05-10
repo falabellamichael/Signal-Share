@@ -84,23 +84,40 @@
         <li>For YouTube and Spotify posts, use full valid links when publishing.</li>
       </ul>
     </section>
-
-    <section class="questions-page-card">
-      <h2>Read more</h2>
-      <p>
-        For project setup notes, developer details, and the full README, open the attached
-        <a href="./README.md">README HERE</a>.
-      </p>
-    </section>
-
-<section class="questions-page-card">
-  <h2>Read more</h2>
+  
+   <div id="developer-tools-panel" class="questions-page-card" style="display: none; background-color: #f0f8ff; border: 2px solid #4682b4;"></div>
   <p>
     For project setup notes, developer details, and full documentation on core features:
-    <ul>
-        <li><a href="./README.md">Project Setup & README Details</a></li>
-        <li><a href="./hero-player-deepdive.html">Hero Player Technical Deep Dive (Developers)</a></li>
-    </ul>
   </p>
-</section>
+  <div class="questions-page-actions">
+    <a class="questions-page-button" href="./index.html">Back to Signal Share</a>
+    <a class="questions-page-button" href="./contact.html">Contact us</a>
+    <a class="questions-page-button" href="./README.md">Open README</a>
+    <!-- NEW COOL TOGGLE HERE -->
+    <button id="toggle-deepdive" class="questions-page-button toggle-button">Toggle Developer Tools</button>
+  </div>
+</main>
+
+<script>
+  document.getElementById('toggle-deepdive').addEventListener('click', function() {
+    const panel = document.getElementById('developer-tools-panel');
+    if (panel.style.display === 'none') {
+      panel.style.display = 'block';
+      if (!panel.innerHTML.trim()) {
+        panel.innerHTML = `
+          <h2>Hero Player Deep Dive</h2>
+          <p>The Hero Player is a specialized media interface that abstracts multiple sources into a single control layer.</p>
+          <div class="questions-page-actions" style="justify-content: flex-start; gap: 10px; margin-top: 15px;">
+            <a class="questions-page-button" href="./hero-player-deepdive.html" style="background: #4682b4; color: white;">Open Technical Deep Dive</a>
+          </div>
+        `;
+      }
+      panel.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      panel.style.display = 'none';
+    }
+  });
+</script>
+</body>
+</html>
 
