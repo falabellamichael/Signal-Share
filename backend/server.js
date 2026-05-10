@@ -324,6 +324,11 @@ function scoreSession(session, preferredSource = "") {
   if (text.includes("youtube") || text.includes("youtu.be")) score += 120;
   if (session?.media?.title && `${session.media.title}`.trim()) score += 80;
 
+  // Penalize sessions with purely numeric titles, which are often track IDs or stale sessions
+  if (/^\d{5,}$/.test(session?.media?.title || "")) {
+    score -= 2000;
+  }
+
   // Give a small boost to recently updated sessions to help break ties between multiple browser tabs
   const updated = Number(session?.lastUpdatedTime || 0);
   if (Number.isFinite(updated) && updated > 0) {
@@ -350,8 +355,10 @@ function pickBestSession(sessions = [], preferredSource = "") {
     // If it's playing, we might want to return null to show 'Idle' for the requested mode
     // BUT we should still return it if the user wants to 'take over' control.
     if (provider && provider !== preferred) {
-       // If it's playing, we return null to enforce mode isolation in the UI
-       if (mapPlaybackState(best.playback?.playbackStatus) === "playing") return null;
+       // In media mode specifically, if the best session doesn't match the requested platform 
+       // AND it's not currently playing, we return null to avoid showing "old data" from 
+       // a different app on the specialized tab.
+       if (mapPlaybackState(best.playback?.playbackStatus) !== "playing") return null;
     }
   }
 
@@ -501,6 +508,7 @@ function buildFreshSnapshotPayload(preferredSource = "") {
       smtcHealthy: true,
       smtcFailureCount: 0,
       smtcError: "",
+      stale: Boolean(session.stale),
     };
 
     lastGoodSnapshot = payload;
@@ -623,31 +631,32 @@ try {
     if ($manager -ne $null) {
       $sessions = $manager.GetSessions()
 
-      if (-not [string]::IsNullOrWhiteSpace($targetApp)) {
+      if ($sessions.Count -gt 0) {
+        $bestScore = -1
         foreach ($candidate in $sessions) {
           if ($null -eq $candidate) { continue }
           try {
-            if ((Matches-AppId $candidate.SourceAppUserModelId $targetApp) -and (Is-Match-Source $candidate $preferred)) {
+            $score = 0
+            $isTarget = [string]::IsNullOrWhiteSpace($targetApp) -or (Matches-AppId $candidate.SourceAppUserModelId $targetApp)
+            $isPreferred = [string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or (Is-Match-Source $candidate $preferred)
+            
+            if ($isTarget -and $isPreferred) { $score += 1000 }
+            elseif ($isTarget) { $score += 500 }
+            elseif ($isPreferred) { $score += 300 }
+
+            if ($candidate.PlaybackInfo.PlaybackStatus -eq [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus]::Playing) {
+              $score += 5000
+            }
+
+            if ($score -gt $bestScore) {
+              $bestScore = $score
               $session = $candidate
-              break
             }
           } catch {}
         }
       }
 
-      if ($session -eq $null -and -not [string]::IsNullOrWhiteSpace($preferred) -and $preferred -ne "all") {
-        foreach ($candidate in $sessions) {
-          if ($null -eq $candidate) { continue }
-          try {
-            if (Is-Match-Source $candidate $preferred) {
-              $session = $candidate
-              break
-            }
-          } catch {}
-        }
-      }
-
-      if ($session -eq $null -and ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all")) {
+      if ($session -eq $null) {
         $session = $manager.GetCurrentSession()
       }
     }

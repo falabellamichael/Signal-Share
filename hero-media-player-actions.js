@@ -212,10 +212,31 @@ export function handlePlayPauseAction(context, forcePlay) {
     performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE, isNativeCapacitorApp,
     companionPromptDismissed, showCompanionPrompt, normalizePlaybackState,
     getDesktopSnapshotSignature, toggleLocalPlayback, getFallbackPageMediaElement,
-    setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature
+    setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
+    playHeroMedia
   } = context;
 
   const mode = heroMode;
+  console.log(`[Hero] handlePlayPause (Media Mode). Mode: ${mode}, HeroControlMode: ${state.heroControlMode}, DesktopActive: ${Boolean(desktopSnapshot?.active)}`);
+
+  // Handle App mode first
+  if (mode === "app") {
+    if (typeof playHeroMedia === "function") playHeroMedia();
+    return;
+  }
+
+  // SPECIAL: YouTube Mode fallback. If in YouTube mode and the desktop is idle,
+  // we attempt to play the relevant YouTube video within the app.
+  if (state.heroControlSource === "youtube" && mode === "desktop" && (!desktopSnapshot || !desktopSnapshot.active)) {
+    const post = getControllablePlayerPost();
+    if (post && post.sourceKind === "youtube") {
+      if (typeof playHeroMedia === "function") {
+        playHeroMedia();
+        return;
+      }
+    }
+  }
+
   let actionHandled = false;
 
   if (mode === "desktop") {
@@ -279,11 +300,19 @@ export function handlePreviousAction(context) {
     performDesktopAction, DESKTOP_ACTION_PREVIOUS, getFallbackPageMediaElement,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
     ensureControllablePost, stepMiniPlayer, getControllablePlayerPost,
-    getEffectiveHeroMode, getDesktopSnapshotSignature, heroMode
+    getEffectiveHeroMode, getDesktopSnapshotSignature, heroMode,
+    stepHeroPlayer, elements
   } = context;
 
   const mode = heroMode;
   let actionHandled = false;
+
+  if (mode === "app") {
+    if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+    if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
+    render();
+    return;
+  }
 
   if (mode === "desktop") {
     performDesktopAction(DESKTOP_ACTION_PREVIOUS);
@@ -314,11 +343,19 @@ export function handleNextAction(context) {
     performDesktopAction, DESKTOP_ACTION_NEXT, getFallbackPageMediaElement,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
     ensureControllablePost, stepMiniPlayer, getControllablePlayerPost,
-    getEffectiveHeroMode, getDesktopSnapshotSignature, heroMode
+    getEffectiveHeroMode, getDesktopSnapshotSignature, heroMode,
+    stepHeroPlayer, elements
   } = context;
 
   const mode = heroMode;
   let actionHandled = false;
+
+  if (mode === "app") {
+    if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+    if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
+    render();
+    return;
+  }
 
   if (mode === "desktop") {
     performDesktopAction(DESKTOP_ACTION_NEXT);

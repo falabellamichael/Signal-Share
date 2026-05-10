@@ -1879,44 +1879,14 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function handlePlayPause(forcePlay) {
-    const controllablePost = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(controllablePost);
-
-    if (mode === "app") {
-      if (typeof playHeroMedia === "function") {
-        playHeroMedia();
-      }
-      return;
-    }
-
     handlePlayPauseAction(getActionContext(), forcePlay);
   }
 
   function handlePrevious() {
-    const controllablePost = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(controllablePost);
-
-    if (mode === "app") {
-      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-      stepHeroPlayer(-1);
-      render();
-      return;
-    }
-
     handlePreviousAction(getActionContext());
   }
 
   function handleNext() {
-    const controllablePost = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(controllablePost);
-
-    if (mode === "app") {
-      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-      stepHeroPlayer(1);
-      render();
-      return;
-    }
-
     handleNextAction(getActionContext());
   }
 
