@@ -368,6 +368,11 @@ function scoreSession(session, preferredSource = "") {
   if (preferred) {
     if (provider === preferred) {
       score += 50000; // High boost for matching source
+    } else if (provider === "") {
+      // If classification is unknown, give it a medium score.
+      // This allows us to pick up sessions that don't have clear branding yet,
+      // as long as they don't explicitly belong to the OTHER platform.
+      score += 5000;
     } else {
       // MASSIVE penalty for confirmed mismatch to ensure we don't pick up the other app.
       // If we pick up NOTHING, buildFreshSnapshotPayload will return "Idle" for the mode.
@@ -376,6 +381,7 @@ function scoreSession(session, preferredSource = "") {
   } else if (isPreferredApp(session.sourceAppUserModelId || session.sourceAppId)) {
     score += 500;
   }
+
 
 
 
