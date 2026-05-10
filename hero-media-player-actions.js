@@ -324,7 +324,7 @@ export function handlePlayPauseAction(context, forcePlay) {
   }, 50);
 
   // 2. Hardware-Friendly Throttling
-  if (debounceAction(state, "play_pause", mode === "device" ? 500 : 400)) return;
+  if (debounceAction(state, "play_pause", 100)) return;
 
   console.log(`[Hero] Play/Pause Action. Mode: ${mode}, Source: ${preferredSource}, Target: ${target}`);
 

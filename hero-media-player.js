@@ -76,8 +76,8 @@ export function createHeroMediaPlayerController(options) {
   let lastNativePollTime = 0;
   let lastDesktopActionKey = "";
   let companionPromptDismissed = localStorage.getItem("ss_companion_dismissed") === "true";
-  const DESKTOP_ACTION_COOLDOWN_MS = 280;
-  const NATIVE_ACTION_COOLDOWN_MS = 280;
+  const DESKTOP_ACTION_COOLDOWN_MS = 50;
+  const NATIVE_ACTION_COOLDOWN_MS = 50;
   const COMPANION_SETUP_SCRIPT = `@echo off
 setlocal
 title Signal Share Companion
@@ -1693,8 +1693,8 @@ The companion bridge is designed with several security layers to keep your PC sa
       window.setTimeout(() => {
         nativeActionInFlight = false;
         // Delay the poll slightly so native state has time to update
-        if (Date.now() - lastNativeActionAt > 900) refreshNativeSnapshot();
-      }, 1000);
+        if (Date.now() - lastNativeActionAt > 100) refreshNativeSnapshot();
+      }, 100);
 
       return Boolean(success);
     } catch {
@@ -1754,8 +1754,8 @@ The companion bridge is designed with several security layers to keep your PC sa
     }))
       .then((response) => response.ok ? response.json().catch(() => ({ ok: true })) : { ok: false })
       .then((responsePayload) => {
-        window.setTimeout(() => refreshDesktopSnapshot({ force: true }), 260);
-        window.setTimeout(() => refreshDesktopSnapshot({ force: true }), 950);
+        window.setTimeout(() => refreshDesktopSnapshot({ force: true }), 0);
+        window.setTimeout(() => refreshDesktopSnapshot({ force: true }), 50);
         return Boolean(responsePayload?.ok);
       })
       .catch(() => false)
