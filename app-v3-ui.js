@@ -1225,7 +1225,7 @@ export function createAppUi(context) {
       const q = state.emojiSearchQuery;
       emojis = emojis.filter(emoji => 
         emoji.label.toLowerCase().includes(q) || 
-        (emoji.tags && emoji.tags.toLowerCase().includes(q)) ||
+        (emoji.tags && (Array.isArray(emoji.tags) ? emoji.tags.join(" ") : emoji.tags).toLowerCase().includes(q)) ||
         emoji.category.toLowerCase().includes(q)
       );
     } else {
@@ -1238,7 +1238,8 @@ export function createAppUi(context) {
     }
 
     const emojisHtml = emojis.map(emoji => {
-      const tooltip = emoji.tags ? `${emoji.label} (${emoji.tags})` : emoji.label;
+      const displayTags = Array.isArray(emoji.tags) ? emoji.tags.join(", ") : emoji.tags;
+      const tooltip = emoji.tags ? `${emoji.label} (${displayTags})` : emoji.label;
       return `<button class="emoji-chip" type="button" data-emoji="${emoji.char}" title="${tooltip}" aria-label="Insert ${emoji.label.toLowerCase()}">${emoji.char}</button>`;
     }).join("");
 

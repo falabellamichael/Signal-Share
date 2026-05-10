@@ -1,48 +1,130 @@
 export default [
-  { char: "🎉", label: "Party popper", category: "objects" },
-  { char: "🎊", label: "Confetti ball", category: "objects" },
-  { char: "🎈", label: "Balloon", category: "objects" },
-  { char: "🎁", label: "Wrapped gift", category: "objects" },
-  { char: "💎", label: "Gem stone", category: "objects" },
-  { char: "💡", label: "Light bulb", category: "objects" },
-  { char: "🔋", label: "Battery", category: "objects" },
-  { char: "💻", label: "Laptop", category: "objects" },
-  { char: "📱", label: "Mobile phone", category: "objects" },
-  { char: "🚀", label: "Rocket", category: "objects" },
-  { char: "🛸", label: "Flying saucer", category: "objects" },
-  { char: "🌈", label: "Rainbow", category: "objects" },
-  { char: "🌊", label: "Water wave", category: "objects" },
-  { char: "🌍", label: "Earth globe Europe-Africa", category: "objects" },
-  { char: "🍕", label: "Pizza", category: "objects" },
-  { char: "🍔", label: "Hamburger", category: "objects" },
-  { char: "🍟", label: "French fries", category: "objects" },
-  { char: "☕", label: "Hot beverage", category: "objects" },
-  { char: "🍺", label: "Beer mug", category: "objects" },
-  { char: "🍷", label: "Wine glass", category: "objects" },
-  { char: "🍹", label: "Tropical drink", category: "objects" },
-  { char: "🍦", label: "Soft ice cream", category: "objects" },
-  { char: "🍩", label: "Doughnut", category: "objects" },
-  { char: "🍪", label: "Cookie", category: "objects" },
-  { char: "🍫", label: "Chocolate bar", category: "objects" },
-  { char: "🎨", label: "Artist palette", category: "objects" },
-  { char: "🎤", label: "Microphone", category: "objects" },
-  { char: "🎧", label: "Headphone", category: "objects" },
-  { char: "🎹", label: "Musical keyboard", category: "objects" },
-  { char: "🎸", label: "Guitar", category: "objects" },
-  { char: "🎻", label: "Violin", category: "objects" },
-  { char: "🎺", label: "Trumpet", category: "objects" },
-  { char: "🎷", label: "Saxophone", category: "objects" },
-  { char: "🥁", label: "Drum", category: "objects" },
-  { char: "🎮", label: "Video game", category: "objects" },
-  { char: "🎲", label: "Game die", category: "objects" },
-  { char: "🎰", label: "Slot machine", category: "objects" },
-  { char: "♟️", label: "Chess pawn", category: "objects" },
-  { char: "🎭", label: "Theater arts", category: "objects" },
-  { char: "🎬", label: "Clapper board", category: "objects" },
-  { char: "📺", label: "Television", category: "objects" },
-  { char: "📷", label: "Camera", category: "objects" },
-  { char: "🕯️", label: "Candle", category: "objects" },
-  { char: "🧨", label: "Firecracker", category: "objects" },
-  { char: "🧧", label: "Red envelope", category: "objects" },
-  { char: "🧿", label: "Nazar amulet", category: "objects" }
+  { 
+    char: "🎉",
+    label: "Party popper",
+    category: "objects",
+    tags: ["party celebration celebrate"]
+  },
+  { 
+    char: "🎊",
+    label: "Confetti ball",
+    category: "objects",
+    tags: ["party celebration ball"]
+  },
+  { 
+    char: "🎈",
+    label: "Balloon",
+    category: "objects",
+    tags: ["party balloon celebration"]
+  },
+  { 
+    char: "🎁",
+    label: "Wrapped gift",
+    category: "objects",
+    tags: ["gift present box"]
+  },
+  { 
+    char: "💎",
+    label: "Gem stone",
+    category: "objects",
+    tags: ["gem stone diamond jewelry"],
+    style: { icon: "✨" }
+  },
+  { 
+    char: "💡",
+    label: "Light bulb",
+    category: "objects",
+    tags: ["light bulb idea"]
+  },
+  { 
+    char: "🔋",
+    label: "Battery",
+    category: "objects",
+    tags: ["battery power energy"]
+  },
+  { 
+    char: "💻",
+    label: "Laptop",
+    category: "objects",
+    tags: ["computer laptop tech"],
+    style: { icon: "⚙️" }
+  },
+  { 
+    char: "📱",
+    label: "Mobile phone",
+    category: "objects",
+    tags: ["phone mobile tech"]
+  },
+  { 
+    char: "🚀",
+    label: "Rocket",
+    category: "objects",
+    tags: ["rocket space fly"]
+  },
+  { 
+    char: "🛸",
+    label: "Flying saucer",
+    category: "objects",
+    tags: ["ufo space alien"]
+  },
+  { 
+    char: "🌈",
+    label: "Rainbow",
+    category: "objects",
+    tags: ["rainbow sky nature"]
+  },
+  { 
+    char: "🌊",
+    label: "Water wave",
+    category: "objects",
+    tags: ["wave sea water"]
+  },
+  { 
+    char: "🌍",
+    label: "Earth globe Europe-Africa",
+    category: "objects",
+    tags: ["earth globe world"]
+  },
+  { 
+    char: "🎬",
+    label: "Clapper board",
+    category: "objects",
+    tags: ["movie clapper film"]
+  },
+  { 
+    char: "📺",
+    label: "Television",
+    category: "objects",
+    tags: ["tv television movie"]
+  },
+  { 
+    char: "📷",
+    label: "Camera",
+    category: "objects",
+    tags: ["camera photo picture"]
+  },
+  { 
+    char: "🕯️",
+    label: "Candle",
+    category: "objects",
+    tags: ["candle light burn"]
+  },
+  { 
+    char: "🧨",
+    label: "Firecracker",
+    category: "objects",
+    tags: ["firecracker explosion"]
+  },
+  { 
+    char: "🧧",
+    label: "Red envelope",
+    category: "objects",
+    tags: ["envelope money gift"]
+  },
+  { 
+    char: "🧿",
+    label: "Nazar amulet",
+    category: "objects",
+    tags: ["amulet nazar lucky"]
+  }
 ];
