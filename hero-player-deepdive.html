@@ -20,17 +20,26 @@
             This document details the underlying mechanisms, state management, and cross-device communication protocols used by the Hero Media Player. This guide is intended for developers integrating or debugging media playback features.
         </p>
 
-        <!-- Index/Table of Contents (Sticky) -->
-        <div class="questions-page-card" style="position: sticky; top: 12px; z-index: 100; margin: 20px 0; padding: 18px 20px; border-color: rgba(70, 130, 180, 0.4); background: rgba(8, 8, 11, 0.95); backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-            <h3 style="margin: 0 0 12px; font-size: 0.9rem; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.05em;">Quick Jump Guide</h3>
-            <ul style="list-style-type: none; padding-left: 0; display: flex; flex-wrap: wrap; gap: 10px 20px; font-size: 0.95rem;">
-                <li><a href="#section-state" style="color: #4682b4; text-decoration: none; font-weight: 500;">1. Architecture</a></li>
-                <li><a href="#section-media" style="color: #4682b4; text-decoration: none; font-weight: 500;">2. Media Sources</a></li>
-                <li><a href="#section-bridge" style="color: #4682b4; text-decoration: none; font-weight: 500;">3. Desktop Bridge</a></li>
-                <li><a href="#section-llm" style="color: #4682b4; text-decoration: none; font-weight: 500;">4. Local AI</a></li>
-                <li><a href="#section-debug" style="color: #4682b4; text-decoration: none; font-weight: 500;">5. Debugging</a></li>
+        <!-- Index/Table of Contents (Sticky Pill Nav) -->
+        <nav class="questions-page-card" style="position: sticky; top: 16px; z-index: 100; margin: 24px auto; padding: 8px 12px; border-radius: 999px; border-color: rgba(255,255,255,0.12); background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(24px); box-shadow: 0 16px 40px rgba(0,0,0,0.4); width: fit-content; max-width: 100%; overflow-x: auto;">
+            <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; align-items: center; gap: 4px; font-size: 0.88rem; white-space: nowrap;">
+                <li><a href="#section-state" style="color: rgba(255,255,255,0.8); text-decoration: none; padding: 8px 14px; border-radius: 999px; transition: background 180ms ease;">Architecture</a></li>
+                <li><a href="#section-media" style="color: rgba(255,255,255,0.8); text-decoration: none; padding: 8px 14px; border-radius: 999px; transition: background 180ms ease;">Sources</a></li>
+                <li><a href="#section-bridge" style="color: rgba(255,255,255,0.8); text-decoration: none; padding: 8px 14px; border-radius: 999px; transition: background 180ms ease;">Bridge</a></li>
+                <li><a href="#section-llm" style="color: rgba(255,255,255,0.8); text-decoration: none; padding: 8px 14px; border-radius: 999px; transition: background 180ms ease;">AI Integration</a></li>
+                <li><a href="#section-debug" style="color: rgba(255,255,255,0.8); text-decoration: none; padding: 8px 14px; border-radius: 999px; transition: background 180ms ease;">Debug</a></li>
+                <li style="margin-left: 4px; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 10px;">
+                    <a href="#hero-player-architecture" style="color: #4682b4; text-decoration: none; font-weight: 600; padding: 8px 10px;">↑ Top</a>
+                </li>
             </ul>
-        </div>
+        </nav>
+
+        <style>
+            .questions-page-card nav a:hover {
+                background: rgba(255,255,255,0.08);
+                color: #fff !important;
+            }
+        </style>
 
 
         <!-- Section 1: Core Component -->
