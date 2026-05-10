@@ -319,8 +319,15 @@ export function createAppUi(context) {
   }
 
   function getStandbyPreviewPost() {
-    // Pick the most recent playable post from the feed that isn't the current one
+    // Pick the most recent playable post from the feed that matches the current source
     const posts = getAllPosts() || [];
+    const source = (state.heroControlSource || state.heroMediaSource || "").toLowerCase();
+
+    if (source === "youtube" || source === "spotify") {
+      const matched = posts.filter(p => isPlayablePost(p) && p.sourceKind === source);
+      if (matched.length > 0) return matched[0];
+    }
+
     const playable = posts.filter(p => isPlayablePost(p) && p.id !== state.playerPostId);
     return playable[0] || null;
   }
@@ -2072,7 +2079,15 @@ export function createAppUi(context) {
   }
 
   function getControllablePlayerPost() {
-    return getPostById(state.heroPlayerPostId || state.activePlayerPostId || state.playerPostId);
+    const active = getPostById(state.heroPlayerPostId || state.activePlayerPostId || state.playerPostId);
+    const source = (state.heroControlSource || state.heroMediaSource || "").toLowerCase();
+
+    if (source === "youtube" || source === "spotify") {
+      // If the active post doesn't match the source, don't return it as "controllable"
+      // This forces the player to fallback to a standby post that matches the source.
+      if (active && active.sourceKind !== source) return null;
+    }
+    return active;
   }
 
   function resolveExternalEmbedSource(post) {
