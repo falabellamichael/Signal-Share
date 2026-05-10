@@ -84,6 +84,11 @@ public class MainActivity extends BridgeActivity {
                 return false;
             }
         }
+
+        @android.webkit.JavascriptInterface
+        public void forceRefreshNowPlaying() {
+            PhoneNowPlayingHelper.pushSnapshotToConnectedNodes(MainActivity.this);
+        }
     };
 
     @Override

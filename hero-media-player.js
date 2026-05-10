@@ -1619,6 +1619,60 @@ The companion bridge is designed with several security layers to keep your PC sa
     return false;
   }
 
+  let isRefreshing = false;
+  async function handleRefresh() {
+    if (isRefreshing || !hasUi()) return;
+    isRefreshing = true;
+
+    // Visual feedback on the stage/status
+    const prevStatus = elements.heroPlayerStatus.textContent;
+    elements.heroPlayerStatus.textContent = "REFRESHING...";
+    elements.heroPlayerRefreshButton?.classList.add("loading");
+
+    try {
+      // 1. Clear matched post cache temporarily to force a re-evaluation
+      matchedPost = null;
+
+      // 2. Force immediate poll of available bridges
+      if (hasNativeSnapshotBridge()) {
+        await pollNativeSnapshot();
+      }
+      if (canUseDesktopBridge()) {
+        await pollDesktopSnapshot();
+      }
+
+      // 3. Android: Explicitly poke the native layer to broadcast state
+      if (isNativeCapacitorApp()) {
+        const bridge = getNativeBridge();
+        if (bridge && typeof bridge.forceRefreshNowPlaying === "function") {
+          bridge.forceRefreshNowPlaying();
+        }
+      }
+
+      // 4. Re-render the UI
+      render();
+
+      if (typeof window.showNotification === "function") {
+        window.showNotification({
+          title: "Player Synchronized",
+          body: "Media session state has been refreshed.",
+          kind: "success"
+        });
+      }
+    } catch (error) {
+      console.error("[Hero] Refresh failed:", error);
+    } finally {
+      setTimeout(() => {
+        isRefreshing = false;
+        elements.heroPlayerRefreshButton?.classList.remove("loading");
+        // Restore status if it hasn't been changed by a newer poll
+        if (elements.heroPlayerStatus.textContent === "REFRESHING...") {
+          elements.heroPlayerStatus.textContent = prevStatus;
+        }
+      }, 800);
+    }
+  }
+
   function performNativeAction(action) {
     if (!hasNativeActionBridge()) return false;
 
@@ -2007,6 +2061,11 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     elements.heroPlayerOpenPhoneButton.addEventListener("click", (event) => {
       handleOpenPhone();
+      if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
+    });
+
+    elements.heroPlayerRefreshButton?.addEventListener("click", (event) => {
+      handleRefresh();
       if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
     });
 
