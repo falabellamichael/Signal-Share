@@ -336,10 +336,16 @@ function classifySessionProvider(session, preferredSource = "") {
 
   // 3. Mode-Based Tie-Breaker (Exclusive Isolation)
   // If we are in a specific mode (e.g. YouTube mode) and the session is a browser,
-  // we "claim" it for the target mode UNLESS it explicitly looks like the OTHER platform.
+  // we "claim" it for the target mode.
   if (isBrowserLikeSource(sourceAppId) || sourceAppId.includes("native-bridge")) {
-    if (preferred === "youtube" && !looksLikeSpotify && !isSpotifyId) return "youtube";
-    // We no longer blindly claim for Spotify. Spotify Web Player always has "Spotify" in the title.
+    if (preferred === "youtube") {
+      // If locked to YouTube, we trust generic browser sessions unless it's explicitly the Spotify app
+      if (!isSpotifyId) return "youtube";
+    }
+    if (preferred === "spotify") {
+      // If locked to Spotify, we trust generic browser sessions unless it's explicitly the YouTube app
+      if (!isYouTubeId) return "spotify";
+    }
   }
 
 

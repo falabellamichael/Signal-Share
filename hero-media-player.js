@@ -1816,7 +1816,6 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   function getEffectiveHeroMode(controllablePost) {
     // 1. Explicit Mode Override (House/Waveform icons)
-    // If the user has manually selected a mode, we must respect it strictly.
     if (state.heroControlMode === "feed") return "app";
     if (state.heroControlMode === "media") {
       if (!isNativeCapacitorApp() && canUseDesktopBridge()) return "desktop";
@@ -1825,23 +1824,21 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     const preferredSource = getPreferredHeroControlSource();
 
-    // 2. AUTO MODE or SOURCE-LOCKED logic:
-    // If the user has locked the source to 'YouTube' or 'Spotify', we prioritize the bridge
-    // for that specific platform to ensure "strict detection" of PC/Phone activity.
+    // 2. SOURCE-LOCKED logic:
+    // If the user has locked the source to 'YouTube' or 'Spotify', we prioritize the system bridge.
+    // We intentionally ignore what was played on the website (controllablePost) to ensure
+    // the Hero Stage acts as a dedicated controller for the PC/Phone app.
     if (preferredSource) {
-      if (shouldUseNativeMode(controllablePost)) return "device";
-      if (shouldUseDesktopMode(controllablePost)) return "desktop";
+      // In source-locked mode, always prefer system bridges if available.
+      // We ignore controllablePost to satisfy the "ignore what was played last on our site" requirement.
+      if (hasNativeSnapshotBridge()) return "device";
+      if (canUseDesktopBridge()) return "desktop";
 
-      // If bridge is idle but we have a matching local post (e.g. a YouTube Iframe), stay in app mode.
-      if (controllablePost && controllablePost.sourceKind === preferredSource) return "app";
-
-      // In source-locked mode, if nothing is active yet, default to the system mode
-      // rather than the app mode to allow "remote wake up".
-      if (!isNativeCapacitorApp() && canUseDesktopBridge()) return "desktop";
-      return "device";
+      // Fallback only if no bridge is available at all
+      return "app";
     }
 
-    // 3. Default Auto behavior
+    // 3. AUTO Mode (Source: "All")
     if (shouldUseNativeMode(controllablePost)) return "device";
     if (shouldUseDesktopMode(controllablePost)) return "desktop";
     return "app";
