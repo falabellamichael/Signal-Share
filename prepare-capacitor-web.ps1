@@ -60,12 +60,29 @@ if (Test-Path -LiteralPath $dist) {
 
 New-Item -ItemType Directory -Path $dist | Out-Null
 
+Write-Host "--- Copying Files ---"
 foreach ($file in $files) {
-  Copy-Item -LiteralPath (Join-Path $root $file) -Destination (Join-Path $dist $file) -Force
+  $src = Join-Path $root $file
+  $dest = Join-Path $dist $file
+  if (Test-Path -LiteralPath $src) {
+    Copy-Item -LiteralPath $src -Destination $dest -Force
+    Write-Host "✓ [File] $file"
+  } else {
+    Write-Warning "File missing: $file"
+  }
 }
 
+Write-Host "`n--- Copying Directories ---"
 foreach ($directory in $directories) {
-  Copy-Item -LiteralPath (Join-Path $root $directory) -Destination (Join-Path $dist $directory) -Recurse -Force
+  $src = Join-Path $root $directory
+  $dest = Join-Path $dist $directory
+  if (Test-Path -LiteralPath $src) {
+    Copy-Item -LiteralPath $src -Destination $dest -Recurse -Force
+    Write-Host "✓ [Dir]  $directory"
+  } else {
+    Write-Warning "Directory missing: $directory"
+  }
 }
 
-Write-Host "Prepared Capacitor web assets in $dist"
+Write-Host "`nReady for Capacitor Sync."
+
