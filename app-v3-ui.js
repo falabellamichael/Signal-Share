@@ -2095,7 +2095,12 @@ export function createAppUi(context) {
   }
 
   function getControllablePlayerPost() {
-    const active = getPostById(state.heroPlayerPostId || state.activePlayerPostId || state.playerPostId);
+    // Priority: explicitly mounted hero post, then standby preview post, then mini player post
+    const heroPost = typeof getHeroPost === "function" ? getHeroPost() : null;
+    const standby = typeof getStandbyPreviewPost === "function" ? getStandbyPreviewPost() : null;
+    const mini = getPostById(state.activePlayerPostId || state.playerPostId);
+
+    const active = heroPost || standby || mini;
     const source = (state.heroControlSource || state.heroMediaSource || "").toLowerCase();
 
     if (source === "youtube" || source === "spotify") {

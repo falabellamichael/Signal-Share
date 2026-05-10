@@ -280,6 +280,8 @@ function getSessionSourceText(session) {
     media.albumTitle,
     // Add specific indicators for YouTube to help scoring
     media.title?.toLowerCase().includes("youtube") ? "youtube-source" : "",
+    // Common YouTube PWA/Browser markers
+    session?.sourceAppUserModelId?.toLowerCase().includes("youtube") ? "youtube-source" : "",
   ]
     .filter(Boolean)
     .join(" ")
@@ -290,11 +292,16 @@ function classifySessionProvider(session) {
   const text = getSessionSourceText(session);
   const sourceAppId = `${session?.sourceAppUserModelId || session?.sourceAppId || ""}`.toLowerCase();
 
-  if (sourceAppId.includes("spotify") || text.includes("open.spotify.com") || text.includes("spotify")) return "spotify";
+  // Primary check: Source ID
+  if (sourceAppId.includes("spotify")) return "spotify";
+  if (sourceAppId.includes("youtube") || sourceAppId.includes("ytmusic") || sourceAppId.includes("google.android.youtube")) return "youtube";
+
+  // Secondary check: Metadata Text
+  if (text.includes("open.spotify.com") || text.includes("spotify")) return "spotify";
   if (
-    sourceAppId.includes("youtube")
-    || sourceAppId.includes("ytmusic")
-    || text.includes("youtube")
+    text.includes("youtube.com")
+    || text.includes("youtube -")
+    || text.includes("- youtube")
     || text.includes("youtu.be")
     || text.includes("music.youtube")
   ) return "youtube";
@@ -610,14 +617,14 @@ function Is-Match-Source($session, [string]$source) {
   $isBrowser = Is-Browser-App $id
 
   if ($source -eq "spotify") {
-    if ($id -match "youtube|ytmusic" -or $text -match "youtube|youtu\\.be|music\\.youtube") { return $false }
+    if ($id -match "youtube|ytmusic" -or $text -match "youtube\\.com|youtube -|- youtube|youtu\\.be|music\\.youtube") { return $false }
     if ($id -match "spotify" -or $text -match "spotify|open\\.spotify") { return $true }
     return $isBrowser
   }
 
   if ($source -eq "youtube") {
     if ($id -match "spotify" -or $text -match "spotify|open\\.spotify") { return $false }
-    if ($id -match "youtube|ytmusic" -or $text -match "youtube|youtu\\.be|music\\.youtube") { return $true }
+    if ($id -match "youtube|ytmusic" -or $text -match "youtube\\.com|youtube -|- youtube|youtu\\.be|music\\.youtube") { return $true }
     return $isBrowser
   }
 
@@ -717,9 +724,8 @@ $APPCOMMAND_MEDIA_NEXTTRACK = 11
 $APPCOMMAND_MEDIA_PREVIOUSTRACK = 12
 
 function Send-AppCommand([int]$cmd) {
-  # Use current process HWND as sender
-  $currentHwnd = (Get-Process -Id $pid).MainWindowHandle
-  [MediaKeySender]::SendMessage($HWND_BROADCAST, $WM_APPCOMMAND, $currentHwnd, [IntPtr]($cmd -shl 16))
+  # HWND_BROADCAST (0xffff) and IntPtr.Zero for sender
+  [MediaKeySender]::SendMessage($HWND_BROADCAST, $WM_APPCOMMAND, [IntPtr]::Zero, [IntPtr]($cmd -shl 16))
 }
 
 # Fallback to global media keys or AppCommands if WinRT targeting failed or if it's a skip/toggle action.

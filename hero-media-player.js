@@ -2047,7 +2047,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     const controllablePost = getControllablePlayerPost();
     const mode = getEffectiveHeroMode(controllablePost);
 
-    const canStep = playableCount > 1;
+    const canStep = (mode === "desktop" || mode === "device") ? true : (playableCount > 1);
 
     if (elements.heroPlayerPrevButton.disabled !== !canStep) {
       elements.heroPlayerPrevButton.disabled = !canStep;

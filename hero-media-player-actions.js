@@ -233,40 +233,32 @@ export function handlePlayPauseAction(context, forcePlay) {
     playHeroMedia, getNativeBridge, target
   } = context;
 
-  // The Mini Player is ALWAYS in 'app' mode regardless of the global hero control mode.
   const mode = target === "mini" ? "app" : heroMode;
   const controllablePost = getControllablePlayerPost();
   const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
 
-  console.log(`[Hero] handlePlayPause (Locked). Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}`);
+  console.log(`[Hero] handlePlayPause. Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}`);
 
   // 1. App Mode (Website Player Only)
   if (mode === "app") {
-    // If we have a target hint, respect it.
     if (target === "mini") {
         if (state.activePlayerPostId && state.activePlayerElement) {
-            console.log("[Hero] App Mode (Mini): Toggling existing mini player playback.");
             if (typeof toggleLocalPlayback === "function") toggleLocalPlayback(forcePlay, { target });
         } else if (state.playerPostId) {
-            // No player mounted yet, but we have a post selected for the mini player
             const post = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
             if (post && typeof context.mountPersistentPlayer === "function") {
-                console.log("[Hero] App Mode (Mini): Launching Mini Player media.");
                 context.mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: true });
                 state.miniPlayerPlaybackState = "playing";
             }
         }
     } else {
-        // Default target (usually Hero Stage)
         const isHeroActive = state.heroPlayerPostId
           && !!state.heroPlayerElement
           && elements.heroPlayerStage.contains(state.heroPlayerElement);
 
         if (isHeroActive) {
-          console.log("[Hero] App Mode (Hero): Toggling existing hero playback.");
           if (typeof toggleLocalPlayback === "function") toggleLocalPlayback(forcePlay, { target });
         } else if (typeof playHeroMedia === "function") {
-          console.log("[Hero] App Mode (Hero): No active player, launching Hero Media.");
           playHeroMedia();
         }
     }
@@ -276,12 +268,12 @@ export function handlePlayPauseAction(context, forcePlay) {
 
   // 2. System Media Modes (Locked to Bridge/Native)
   const isSystemActive = mode === "desktop" ? Boolean(desktopSnapshot?.active) : Boolean(nativeSnapshot?.active);
+  console.log(`[Hero] System Action Check. Active: ${isSystemActive}, Mode: ${mode}`);
 
-  // If the system media is idle but we have a matching preview, "Wake up" that specific content
   if (!isSystemActive && controllablePost && controllablePost.sourceKind === preferredSource) {
       const url = controllablePost.externalUrl || controllablePost.embedUrl || controllablePost.src || (controllablePost.externalId ? `https://www.youtube.com/watch?v=${controllablePost.externalId}` : "");
-
       if (url) {
+          console.log(`[Hero] Waking up idle system with: ${url}`);
           if (isNativeCapacitorApp()) {
               const bridge = getNativeBridge();
               if (bridge && typeof bridge.openNowPlayingMediaApp === "function") {
@@ -303,7 +295,7 @@ export function handlePlayPauseAction(context, forcePlay) {
     }
 
     const playbackStatus = normalizePlaybackState(desktopSnapshot?.playbackState);
-    const nextPlaybackState = playbackStatus === "playing" ? "paused" : "playing";
+    const nextPlaybackState = (typeof forcePlay === "boolean") ? (forcePlay ? "playing" : "paused") : (playbackStatus === "playing" ? "paused" : "playing");
 
     if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
       const updated = { ...desktopSnapshot, active: true, playbackState: nextPlaybackState };
@@ -324,7 +316,7 @@ export function handlePlayPauseAction(context, forcePlay) {
     if (now - (context.lastNativeActionAt || 0) < NATIVE_ACTION_COOLDOWN_MS) return;
 
     const playbackStatus = normalizePlaybackState(nativeSnapshot?.playbackState);
-    const nextPlaybackState = playbackStatus === "playing" ? "paused" : "playing";
+    const nextPlaybackState = (typeof forcePlay === "boolean") ? (forcePlay ? "playing" : "paused") : (playbackStatus === "playing" ? "paused" : "playing");
 
     if (nativeSnapshot && typeof setNativeSnapshot === "function") {
       setNativeSnapshot({ ...nativeSnapshot, active: true, playbackState: nextPlaybackState });
@@ -342,13 +334,13 @@ export function handlePreviousAction(context) {
     NATIVE_ACTION_PREVIOUS, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
     performDesktopAction, DESKTOP_ACTION_PREVIOUS,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
-    getControllablePlayerPost, getEffectiveHeroMode,
+    getControllablePlayerPost, heroMode,
     getDesktopSnapshotSignature, stepHeroPlayer,
     ensureControllablePost, stepMiniPlayer, mountPersistentPlayer, target
   } = context;
 
-  const mode = target === "mini" ? "app" : getEffectiveHeroMode(getControllablePlayerPost());
-  console.log(`[Hero] handlePrevious (Locked). Mode: ${mode}, Target: ${target || 'default'}`);
+  const mode = target === "mini" ? "app" : heroMode;
+  console.log(`[Hero] handlePrevious. Mode: ${mode}, Target: ${target || 'default'}`);
 
   if (mode === "app") {
     if (target === "mini") {
@@ -391,13 +383,13 @@ export function handleNextAction(context) {
     NATIVE_ACTION_NEXT, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
     performDesktopAction, DESKTOP_ACTION_NEXT,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
-    getControllablePlayerPost, getEffectiveHeroMode,
+    getControllablePlayerPost, heroMode,
     getDesktopSnapshotSignature, stepHeroPlayer,
     ensureControllablePost, stepMiniPlayer, mountPersistentPlayer, target
   } = context;
 
-  const mode = target === "mini" ? "app" : getEffectiveHeroMode(getControllablePlayerPost());
-  console.log(`[Hero] handleNext (Locked). Mode: ${mode}, Target: ${target || 'default'}`);
+  const mode = target === "mini" ? "app" : heroMode;
+  console.log(`[Hero] handleNext. Mode: ${mode}, Target: ${target || 'default'}`);
 
   if (mode === "app") {
     if (target === "mini") {
