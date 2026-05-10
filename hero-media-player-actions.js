@@ -565,8 +565,8 @@ export function handleVolumeAction(context, event) {
  */
 export function handleRefreshAction(context) {
   const {
-    state, elements, getControllablePlayerPost,
-    mountPersistentPlayer, destroyActivePlayer, render, target
+    state, getControllablePlayerPost,
+    destroyActivePlayer, render
   } = context;
 
   const post = getControllablePlayerPost();
@@ -584,23 +584,22 @@ export function handleRefreshAction(context) {
       el.pause();
       el.currentTime = 0;
       el.load();
-      el.play().catch(() => {});
+      // No .play() here to satisfy "stay on the previews not play it"
     } catch (e) {
       console.warn("[Hero] Local media refresh failed:", e);
     }
   } 
-  // 2. Fallback: Re-mount the entire player (fixes stuck Iframes for YouTube/Spotify)
-  else if (typeof mountPersistentPlayer === "function") {
-    // Force a full remount by clearing the active ID and destroying the current instance
-    if (typeof destroyActivePlayer === "function") {
-      destroyActivePlayer();
-    }
-    
-    const stage = (target === "mini" ? elements.miniPlayerStage : elements.heroPlayerStage);
-    if (stage) {
-      mountPersistentPlayer(stage, post, target || "hero", { autoplay: true });
-    }
+  
+  // 2. Always attempt to destroy the active player instance if it exists.
+  // This effectively resets YouTube/Spotify back to their preview card state
+  // and ensures any background audio or stuck iframes are cleared.
+  if (typeof destroyActivePlayer === "function") {
+    destroyActivePlayer();
   }
+
+  // 3. Update the global playback state to reflect that we are now 'idle'
+  state.heroPlayerPlaybackState = "none";
+  state.miniPlayerPlaybackState = "none";
 
   render();
 }

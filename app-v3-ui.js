@@ -3211,8 +3211,17 @@ export function createAppUi(context) {
       if (state.activePlayerElement instanceof HTMLIFrameElement) state.activePlayerElement.src = "about:blank";
       state.activePlayerElement.remove();
     }
+    if (state.heroPlayerElement instanceof HTMLElement) {
+      const media = state.heroPlayerElement.matches("video, audio") ? state.heroPlayerElement : state.heroPlayerElement.querySelector("video, audio");
+      if (media instanceof HTMLMediaElement) { media.pause(); media.removeAttribute("src"); media.load(); }
+      if (state.heroPlayerElement instanceof HTMLIFrameElement) state.heroPlayerElement.src = "about:blank";
+      state.heroPlayerElement.remove();
+    }
     if (state.activePlayerUrl) { URL.revokeObjectURL(state.activePlayerUrl); state.activePlayerUrl = ""; }
-    state.activePlayerElement = null; state.activePlayerPostId = null;
+    state.activePlayerElement = null;
+    state.activePlayerPostId = null;
+    state.heroPlayerElement = null;
+    state.heroPlayerPostId = null;
   }
 
   function hydrateRememberedCreator() { const remembered = localStorage.getItem(CREATOR_NAME_KEY); if (remembered) elements.creatorInput.value = remembered; }
