@@ -1,6 +1,7 @@
 /**
  * Hero Media Player Actions
- * Isolated handler for specialized media operations like "Open Media" and "Open Phone".
+ * Isolated handler for specialized media operations like "Open Media", "Open Phone",
+ * and System Media control (Play/Pause, Next, Previous).
  */
 
 export function handleOpenMediaAction(post, context) {
@@ -170,8 +171,6 @@ export function handleOpenPhoneAction(post, context) {
     let targetPost = post;
     if (!targetPost) {
        const bestPost = (typeof context.getControllablePlayerPost === "function" ? context.getControllablePlayerPost() : null);
-       // ONLY fallback to the controllable post if it matches our active source kind
-       // This prevents "Open Phone" in YouTube mode from launching a random Spotify post from the feed.
        if (bestPost && bestPost.sourceKind === source) {
           targetPost = bestPost;
        }
@@ -182,7 +181,6 @@ export function handleOpenPhoneAction(post, context) {
       uri = targetPost.externalUrl || targetPost.embedUrl || targetPost.src;
     }
 
-    // 2. Fallback to source-specific landing pages if no post matches the mode
     if (!uri) {
       if (source === "spotify") uri = "spotify:";
       if (source === "youtube") uri = "https://www.youtube.com";
@@ -203,14 +201,13 @@ export function handleOpenPhoneAction(post, context) {
     }
   }
 
-  // Final fallback: If we reached here on PC, we've already tried opening Phone Link.
-  // We do NOT want to open the media locally on the PC as a fallback for "Open Phone".
   return;
 }
+
 export function handlePlayPauseAction(context, forcePlay) {
   const {
     state, elements, getControllablePlayerPost, getEffectiveHeroMode,
-    playHeroMedia, render, nativeSnapshot, performNativeAction,
+    render, nativeSnapshot, performNativeAction,
     NATIVE_ACTION_PLAY_PAUSE, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
     performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE, isNativeCapacitorApp,
     companionPromptDismissed, showCompanionPrompt, normalizePlaybackState,
@@ -220,14 +217,7 @@ export function handlePlayPauseAction(context, forcePlay) {
 
   const controllablePost = getControllablePlayerPost();
   const mode = getEffectiveHeroMode(controllablePost);
-  console.log(`[Hero] handlePlayPause triggered. Mode: ${mode}, ForcePlay: ${forcePlay || "toggle"}`);
-
-  if (mode === "app") {
-    if (typeof playHeroMedia === "function") {
-      playHeroMedia();
-    }
-    return;
-  }
+  console.log(`[Hero] handlePlayPause (Media Mode). Mode: ${mode}`);
 
   if (mode === "device") {
     if (nativeSnapshot?.permissionRequired && typeof context.getNativeBridge === "function") {
@@ -260,7 +250,7 @@ export function handlePlayPauseAction(context, forcePlay) {
       const updated = { ...desktopSnapshot, active: true, playbackState: nextPlaybackState };
       setDesktopSnapshot(updated);
       if (typeof setDesktopSnapshotSignature === "function") {
-        setDesktopSnapshotSignature(context.getDesktopSnapshotSignature(updated));
+        setDesktopSnapshotSignature(getDesktopSnapshotSignature(updated));
       }
 
       if (elements.heroPlayerPlayPauseButton) {
@@ -282,23 +272,15 @@ export function handlePlayPauseAction(context, forcePlay) {
 
 export function handlePreviousAction(context) {
   const {
-    state, elements, getControllablePlayerPost, getEffectiveHeroMode,
-    stepHeroPlayer, render, nativeSnapshot, performNativeAction,
+    render, nativeSnapshot, performNativeAction,
     NATIVE_ACTION_PREVIOUS, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
     performDesktopAction, DESKTOP_ACTION_PREVIOUS, getFallbackPageMediaElement,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
-    ensureControllablePost, stepMiniPlayer
+    ensureControllablePost, stepMiniPlayer, getControllablePlayerPost,
+    getEffectiveHeroMode, getDesktopSnapshotSignature
   } = context;
 
-  const controllablePost = getControllablePlayerPost();
-  const mode = getEffectiveHeroMode(controllablePost);
-
-  if (mode === "app") {
-    if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-    if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
-    render();
-    return;
-  }
+  const mode = getEffectiveHeroMode(getControllablePlayerPost());
 
   if (mode === "device") {
     if (Date.now() - (context.lastNativeActionAt || 0) < NATIVE_ACTION_COOLDOWN_MS) return;
@@ -315,7 +297,7 @@ export function handlePreviousAction(context) {
       const updated = { ...desktopSnapshot, active: true, playbackState: "playing" };
       setDesktopSnapshot(updated);
       if (typeof setDesktopSnapshotSignature === "function") {
-        setDesktopSnapshotSignature(context.getDesktopSnapshotSignature(updated));
+        setDesktopSnapshotSignature(getDesktopSnapshotSignature(updated));
       }
       render();
     }
@@ -336,23 +318,15 @@ export function handlePreviousAction(context) {
 
 export function handleNextAction(context) {
   const {
-    state, elements, getControllablePlayerPost, getEffectiveHeroMode,
-    stepHeroPlayer, render, nativeSnapshot, performNativeAction,
+    render, nativeSnapshot, performNativeAction,
     NATIVE_ACTION_NEXT, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
     performDesktopAction, DESKTOP_ACTION_NEXT, getFallbackPageMediaElement,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
-    ensureControllablePost, stepMiniPlayer
+    ensureControllablePost, stepMiniPlayer, getControllablePlayerPost,
+    getEffectiveHeroMode, getDesktopSnapshotSignature
   } = context;
 
-  const controllablePost = getControllablePlayerPost();
-  const mode = getEffectiveHeroMode(controllablePost);
-
-  if (mode === "app") {
-    if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-    if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
-    render();
-    return;
-  }
+  const mode = getEffectiveHeroMode(getControllablePlayerPost());
 
   if (mode === "device") {
     if (Date.now() - (context.lastNativeActionAt || 0) < NATIVE_ACTION_COOLDOWN_MS) return;
@@ -369,7 +343,7 @@ export function handleNextAction(context) {
       const updated = { ...desktopSnapshot, active: true, playbackState: "playing" };
       setDesktopSnapshot(updated);
       if (typeof setDesktopSnapshotSignature === "function") {
-        setDesktopSnapshotSignature(context.getDesktopSnapshotSignature(updated));
+        setDesktopSnapshotSignature(getDesktopSnapshotSignature(updated));
       }
       render();
     }

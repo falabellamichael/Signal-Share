@@ -1856,6 +1856,25 @@ The companion bridge is designed with several security layers to keep your PC sa
   function getActionContext() {
     return {
       state, elements, getControllablePlayerPost, getEffectiveHeroMode,
+      getFallbackPageMediaElement, playHeroMedia, render,
+      nativeSnapshot, performNativeAction, NATIVE_ACTION_PLAY_PAUSE,
+      NATIVE_ACTION_NEXT, NATIVE_ACTION_PREVIOUS, NATIVE_ACTION_COOLDOWN_MS,
+      desktopSnapshot, performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE,
+      DESKTOP_ACTION_NEXT, DESKTOP_ACTION_PREVIOUS, DESKTOP_ACTION_COOLDOWN_MS,
+      isNativeCapacitorApp, companionPromptDismissed, showCompanionPrompt,
+      normalizePlaybackState, getDesktopSnapshotSignature, toggleLocalPlayback,
+      setDesktopSnapshot: (s) => { desktopSnapshot = s; },
+      setNativeSnapshot: (s) => { nativeSnapshot = s; },
+      setDesktopSnapshotSignature: (s) => { lastDesktopSnapshotSignature = s; },
+      lastNativeActionAt, lastDesktopActionAt, stepHeroPlayer, stepMiniPlayer,
+      ensureControllablePost, getNativeBridge, hasNativeSettingsBridge,
+      parseYouTubeUrl, performSupabaseDesktopAction
+    };
+  }
+
+  function getActionContext() {
+    return {
+      state, elements, getControllablePlayerPost, getEffectiveHeroMode,
       getFallbackPageMediaElement, playHeroMedia, render, 
       nativeSnapshot, performNativeAction, NATIVE_ACTION_PLAY_PAUSE, 
       NATIVE_ACTION_NEXT, NATIVE_ACTION_PREVIOUS, NATIVE_ACTION_COOLDOWN_MS,
@@ -1873,14 +1892,44 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function handlePlayPause(forcePlay) {
+    const controllablePost = getControllablePlayerPost();
+    const mode = getEffectiveHeroMode(controllablePost);
+
+    if (mode === "app") {
+      if (typeof playHeroMedia === "function") {
+        playHeroMedia();
+      }
+      return;
+    }
+
     handlePlayPauseAction(getActionContext(), forcePlay);
   }
 
   function handlePrevious() {
+    const controllablePost = getControllablePlayerPost();
+    const mode = getEffectiveHeroMode(controllablePost);
+
+    if (mode === "app") {
+      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+      stepHeroPlayer(-1);
+      render();
+      return;
+    }
+
     handlePreviousAction(getActionContext());
   }
 
   function handleNext() {
+    const controllablePost = getControllablePlayerPost();
+    const mode = getEffectiveHeroMode(controllablePost);
+
+    if (mode === "app") {
+      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+      stepHeroPlayer(1);
+      render();
+      return;
+    }
+
     handleNextAction(getActionContext());
   }
 
