@@ -1872,25 +1872,6 @@ The companion bridge is designed with several security layers to keep your PC sa
     };
   }
 
-  function getActionContext() {
-    return {
-      state, elements, getControllablePlayerPost, getEffectiveHeroMode,
-      getFallbackPageMediaElement, playHeroMedia, render, 
-      nativeSnapshot, performNativeAction, NATIVE_ACTION_PLAY_PAUSE, 
-      NATIVE_ACTION_NEXT, NATIVE_ACTION_PREVIOUS, NATIVE_ACTION_COOLDOWN_MS,
-      desktopSnapshot, performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE, 
-      DESKTOP_ACTION_NEXT, DESKTOP_ACTION_PREVIOUS, DESKTOP_ACTION_COOLDOWN_MS,
-      isNativeCapacitorApp, companionPromptDismissed, showCompanionPrompt,
-      normalizePlaybackState, getDesktopSnapshotSignature, toggleLocalPlayback,
-      setDesktopSnapshot: (s) => { desktopSnapshot = s; },
-      setNativeSnapshot: (s) => { nativeSnapshot = s; },
-      setDesktopSnapshotSignature: (s) => { lastDesktopSnapshotSignature = s; },
-      lastNativeActionAt, lastDesktopActionAt, stepHeroPlayer, stepMiniPlayer,
-      ensureControllablePost, getNativeBridge, hasNativeSettingsBridge,
-      parseYouTubeUrl, performSupabaseDesktopAction
-    };
-  }
-
   function handlePlayPause(forcePlay) {
     const controllablePost = getControllablePlayerPost();
     const mode = getEffectiveHeroMode(controllablePost);
