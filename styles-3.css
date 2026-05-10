@@ -1771,11 +1771,28 @@
         right: 0;
         bottom: calc(100% + 6px);
         padding: 6px;
-        background: var(--bg-surface, #1a1a1a);
+        background: var(--surface-strong);
         border: 1px solid var(--line);
         border-radius: 18px;
         box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
         scrollbar-width: none;
+      }
+
+      body[data-theme="contrast"] .message-emoji-panel {
+        background: #000000 !important;
+        border: 2px solid #ffffff !important;
+      }
+
+      body[data-theme="midnight"] .emoji-search-input,
+      body[data-theme="midnight"] .emoji-category-tab {
+        background: rgba(17, 26, 36, 0.82);
+        border-color: rgba(164, 184, 201, 0.16);
+      }
+
+      body[data-theme="ember"] .emoji-search-input,
+      body[data-theme="ember"] .emoji-category-tab {
+        background: rgba(36, 12, 10, 0.86);
+        border-color: rgba(255, 120, 82, 0.18);
       }
 
       .message-emoji-panel::-webkit-scrollbar {

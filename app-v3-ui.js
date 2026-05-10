@@ -330,6 +330,9 @@ export function createAppUi(context) {
     if (source === "youtube" || source === "spotify") {
       const matched = posts.filter(p => isPlayablePost(p) && p.sourceKind === source);
       if (matched.length > 0) return matched[0];
+
+      // STRICT MODE: If we are locked to a source, do NOT fall back to general feed.
+      return null;
     }
 
     const playable = posts.filter(p => isPlayablePost(p) && p.id !== state.playerPostId);
@@ -1876,10 +1879,13 @@ export function createAppUi(context) {
     // This prevents the UI from swapping metadata while a video is playing.
     if (state.heroPlayerElement && heroPost) return heroPost;
 
+    const source = (state.heroControlSource || state.heroMediaSource || "").toLowerCase();
+    const isLocked = source === "youtube" || source === "spotify";
+
     const matchesSourceFilter = (post) => {
       if (!post || !isPlayablePost(post)) return false;
-      if (!state.heroControlSource || state.heroControlSource === "all") return true;
-      return post.sourceKind === state.heroControlSource;
+      if (!isLocked || source === "all") return true;
+      return post.sourceKind === source;
     };
 
     if (heroPost && matchesSourceFilter(heroPost)) return heroPost;
@@ -1887,12 +1893,11 @@ export function createAppUi(context) {
     const playable = getHeroPlayablePosts();
     const latestPlayable = playable[0] || null;
 
-    if (latestPlayable) {
-      state.heroPlayerPostId = latestPlayable.id;
-      localStorage.setItem(HERO_POST_KEY, latestPlayable.id);
-    }
+    // STUTTER/MIXING FIX: Do NOT auto-set heroPlayerPostId to a feed post if the bridge
+    // is intended to be primary. We only return latestPlayable as a standby candidate.
     return latestPlayable;
   }
+
 
   function setHeroPost(post) {
     if (!post || !isPlayablePost(post)) return;
@@ -2128,19 +2133,21 @@ export function createAppUi(context) {
     const mini = getPostById(state.activePlayerPostId || state.playerPostId);
     const standby = typeof getStandbyPreviewPost === "function" ? getStandbyPreviewPost() : null;
 
-    // MIXING FIX: Prioritize explicitly active posts (playing or open in mini)
-    // and let them bypass source filters.
-    if (state.heroPlayerPostId && heroPost) return heroPost;
-    if (mini) return mini;
-
-    const active = heroPost || standby;
     const source = (state.heroControlSource || state.heroMediaSource || "").toLowerCase();
+    const isLocked = source === "youtube" || source === "spotify";
 
-    if (source === "youtube" || source === "spotify") {
-      // If nothing is active, only return standby posts that match the source filter.
-      if (active && active.sourceKind !== source) return null;
+    // MIXING FIX: Prioritize explicitly active posts (playing or open in mini)
+    // BUT only if they match the current source filter if one is active.
+    if (state.heroPlayerPostId && heroPost) {
+      if (!isLocked || heroPost.sourceKind === source) return heroPost;
     }
-    return active;
+
+    if (mini) {
+      if (!isLocked || mini.sourceKind === source) return mini;
+    }
+
+    // If nothing active matches the filter, use the standby post (which already respects the filter)
+    return standby;
   }
 
   function resolveExternalEmbedSource(post) {

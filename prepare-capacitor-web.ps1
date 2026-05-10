@@ -22,6 +22,13 @@ $files = @(
   "profiles.js",
   "profile.js",
   "emojis.js",
+  "faces.js",
+  "gestures.js",
+  "food.js",
+  "nature.js",
+  "places.js",
+  "activities.js",
+  "objects.js",
   "hero-media-player-actions.js",
   "messenger-realtime.js",
   "keyboard-bindings-v3.js",
@@ -32,7 +39,13 @@ $files = @(
   "questions-guide.css",
   "contact.html",
   "how-to-guide.html",
-  "security.html"
+  "security.html",
+  "apple-touch-icon-180.png",
+  "icon-192.png",
+  "icon-512.png",
+  "icon-maskable-512.png",
+  "icon.svg",
+  "profile_avatar.png"
 )
 
 $directories = @(

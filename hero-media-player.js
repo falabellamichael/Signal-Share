@@ -1460,7 +1460,14 @@ The companion bridge is designed with several security layers to keep your PC sa
     title = title.replace(/\s*\(official (video|audio|music video|lyric video)\)$/i, "").trim();
     title = title.replace(/\s*\[official (video|audio|music video|lyric video)\]$/i, "").trim();
 
-    const posts = typeof getAllPosts === "function" ? getAllPosts() : [];
+    const preferredSource = getPreferredHeroControlSource();
+    const allPosts = typeof getAllPosts === "function" ? getAllPosts() : [];
+
+    // STRICT MATCHING: If locked to a platform, only match against feed items for that platform.
+    const posts = preferredSource
+      ? allPosts.filter(p => p.sourceKind === preferredSource)
+      : allPosts;
+
     return posts.find((p) => {
       const pTitle = normalizeText(p.title);
       const pCreator = normalizeText(p.creator);
@@ -1475,6 +1482,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       return false;
     }) || null;
   }
+
 
   function getLocalPlaybackState() {
     const mediaElement = getActivePlayerMediaElement() || getFallbackPageMediaElement();
@@ -1794,17 +1802,33 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function getEffectiveHeroMode(controllablePost) {
-    if (state.heroControlMode === "feed") return "app";
+    const preferredSource = getPreferredHeroControlSource();
+
+    // 1. Platform Lock Priority: If YouTube or Spotify is selected,
+    // prioritize detecting that platform on the PC/Phone.
+    if (preferredSource) {
+      if (shouldUseNativeMode(controllablePost)) return "device";
+      if (shouldUseDesktopMode(controllablePost)) return "desktop";
+
+      // If bridge is idle but we have a matching local post (e.g. a YouTube Iframe), stay in app mode.
+      if (controllablePost && controllablePost.sourceKind === preferredSource) return "app";
+    }
+
+    // 2. Explicit Mode Toggle: House icon vs Waveform icon.
     if (state.heroControlMode === "media") {
       if (!isNativeCapacitorApp() && canUseDesktopBridge()) return "desktop";
       return "device";
     }
 
-    // Auto mode
+    if (state.heroControlMode === "feed") return "app";
+
+    // 3. Default Auto behavior
     if (shouldUseNativeMode(controllablePost)) return "device";
     if (shouldUseDesktopMode(controllablePost)) return "desktop";
     return "app";
   }
+
+
 
   function getActionContext() {
     const controllablePost = getControllablePlayerPost();

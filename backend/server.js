@@ -673,7 +673,11 @@ try {
 
       if ($session -eq $null) {
         $session = $manager.GetCurrentSession()
+        if ($null -ne $session -and ![string]::IsNullOrWhiteSpace($preferred) -and $preferred -ne "all") {
+          if (-not (Is-Match-Source $session $preferred)) { $session = $null }
+        }
       }
+
     }
 
     if ($session -ne $null) {

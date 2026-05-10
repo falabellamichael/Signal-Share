@@ -332,9 +332,10 @@ export function handlePlayPauseAction(context, forcePlay) {
   const appPkg = (snapshot?.appPackage || "").toLowerCase();
   const metaText = (snapshot?.meta || "").toLowerCase();
   const titleText = (snapshot?.title || "").toLowerCase();
+  const provider = (snapshot?.sourceProvider || "").toLowerCase();
 
-  const systemIsSpotify = appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
-  const systemIsYouTube = appPkg.includes("youtube") || appPkg.includes("ytmusic")
+  const systemIsSpotify = provider === "spotify" || appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
+  const systemIsYouTube = provider === "youtube" || appPkg.includes("youtube") || appPkg.includes("ytmusic")
     || metaText.includes("youtube") || metaText.includes("ytmusic")
     || titleText.includes("youtube") || titleText.includes("ytmusic");
 
@@ -342,6 +343,7 @@ export function handlePlayPauseAction(context, forcePlay) {
     (preferredSource === "youtube" && systemIsYouTube) ||
     (preferredSource === "spotify" && systemIsSpotify)
   );
+
 
   const isPlayingOnSystem = snapshot?.playbackState === "playing" && (!isSourceLocked || bridgeMatchesLockedSource);
 
@@ -457,9 +459,10 @@ export function handlePreviousAction(context) {
   const appPkg = (snapshot?.appPackage || "").toLowerCase();
   const metaText = (snapshot?.meta || "").toLowerCase();
   const titleText = (snapshot?.title || "").toLowerCase();
-  
-  const systemIsSpotify = appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
-  const systemIsYouTube = appPkg.includes("youtube") || appPkg.includes("ytmusic") 
+  const provider = (snapshot?.sourceProvider || "").toLowerCase();
+
+  const systemIsSpotify = provider === "spotify" || appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
+  const systemIsYouTube = provider === "youtube" || appPkg.includes("youtube") || appPkg.includes("ytmusic")
     || metaText.includes("youtube") || metaText.includes("ytmusic")
     || titleText.includes("youtube") || titleText.includes("ytmusic");
 
@@ -545,8 +548,10 @@ export function handleNextAction(context) {
   const appPkg = (snapshot?.appPackage || "").toLowerCase();
   const metaText = (snapshot?.meta || "").toLowerCase();
   const titleText = (snapshot?.title || "").toLowerCase();
-  const systemIsSpotify = appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
-  const systemIsYouTube = appPkg.includes("youtube") || appPkg.includes("ytmusic") 
+  const provider = (snapshot?.sourceProvider || "").toLowerCase();
+
+  const systemIsSpotify = provider === "spotify" || appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
+  const systemIsYouTube = provider === "youtube" || appPkg.includes("youtube") || appPkg.includes("ytmusic")
     || metaText.includes("youtube") || metaText.includes("ytmusic")
     || titleText.includes("youtube") || titleText.includes("ytmusic");
 
