@@ -53,6 +53,8 @@ export function createAppUi(context) {
     getAppConfig, updatePostLikeCount, createDemoGraphic,
   } = context;
 
+  const HERO_POST_KEY = "signal-share-hero-player-post-id";
+
 
 
   const elements = {
@@ -1841,8 +1843,6 @@ export function createAppUi(context) {
   function renderViewerAttachmentMedia(container, attachment) { if (!attachment?.url || !attachment?.kind) return; if (attachment.kind === "image") { const image = document.createElement("img"); image.className = "viewer-media"; image.loading = "eager"; image.alt = attachment.title || "Shared image"; image.src = attachment.url; container.appendChild(image); return; } const video = document.createElement("video"); video.className = "viewer-media"; video.controls = true; video.preload = "metadata"; video.playsInline = true; video.src = attachment.url; container.appendChild(video); }
 
   function renderMiniPlayerMedia(container, post) { mountPersistentPlayer(container, post, "mini"); }
-
-  const HERO_POST_KEY = "signal-share-hero-player-post-id";
 
   function getHeroPost() {
     const heroPostId = state.heroPlayerPostId || localStorage.getItem(HERO_POST_KEY);
