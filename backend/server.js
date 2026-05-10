@@ -304,9 +304,12 @@ function classifySessionProvider(session, preferredSource = "") {
   const media = session?.media || {};
   const preferred = normalizePreferredSource(preferredSource);
 
+  const isSpotifyId = sourceAppId.includes("spotify");
+  const isYouTubeId = sourceAppId.includes("youtube") || sourceAppId.includes("ytmusic") || sourceAppId.includes("google.android.youtube") || sourceAppId.includes("you.tube");
+
   // Primary check: Source ID / App Name
-  if (sourceAppId.includes("spotify")) return "spotify";
-  if (sourceAppId.includes("youtube") || sourceAppId.includes("ytmusic") || sourceAppId.includes("google.android.youtube") || sourceAppId.includes("you.tube")) return "youtube";
+  if (isSpotifyId) return "spotify";
+  if (isYouTubeId) return "youtube";
 
   // Secondary check: Known browser session attributes for YouTube
   const browserText = [
@@ -318,22 +321,25 @@ function classifySessionProvider(session, preferredSource = "") {
     session?.sourceAppUserModelId
   ].filter(Boolean).join(" ").toLowerCase();
 
-  if (
+  const hasYouTubeKeywords =
     browserText.includes("youtube")
     || browserText.includes("ytmusic")
     || browserText.includes("youtu.be")
     || browserText.includes("music.youtube")
     || browserText.includes("you tube")
-    || browserText.includes("video")
-  ) return "youtube";
+    || browserText.includes("video");
 
-  if (browserText.includes("spotify") || browserText.includes("open.spotify.com")) return "spotify";
+  const hasSpotifyKeywords = browserText.includes("spotify") || browserText.includes("open.spotify.com");
 
-  // TIE-BREAKER: If we are in a specific mode (e.g. YouTube mode) and the session has NO other
-  // classification but comes from a browser, assume it's the target. This ensures we don't
-  // show "Idle" when a video is clearly playing but just missing brand keywords.
-  if (preferred === "youtube" && isBrowserLikeSource(sourceAppId)) return "youtube";
-  if (preferred === "spotify" && isBrowserLikeSource(sourceAppId)) return "spotify";
+  if (hasYouTubeKeywords) return "youtube";
+  if (hasSpotifyKeywords) return "spotify";
+
+  // STRICT ISOLATION: Only apply the browser tie-breaker if the session
+  // doesn't explicitly match the OTHER restricted platform.
+  if (isBrowserLikeSource(sourceAppId)) {
+    if (preferred === "youtube" && !hasSpotifyKeywords && !isSpotifyId) return "youtube";
+    if (preferred === "spotify" && !hasYouTubeKeywords && !isYouTubeId) return "spotify";
+  }
 
   if (sourceAppId.includes("phone link") || sourceAppId.includes("bluetooth") || text.includes("phone link") || text.includes("bluetooth")) return "phone_link";
 
@@ -342,31 +348,24 @@ function classifySessionProvider(session, preferredSource = "") {
 
 
 
+
 function scoreSession(session, preferredSource = "") {
   const preferred = normalizePreferredSource(preferredSource);
-  const sourceAppId = `${session?.sourceAppUserModelId || session?.sourceAppId || ""}`.trim();
-  const text = getSessionSourceText(session);
   const provider = classifySessionProvider(session, preferredSource);
   const priority = getPlaybackPriority(session?.playback?.playbackStatus);
-  const isBrowser = isBrowserLikeSource(sourceAppId);
 
   let score = priority * 1000;
 
   if (preferred) {
-    const isMatch = (provider === preferred)
-      || (preferred === "spotify" && sourceAppId.toLowerCase().includes("spotify"))
-      || (preferred === "youtube" && /youtube|ytmusic|youtube\.music/i.test(sourceAppId))
-      || (preferred === "youtube" && isBrowser && (provider === "youtube" || text.includes("youtube") || text.includes("youtu.be") || text.includes("video")))
-      || (preferred === "spotify" && isBrowser && (provider === "spotify" || text.includes("spotify") || text.includes("open.spotify")));
-
-    if (isMatch) {
+    if (provider === preferred) {
       score += 50000; // High boost for matching source
     } else {
-      score -= 100000; // Penalty for confirmed mismatch
+      score -= 100000; // Total rejection for non-matching source
     }
-  } else if (isPreferredApp(sourceAppId)) {
+  } else if (isPreferredApp(session.sourceAppUserModelId || session.sourceAppId)) {
     score += 500;
   }
+
 
 
 
@@ -653,20 +652,26 @@ function Is-Match-Source($session, [string]$source) {
   $text = Get-Session-Text $session
   $isBrowser = Is-Browser-App $id
 
+  $isYouTube = ($id -match "youtube|ytmusic") -or ($text -match "youtube\\.com|youtube -|- youtube|youtu\\.be|music\\.youtube")
+  $isSpotify = ($id -match "spotify") -or ($text -match "spotify|open\\.spotify")
+
   if ($source -eq "spotify") {
-    if ($id -match "youtube|ytmusic" -or $text -match "youtube\\.com|youtube -|- youtube|youtu\\.be|music\\.youtube") { return $false }
-    if ($id -match "spotify" -or $text -match "spotify|open\\.spotify") { return $true }
+    if ($isYouTube) { return $false }
+    if ($isSpotify) { return $true }
+    # Only allow generic browser if it doesn't look like YouTube
     return $isBrowser
   }
 
   if ($source -eq "youtube") {
-    if ($id -match "spotify" -or $text -match "spotify|open\\.spotify") { return $false }
-    if ($id -match "youtube|ytmusic" -or $text -match "youtube\\.com|youtube -|- youtube|youtu\\.be|music\\.youtube") { return $true }
+    if ($isSpotify) { return $false }
+    if ($isYouTube) { return $true }
+    # Only allow generic browser if it doesn't look like Spotify
     return $isBrowser
   }
 
   return $true
 }
+
 
 try {
   Add-Type -AssemblyName System.Runtime.WindowsRuntime

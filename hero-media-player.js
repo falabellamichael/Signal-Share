@@ -2116,8 +2116,9 @@ The companion bridge is designed with several security layers to keep your PC sa
     const volumePercent = Math.round(normalizePlayerVolume(state.playerVolume) * 100);
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
 
-    const playbackStateLabel = (playbackState === "playing" ? "NOW PLAYING" : "PAUSED");
+    const playbackStateLabel = (playbackState === "playing" ? "NOW PLAYING" : (playbackState === "paused" ? "PAUSED" : "READY"));
     let nextHeader = playbackStateLabel;
+
     let nextTitle = "";
     let nextCaption = "";
     let nextStatus = "";
