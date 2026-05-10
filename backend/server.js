@@ -213,11 +213,23 @@ function sanitizeMediaMeta(rawMeta = "", sourceAppId = "") {
 
 function extractYoutubeVideoId(value) {
   if (!value) return "";
+  // 1. Check for standard URL patterns
   const ytMatch = value.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/|.*embed\/|.*shorts\/))([a-zA-Z0-9_-]{11})/i);
   if (ytMatch) return ytMatch[1];
+
+  // 2. Check for common browser window titles that include the ID
+  const bracketMatch = value.match(/[\[\(\u3010]([a-zA-Z0-9_-]{11})[\]\)\u3011]/);
+  if (bracketMatch) return bracketMatch[1];
+
+  // 3. Fallback: Search for a raw 11-char ID that isn't just a number
   const directIdMatch = value.match(/[a-zA-Z0-9_-]{11}/);
-  return directIdMatch ? directIdMatch[0] : "";
+  if (directIdMatch && /[a-zA-Z_-]/.test(directIdMatch[0])) {
+    return directIdMatch[0];
+  }
+
+  return "";
 }
+
 
 function normalizePreferredSource(value = "") {
   const normalized = `${value || ""}`.trim().toLowerCase();
@@ -510,12 +522,25 @@ function buildFreshSnapshotPayload(preferredSource = "") {
 
     let openUri = "";
     if (sourceProvider === "youtube" || sourceAppId.toLowerCase().includes("youtube") || title.toLowerCase().includes("youtube")) {
-      const videoId = extractYoutubeVideoId(title) || extractYoutubeVideoId(session.media?.albumTitle);
+      const albumTitle = `${session.media?.albumTitle || ""}`.trim();
+      const videoId = extractYoutubeVideoId(title)
+        || extractYoutubeVideoId(albumTitle)
+        || extractYoutubeVideoId(sourceAppId);
+
       if (videoId) {
         openUri = `https://www.youtube.com/watch?v=${videoId}`;
-        if (!artworkUri) artworkUri = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+        // OVERRIDE FOR ADVERTISEMENTS / LOW-RES ARTWORK:
+        // If we found a valid YouTube ID, we prefer the direct high-res thumbnail from YouTube's servers.
+        // This fixes the issue where an "Advertisement" thumbnail (often just a small icon) is shown
+        // instead of the actual video's thumbnail.
+        const isAd = title.toLowerCase().includes("advertisement") || title.toLowerCase() === "ad";
+        if (!artworkUri || isAd || sourceProvider === "youtube") {
+           artworkUri = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+        }
       }
     }
+
 
     const payload = {
       ...base,
