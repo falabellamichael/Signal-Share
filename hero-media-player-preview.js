@@ -564,11 +564,14 @@ export function renderHeroStagePreview(options = {}) {
     isSpotifyActive,
   };
 
-  const preferredSourceLocked = isSpotifyActive || isYouTubeMode;
+  // Resolve current source filter
+  const sourceFilter = (state?.heroControlSource || state?.heroMediaSource || "").toLowerCase();
+  const isSourceLocked = sourceFilter === "youtube" || sourceFilter === "spotify";
 
-  const standbyPost = (!post && !preferredSourceLocked && typeof getStandbyPreviewPost === "function")
+  const standbyPost = (!post && typeof getStandbyPreviewPost === "function")
     ? safeCall(getStandbyPreviewPost, null)
     : null;
+
 
 
   if (mode === "device") {
@@ -614,7 +617,7 @@ export function renderHeroStagePreview(options = {}) {
   }
 
   if (mode === "desktop") {
-    if (desktopSnapshot?.active) {
+    if (desktopSnapshot?.active || desktopSnapshot?.playbackState === "paused") {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
       // PRIORITIZE BRIDGE ARTWORK: The bridge has the live thumbnail for what's actually playing.
       // We fall back to the matched feed item's artwork if the bridge is missing it.
@@ -631,6 +634,7 @@ export function renderHeroStagePreview(options = {}) {
 
       return;
     }
+
 
     if (options.showCompanionCard) {
       const card = createCompanionCard();

@@ -307,11 +307,11 @@ function classifySessionProvider(session, preferredSource = "") {
   const isSpotifyId = sourceAppId.includes("spotify");
   const isYouTubeId = sourceAppId.includes("youtube") || sourceAppId.includes("ytmusic") || sourceAppId.includes("google.android.youtube") || sourceAppId.includes("you.tube");
 
-  // Primary check: Source ID / App Name
+  // 1. Explicit ID Match (Desktop Apps)
   if (isSpotifyId) return "spotify";
   if (isYouTubeId) return "youtube";
 
-  // Secondary check: Known browser session attributes for YouTube
+  // 2. Keyword Match (Browser Titles/Metadata)
   const browserText = [
     media.title,
     media.artist,
@@ -321,7 +321,7 @@ function classifySessionProvider(session, preferredSource = "") {
     session?.sourceAppUserModelId
   ].filter(Boolean).join(" ").toLowerCase();
 
-  const hasYouTubeKeywords =
+  const looksLikeYouTube =
     browserText.includes("youtube")
     || browserText.includes("ytmusic")
     || browserText.includes("youtu.be")
@@ -329,17 +329,23 @@ function classifySessionProvider(session, preferredSource = "") {
     || browserText.includes("you tube")
     || browserText.includes("video");
 
-  const hasSpotifyKeywords = browserText.includes("spotify") || browserText.includes("open.spotify.com");
+  const looksLikeSpotify = browserText.includes("spotify") || browserText.includes("open.spotify.com");
 
-  if (hasYouTubeKeywords) return "youtube";
-  if (hasSpotifyKeywords) return "spotify";
+  if (looksLikeYouTube) return "youtube";
+  if (looksLikeSpotify) return "spotify";
 
-  // STRICT ISOLATION: Only apply the browser tie-breaker if the session
-  // doesn't explicitly match the OTHER restricted platform.
-  if (isBrowserLikeSource(sourceAppId)) {
-    if (preferred === "youtube" && !hasSpotifyKeywords && !isSpotifyId) return "youtube";
-    if (preferred === "spotify" && !hasYouTubeKeywords && !isYouTubeId) return "spotify";
+  // 3. Mode-Based Tie-Breaker (Exclusive Isolation)
+  // If we are in a specific mode (e.g. YouTube mode) and the session is a browser,
+  // we "claim" it for the target mode UNLESS it explicitly looks like the OTHER platform.
+  if (isBrowserLikeSource(sourceAppId) || sourceAppId.includes("native-bridge")) {
+    if (preferred === "youtube" && !looksLikeSpotify && !isSpotifyId) return "youtube";
+    if (preferred === "spotify" && !looksLikeYouTube && !isYouTubeId) return "spotify";
+
+    // Last ditch: if we ARE in a mode, and it's a browser, just give it to the mode.
+    if (preferred) return preferred;
   }
+
+
 
   if (sourceAppId.includes("phone link") || sourceAppId.includes("bluetooth") || text.includes("phone link") || text.includes("bluetooth")) return "phone_link";
 
@@ -349,22 +355,28 @@ function classifySessionProvider(session, preferredSource = "") {
 
 
 
+
 function scoreSession(session, preferredSource = "") {
   const preferred = normalizePreferredSource(preferredSource);
   const provider = classifySessionProvider(session, preferredSource);
   const priority = getPlaybackPriority(session?.playback?.playbackStatus);
+  const text = getSessionSourceText(session);
 
   let score = priority * 1000;
+
 
   if (preferred) {
     if (provider === preferred) {
       score += 50000; // High boost for matching source
     } else {
-      score -= 100000; // Total rejection for non-matching source
+      // MASSIVE penalty for confirmed mismatch to ensure we don't pick up the other app.
+      // If we pick up NOTHING, buildFreshSnapshotPayload will return "Idle" for the mode.
+      score -= 500000;
     }
   } else if (isPreferredApp(session.sourceAppUserModelId || session.sourceAppId)) {
     score += 500;
   }
+
 
 
 
@@ -512,7 +524,8 @@ function buildFreshSnapshotPayload(preferredSource = "") {
     const title = `${session.media?.title || ""}`.trim();
     const artist = `${session.media?.artist || session.media?.albumArtist || ""}`.trim();
     const sanitizedMeta = sanitizeMediaMeta(artist, sourceAppId);
-    const sourceProvider = classifySessionProvider(session) || preferred;
+    const sourceProvider = classifySessionProvider(session, preferred) || preferred;
+
 
     const meta = (appLabel && sanitizedMeta && !/^\d+$/.test(appLabel) && appLabel.toLowerCase() !== sanitizedMeta.toLowerCase())
       ? `${appLabel} - ${sanitizedMeta}`
