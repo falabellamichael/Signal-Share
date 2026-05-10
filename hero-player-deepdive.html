@@ -20,7 +20,7 @@
 
         <!-- Section 1: Core Component -->
         <section class="questions-page-card">
-            <h2>1. Component Overview & State Management</h2>
+            <h2 id="section-state">1. Component Overview & State Management</h2>
             <p>The Hero Player acts as the primary, unified media viewport. Its core responsibility is to abstract away the source complexity (YouTube embed vs. Spotify widget vs. local file upload) into a single, controllable playback interface.</p>
             
             <h3>State Variables (Client-Side Focus):</h3>
@@ -41,7 +41,7 @@
 
         <!-- Section 2: Source Specific Implementations -->
         <section class="questions-page-card">
-            <h2>2. Media Source Integration Details</h2>
+            <h2 id="section-media">2. Media Source Integration Details</h2>
             
             <h3>YouTube Player Module:</h3>
             <p>Uses the standard YouTube IFrame API (or embedded player object). The key interaction point is calling <code>player.playVideo()</code> and listening to <code>onStateChange</code> events (e.g., YT.PlayerState.ENDED) for state synchronization.</p>
@@ -61,7 +61,7 @@
 
         <!-- Section 3: Desktop Bridge Communication Protocol -->
         <section class="questions-page-card">
-            <h2>3. Desktop Bridge IPC (Inter-Process Communication)</h2>
+            <h2 id="section-bridge">3. Desktop Bridge IPC (Inter-Process Communication)</h2>
             <p>When `isDesktopBridgeActive` is true, the player switches control logic from client-side DOM controls to sending standardized commands over a local WebSocket connection established with the bridge service.</p>
 
             <h3>Protocol Details:</h3>
@@ -83,7 +83,7 @@
 
         <!-- Section 4: Local LLM Operation (AI Integration) -->
         <section class="questions-page-card">
-            <h2>4. 🌐 Local LLM Operation (AI Integration)</h2>
+            <h2 id="section-llm">4. 🌐 Local LLM Operation (AI Integration)</h2>
             <p>For advanced functionality like content generation or tagging suggestions, Signal Share supports integration with local Large Language Models (LLMs) running via tools like <strong>LM Studio</strong>.</p>
 
             <h3>Core Principles:</h3>
@@ -106,7 +106,7 @@
         
         <!-- Section 5: Debugging Checklist -->
         <section class="questions-page-card">
-            <h2>🐞 Hero Player Debugging Checklist</h2>
+            <h2 id="section-debug">🐞 Hero Player Debugging Checklist</h2>
             <ul style="list-style-type: disc;">
                 <li><strong>[INIT]</strong> Did the component successfully read the `playbackContextId` from the session state?</li>
                 <li><strong>[SOURCE VALIDATION]</strong> For YouTube/Spotify, is the source URL fully validated before attempting connection? (Check for malformed embed IDs).</li>
