@@ -127,7 +127,7 @@
                 <li><strong>Request Dispatch:</strong> On user action, package the request JSON exactly as defined (<code>{ "action": "GENERATE_TAGS", ... }</code>) and dispatch it to the established WebSocket/HTTP stream.</li>
                 <li><strong>Response Handling:</strong> Process streamed responses. Streaming is preferred over waiting for a single large payload, allowing immediate UI feedback on token generation.</li>
             </ol>
-            <div class="code-snippet" style="background: rgba(0,0,0,2); padding: 15px; border-radius: 12px; margin: 10px 0;">
+            <div class="code-snippet" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin: 10px 0;">
                 <strong>Conceptual Connection Setup (Client JS):</strong><br>
                 <code>const ws = new WebSocket("ws://localhost:12345/llm");\nws.onmessage = (event) => { /* Handle streamed text */ };</code>
             </div>
@@ -139,7 +139,7 @@
         <!-- Section 5: Debugging Checklist -->
         <section class="questions-page-card" id="section-debug">
             <h2 id="section-debug">🐞 Hero Player Debugging Checklist</h2>
-            <ul>
+            <ul style="list-style-type: disc;">
                 <li><strong>[INIT]</strong> Did the component successfully read the <code>playbackContextId</code> from the session state?</li>
                 <li><strong>[SOURCE VALIDATION]</strong> For YouTube/Spotify, is the source URL fully validated before attempting connection? (Check for malformed embed IDs).</li>
                 <li><strong>[STATE DRIFT]</strong> If playback seems stuck, manually force a state refresh by re-calling <code>loadMedia</code> with the current post data.</li>
