@@ -13,34 +13,46 @@
         <a class="questions-back-link" href="./how-to-guide.html">← Back to How To Guide</a>
 
         <p class="questions-page-topline">Technical Deep Dive</p>
-        <h1>The Signal Share Hero Player Architecture</h1>
+        <h1 id="hero-player-architecture">The Signal Share Hero Player Architecture</h1>
         <p class="questions-page-lede">
             This document details the underlying mechanisms, state management, and cross-device communication protocols used by the Hero Media Player. This guide is intended for developers integrating or debugging media playback features.
         </p>
 
+        <!-- Index/Table of Contents -->
+        <div class="toc" style="margin: 20px 0; padding: 15px; border-left: 3px solid #ccc; background-color: #f9f9f9;">
+            <h3>📋 Quick Jump Guide (Index)</h3>
+            <ul>
+                <li><a href="#section-state">1. Component Overview & State Management</a></li>
+                <li><a href="#section-media">2. Media Source Integration Details</a></li>
+                <li><a href="#section-bridge">3. Desktop Bridge IPC (Inter-Process Communication)</a></li>
+                <li><a href="#section-llm">4. 🌐 Local LLM Operation (AI Integration)</a></li>
+                <li><a href="#section-debug">🐞 Hero Player Debugging Checklist</a></li>
+            </ul>
+        </div>
+
         <!-- Section 1: Core Component -->
-        <section class="questions-page-card">
+        <section class="questions-page-card" id="section-state">
             <h2 id="section-state">1. Component Overview & State Management</h2>
             <p>The Hero Player acts as the primary, unified media viewport. Its core responsibility is to abstract away the source complexity (YouTube embed vs. Spotify widget vs. local file upload) into a single, controllable playback interface.</p>
             
             <h3>State Variables (Client-Side Focus):</h3>
             <ul>
-                <li><strong>`currentMediaSource`</strong>: Determines the active playback mode ('youtube', 'spotify', 'local'). This dictates which embed/API is initialized.</li>
-                <li><strong>`isPlaying`</strong>: Boolean state tracking whether playback is currently active or paused.</li>
-                <li><strong>`playbackContextId`</strong>: A unique identifier generated upon loading a post, used to ensure that subsequent API calls target the correct session data within Supabase or locally.</li>
-                <li><strong>`isDesktopBridgeActive`</strong>: Tracks connectivity status with the local desktop bridge service.</li>
+                <li><strong><code>currentMediaSource</code></strong>: Determines the active playback mode ('youtube', 'spotify', 'local'). This dictates which embed/API is initialized.</li>
+                <li><strong><code>isPlaying</code></strong>: Boolean state tracking whether playback is currently active or paused.</li>
+                <li><strong><code>playbackContextId</code></strong>: A unique identifier generated upon loading a post, used to ensure that subsequent API calls target the correct session data within Supabase or locally.</li>
+                <li><strong><code>isDesktopBridgeActive</code></strong>: Tracks connectivity status with the local desktop bridge service.</li>
             </ul>
 
             <h3>Playback Lifecycle Flow:</h3>
             <ol>
                 <li><strong>Initialization:</strong> On page load, the component listens for initial state from the global store (or URL parameters). The player defaults to a neutral/placeholder view.</li>
-                <li><strong>Source Loading:</strong> When `loadMedia(postData)` is called, it first validates `postData.type` and `postData.url`. It then calls source-specific handlers (`initializeYoutubePlayer`, `initializeSpotifyClient`).</li>
+                <li><strong>Source Loading:</strong> When <code>loadMedia(postData)</code> is called, it first validates <code>postData.type</code> and <code>postData.url</code>. It then calls source-specific handlers (<code>initializeYoutubePlayer</code>, <code>initializeSpotifyClient</code>).</li>
                 <li><strong>State Update:</strong> Successful initialization updates the local state variables mentioned above, triggering a re-render of the player element.</li>
             </ol>
         </section>
 
         <!-- Section 2: Source Specific Implementations -->
-        <section class="questions-page-card">
+        <section class="questions-page-card" id="section-media">
             <h2 id="section-media">2. Media Source Integration Details</h2>
             
             <h3>YouTube Player Module:</h3>
@@ -56,13 +68,13 @@
             </div>
 
             <h3>Local/Uploaded Media:</h3>
-            <p>For uploaded files, the player defaults to a standard HTML5 `<video>` element. Playback control is handled directly via JavaScript DOM manipulation (e.g., <code>videoElement.play()</code>). This path is the most resilient against external API changes.</p>
+            <p>For uploaded files, the player defaults to a standard HTML5 <code>&lt;video&gt;</code> element. Playback control is handled directly via JavaScript DOM manipulation (e.g., <code>videoElement.play()</code>). This path is the most resilient against external API changes.</p>
         </section>
 
         <!-- Section 3: Desktop Bridge Communication Protocol -->
-        <section class="questions-page-card">
+        <section class="questions-page-card" id="section-bridge">
             <h2 id="section-bridge">3. Desktop Bridge IPC (Inter-Process Communication)</h2>
-            <p>When `isDesktopBridgeActive` is true, the player switches control logic from client-side DOM controls to sending standardized commands over a local WebSocket connection established with the bridge service.</p>
+            <p>When <code>isDesktopBridgeActive</code> is true, the player switches control logic from client-side DOM controls to sending standardized commands over a local WebSocket connection established with the bridge service.</p>
 
             <h3>Protocol Details:</h3>
             <p>The communication uses JSON payloads sent over the local endpoint (typically <code>ws://localhost:PORT</code>).</p>
@@ -82,9 +94,9 @@
         </section>
 
         <!-- Section 4: Local LLM Operation (AI Integration) -->
-        <section class="questions-page-card">
+        <section class="questions-page-card" id="section-llm">
             <h2 id="section-llm">4. 🌐 Local LLM Operation (AI Integration)</h2>
-            <p>For advanced functionality like content generation or tagging suggestions, Signal Share supports integration with local Large Language Models (LLMs) running via tools like <strong>LM Studio</strong>.</p>
+            <p>For advanced functionality like content generation or tagging suggestions, Signal Share supports integration with local Large Language Models (LLMs) running via tools like <strong class="important-term">LM Studio</strong>.</p>
 
             <h3>Core Principles:</h3>
             <ul>
@@ -100,15 +112,35 @@
                 <code>{ "action": "GENERATE_TAGS", "text": "A sunset over a digital ocean" }</code>
             </div>
 
+            <h3>Prerequisites for Local LLM Execution:</h3>
+            <ol>
+                <li><strong>LLM Runner Software:</strong> You must first install a local inference engine such as <strong class="important-term">LM Studio</strong>, Ollama, or llama.cpp setup. This software manages the loading and running of model weights.</li>
+                <li><strong>Model Weights:</strong> Download a quantized version of the target LLM (e.g., Llama 3 GGUF format) that is compatible with your hardware's capabilities (GPU/RAM). The size dictates performance vs. resource usage.</li>
+                <li><strong>Port Binding:</strong> Configure the LLM Runner to expose an accessible local API endpoint (typically a WebSocket or HTTP REST interface) on a specific port (e.g., 12345).</li>
+            </ol>
+
+            <h3>Execution Flow Checklist (Client Perspective):</h3>
+            <ol>
+                <li><strong>Discovery:</strong> The client-side JS must first attempt to connect to the designated local API endpoint using a <code>fetch</code> or WebSocket connection.</li>
+                <li><strong>Connection Test:</strong> Validate connectivity and check for initial handshake success/failure. If it fails, show the 'LLM Unavailable' warning.</li>
+                <li><strong>Authentication:</strong> If required by your setup (e.g., API keys), securely retrieve and use credentials stored in a client-side config store (but <strong>never</strong> hardcoded).</li>
+                <li><strong>Request Dispatch:</strong> On user action, package the request JSON exactly as defined (<code>{ "action": "GENERATE_TAGS", ... }</code>) and dispatch it to the established WebSocket/HTTP stream.</li>
+                <li><strong>Response Handling:</strong> Process streamed responses. Streaming is preferred over waiting for a single large payload, allowing immediate UI feedback on token generation.</li>
+            </ol>
+            <div class="code-snippet" style="background: rgba(0,0,0,2); padding: 15px; border-radius: 12px; margin: 10px 0;">
+                <strong>Conceptual Connection Setup (Client JS):</strong><br>
+                <code>const ws = new WebSocket("ws://localhost:12345/llm");\nws.onmessage = (event) => { /* Handle streamed text */ };</code>
+            </div>
+
             <h3>Technical Considerations:</h3>
             <p>Implementations must verify available VRAM before loading heavy models to prevent system instability. The UI should gracefully degrade to manual entry if the local AI service is unavailable.</p>
         </section>
         
         <!-- Section 5: Debugging Checklist -->
-        <section class="questions-page-card">
+        <section class="questions-page-card" id="section-debug">
             <h2 id="section-debug">🐞 Hero Player Debugging Checklist</h2>
-            <ul style="list-style-type: disc;">
-                <li><strong>[INIT]</strong> Did the component successfully read the `playbackContextId` from the session state?</li>
+            <ul>
+                <li><strong>[INIT]</strong> Did the component successfully read the <code>playbackContextId</code> from the session state?</li>
                 <li><strong>[SOURCE VALIDATION]</strong> For YouTube/Spotify, is the source URL fully validated before attempting connection? (Check for malformed embed IDs).</li>
                 <li><strong>[STATE DRIFT]</strong> If playback seems stuck, manually force a state refresh by re-calling <code>loadMedia</code> with the current post data.</li>
                 <li><strong>[BRIDGE CHECK]</strong> Is the local desktop bridge running and accessible via WebSocket *before* attempting to send a command? Check console logs for connection errors on the client side.</li>
