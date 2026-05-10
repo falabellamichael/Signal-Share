@@ -1,6 +1,6 @@
 import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js";
-import { 
-  handleOpenMediaAction, handleOpenPhoneAction, 
+import {
+  handleOpenMediaAction, handleOpenPhoneAction,
   handlePlayPauseAction, handleNextAction, handlePreviousAction,
   handleVolumeAction, handleRefreshAction
 } from "./hero-media-player-actions.js";
@@ -448,26 +448,16 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (typeof window.fetch !== "function") return null;
     const watchUrl = resolveYouTubeMetadataUrlFromPost(post);
     if (!watchUrl) return null;
-    return fetchYouTubeOEmbedForUrl(watchUrl);
+    const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(watchUrl)}&format=json`;
+    const response = await window.fetch(endpoint, { method: "GET", cache: "force-cache" });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return normalizeExternalMetadata({
+      title: data?.title,
+      creator: data?.author_name,
+      thumbnailUrl: data?.thumbnail_url,
+    });
   }
-
-  async function fetchYouTubeOEmbedForUrl(url) {
-    if (typeof window.fetch !== "function" || !url) return null;
-    try {
-      const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-      const response = await window.fetch(endpoint, { method: "GET", cache: "force-cache" });
-      if (!response.ok) return null;
-      const data = await response.json();
-      return normalizeExternalMetadata({
-        title: data?.title,
-        creator: data?.author_name,
-        thumbnailUrl: data?.thumbnail_url,
-      });
-    } catch {
-      return null;
-    }
-  }
-
 
   async function fetchSpotifyCatalogHeaderMetadata(post) {
     const sourceUrl = buildSpotifyCanonicalUrlFromPost(post);
@@ -777,30 +767,30 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   function shouldUseNativeMode(post) {
     if (!nativeSnapshot) return false;
-    
+
     // If the user has manually toggled a specific source (Spotify/YouTube), 
     // we should prefer the native bridge for that mode even if nothing is currently playing,
     // so that pressing 'Play' can wake up the app.
     const preferredSource = getPreferredHeroControlSource();
     if (preferredSource && hasNativeActionBridge()) {
-       // If we are in the feed and NOT currently playing a hosted video/audio,
-       // we should let the selected system source take over.
-       const hasLocalAppSession = Boolean(post)
-         || getActivePlayerMediaElement() instanceof HTMLMediaElement
-         || getFallbackPageMediaElement() instanceof HTMLMediaElement;
-       if (!hasLocalAppSession) return true;
+      // If we are in the feed and NOT currently playing a hosted video/audio,
+      // we should let the selected system source take over.
+      const hasLocalAppSession = Boolean(post)
+        || getActivePlayerMediaElement() instanceof HTMLMediaElement
+        || getFallbackPageMediaElement() instanceof HTMLMediaElement;
+      if (!hasLocalAppSession) return true;
     }
 
     const preferredNativeSnapshot = isPreferredNowPlayingSnapshot(nativeSnapshot);
     if (preferredNativeSnapshot && hasSnapshotPlaybackContext(nativeSnapshot)) return true;
-    
+
     const hasAppPlaybackSession = Boolean(post)
       || getActivePlayerMediaElement() instanceof HTMLMediaElement
       || getFallbackPageMediaElement() instanceof HTMLMediaElement;
     const canBootstrapAppPlayback = !post && getPlayableVisiblePostIds().length > 0;
-    
+
     if (hasAppPlaybackSession || canBootstrapAppPlayback) return false;
-    
+
     if (nativeSnapshot.permissionRequired) return true;
     if (nativeSnapshot.active) return true;
     if (!post && hasNativeActionBridge()) return true;
@@ -1697,7 +1687,7 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     const source = getPreferredHeroControlSource();
     console.log(`[Hero] Native Action: ${action} (Source: ${source})`);
-    
+
     const now = Date.now();
     if (nativeActionInFlight && now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) {
       return false;
@@ -1712,13 +1702,13 @@ The companion bridge is designed with several security layers to keep your PC sa
       if (action === NATIVE_ACTION_PLAY_PAUSE && nativeSnapshot) {
         const wasPlaying = nativeSnapshot.playbackState === "playing";
         nativeSnapshot.playbackState = wasPlaying ? "paused" : "playing";
-        
+
         // Find play button and add a quick feedback class if it exists
         if (elements.heroPlayerPlayPauseButton) {
-           elements.heroPlayerPlayPauseButton.classList.add('optimistic-pulse');
-           setTimeout(() => elements.heroPlayerPlayPauseButton.classList.remove('optimistic-pulse'), 400);
+          elements.heroPlayerPlayPauseButton.classList.add('optimistic-pulse');
+          setTimeout(() => elements.heroPlayerPlayPauseButton.classList.remove('optimistic-pulse'), 400);
         }
-        
+
         render();
       }
 
@@ -1911,7 +1901,7 @@ The companion bridge is designed with several security layers to keep your PC sa
   function handleVolumeInput(event) {
     handleVolumeAction(getActionContext(), event);
   }
-  
+
   function handleRefresh(options = {}) {
     if (!hasUi()) return;
 
@@ -2154,7 +2144,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         nextCaption = (matchedPost && matchedPost.creator) ? matchedPost.creator : cleanSnapshotCreator(nativeSnapshot, "Device playback");
         nextStatus = matchedPost ? "MATCHED FROM FEED" : modeLabel;
         if (matchedPost) nextHeader = "SYNCED";
-        
+
         syncTitle = nextTitle;
         syncArtist = nextCaption;
         syncArtwork = nativeSnapshot.artworkUri || "";
@@ -2172,36 +2162,13 @@ The companion bridge is designed with several security layers to keep your PC sa
       // STRICT FILTER: If locked to a source, ONLY show snapshot if it matches.
       const isCorrectSource = !preferredSource || isPreferredNowPlayingSnapshot(desktopSnapshot);
 
-      let activeDesktopSnapshot = desktopSnapshot;
-
       if (desktopSnapshot?.active && isCorrectSource) {
-        // OVERRIDE: Fetch real YouTube title for advertisements
-        if (desktopSnapshot.openUri && desktopSnapshot.openUri.includes("youtube.com/watch")) {
-          const cacheKey = `oembed|${desktopSnapshot.openUri}`;
-          const cached = externalHeaderMetadataCache.get(cacheKey);
-          if (cached) {
-             activeDesktopSnapshot = {
-               ...desktopSnapshot,
-               title: cached.title || desktopSnapshot.title,
-               meta: cached.creator || desktopSnapshot.meta,
-             };
-          } else if (!externalHeaderMetadataInFlight.has(cacheKey)) {
-             const req = fetchYouTubeOEmbedForUrl(desktopSnapshot.openUri).then(meta => {
-                externalHeaderMetadataCache.set(cacheKey, meta || null);
-                if (meta) render();
-             }).finally(() => {
-                externalHeaderMetadataInFlight.delete(cacheKey);
-             });
-             externalHeaderMetadataInFlight.set(cacheKey, req);
-          }
-        }
-
-        nextTitle = cleanSnapshotTitle(activeDesktopSnapshot.title);
-        nextCaption = cleanSnapshotCreator(activeDesktopSnapshot, "Desktop playback");
+        nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
+        nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
         nextStatus = modeLabel;
         syncTitle = nextTitle;
         syncArtist = nextCaption;
-        syncArtwork = activeDesktopSnapshot.artworkUri || "";
+        syncArtwork = desktopSnapshot.artworkUri || "";
       } else {
         nextTitle = (preferredSource === "spotify" || preferredSource === "youtube") ? "Idle" : "PC media idle";
         nextCaption = preferredSource === "spotify"
@@ -2297,7 +2264,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         mode,
         post: mode === "app" ? post : null, // ONLY pass the feed post if we are in app mode
         fallbackMedia,
-        desktopSnapshot: isCorrectSource ? activeDesktopSnapshot : null,
+        desktopSnapshot,
         matchedPost,
         showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot,
         active: mode !== "app" // Treat media modes as "active" to show info/matched player
@@ -2319,11 +2286,11 @@ The companion bridge is designed with several security layers to keep your PC sa
     // Real-time listener for remote media actions (Cross-device control)
     state.supabase
       .channel('remote-media-actions')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
         table: 'system_media_actions',
-        filter: `user_id=eq.${userId}` 
+        filter: `user_id=eq.${userId}`
       }, payload => {
         const data = payload.new;
         if (!data) return;
@@ -2331,11 +2298,11 @@ The companion bridge is designed with several security layers to keep your PC sa
         // If this is an 'open_uri' command targeted at this device type
         if (data.action === "open_uri" && data.payload?.uri) {
           if (isNativeCapacitorApp()) {
-             const bridge = getNativeBridge();
-             if (bridge && typeof bridge.openNowPlayingMediaApp === "function") {
-               console.log("[Hero] Executing remote open command:", data.payload.uri);
-               bridge.openNowPlayingMediaApp("", data.payload.uri, true);
-             }
+            const bridge = getNativeBridge();
+            if (bridge && typeof bridge.openNowPlayingMediaApp === "function") {
+              console.log("[Hero] Executing remote open command:", data.payload.uri);
+              bridge.openNowPlayingMediaApp("", data.payload.uri, true);
+            }
           }
         }
       })
