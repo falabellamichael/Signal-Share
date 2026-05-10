@@ -234,7 +234,7 @@ export function handlePlayPauseAction(context, forcePlay) {
     NATIVE_ACTION_PLAY_PAUSE, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
     performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE, isNativeCapacitorApp,
     companionPromptDismissed, showCompanionPrompt, normalizePlaybackState,
-    getDesktopSnapshotSignature, toggleLocalPlayback, getFallbackPageMediaElement,
+    getDesktopSnapshotSignature, toggleLocalPlayback,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
     playHeroMedia, getNativeBridge, target
   } = context;
@@ -245,38 +245,25 @@ export function handlePlayPauseAction(context, forcePlay) {
 
   console.log(`[Hero] handlePlayPause. Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}`);
 
-  // 1. Global Cooldown to prevent double-triggering glitches
+  // 1. Cooldown Protection
   const now = Date.now();
-  const cooldown = (mode === "device" ? NATIVE_ACTION_COOLDOWN_MS : 350);
-  if (state._lastPlayPauseAt && (now - state._lastPlayPauseAt < cooldown)) {
-    console.warn("[Hero] Play/Pause throttled.");
+  const cooldownLimit = (mode === "device" ? NATIVE_ACTION_COOLDOWN_MS : 500) || 500;
+  if (state._lastPlayPauseAt && (now - state._lastPlayPauseAt < cooldownLimit)) {
+    console.warn("[Hero] Action throttled.");
     return;
   }
   state._lastPlayPauseAt = now;
 
-  // 2. High Priority: If there's an active local player element, ALWAYS prioritize it.
-  // This makes the UI buttons feel responsive to the media currently visible.
+  // 2. High Priority: Local Player control
   if (typeof toggleLocalPlayback === "function") {
     const handled = toggleLocalPlayback(forcePlay, { target });
     if (handled) {
-      console.log("[Hero] Play/Pause handled by local media element.");
       render();
       return;
     }
   }
 
-  // 2.5 New Logic: If we have a local post matching the current source mode (YouTube/Spotify)
-  // but it's not yet playing/mounted, mount it locally instead of triggering the system bridge.
-  if (controllablePost && controllablePost.sourceKind === preferredSource) {
-    if (target !== "mini" && typeof playHeroMedia === "function") {
-      console.log(`[Hero] Waking up local ${preferredSource} player.`);
-      playHeroMedia();
-      render();
-      return;
-    }
-  }
-
-  // 3. Fallback to App Mode for non-media-toggle scenarios
+  // 3. App Mode: Initial Mount
   if (mode === "app") {
     if (target !== "mini" && typeof playHeroMedia === "function") {
       playHeroMedia();
@@ -291,32 +278,47 @@ export function handlePlayPauseAction(context, forcePlay) {
     return;
   }
 
-  // 2. System Media Modes (Locked to Bridge/Native)
+  // 4. System Source Isolation
   const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
   const appPkg = (snapshot?.appPackage || "").toLowerCase();
   const metaText = (snapshot?.meta || "").toLowerCase();
   const titleText = (snapshot?.title || "").toLowerCase();
-  const systemIsSpotify = appPkg.includes("spotify") || metaText.includes("spotify");
-  const systemIsYouTube = appPkg.includes("youtube") || metaText.includes("youtube") || titleText.includes("youtube");
+  
+  const systemIsSpotify = appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
+  const systemIsYouTube = appPkg.includes("youtube") || appPkg.includes("ytmusic") 
+    || metaText.includes("youtube") || metaText.includes("ytmusic")
+    || titleText.includes("youtube") || titleText.includes("ytmusic");
 
-  // Source Isolation: Enforce the "Media Toggle" rules
   let isWrongSystemSource = false;
   if (preferredSource === "youtube" && systemIsSpotify && !systemIsYouTube) {
     isWrongSystemSource = true;
-    console.log("[Hero] YouTube mode active. Ignoring system Spotify session.");
+    console.log(`[Hero] YouTube mode active: Ignoring Spotify session (${appPkg}).`);
   } else if (preferredSource === "spotify" && systemIsYouTube && !systemIsSpotify) {
     isWrongSystemSource = true;
-    console.log("[Hero] Spotify mode active. Ignoring system YouTube session.");
+    console.log(`[Hero] Spotify mode active: Ignoring YouTube session (${titleText}).`);
   }
 
-  // 3. System Source Isolation: Enforce 'YouTube Mode' vs 'Spotify Mode'
+  const isSystemActive = !isWrongSystemSource && (mode === "desktop" ? Boolean(desktopSnapshot?.active) : Boolean(nativeSnapshot?.active));
+  console.log(`[Hero] Play/Pause Trace: Source=${preferredSource}, SystemIsYT=${systemIsYouTube}, SystemIsSpotify=${systemIsSpotify}, Active=${isSystemActive}`);
+
+  // 5. Local Redirection: If system is wrong or idle, but we have a matching local video
+  if (isWrongSystemSource || !isSystemActive) {
+    if (controllablePost && controllablePost.sourceKind === preferredSource) {
+      if (target !== "mini" && typeof playHeroMedia === "function") {
+        console.log(`[Hero] Redirecting to local ${preferredSource} player.`);
+        playHeroMedia();
+        render();
+        return;
+      }
+    }
+  }
+
   if (isWrongSystemSource) {
-    console.log(`[Hero] Source isolation active. Ignoring system commands for ${systemIsSpotify ? 'Spotify' : 'YouTube'}.`);
     render();
-    return; 
+    return;
   }
 
-  // 4. System Action: Desktop / Native Bridge Control
+  // 6. Bridge Commands
   if (mode === "desktop") {
     if (!isNativeCapacitorApp() && !desktopSnapshot && !companionPromptDismissed) {
       if (typeof showCompanionPrompt === "function") showCompanionPrompt();
@@ -333,24 +335,17 @@ export function handlePlayPauseAction(context, forcePlay) {
         setDesktopSnapshotSignature(getDesktopSnapshotSignature(updated));
       }
     }
-
     performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
   } else if (mode === "device") {
     if (nativeSnapshot?.permissionRequired && typeof context.getNativeBridge === "function") {
       try { context.getNativeBridge().openNowPlayingAccessSettings(); } catch { }
       return;
     }
-
-    const now = Date.now();
-    if (now - (context.lastNativeActionAt || 0) < NATIVE_ACTION_COOLDOWN_MS) return;
-
     const playbackStatus = normalizePlaybackState(nativeSnapshot?.playbackState);
     const nextPlaybackState = (typeof forcePlay === "boolean") ? (forcePlay ? "playing" : "paused") : (playbackStatus === "playing" ? "paused" : "playing");
-
     if (nativeSnapshot && typeof setNativeSnapshot === "function") {
       setNativeSnapshot({ ...nativeSnapshot, active: true, playbackState: nextPlaybackState });
     }
-
     performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
   }
 
@@ -376,7 +371,7 @@ export function handlePreviousAction(context) {
 
   // Cooldown to prevent double-skipping glitches
   const now = Date.now();
-  if (state._lastStepAt && (now - state._lastStepAt < 350)) {
+  if (state._lastStepAt && (now - state._lastStepAt < 500)) {
     console.warn("[Hero] Step throttled.");
     return;
   }
@@ -456,7 +451,7 @@ export function handleNextAction(context) {
 
   // Cooldown to prevent double-skipping glitches
   const now = Date.now();
-  if (state._lastStepAt && (now - state._lastStepAt < 350)) {
+  if (state._lastStepAt && (now - state._lastStepAt < 500)) {
     console.warn("[Hero] Step throttled.");
     return;
   }
