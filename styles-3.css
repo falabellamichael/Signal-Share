@@ -1762,20 +1762,37 @@
       }
 
       .message-emoji-panel {
-        gap: 6px;
-        flex-wrap: nowrap;
-        max-height: none;
-        overflow-x: auto;
-        overflow-y: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        max-height: 45dvh;
+        overflow: hidden;
         left: 0;
         right: 0;
-        bottom: calc(100% + 8px);
-        padding: 8px;
+        bottom: calc(100% + 6px);
+        padding: 6px;
+        background: var(--bg-surface, #1a1a1a);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
         scrollbar-width: none;
       }
 
       .message-emoji-panel::-webkit-scrollbar {
         display: none;
+      }
+
+      .emoji-panel-header {
+        flex-shrink: 0;
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+      }
+
+      .emoji-panel-grid {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        max-height: none; /* Let flexbox handle it */
       }
 
       .emoji-chip {
