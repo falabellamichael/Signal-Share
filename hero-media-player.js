@@ -684,11 +684,26 @@ The companion bridge is designed with several security layers to keep your PC sa
     };
   }
 
+  async function pollNativeSnapshot() {
+    if (!hasNativeSnapshotBridge()) return null;
+    const bridge = getNativeBridge();
+    try {
+      const source = getPreferredHeroControlSource();
+      const payload = bridge.getNowPlayingSnapshot(source);
+      if (typeof payload !== "string" || !payload.trim()) return null;
+      const parsed = JSON.parse(payload);
+      return normalizeNativeSnapshot(parsed);
+    } catch {
+      return null;
+    }
+  }
+
   function readNativeSnapshot() {
     if (!hasNativeSnapshotBridge()) return null;
     const bridge = getNativeBridge();
     try {
-      const payload = bridge.getNowPlayingSnapshot();
+      const source = getPreferredHeroControlSource();
+      const payload = bridge.getNowPlayingSnapshot(source);
       if (typeof payload !== "string" || !payload.trim()) return null;
       const parsed = JSON.parse(payload);
       return normalizeNativeSnapshot(parsed);
@@ -1682,6 +1697,9 @@ The companion bridge is designed with several security layers to keep your PC sa
   function performNativeAction(action) {
     if (!hasNativeActionBridge()) return false;
 
+    const source = getPreferredHeroControlSource();
+    console.log(`[Hero] Native Action: ${action} (Source: ${source})`);
+    
     const now = Date.now();
     if (nativeActionInFlight && now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) {
       return false;
@@ -1706,7 +1724,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         render();
       }
 
-      const success = bridge.performNowPlayingAction(action);
+      const success = bridge.performNowPlayingAction(action, source);
 
       window.setTimeout(() => {
         nativeActionInFlight = false;

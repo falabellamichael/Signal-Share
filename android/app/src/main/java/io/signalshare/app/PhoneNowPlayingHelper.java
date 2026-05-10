@@ -44,8 +44,8 @@ final class PhoneNowPlayingHelper {
     private PhoneNowPlayingHelper() {
     }
 
-    static Snapshot readSnapshot(Context context) {
-        MediaController controller = getBestActiveController(context);
+    static Snapshot readSnapshot(Context context, String preferredSource) {
+        MediaController controller = getBestActiveController(context, preferredSource);
         if (!hasNotificationListenerAccess(context)) {
             return Snapshot.permissionRequired();
         }
@@ -70,12 +70,12 @@ final class PhoneNowPlayingHelper {
         return Snapshot.active(title, buildMediaMeta(appLabel, creator, stateLabel), packageName, openUri, artworkUri, playbackState);
     }
 
-    static boolean performAction(Context context, String action) {
+    static boolean performAction(Context context, String action, String preferredSource) {
         if (TextUtils.isEmpty(action)) {
             return false;
         }
 
-        MediaController controller = getBestActiveController(context);
+        MediaController controller = getBestActiveController(context, preferredSource);
         if (controller == null) {
             if (ACTION_PLAY_PAUSE.equals(action)) {
                 return resumeLastMediaSession(context);
@@ -102,8 +102,28 @@ final class PhoneNowPlayingHelper {
             case ACTION_PLAY_PAUSE:
                 togglePlayback(controller, controls);
                 return true;
+        }
+
+        return false;
+    }
+
+    private static void togglePlayback(MediaController controller, MediaController.TransportControls controls) {
+        PlaybackState playbackState = controller.getPlaybackState();
+        int state = playbackState != null ? playbackState.getState() : PlaybackState.STATE_NONE;
+        switch (state) {
+            case PlaybackState.STATE_PLAYING:
+            case PlaybackState.STATE_BUFFERING:
+            case PlaybackState.STATE_CONNECTING:
+            case PlaybackState.STATE_FAST_FORWARDING:
+            case PlaybackState.STATE_REWINDING:
+            case PlaybackState.STATE_SKIPPING_TO_NEXT:
+            case PlaybackState.STATE_SKIPPING_TO_PREVIOUS:
+            case PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM:
+                controls.pause();
+                break;
             default:
-                return false;
+                controls.play();
+                break;
         }
     }
 
@@ -259,7 +279,7 @@ final class PhoneNowPlayingHelper {
         return new Intent[]{detailIntent, listenerIntent, appNotificationIntent, appDetailsIntent, settingsIntent};
     }
 
-    private static MediaController getBestActiveController(Context context) {
+    static MediaController getBestActiveController(Context context, String preferredSource) {
         if (!hasNotificationListenerAccess(context)) {
             return null;
         }
@@ -278,30 +298,6 @@ final class PhoneNowPlayingHelper {
             return null;
         }
 
-        return selectBestMediaController(controllers);
-    }
-
-    private static void togglePlayback(MediaController controller, MediaController.TransportControls controls) {
-        PlaybackState playbackState = controller.getPlaybackState();
-        int state = playbackState != null ? playbackState.getState() : PlaybackState.STATE_NONE;
-        switch (state) {
-            case PlaybackState.STATE_PLAYING:
-            case PlaybackState.STATE_BUFFERING:
-            case PlaybackState.STATE_CONNECTING:
-            case PlaybackState.STATE_FAST_FORWARDING:
-            case PlaybackState.STATE_REWINDING:
-            case PlaybackState.STATE_SKIPPING_TO_NEXT:
-            case PlaybackState.STATE_SKIPPING_TO_PREVIOUS:
-            case PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM:
-                controls.pause();
-                break;
-            default:
-                controls.play();
-                break;
-        }
-    }
-
-    private static MediaController selectBestMediaController(List<MediaController> controllers) {
         if (controllers == null || controllers.isEmpty()) {
             return null;
         }
@@ -313,17 +309,31 @@ final class PhoneNowPlayingHelper {
                 continue;
             }
 
-            int score = scoreMediaController(controller);
+            int score = scoreMediaController(controller, preferredSource);
             if (score > bestScore) {
                 bestController = controller;
                 bestScore = score;
             }
         }
 
+        // If a specific source was requested but no matching controller was found with a high enough score,
+        // we should be strict and return null if the "best" one is completely unrelated.
+        if (!TextUtils.isEmpty(preferredSource) && bestController != null) {
+            String pkg = bestController.getPackageName();
+            boolean isSpotify = "spotify".equalsIgnoreCase(preferredSource) && SPOTIFY_PACKAGE_NAME.equals(pkg);
+            boolean isYouTube = "youtube".equalsIgnoreCase(preferredSource) && (YOUTUBE_PACKAGE_NAME.equals(pkg) || YOUTUBE_MUSIC_PACKAGE_NAME.equals(pkg));
+            
+            // If the best we found isn't the one we wanted, but we have a preferred source, 
+            // it means the preferred source app isn't even in the active sessions list.
+            if (!isSpotify && !isYouTube) {
+                return null;
+            }
+        }
+
         return bestController;
     }
 
-    private static int scoreMediaController(MediaController controller) {
+    private static int scoreMediaController(MediaController controller, String preferredSource) {
         int score = 0;
         String packageName = controller.getPackageName();
         PlaybackState playbackState = controller.getPlaybackState();
@@ -365,6 +375,16 @@ final class PhoneNowPlayingHelper {
         if (isPreferredNowPlayingPackage(packageName)) {
             // Prefer Spotify/YouTube/YouTube Music snapshots even over generic feed/browser sessions.
             score += 400;
+        }
+
+        // BOOST specifically requested source to the top
+        if (!TextUtils.isEmpty(preferredSource)) {
+            if ("spotify".equalsIgnoreCase(preferredSource) && SPOTIFY_PACKAGE_NAME.equals(packageName)) {
+                score += 2000;
+            } else if ("youtube".equalsIgnoreCase(preferredSource) && 
+                (YOUTUBE_PACKAGE_NAME.equals(packageName) || YOUTUBE_MUSIC_PACKAGE_NAME.equals(packageName))) {
+                score += 2000;
+            }
         }
 
         return score;

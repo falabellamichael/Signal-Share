@@ -37,10 +37,10 @@ public class MainActivity extends BridgeActivity {
         }
 
         @android.webkit.JavascriptInterface
-        public String getNowPlayingSnapshot() {
+        public String getNowPlayingSnapshot(String preferredSource) {
             try {
                 return new String(
-                        PhoneNowPlayingHelper.readSnapshot(MainActivity.this).toBytes(),
+                        PhoneNowPlayingHelper.readSnapshot(MainActivity.this, preferredSource).toBytes(),
                         StandardCharsets.UTF_8
                 );
             } catch (Exception ignored) {
@@ -49,9 +49,9 @@ public class MainActivity extends BridgeActivity {
         }
 
         @android.webkit.JavascriptInterface
-        public boolean performNowPlayingAction(String action) {
+        public boolean performNowPlayingAction(String action, String preferredSource) {
             try {
-                return PhoneNowPlayingHelper.performAction(MainActivity.this, action);
+                return PhoneNowPlayingHelper.performAction(MainActivity.this, action, preferredSource);
             } catch (Exception ignored) {
                 return false;
             }
