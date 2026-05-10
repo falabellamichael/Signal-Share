@@ -44,6 +44,10 @@ final class PhoneNowPlayingHelper {
     private PhoneNowPlayingHelper() {
     }
 
+    static Snapshot readSnapshot(Context context) {
+        return readSnapshot(context, null);
+    }
+
     static Snapshot readSnapshot(Context context, String preferredSource) {
         MediaController controller = getBestActiveController(context, preferredSource);
         if (!hasNotificationListenerAccess(context)) {
@@ -68,6 +72,10 @@ final class PhoneNowPlayingHelper {
         String playbackState = resolvePlaybackState(controller.getPlaybackState());
         String artworkUri = extractNowPlayingArtworkUri(controller.getMetadata(), openUri);
         return Snapshot.active(title, buildMediaMeta(appLabel, creator, stateLabel), packageName, openUri, artworkUri, playbackState);
+    }
+
+    static boolean performAction(Context context, String action) {
+        return performAction(context, action, null);
     }
 
     static boolean performAction(Context context, String action, String preferredSource) {
@@ -321,6 +329,10 @@ final class PhoneNowPlayingHelper {
                 .setData(Uri.fromParts("package", context.getPackageName(), null));
         Intent settingsIntent = new Intent(Settings.ACTION_SETTINGS);
         return new Intent[]{detailIntent, listenerIntent, appNotificationIntent, appDetailsIntent, settingsIntent};
+    }
+
+    static MediaController getBestActiveController(Context context) {
+        return getBestActiveController(context, null);
     }
 
     static MediaController getBestActiveController(Context context, String preferredSource) {
