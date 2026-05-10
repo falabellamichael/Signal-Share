@@ -692,7 +692,7 @@ try {
   Add-Type -AssemblyName System.Runtime.WindowsRuntime
   $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime]
   $asTaskMethod = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
-    $_.ToString() -eq 'System.Threading.Tasks.Task\ 1[TResult] AsTask[TResult](Windows.Foundation.IAsyncOperation\ 1[TResult])'
+    $_.ToString() -match 'Task.*AsTask.*IAsyncOperation' -and $_.ToString() -notmatch 'WithProgress' -and $_.ToString() -notmatch 'CancellationToken' -and $_.ToString() -match 'TResult.*TResult'
   } | Select-Object -First 1
 
   if ($asTaskMethod -ne $null) {
@@ -765,7 +765,7 @@ try {
 # CRITICAL: Only allow global fallback if NO specific source is preferred.
 # This prevents "YouTube mode" from accidentally toggling Spotify.
 if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all") {
-  if ($isToggleAction) {
+  if ("${action}" -eq "play_pause") {
     Send-AppCommand $APPCOMMAND_MEDIA_PLAY_PAUSE
   } elseif ("${action}" -eq "next") {
     Send-AppCommand $APPCOMMAND_MEDIA_NEXTTRACK
@@ -786,8 +786,19 @@ if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all") {
 }
 
 # If we had a preferred source but winRtSuccess is false, it means we couldn't find a matching app.
-# We stop here to avoid toggling the wrong application.
+# We auto-launch the app if it's a play_pause action, similar to Android's behavior.
 if ($winRtSuccess -eq $false) {
+  if ("${action}" -eq "play_pause") {
+    if ($preferred -eq "youtube") {
+      try { Start-Process "https://www.youtube.com" } catch {}
+      Write-Output "ok-launched-youtube"
+      exit 0
+    } elseif ($preferred -eq "spotify") {
+      try { Start-Process "spotify:" } catch {}
+      Write-Output "ok-launched-spotify"
+      exit 0
+    }
+  }
   Write-Output "fail-target-not-found"
   exit 0
 }
@@ -795,7 +806,7 @@ if ($winRtSuccess -eq $false) {
 Write-Output "ok-winrt"
 exit 0
 
-  `.trim().replace(/\u007f/g, '`');
+  `.trim();
 
   return new Promise((resolve) => {
     const child = spawn("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], {
