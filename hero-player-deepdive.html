@@ -6,6 +6,8 @@
     <title>Hero Player Deep Dive | Signal Share</title>
     <!-- Assuming you use questions-guide.css for styling consistency -->
     <link rel="stylesheet" href="./questions-guide.css"> 
+    <link rel="icon" href="./icons/icon.svg?v=5" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=5" />
 </head>
 <body class="questions-page">
     <main class="questions-page-shell">
@@ -18,15 +20,15 @@
             This document details the underlying mechanisms, state management, and cross-device communication protocols used by the Hero Media Player. This guide is intended for developers integrating or debugging media playback features.
         </p>
 
-                <!-- Index/Table of Contents -->
-        <div class="toc" style="margin: 20px 0; padding: 15px; border-left: 3px solid #ccc; background-color: #f9f9f9;">
-            <h3>📋 Quick Jump Guide (Index)</h3>
-            <ul style="list-style-type: none; padding-left: 0;">
-                <li><a href="#section-state">1. Component Overview & State Management</a></li>
-                <li><a href="#section-media">2. Media Source Integration Details</a></li>
-                <li><a href="#section-bridge">3. Desktop Bridge IPC (Inter-Process Communication)</a></li>
-                <li><a href="#section-llm">4. 🌐 Local LLM Operation (AI Integration)</a></li>
-                <li><a href="#section-debug">5. 🐞 Hero Player Debugging Checklist</a></li>
+        <!-- Index/Table of Contents -->
+        <div class="questions-page-card" style="margin: 20px 0; padding: 20px; border-color: rgba(255,255,255,0.1);">
+            <h3 style="margin-top: 0;">Quick Jump Guide</h3>
+            <ul style="list-style-type: none; padding-left: 0; display: grid; gap: 8px;">
+                <li><a href="#section-state" style="color: #4682b4;">1. Component Overview & State Management</a></li>
+                <li><a href="#section-media" style="color: #4682b4;">2. Media Source Integration Details</a></li>
+                <li><a href="#section-bridge" style="color: #4682b4;">3. Desktop Bridge IPC (Inter-Process Communication)</a></li>
+                <li><a href="#section-llm" style="color: #4682b4;">4. Local LLM Operation (AI Integration)</a></li>
+                <li><a href="#section-debug" style="color: #4682b4;">5. Hero Player Debugging Checklist</a></li>
             </ul>
         </div>
 
@@ -97,7 +99,7 @@
         <!-- Section 4: Local LLM Operation (AI Integration) -->
         <section class="questions-page-card" id="section-llm">
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                <h2 style="margin: 0;">4. 🌐 Local LLM Operation (AI Integration)</h2>
+                <h2 style="margin: 0;">4. Local LLM Operation (AI Integration)</h2>
                 <span style="background: rgba(255, 255, 255, 0.1); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6);">CURRENTLY INACTIVE</span>
             </div>
             <p>For advanced functionality like content generation or tagging suggestions, Signal Share is designed to support integration with local Large Language Models (LLMs) running via tools like <strong>LM Studio</strong>.</p>
@@ -142,7 +144,7 @@
         
         <!-- Section 5: Debugging Checklist -->
         <section class="questions-page-card" id="section-debug">
-            <h2>5. 🐞 Hero Player Debugging Checklist</h2>
+            <h2>5. Hero Player Debugging Checklist</h2>
             <ul style="list-style-type: disc;">
                 <li><strong>[INIT]</strong> Did the component successfully read the <code>playbackContextId</code> from the session state?</li>
                 <li><strong>[SOURCE VALIDATION]</strong> For YouTube/Spotify, is the source URL fully validated before attempting connection? (Check for malformed embed IDs).</li>
