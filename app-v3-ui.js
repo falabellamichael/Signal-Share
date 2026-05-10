@@ -629,6 +629,11 @@ export function createAppUi(context) {
     // If switching to media, ensure bridge is active and restore the last chosen specific source if current is "all"
     if (mode === "media") {
       state.desktopBridgeSuspended = false;
+
+      // Clear any stale feed post to avoid "old data" appearing on the Hero Stage when the bridge should be primary
+      state.heroPlayerPostId = "";
+      localStorage.removeItem("signal-share-hero-player-post-id");
+
       if (state.heroControlSource === "all") {
         const sourceToRestore = state.lastHeroControlSource || "youtube";
         setHeroControlSource(sourceToRestore);

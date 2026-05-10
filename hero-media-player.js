@@ -255,17 +255,21 @@ The companion bridge is designed with several security layers to keep your PC sa
     return "Ready";
   }
 
-  function appendPreferredSourceToEndpoint(endpoint = "") {
+  function appendPreferredSourceToEndpoint(endpoint = "", { force = false } = {}) {
+    if (!endpoint) return endpoint;
     const preferredSource = getPreferredHeroControlSource();
-    if (!preferredSource || !endpoint) return endpoint;
 
     try {
       const url = new URL(endpoint, window.location.href);
-      url.searchParams.set("source", preferredSource);
+      if (preferredSource) url.searchParams.set("source", preferredSource);
+      if (force) url.searchParams.set("force", "true");
       return url.toString();
     } catch {
       const separator = endpoint.includes("?") ? "&" : "?";
-      return `${endpoint}${separator}source=${encodeURIComponent(preferredSource)}`;
+      let result = endpoint;
+      if (preferredSource) result += `${separator}source=${encodeURIComponent(preferredSource)}`;
+      if (force) result += `${result.includes("?") ? "&" : "?"}force=true`;
+      return result;
     }
   }
 
@@ -918,7 +922,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     return "/api/system-media/current";
   }
 
-  function resolveDesktopSnapshotEndpoints() {
+  function resolveDesktopSnapshotEndpoints(options = {}) {
     const candidates = [];
     const seen = new Set();
 
@@ -978,14 +982,14 @@ The companion bridge is designed with several security layers to keep your PC sa
       pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
     }
 
-    return candidates.map(appendPreferredSourceToEndpoint);
+    return candidates.map((endpoint) => appendPreferredSourceToEndpoint(endpoint, { force: options.force }));
   }
 
   function deriveDesktopActionEndpoint(snapshotEndpoint) {
     if (typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_ACTION_ENDPOINT === "string" && window.SIGNAL_SHARE_SYSTEM_MEDIA_ACTION_ENDPOINT.trim()) {
       return window.SIGNAL_SHARE_SYSTEM_MEDIA_ACTION_ENDPOINT.trim();
     }
-    if (!snapshotEndpoint) return "/api/system-media/action";
+    if (!snapshotEndpoint || snapshotEndpoint === "supabase-sync") return "/api/system-media/action";
     try {
       const url = new URL(snapshotEndpoint, window.location.href);
       url.pathname = url.pathname.replace(/\/current$/i, "/action");
@@ -1226,11 +1230,11 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
   }
 
-  async function readDesktopSnapshot() {
+  async function readDesktopSnapshot({ force = false } = {}) {
     if (!canUseDesktopBridge()) return null;
 
     // Try local endpoints first for instant response
-    const localSnapshot = await readDesktopSnapshotFromLocal();
+    const localSnapshot = await readDesktopSnapshotFromLocal({ force });
     if (localSnapshot) return localSnapshot;
 
     // Fallback to Supabase sync for remote control
@@ -1245,9 +1249,9 @@ The companion bridge is designed with several security layers to keep your PC sa
     return null;
   }
 
-  async function readDesktopSnapshotFromLocal() {
+  async function readDesktopSnapshotFromLocal({ force = false } = {}) {
     let lastError = null;
-    const endpoints = resolveDesktopSnapshotEndpoints();
+    const endpoints = resolveDesktopSnapshotEndpoints({ force });
     for (const endpoint of endpoints) {
       try {
         const response = await window.fetch(endpoint, withLocalNetworkFetchOptions(endpoint, {
@@ -1314,7 +1318,7 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     lastDesktopPollTime = now;
 
-    desktopSnapshotReadPromise = readDesktopSnapshot()
+    desktopSnapshotReadPromise = readDesktopSnapshot({ force })
       .then((snapshot) => {
         // Prevent optimistic state flicker: Ignore incoming snapshots if an action was just performed
         if (Date.now() - lastDesktopActionAt < SNAPSHOT_INGEST_DELAY_MS) {

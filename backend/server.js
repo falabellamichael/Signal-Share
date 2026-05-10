@@ -324,8 +324,12 @@ function scoreSession(session, preferredSource = "") {
   if (text.includes("youtube") || text.includes("youtu.be")) score += 120;
   if (session?.media?.title && `${session.media.title}`.trim()) score += 80;
 
+  // Give a small boost to recently updated sessions to help break ties between multiple browser tabs
   const updated = Number(session?.lastUpdatedTime || 0);
-  if (Number.isFinite(updated)) score += updated % 100;
+  if (Number.isFinite(updated) && updated > 0) {
+    // We use a small fraction of the timestamp to prioritize the most recent one without overpowering the status bits
+    score += (updated % 1000) / 100;
+  }
 
   return score;
 }
@@ -739,7 +743,8 @@ exit 0
 app.get("/api/system-media/current", (req, res) => {
   try {
     const preferredSource = normalizePreferredSource(req.query.source || "");
-    res.json(buildSnapshotPayload({ preferredSource }));
+    const force = req.query.force === "true";
+    res.json(buildSnapshotPayload({ preferredSource, force }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || "Unknown bridge error");
     console.warn("[Bridge] Snapshot request failed safely:", message);
