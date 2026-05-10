@@ -45,7 +45,9 @@ $files = @(
   "icon-512.png",
   "icon-maskable-512.png",
   "icon.svg",
-  "profile_avatar.png"
+  "profile_avatar.png",
+  "cordova.js",
+  "cordova_plugins.js"
 )
 
 $directories = @(
