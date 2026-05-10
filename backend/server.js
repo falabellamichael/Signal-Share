@@ -693,39 +693,10 @@ try {
   $winRtSuccess = $false
 }
 
-# Skip and Toggle actions need aggressive fallback because WinRT can report success while browsers ignore the command.
-$isSkipAction = "${action}" -eq "next" -or "${action}" -eq "previous"
-$isToggleAction = "${action}" -eq "play_pause"
-
-if ($winRtSuccess -and -not $isSkipAction -and -not $isToggleAction) {
-  Write-Output "ok"
-  exit 0
-}
-
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-public static class MediaKeySender {
-  [DllImport("user32.dll", SetLastError=true)]
-  public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-  [DllImport("user32.dll")]
-  public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
-}
-"@
-
-$HWND_BROADCAST = [IntPtr]0xffff
-$WM_APPCOMMAND = 0x0319
-$APPCOMMAND_MEDIA_PLAY_PAUSE = 14
-$APPCOMMAND_MEDIA_NEXTTRACK = 11
-$APPCOMMAND_MEDIA_PREVIOUSTRACK = 12
-
-function Send-AppCommand([int]$cmd) {
-  # HWND_BROADCAST (0xffff) and IntPtr.Zero for sender
-  [MediaKeySender]::SendMessage($HWND_BROADCAST, $WM_APPCOMMAND, [IntPtr]::Zero, [IntPtr]($cmd -shl 16))
-}
-
 # Fallback to global media keys or AppCommands if WinRT targeting failed or if it's a skip/toggle action.
-if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or $winRtSuccess -eq $false -or $isSkipAction -or $isToggleAction) {
+# CRITICAL: Only allow global fallback if NO specific source is preferred.
+# This prevents "YouTube mode" from accidentally toggling Spotify.
+if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all") {
   if ($isToggleAction) {
     Send-AppCommand $APPCOMMAND_MEDIA_PLAY_PAUSE
   } elseif ("${action}" -eq "next") {
@@ -746,8 +717,16 @@ if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or $winRt
   exit 0
 }
 
-Write-Output "fail-source-not-active"
+# If we had a preferred source but winRtSuccess is false, it means we couldn't find a matching app.
+# We stop here to avoid toggling the wrong application.
+if ($winRtSuccess -eq $false) {
+  Write-Output "fail-target-not-found"
+  exit 0
+}
+
+Write-Output "ok-winrt"
 exit 0
+
   `.trim().replace(/\u007f/g, '`');
 
   return new Promise((resolve) => {

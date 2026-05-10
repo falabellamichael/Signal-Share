@@ -315,30 +315,42 @@ export function handlePlayPauseAction(context, forcePlay) {
   const mode = target === "mini" ? "app" : heroMode;
 
   // 1. AUTHORITATIVE COOLDOWN
-  // Prevent command flooding. We use a longer lockout for sync stabilization.
   if (state._lastPlayPauseAt && (now - state._lastPlayPauseAt < 600)) return;
   state._lastPlayPauseAt = now;
   state._mediaActionLockoutUntil = now + 2800;
 
+  // Identify preferred sources from toggle state
+  const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+  const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
+
   // 2. RESOLVE INTENT
-  // Determine if we are trying to Play or Pause.
-  // We look at the local state first as it's the most responsive.
   const localState = target === "mini" ? state.miniPlayerPlaybackState : state.heroPlayerPlaybackState;
   const isPlayingLocally = localState === "playing";
 
-  // Also check system snapshots if we are in a bridge mode
-  const systemSnapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
-  const isPlayingOnSystem = systemSnapshot?.playbackState === "playing";
+  // System state check with Source Isolation
+  const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
+  const appPkg = (snapshot?.appPackage || "").toLowerCase();
+  const metaText = (snapshot?.meta || "").toLowerCase();
+  const titleText = (snapshot?.title || "").toLowerCase();
 
-  // If forcePlay is provided, use it. Otherwise, toggle based on current state.
-  // We consider "playing" if EITHER the local player OR the system bridge reports playing.
+  const systemIsSpotify = appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
+  const systemIsYouTube = appPkg.includes("youtube") || appPkg.includes("ytmusic")
+    || metaText.includes("youtube") || metaText.includes("ytmusic")
+    || titleText.includes("youtube") || titleText.includes("ytmusic");
+
+  const bridgeMatchesLockedSource = isSourceLocked && (
+    (preferredSource === "youtube" && systemIsYouTube) ||
+    (preferredSource === "spotify" && systemIsSpotify)
+  );
+
+  const isPlayingOnSystem = snapshot?.playbackState === "playing" && (!isSourceLocked || bridgeMatchesLockedSource);
+
   const currentlyPlaying = isPlayingLocally || isPlayingOnSystem;
   const shouldPlay = (typeof forcePlay === "boolean") ? forcePlay : !currentlyPlaying;
 
-  console.log(`[Hero] Play/Pause Intent: ${shouldPlay ? "PLAY" : "PAUSE"} (Mode: ${mode}, Target: ${target || 'hero'})`);
+  console.log(`[Hero] Play/Pause Intent: ${shouldPlay ? "PLAY" : "PAUSE"} (Locked: ${preferredSource || 'none'}, BridgeMatch: ${bridgeMatchesLockedSource})`);
 
   // 3. OPTIMISTIC STATE UPDATE
-  // We update our local state immediately to suppress stutters and provide instant UI feedback.
   const nextState = shouldPlay ? "playing" : "paused";
   if (target === "mini") {
     state.miniPlayerPlaybackState = nextState;
@@ -348,52 +360,55 @@ export function handlePlayPauseAction(context, forcePlay) {
 
   // 4. COMMAND DISPATCH
   let handledLocally = false;
+  const controllablePost = getControllablePlayerPost();
 
-  // A. Local Website Elements (Hosted videos, YouTube/Spotify Iframes)
-  if (typeof toggleLocalPlayback === "function") {
-    // We try to toggle local playback. This returns true if an active element was found and signaled.
-    handledLocally = toggleLocalPlayback(shouldPlay, { target });
-  }
+  // A. Bridge vs Local Priority
+  // If we are playing and the bridge matches our locked source, prefer the bridge.
+  // Otherwise, if the bridge is idle or mismatching, act locally.
+  const useBridge = (mode === "desktop" || mode === "device") && (!isSourceLocked || bridgeMatchesLockedSource || !shouldPlay);
 
-  // B. Local Player Activation (If nothing was playing locally but user pressed Play)
-  if (!handledLocally && shouldPlay && mode === "app") {
-    if (target === "mini" && state.playerPostId) {
-      const p = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
-      if (p && typeof context.mountPersistentPlayer === "function") {
-        context.mountPersistentPlayer(elements.miniPlayerStage, p, "mini", { autoplay: true });
-        handledLocally = true;
-      }
-    } else if (typeof playHeroMedia === "function") {
-      playHeroMedia();
-      handledLocally = true;
-    }
-  }
-
-  // C. Bridge Commands (Always send if in bridge mode, or as a secondary "pause all" measure)
-  // If we are pausing, we send the command to the system bridge TOO, even if handled locally,
-  // to ensure background audio is cleared.
-  const sendToBridge = (mode === "desktop" || mode === "device") || (!shouldPlay && (desktopSnapshot?.active || nativeSnapshot?.active));
-
-  if (sendToBridge) {
+  if (useBridge) {
     if (mode === "desktop") {
       if (!isNativeCapacitorApp() && !companionPromptDismissed && !desktopSnapshot) {
         if (shouldPlay && typeof showCompanionPrompt === "function") showCompanionPrompt();
       } else {
-        console.log(`[Hero] Dispatching Bridge: Desktop ${shouldPlay ? "Play" : "Pause"}`);
         performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
+        // If we are playing via bridge, we stop any local players to avoid double-audio
+        if (shouldPlay && typeof toggleLocalPlayback === "function") toggleLocalPlayback(false, { target });
       }
     } else if (mode === "device") {
       if (nativeSnapshot?.permissionRequired) {
         if (shouldPlay && typeof getNativeBridge === "function") getNativeBridge()?.openNowPlayingAccessSettings();
       } else {
-        console.log(`[Hero] Dispatching Bridge: Native ${shouldPlay ? "Play" : "Pause"}`);
         performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
+        if (shouldPlay && typeof toggleLocalPlayback === "function") toggleLocalPlayback(false, { target });
+      }
+    }
+  }
+
+  // B. Local Action (If bridge wasn't the primary target for 'Play', or we are 'Pausing' everything)
+  if (!useBridge || !shouldPlay || isSourceLocked && !bridgeMatchesLockedSource) {
+    if (typeof toggleLocalPlayback === "function") {
+      handledLocally = toggleLocalPlayback(shouldPlay, { target });
+    }
+
+    if (!handledLocally && shouldPlay) {
+      if (target === "mini" && state.playerPostId) {
+        const p = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
+        if (p && typeof context.mountPersistentPlayer === "function") {
+          context.mountPersistentPlayer(elements.miniPlayerStage, p, "mini", { autoplay: true });
+          handledLocally = true;
+        }
+      } else if (typeof playHeroMedia === "function") {
+        playHeroMedia();
+        handledLocally = true;
       }
     }
   }
 
   render();
 }
+
 
 
 export function handlePreviousAction(context) {
