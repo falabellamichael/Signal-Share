@@ -1946,7 +1946,8 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     if (mode === "desktop") {
       if (desktopSnapshot) {
-        desktopSnapshot.playbackState = "playing"; // Optimistic
+        desktopSnapshot = { ...desktopSnapshot, active: true, playbackState: "playing" };
+        lastDesktopSnapshotSignature = getDesktopSnapshotSignature(desktopSnapshot);
         render();
       }
       performDesktopAction(DESKTOP_ACTION_PREVIOUS);
@@ -1993,7 +1994,8 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     if (mode === "desktop") {
       if (desktopSnapshot) {
-        desktopSnapshot.playbackState = "playing"; // Optimistic
+        desktopSnapshot = { ...desktopSnapshot, active: true, playbackState: "playing" };
+        lastDesktopSnapshotSignature = getDesktopSnapshotSignature(desktopSnapshot);
         render();
       }
       performDesktopAction(DESKTOP_ACTION_NEXT);

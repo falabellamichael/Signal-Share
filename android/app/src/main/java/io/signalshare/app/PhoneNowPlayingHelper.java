@@ -78,18 +78,18 @@ final class PhoneNowPlayingHelper {
         MediaController controller = getBestActiveController(context, preferredSource);
         if (controller == null) {
             if (ACTION_PLAY_PAUSE.equals(action)) {
-                return resumeLastMediaSession(context);
+                return resumeLastMediaSession(context, preferredSource);
             }
-            return launchSpotifyApp(context);
+            return launchPreferredMediaApp(context, preferredSource);
         }
 
         rememberMediaPackage(context, controller.getPackageName());
         MediaController.TransportControls controls = controller.getTransportControls();
         if (controls == null) {
             if (ACTION_PLAY_PAUSE.equals(action)) {
-                return resumeLastMediaSession(context);
+                return resumeLastMediaSession(context, preferredSource);
             }
-            return launchSpotifyApp(context);
+            return launchPreferredMediaApp(context, preferredSource);
         }
 
         switch (action) {
@@ -128,7 +128,7 @@ final class PhoneNowPlayingHelper {
     }
 
     static boolean setVolume(Context context, float volumePercent) {
-        MediaController controller = getBestActiveController(context);
+        MediaController controller = getBestActiveController(context, null);
         if (controller == null) {
             // Fallback: Adjust system music volume directly if no active media session
             android.media.AudioManager am = (android.media.AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
@@ -165,22 +165,66 @@ final class PhoneNowPlayingHelper {
         return false;
     }
 
-    private static boolean resumeLastMediaSession(Context context) {
-        // 1. Try to trigger Spotify playback silently via its internal widget broadcast
-        try {
-            Intent spotifyIntent = new Intent("com.spotify.mobile.android.ui.widget.PLAY");
-            spotifyIntent.setPackage(SPOTIFY_PACKAGE_NAME);
-            context.sendBroadcast(spotifyIntent);
-        } catch (Exception ignored) {}
+    private static boolean resumeLastMediaSession(Context context, String preferredSource) {
+        boolean isYouTube = "youtube".equalsIgnoreCase(preferredSource);
+
+        // 1. Try to trigger playback via package-specific broadcasts or intents
+        if (isYouTube) {
+            // YouTube doesn't have a simple play broadcast, so we try to wake it with a media key
+            return dispatchMediaKey(context, android.view.KeyEvent.KEYCODE_MEDIA_PLAY);
+        } else {
+            // Default to Spotify (original behavior)
+            try {
+                Intent spotifyIntent = new Intent("com.spotify.mobile.android.ui.widget.PLAY");
+                spotifyIntent.setPackage(SPOTIFY_PACKAGE_NAME);
+                context.sendBroadcast(spotifyIntent);
+            } catch (Exception ignored) {}
+        }
 
         // 2. Try generic media play command (wakes up the last active player)
+        return dispatchMediaKey(context, android.view.KeyEvent.KEYCODE_MEDIA_PLAY);
+    }
+
+    private static boolean dispatchMediaKey(Context context, int keyCode) {
         android.media.AudioManager am = (android.media.AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         if (am != null) {
             long eventTime = android.os.SystemClock.uptimeMillis();
-            am.dispatchMediaKeyEvent(new android.view.KeyEvent(eventTime, eventTime, android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PLAY, 0));
-            am.dispatchMediaKeyEvent(new android.view.KeyEvent(eventTime, eventTime, android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PLAY, 0));
+            am.dispatchMediaKeyEvent(new android.view.KeyEvent(eventTime, eventTime, android.view.KeyEvent.ACTION_DOWN, keyCode, 0));
+            am.dispatchMediaKeyEvent(new android.view.KeyEvent(eventTime, eventTime, android.view.KeyEvent.ACTION_UP, keyCode, 0));
             return true;
         }
+        return false;
+    }
+
+    private static boolean launchPreferredMediaApp(Context context, String preferredSource) {
+        if ("youtube".equalsIgnoreCase(preferredSource)) {
+            return launchYoutubeApp(context);
+        }
+        return launchSpotifyApp(context);
+    }
+
+    private static boolean launchYoutubeApp(Context context) {
+        try {
+            Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(YOUTUBE_PACKAGE_NAME);
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                context.startActivity(launchIntent);
+                rememberMediaPackage(context, YOUTUBE_PACKAGE_NAME);
+                return true;
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            Intent youtubeIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com"))
+                    .setPackage(YOUTUBE_PACKAGE_NAME)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            if (youtubeIntent.resolveActivity(context.getPackageManager()) != null) {
+                context.startActivity(youtubeIntent);
+                rememberMediaPackage(context, YOUTUBE_PACKAGE_NAME);
+                return true;
+            }
+        } catch (Exception ignored) {}
+
         return false;
     }
 
