@@ -85,8 +85,13 @@ export function handleOpenMediaAction(context) {
     const systemIsSpotify = appPackage.includes("spotify") || meta.includes("spotify");
     const systemIsYouTube = appPackage.includes("youtube") || meta.includes("youtube") || title.includes("youtube");
 
-    // Source Isolation: Respect the toggle strictly
-    if (prefersYouTube && (systemIsYouTube || (!systemIsSpotify && !post))) {
+    // Source Isolation Logic: 
+    // 1. If locked to a source, only act if system matches or isn't the 'other' major source.
+    // 2. If in 'All' mode, follow whatever the system reports.
+    const actAsYouTube = (prefersYouTube && (systemIsYouTube || !systemIsSpotify)) || (systemIsYouTube && !prefersSpotify);
+    const actAsSpotify = (prefersSpotify && (systemIsSpotify || !systemIsYouTube)) || (systemIsSpotify && !prefersYouTube);
+
+    if (actAsYouTube) {
       // Prioritize direct link from bridge
       let youtubeUrl = resolveYouTubeUrl(desktopSnapshot.openUri);
       
