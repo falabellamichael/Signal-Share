@@ -448,16 +448,26 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (typeof window.fetch !== "function") return null;
     const watchUrl = resolveYouTubeMetadataUrlFromPost(post);
     if (!watchUrl) return null;
-    const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(watchUrl)}&format=json`;
-    const response = await window.fetch(endpoint, { method: "GET", cache: "force-cache" });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return normalizeExternalMetadata({
-      title: data?.title,
-      creator: data?.author_name,
-      thumbnailUrl: data?.thumbnail_url,
-    });
+    return fetchYouTubeOEmbedForUrl(watchUrl);
   }
+
+  async function fetchYouTubeOEmbedForUrl(url) {
+    if (typeof window.fetch !== "function" || !url) return null;
+    try {
+      const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+      const response = await window.fetch(endpoint, { method: "GET", cache: "force-cache" });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return normalizeExternalMetadata({
+        title: data?.title,
+        creator: data?.author_name,
+        thumbnailUrl: data?.thumbnail_url,
+      });
+    } catch {
+      return null;
+    }
+  }
+
 
   async function fetchSpotifyCatalogHeaderMetadata(post) {
     const sourceUrl = buildSpotifyCanonicalUrlFromPost(post);
@@ -2162,13 +2172,36 @@ The companion bridge is designed with several security layers to keep your PC sa
       // STRICT FILTER: If locked to a source, ONLY show snapshot if it matches.
       const isCorrectSource = !preferredSource || isPreferredNowPlayingSnapshot(desktopSnapshot);
 
+      let activeDesktopSnapshot = desktopSnapshot;
+
       if (desktopSnapshot?.active && isCorrectSource) {
-        nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
-        nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
+        // OVERRIDE: Fetch real YouTube title for advertisements
+        if (desktopSnapshot.openUri && desktopSnapshot.openUri.includes("youtube.com/watch")) {
+          const cacheKey = `oembed|${desktopSnapshot.openUri}`;
+          const cached = externalHeaderMetadataCache.get(cacheKey);
+          if (cached) {
+             activeDesktopSnapshot = {
+               ...desktopSnapshot,
+               title: cached.title || desktopSnapshot.title,
+               meta: cached.creator || desktopSnapshot.meta,
+             };
+          } else if (!externalHeaderMetadataInFlight.has(cacheKey)) {
+             const req = fetchYouTubeOEmbedForUrl(desktopSnapshot.openUri).then(meta => {
+                externalHeaderMetadataCache.set(cacheKey, meta || null);
+                if (meta) render();
+             }).finally(() => {
+                externalHeaderMetadataInFlight.delete(cacheKey);
+             });
+             externalHeaderMetadataInFlight.set(cacheKey, req);
+          }
+        }
+
+        nextTitle = cleanSnapshotTitle(activeDesktopSnapshot.title);
+        nextCaption = cleanSnapshotCreator(activeDesktopSnapshot, "Desktop playback");
         nextStatus = modeLabel;
         syncTitle = nextTitle;
         syncArtist = nextCaption;
-        syncArtwork = desktopSnapshot.artworkUri || "";
+        syncArtwork = activeDesktopSnapshot.artworkUri || "";
       } else {
         nextTitle = (preferredSource === "spotify" || preferredSource === "youtube") ? "Idle" : "PC media idle";
         nextCaption = preferredSource === "spotify"
@@ -2264,7 +2297,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         mode,
         post: mode === "app" ? post : null, // ONLY pass the feed post if we are in app mode
         fallbackMedia,
-        desktopSnapshot,
+        desktopSnapshot: isCorrectSource ? activeDesktopSnapshot : null,
         matchedPost,
         showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot,
         active: mode !== "app" // Treat media modes as "active" to show info/matched player
