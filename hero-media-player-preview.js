@@ -613,13 +613,14 @@ export function renderHeroStagePreview(options = {}) {
     return;
   }
 
+  if (mode === "desktop") {
     if (desktopSnapshot?.active) {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
       // PRIORITIZE BRIDGE ARTWORK: The bridge has the live thumbnail for what's actually playing.
       // We fall back to the matched feed item's artwork if the bridge is missing it.
       let artworkUrl = desktopSnapshot.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
 
-      const card = commitCard(stage, {
+      commitCard(stage, {
         badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
         title: (desktopSnapshot.title || matchedPost?.title || "Now playing"),
         meta: (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : (desktopSnapshot.appPackage || "Desktop playback"))),
@@ -630,8 +631,6 @@ export function renderHeroStagePreview(options = {}) {
 
       return;
     }
-
-
 
     if (options.showCompanionCard) {
       const card = createCompanionCard();
@@ -653,6 +652,7 @@ export function renderHeroStagePreview(options = {}) {
     });
     return;
   }
+
 
 
   if (!post && canUseFallbackMedia(fallbackMedia)) {
