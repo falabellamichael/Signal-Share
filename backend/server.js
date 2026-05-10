@@ -300,10 +300,11 @@ function getSessionSourceText(session) {
     .toLowerCase();
 }
 
-function classifySessionProvider(session) {
+function classifySessionProvider(session, preferredSource = "") {
   const text = getSessionSourceText(session);
   const sourceAppId = `${session?.sourceAppUserModelId || session?.sourceAppId || ""}`.toLowerCase();
   const media = session?.media || {};
+  const preferred = normalizePreferredSource(preferredSource);
 
   // Primary check: Source ID / App Name
   if (sourceAppId.includes("spotify")) return "spotify";
@@ -315,7 +316,8 @@ function classifySessionProvider(session) {
     media.artist,
     media.albumArtist,
     media.albumTitle,
-    session?.sourceAppId
+    session?.sourceAppId,
+    session?.sourceAppUserModelId
   ].filter(Boolean).join(" ").toLowerCase();
 
   if (
@@ -324,9 +326,16 @@ function classifySessionProvider(session) {
     || browserText.includes("youtu.be")
     || browserText.includes("music.youtube")
     || browserText.includes("you tube")
+    || browserText.includes("video")
   ) return "youtube";
 
   if (browserText.includes("spotify") || browserText.includes("open.spotify.com")) return "spotify";
+
+  // TIE-BREAKER: If we are in a specific mode (e.g. YouTube mode) and the session has NO other
+  // classification but comes from a browser, assume it's the target. This ensures we don't
+  // show "Idle" when a video is clearly playing but just missing brand keywords.
+  if (preferred === "youtube" && isBrowserLikeSource(sourceAppId)) return "youtube";
+  if (preferred === "spotify" && isBrowserLikeSource(sourceAppId)) return "spotify";
 
   if (sourceAppId.includes("phone link") || sourceAppId.includes("bluetooth") || text.includes("phone link") || text.includes("bluetooth")) return "phone_link";
 
@@ -334,11 +343,12 @@ function classifySessionProvider(session) {
 }
 
 
+
 function scoreSession(session, preferredSource = "") {
   const preferred = normalizePreferredSource(preferredSource);
   const sourceAppId = `${session?.sourceAppUserModelId || session?.sourceAppId || ""}`.trim();
   const text = getSessionSourceText(session);
-  const provider = classifySessionProvider(session);
+  const provider = classifySessionProvider(session, preferredSource);
   const priority = getPlaybackPriority(session?.playback?.playbackStatus);
   const isBrowser = isBrowserLikeSource(sourceAppId);
 
@@ -348,17 +358,19 @@ function scoreSession(session, preferredSource = "") {
     const isMatch = (provider === preferred)
       || (preferred === "spotify" && sourceAppId.toLowerCase().includes("spotify"))
       || (preferred === "youtube" && /youtube|ytmusic|youtube\.music/i.test(sourceAppId))
-      || (preferred === "youtube" && isBrowser && provider !== "spotify" && (text.includes("youtube") || text.includes("youtu.be") || text.includes("video")))
-      || (preferred === "spotify" && isBrowser && provider !== "youtube" && (text.includes("spotify") || text.includes("open.spotify")));
+      || (preferred === "youtube" && isBrowser && (provider === "youtube" || text.includes("youtube") || text.includes("youtu.be") || text.includes("video")))
+      || (preferred === "spotify" && isBrowser && (provider === "spotify" || text.includes("spotify") || text.includes("open.spotify")));
 
     if (isMatch) {
-      score += 50000; // Even heavier boost for matching source
+      score += 50000; // High boost for matching source
     } else {
-      score -= 100000; // Even heavier penalty for non-matching source
+      score -= 100000; // Penalty for confirmed mismatch
     }
   } else if (isPreferredApp(sourceAppId)) {
     score += 500;
   }
+
+
 
 
   if (text.includes("spotify")) score += 120;

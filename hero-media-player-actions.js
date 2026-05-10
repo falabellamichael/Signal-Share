@@ -316,7 +316,8 @@ export function handlePlayPauseAction(context, forcePlay) {
   // 1. AUTHORITATIVE COOLDOWN
   if (state._lastPlayPauseAt && (now - state._lastPlayPauseAt < 600)) return;
   state._lastPlayPauseAt = now;
-  state._mediaActionLockoutUntil = now + 2800;
+  state._mediaActionLockoutUntil = now + 300;  // Reduced lockout for faster UI updates
+
 
   // Identify modes and sources
   const isFeedMode = state.heroControlMode === "feed";
