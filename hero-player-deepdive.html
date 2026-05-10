@@ -75,13 +75,36 @@
 
             <h4>Incoming Events (Bridge -> Client):</h4>
             <p>The client must listen for status updates from the bridge. Example event:</p>
-            <pre style="background-color: #eee; padding: 10px;">{ "event": "STATE_UPDATED", "status": "PLAYING", "timeRemaining": 25 }</code></pre>
+            <pre style="background-color: #eee; padding: 10px; color: #333;">{ "event": "STATE_UPDATED", "status": "PLAYING", "timeRemaining": 25 }</code></pre>
 
             <h3>Security Note:</h3>
             <p>The optional <strong>Bridge Secret</strong> must be validated server-side (if using a dedicated backend endpoint to relay commands) or strictly checked against client input on the page level to prevent unauthorized control hijacking.</p>
         </section>
+
+        <!-- Section 4: Local LLM Operation (AI Integration) -->
+        <section class="questions-page-card">
+            <h2>4. 🌐 Local LLM Operation (AI Integration)</h2>
+            <p>For advanced functionality like content generation or tagging suggestions, Signal Share supports integration with local Large Language Models (LLMs) running via tools like <strong>LM Studio</strong>.</p>
+
+            <h3>Core Principles:</h3>
+            <ul>
+                <li><strong>Privacy:</strong> All processing happens on the user's hardware. No metadata is sent to external APIs.</li>
+                <li><strong>Latency:</strong> Zero network round-trip; speed is limited only by local GPU/CPU performance.</li>
+                <li><strong>Connectivity:</strong> Operates entirely offline using quantized model weights (GGUF).</li>
+            </ul>
+
+            <h3>Integration Pattern:</h3>
+            <p>Similar to the Desktop Bridge, the AI module establishes a local WebSocket or HTTP connection to the LLM runner.</p>
+            <div class="code-snippet" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin: 10px 0;">
+                <strong>Conceptual Request:</strong><br>
+                <code>{ "action": "GENERATE_TAGS", "text": "A sunset over a digital ocean" }</code>
+            </div>
+
+            <h3>Technical Considerations:</h3>
+            <p>Implementations must verify available VRAM before loading heavy models to prevent system instability. The UI should gracefully degrade to manual entry if the local AI service is unavailable.</p>
+        </section>
         
-        <!-- Section 4: Debugging Checklist -->
+        <!-- Section 5: Debugging Checklist -->
         <section class="questions-page-card">
             <h2>🐞 Hero Player Debugging Checklist</h2>
             <ul style="list-style-type: disc;">
