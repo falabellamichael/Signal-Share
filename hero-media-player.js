@@ -1842,12 +1842,7 @@ The companion bridge is designed with several security layers to keep your PC sa
   function getEffectiveHeroMode(controllablePost) {
     if (state.heroControlMode === "feed") return "app";
     if (state.heroControlMode === "media") {
-      // Prioritize whatever is actually active
-      if (desktopSnapshot?.active) return "desktop";
-      if (nativeSnapshot?.active) return "device";
-
-      // If nothing is active, prefer desktop bridge if it seems healthy
-      if (canUseDesktopBridge() && desktopPollFailureCount < 5) return "desktop";
+      if (!isNativeCapacitorApp() && canUseDesktopBridge()) return "desktop";
       return "device";
     }
 
@@ -1879,14 +1874,51 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function handlePlayPause(forcePlay) {
+    const controllablePost = getControllablePlayerPost();
+    const mode = getEffectiveHeroMode(controllablePost);
+
+    if (mode === "app") {
+      const isHeroActive = state.heroPlayerPostId
+        && !!state.heroPlayerElement
+        && elements.heroPlayerStage.contains(state.heroPlayerElement);
+
+      if (isHeroActive) {
+        toggleLocalPlayback(forcePlay);
+      } else if (typeof playHeroMedia === "function") {
+        playHeroMedia();
+      }
+      render();
+      return;
+    }
+
     handlePlayPauseAction(getActionContext(), forcePlay);
   }
 
   function handlePrevious() {
+    const controllablePost = getControllablePlayerPost();
+    const mode = getEffectiveHeroMode(controllablePost);
+
+    if (mode === "app") {
+      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+      stepHeroPlayer(-1);
+      render();
+      return;
+    }
+
     handlePreviousAction(getActionContext());
   }
 
   function handleNext() {
+    const controllablePost = getControllablePlayerPost();
+    const mode = getEffectiveHeroMode(controllablePost);
+
+    if (mode === "app") {
+      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+      stepHeroPlayer(1);
+      render();
+      return;
+    }
+
     handleNextAction(getActionContext());
   }
 
