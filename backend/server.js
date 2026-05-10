@@ -638,15 +638,17 @@ try {
       }
     }
 
-    if ($session -ne $null) {
-      $actionMethod = $session.GetType().GetMethod('${winrtMethodName}', [Type[]]@())
-      if ($actionMethod -ne $null) {
-        try {
-          $actionOp = $actionMethod.Invoke($session, @())
-          $resultTask = $asTaskMethod.MakeGenericMethod(@([bool])).Invoke($null, @($actionOp))
-          $winRtSuccess = [bool]$resultTask.Result
-        } catch {
-          $winRtSuccess = $false
+      if ($session -ne $null) {
+        try { $id = $session.SourceAppUserModelId } catch { $id = "" }
+        $actionMethod = $session.GetType().GetMethod('${winrtMethodName}', [Type[]]@())
+        if ($actionMethod -ne $null) {
+          try {
+            $actionOp = $actionMethod.Invoke($session, @())
+            $resultTask = $asTaskMethod.MakeGenericMethod(@([bool])).Invoke($null, @($actionOp))
+            $winRtSuccess = [bool]$resultTask.Result
+          } catch {
+            $winRtSuccess = $false
+          }
         }
       }
     }
@@ -684,7 +686,8 @@ if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or $winRt
   [MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
 
   # For Skip actions on YouTube, also try sending browser-specific shortcuts if a browser is focused or if preferred is youtube
-  if ($isSkipAction -and ($preferred -eq "youtube" -or $id -match "chrome|msedge|firefox")) {
+  $isBrowserId = ($null -ne $id -and $id -match "chrome|msedge|firefox")
+  if ($isSkipAction -and ($preferred -eq "youtube" -or $isBrowserId)) {
     try {
       $wshell = New-Object -ComObject WScript.Shell
       if ("${action}" -eq "next") {

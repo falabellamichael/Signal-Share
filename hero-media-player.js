@@ -1053,6 +1053,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       openUri: typeof raw.openUri === "string" ? raw.openUri.trim() : "",
       artworkUri: typeof raw.artworkUri === "string" ? raw.artworkUri.trim() : "",
       playbackState,
+      sourceProvider: typeof raw.sourceProvider === "string" ? raw.sourceProvider.trim() : "",
     };
   }
 
@@ -1788,7 +1789,9 @@ The companion bridge is designed with several security layers to keep your PC sa
       },
       body: JSON.stringify({
         action,
-        appPackage: desktopSnapshot?.appPackage || "",
+        appPackage: (preferredSource && desktopSnapshot?.sourceProvider && desktopSnapshot.sourceProvider !== preferredSource)
+          ? ""
+          : (desktopSnapshot?.appPackage || ""),
         preferredSource,
         ...payload
       }),
