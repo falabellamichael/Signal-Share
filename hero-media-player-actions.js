@@ -496,6 +496,7 @@ export function handlePreviousAction(context) {
 
     // If source is locked, we ALWAYS want to send the command to the bridge so it can target the correct app independently.
     // If source is not locked ("All"), and system is idle, we fall back to local stepping.
+    // Send to bridge for Spotify or YouTube based on source lock
     const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube;
 
     if (!shouldSendToBridge) {
