@@ -172,6 +172,38 @@ export function handleOpenPhoneAction(post, context) {
     return;
   }
 
+  // Cross-Device Handoff: PC -> Phone (via Supabase)
+  if (state.supabase && state.currentUser?.id && typeof context.performSupabaseDesktopAction === "function") {
+    const targetPost = post || (typeof context.getControllablePlayerPost === "function" ? context.getControllablePlayerPost() : null);
+    
+    let uri = "";
+    if (targetPost) {
+      uri = targetPost.externalUrl || targetPost.embedUrl || targetPost.src;
+    }
+
+    // Fallback to source-specific landing pages if no post
+    if (!uri) {
+      const source = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+      if (source === "spotify") uri = "spotify:";
+      if (source === "youtube") uri = "https://www.youtube.com";
+    }
+
+    if (uri) {
+      console.log(`[Hero] Sending remote open command to phone. URI: ${uri}`);
+      context.performSupabaseDesktopAction("open_uri", { uri });
+      
+      if (typeof window.showNotification === "function") {
+        window.showNotification({
+          title: "Cross-device handoff",
+          body: "Opening content on your phone...",
+          kind: "info"
+        });
+      }
+      return;
+    }
+  }
+
+  // Final fallback: attempt local open
   const isSpotify = post?.sourceKind === "spotify";
   if (isSpotify) {
     const spotifyUri = "spotify:";

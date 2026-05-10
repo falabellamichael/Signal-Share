@@ -2325,9 +2325,40 @@ The companion bridge is designed with several security layers to keep your PC sa
     if (typeof renderMiniPlayer === "function") renderMiniPlayer();
   }
 
+  function subscribeToRemoteActions() {
+    const userId = state.currentUser?.id;
+    if (!state.supabase || !userId) return;
+
+    // Real-time listener for remote media actions (Cross-device control)
+    state.supabase
+      .channel('remote-media-actions')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'system_media_actions',
+        filter: `user_id=eq.${userId}` 
+      }, payload => {
+        const data = payload.new;
+        if (!data) return;
+
+        // If this is an 'open_uri' command targeted at this device type
+        if (data.action === "open_uri" && data.payload?.uri) {
+          if (isNativeCapacitorApp()) {
+             const bridge = getNativeBridge();
+             if (bridge && typeof bridge.openNowPlayingMediaApp === "function") {
+               console.log("[Hero] Executing remote open command:", data.payload.uri);
+               bridge.openNowPlayingMediaApp("", data.payload.uri, true);
+             }
+          }
+        }
+      })
+      .subscribe();
+  }
+
   function initialize() {
     attachEventListeners();
     initializeSdkHooks();
+    subscribeToRemoteActions();
   }
 
   initialize();
@@ -2357,6 +2388,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     showCompanionPrompt,
     hideCompanionPrompt,
     handleCompanionResponse,
+    performSupabaseDesktopAction,
     downloadCompanion,
     downloadSecurityReadme
   };

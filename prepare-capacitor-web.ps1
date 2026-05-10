@@ -29,7 +29,10 @@ $files = @(
   "site.webmanifest",
   "service-worker.js",
   "banned_foul_language.txt",
-  "questions-guide.css"
+  "questions-guide.css",
+  "contact.html",
+  "how-to-guide.html",
+  "security.html"
 )
 
 $directories = @(
