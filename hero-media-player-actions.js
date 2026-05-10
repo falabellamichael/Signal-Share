@@ -230,25 +230,44 @@ export function handlePlayPauseAction(context, forcePlay) {
     companionPromptDismissed, showCompanionPrompt, normalizePlaybackState,
     getDesktopSnapshotSignature, toggleLocalPlayback, getFallbackPageMediaElement,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
-    playHeroMedia, getNativeBridge
+    playHeroMedia, getNativeBridge, target
   } = context;
 
   const mode = heroMode;
   const controllablePost = getControllablePlayerPost();
   const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
 
-  console.log(`[Hero] handlePlayPause (Locked). Mode: ${mode}, Source: ${preferredSource}`);
+  console.log(`[Hero] handlePlayPause (Locked). Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}`);
 
   // 1. App Mode (Website Player Only)
   if (mode === "app") {
-    const isHeroActive = state.heroPlayerPostId
-      && !!state.heroPlayerElement
-      && elements.heroPlayerStage.contains(state.heroPlayerElement);
+    // If we have a target hint, respect it.
+    if (target === "mini") {
+        if (state.activePlayerPostId && state.activePlayerElement) {
+            console.log("[Hero] App Mode (Mini): Toggling existing mini player playback.");
+            if (typeof toggleLocalPlayback === "function") toggleLocalPlayback(forcePlay);
+        } else if (state.playerPostId) {
+            // No player mounted yet, but we have a post selected for the mini player
+            const post = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
+            if (post && typeof context.mountPersistentPlayer === "function") {
+                console.log("[Hero] App Mode (Mini): Launching Mini Player media.");
+                context.mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: true });
+                state.miniPlayerPlaybackState = "playing";
+            }
+        }
+    } else {
+        // Default target (usually Hero Stage)
+        const isHeroActive = state.heroPlayerPostId
+          && !!state.heroPlayerElement
+          && elements.heroPlayerStage.contains(state.heroPlayerElement);
 
-    if (isHeroActive) {
-      if (typeof toggleLocalPlayback === "function") toggleLocalPlayback(forcePlay);
-    } else if (typeof playHeroMedia === "function") {
-      playHeroMedia();
+        if (isHeroActive) {
+          console.log("[Hero] App Mode (Hero): Toggling existing hero playback.");
+          if (typeof toggleLocalPlayback === "function") toggleLocalPlayback(forcePlay);
+        } else if (typeof playHeroMedia === "function") {
+          console.log("[Hero] App Mode (Hero): No active player, launching Hero Media.");
+          playHeroMedia();
+        }
     }
     render();
     return;
@@ -318,21 +337,37 @@ export function handlePlayPauseAction(context, forcePlay) {
 
 export function handlePreviousAction(context) {
   const {
-    render, nativeSnapshot, performNativeAction,
+    state, elements, render, nativeSnapshot, performNativeAction,
     NATIVE_ACTION_PREVIOUS, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
     performDesktopAction, DESKTOP_ACTION_PREVIOUS,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
     getControllablePlayerPost, getEffectiveHeroMode,
-    getDesktopSnapshotSignature, stepHeroPlayer, elements
+    getDesktopSnapshotSignature, stepHeroPlayer,
+    ensureControllablePost, stepMiniPlayer, mountPersistentPlayer, target
   } = context;
 
   const mode = getEffectiveHeroMode(getControllablePlayerPost());
-  console.log(`[Hero] handlePrevious (Locked). Mode: ${mode}`);
+  console.log(`[Hero] handlePrevious (Locked). Mode: ${mode}, Target: ${target || 'default'}`);
 
   if (mode === "app") {
-    if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-    if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
-  } else if (mode === "desktop") {
+    if (target === "mini") {
+        if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
+          const wasPlaying = state.miniPlayerPlaybackState === "playing";
+          if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
+          const post = getControllablePlayerPost();
+          if (post && typeof mountPersistentPlayer === "function") {
+            mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
+          }
+        }
+    } else {
+        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+        if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
+    }
+    render();
+    return;
+  }
+
+  if (mode === "desktop") {
     if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
       const updated = { ...desktopSnapshot, active: true, playbackState: "playing" };
       setDesktopSnapshot(updated);
@@ -351,21 +386,37 @@ export function handlePreviousAction(context) {
 
 export function handleNextAction(context) {
   const {
-    render, nativeSnapshot, performNativeAction,
+    state, elements, render, nativeSnapshot, performNativeAction,
     NATIVE_ACTION_NEXT, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
     performDesktopAction, DESKTOP_ACTION_NEXT,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
     getControllablePlayerPost, getEffectiveHeroMode,
-    getDesktopSnapshotSignature, stepHeroPlayer, elements
+    getDesktopSnapshotSignature, stepHeroPlayer,
+    ensureControllablePost, stepMiniPlayer, mountPersistentPlayer, target
   } = context;
 
   const mode = getEffectiveHeroMode(getControllablePlayerPost());
-  console.log(`[Hero] handleNext (Locked). Mode: ${mode}`);
+  console.log(`[Hero] handleNext (Locked). Mode: ${mode}, Target: ${target || 'default'}`);
 
   if (mode === "app") {
-    if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-    if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
-  } else if (mode === "desktop") {
+    if (target === "mini") {
+        if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
+          const wasPlaying = state.miniPlayerPlaybackState === "playing";
+          if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
+          const post = getControllablePlayerPost();
+          if (post && typeof mountPersistentPlayer === "function") {
+            mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
+          }
+        }
+    } else {
+        if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+        if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
+    }
+    render();
+    return;
+  }
+
+  if (mode === "desktop") {
     if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
       const updated = { ...desktopSnapshot, active: true, playbackState: "playing" };
       setDesktopSnapshot(updated);

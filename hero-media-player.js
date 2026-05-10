@@ -39,6 +39,8 @@ export function createHeroMediaPlayerController(options) {
     isNativeCapacitorApp,
     getCapacitorPlatform,
     openViewer,
+    mountPersistentPlayer,
+    destroyActivePlayer,
     onStatusChange
   } = options;
 
@@ -1626,23 +1628,28 @@ The companion bridge is designed with several security layers to keep your PC sa
     const mediaElement = getActivePlayerMediaElement() || getFallbackPageMediaElement();
     if (mediaElement instanceof HTMLMediaElement) {
       const shouldPlay = typeof forcePlay === "boolean" ? forcePlay : mediaElement.paused;
+      const nextState = shouldPlay ? "playing" : "paused";
       if (shouldPlay) {
         const playResult = mediaElement.play();
         if (playResult && typeof playResult.catch === "function") playResult.catch(() => { });
-        state.heroPlayerPlaybackState = "playing";
       } else {
         mediaElement.pause();
-        state.heroPlayerPlaybackState = "paused";
       }
+      state.heroPlayerPlaybackState = nextState;
+      state.miniPlayerPlaybackState = nextState;
       return true;
     }
 
     const post = getControllablePlayerPost();
     const activeMedia = getActivePlayerMediaElement();
     if (post?.sourceKind === "youtube" && activeMedia instanceof HTMLIFrameElement) {
-      const shouldPlay = typeof forcePlay === "boolean" ? forcePlay : getLocalPlaybackState() !== "playing";
+      const isPlaying = activeMedia.dataset.playbackState === "playing" || state.miniPlayerPlaybackState === "playing" || state.heroPlayerPlaybackState === "playing";
+      const shouldPlay = typeof forcePlay === "boolean" ? forcePlay : !isPlaying;
+      const nextState = shouldPlay ? "playing" : "paused";
       postMessageToYouTubePlayer(activeMedia, shouldPlay ? "playVideo" : "pauseVideo");
-      state.heroPlayerPlaybackState = shouldPlay ? "playing" : "paused";
+      activeMedia.dataset.playbackState = nextState;
+      state.heroPlayerPlaybackState = nextState;
+      state.miniPlayerPlaybackState = nextState;
       return true;
     }
 
@@ -1873,20 +1880,20 @@ The companion bridge is designed with several security layers to keep your PC sa
       ensureControllablePost, getNativeBridge, hasNativeSettingsBridge,
       parseYouTubeUrl, performSupabaseDesktopAction, heroMode,
       findMatchedPost, openViewer, normalizePlayerVolume, savePlayerVolume,
-      applyPlayerVolumeToActiveElement
+      applyPlayerVolumeToActiveElement, mountPersistentPlayer, destroyActivePlayer
     };
   }
 
-  function handlePlayPause(forcePlay) {
-    handlePlayPauseAction(getActionContext(), forcePlay);
+  function handlePlayPause(forcePlay, options = {}) {
+    handlePlayPauseAction({ ...getActionContext(), ...options }, forcePlay);
   }
 
-  function handlePrevious() {
-    handlePreviousAction(getActionContext());
+  function handlePrevious(options = {}) {
+    handlePreviousAction({ ...getActionContext(), ...options });
   }
 
-  function handleNext() {
-    handleNextAction(getActionContext());
+  function handleNext(options = {}) {
+    handleNextAction({ ...getActionContext(), ...options });
   }
 
   function handleOpenPhone() {

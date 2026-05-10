@@ -412,6 +412,8 @@ export function createAppUi(context) {
     isNativeCapacitorApp,
     getCapacitorPlatform,
     openViewer,
+    mountPersistentPlayer,
+    destroyActivePlayer,
     onStatusChange: render
   });
 
@@ -507,9 +509,9 @@ export function createAppUi(context) {
     elements.viewerNextButton.addEventListener("click", () => stepViewer(1));
     elements.miniExpandButton.addEventListener("click", expandMiniPlayer);
     elements.miniCloseButton.addEventListener("click", closeMiniPlayer);
-    elements.miniPrevButton.addEventListener("click", handleMiniPrevious);
-    elements.miniPlayPauseButton.addEventListener("click", handleMiniPlayPause);
-    elements.miniNextButton.addEventListener("click", handleMiniNext);
+    elements.miniPrevButton.addEventListener("click", () => heroMediaPlayerController.handlePrevious({ target: "mini" }));
+    elements.miniPlayPauseButton.addEventListener("click", () => heroMediaPlayerController.handlePlayPause(null, { target: "mini" }));
+    elements.miniNextButton.addEventListener("click", () => heroMediaPlayerController.handleNext({ target: "mini" }));
     elements.miniPlayerStage.addEventListener("click", handleMiniPlayerStageClick);
     elements.miniPlayerVolumeSlider.addEventListener("input", (event) => heroMediaPlayerController.handleVolumeInput(event));
     elements.heroPlayerOpenMiniButton?.addEventListener("click", () => {
@@ -3086,78 +3088,15 @@ export function createAppUi(context) {
   function handleMiniPlayerVolumeInput(event) { heroMediaPlayerController.handleVolumeInput(event); }
 
   function handleMiniPlayPause() {
-    if (!checkMediaCooldown()) return;
-
-    if (!state.playerPostId) return;
-    const post = getPostById(state.playerPostId);
-    if (!post) return;
-
-    const media = state.activePlayerElement;
-    if (!media) {
-      mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: true });
-      state.miniPlayerPlaybackState = "playing";
-      renderMiniPlayer();
-      return;
-    }
-
-    const mediaEl = media instanceof HTMLMediaElement ? media : media.querySelector("video, audio");
-    const iframe = media instanceof HTMLIFrameElement ? media : media.querySelector("iframe");
-
-    if (mediaEl instanceof HTMLMediaElement) {
-      if (mediaEl.paused) {
-        mediaEl.play().catch(() => { });
-        state.miniPlayerPlaybackState = "playing";
-      } else {
-        mediaEl.pause();
-        state.miniPlayerPlaybackState = "paused";
-      }
-    } else if (iframe && post.sourceKind === "youtube") {
-      const isPlaying = iframe.dataset.playbackState === "playing";
-      postMessageToYouTubePlayer(iframe, isPlaying ? "pauseVideo" : "playVideo");
-      const nextState = isPlaying ? "paused" : "playing";
-      iframe.dataset.playbackState = nextState;
-      state.miniPlayerPlaybackState = nextState;
-    } else if (iframe && post.sourceKind === "spotify") {
-      state.miniPlayerPlaybackState = state.miniPlayerPlaybackState === "playing" ? "paused" : "playing";
-    }
-
-    renderMiniPlayer();
-    heroMediaPlayerController.render();
+    heroMediaPlayerController.handlePlayPause();
   }
 
   function handleMiniNext() {
-    if (!checkMediaCooldown()) return;
-    const wasPlaying = state.miniPlayerPlaybackState === "playing";
-    const oldId = state.playerPostId;
-    stepMiniPlayer(1);
-
-    if (state.playerPostId === oldId) return;
-
-    const post = getPostById(state.playerPostId);
-    if (post) {
-      if (wasPlaying) state.miniPlayerPlaybackState = "playing";
-      mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
-    }
-    renderMiniPlayer();
-    // Also sync the global master controller so system media is updated
-    heroMediaPlayerController.render();
+    heroMediaPlayerController.handleNext();
   }
 
   function handleMiniPrevious() {
-    if (!checkMediaCooldown()) return;
-    const wasPlaying = state.miniPlayerPlaybackState === "playing";
-    const oldId = state.playerPostId;
-    stepMiniPlayer(-1);
-
-    if (state.playerPostId === oldId) return;
-
-    const post = getPostById(state.playerPostId);
-    if (post) {
-      if (wasPlaying) state.miniPlayerPlaybackState = "playing";
-      mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
-    }
-    renderMiniPlayer();
-    heroMediaPlayerController.render();
+    heroMediaPlayerController.handlePrevious();
   }
 
   function getPlayableVisiblePostIds() {
