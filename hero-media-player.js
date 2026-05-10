@@ -2155,7 +2155,13 @@ The companion bridge is designed with several security layers to keep your PC sa
       }
     } else if (mode === "desktop") {
       const modeLabel = getSystemMediaHeaderLabel();
-      if (desktopSnapshot?.active) {
+      const preferredSource = getPreferredHeroControlSource();
+      const sourceProvider = normalizeText(desktopSnapshot?.sourceProvider);
+
+      // STRICT FILTER: If locked to a source, ONLY show snapshot if it matches.
+      const isCorrectSource = !preferredSource || (sourceProvider === preferredSource);
+
+      if (desktopSnapshot?.active && isCorrectSource) {
         nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
         nextCaption = cleanSnapshotCreator(desktopSnapshot, "Desktop playback");
         nextStatus = modeLabel;
@@ -2163,7 +2169,6 @@ The companion bridge is designed with several security layers to keep your PC sa
         syncArtist = nextCaption;
         syncArtwork = desktopSnapshot.artworkUri || "";
       } else {
-        const preferredSource = getPreferredHeroControlSource();
         nextTitle = preferredSource ? `${preferredSource.charAt(0).toUpperCase()}${preferredSource.slice(1)} media idle` : "PC media idle";
         nextCaption = preferredSource === "spotify"
           ? "Start Spotify playback on this PC."
@@ -2172,6 +2177,7 @@ The companion bridge is designed with several security layers to keep your PC sa
             : "Start playback in YouTube, Spotify, or another desktop app.";
         nextStatus = modeLabel;
       }
+
     } else if (mode === "app" && !post && fallbackMedia instanceof HTMLMediaElement) {
       const modeLabel = "BROWSER MEDIA";
       const fallbackTitle = browserMetadata?.title || fallbackMedia.getAttribute("title") || "Now playing in this browser";
