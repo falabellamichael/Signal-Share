@@ -1314,7 +1314,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     // Media mode can retry sooner, but avoid hammering the Windows SMTC bridge.
-    if (isMediaMode) waitTime = Math.min(1200, waitTime);
+    if (isMediaMode) waitTime = Math.min(500, waitTime);  // More aggressive polling in Media mode
 
     if (!force && now - lastDesktopPollTime < waitTime) {
       return Promise.resolve(desktopSnapshot);
