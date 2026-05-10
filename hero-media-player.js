@@ -1802,31 +1802,23 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function getEffectiveHeroMode(controllablePost) {
-    const preferredSource = getPreferredHeroControlSource();
+    // 1. FORCED FEED MODE: Always use local app logic.
+    // Toggles (YouTube/Spotify) act as filters for the feed.
+    if (state.heroControlMode === "feed") return "app";
 
-    // 1. Platform Lock Priority: If YouTube or Spotify is selected,
-    // prioritize detecting that platform on the PC/Phone.
-    if (preferredSource) {
-      if (shouldUseNativeMode(controllablePost)) return "device";
-      if (shouldUseDesktopMode(controllablePost)) return "desktop";
-
-      // If bridge is idle but we have a matching local post (e.g. a YouTube Iframe), stay in app mode.
-      if (controllablePost && controllablePost.sourceKind === preferredSource) return "app";
-    }
-
-    // 2. Explicit Mode Toggle: House icon vs Waveform icon.
+    // 2. FORCED MEDIA MODE: Always use bridge logic.
+    // Toggles (YouTube/Spotify) act as system app selectors.
     if (state.heroControlMode === "media") {
       if (!isNativeCapacitorApp() && canUseDesktopBridge()) return "desktop";
       return "device";
     }
 
-    if (state.heroControlMode === "feed") return "app";
-
-    // 3. Default Auto behavior
+    // 3. AUTO MODE (Fallback): Switch based on activity.
     if (shouldUseNativeMode(controllablePost)) return "device";
     if (shouldUseDesktopMode(controllablePost)) return "desktop";
     return "app";
   }
+
 
 
 

@@ -325,19 +325,23 @@ export function createAppUi(context) {
   function getStandbyPreviewPost() {
     // Pick the most recent playable post from the feed that matches the current source
     const posts = getAllPosts() || [];
+    const isFeedMode = state.heroControlMode === "feed";
     const source = (state.heroControlSource || state.heroMediaSource || "").toLowerCase();
 
     if (source === "youtube" || source === "spotify") {
       const matched = posts.filter(p => isPlayablePost(p) && p.sourceKind === source);
       if (matched.length > 0) return matched[0];
 
-      // STRICT MODE: If we are locked to a source, do NOT fall back to general feed.
+      // If we are strictly in a media platform mode and no match exists, return null
+      // to avoid bleed-through from unrelated feed items on the YouTube/Spotify stage.
       return null;
     }
 
+    // In 'All' mode, or if no source is selected, use the general playable feed.
     const playable = posts.filter(p => isPlayablePost(p) && p.id !== state.playerPostId);
     return playable[0] || null;
   }
+
 
   function sanitizeSnapshotMeta(text) {
     if (typeof text !== "string") return "";
@@ -1884,6 +1888,7 @@ export function createAppUi(context) {
 
     const matchesSourceFilter = (post) => {
       if (!post || !isPlayablePost(post)) return false;
+      // In Feed mode, the toggle acts as a strict filter for the stage.
       if (!isLocked || source === "all") return true;
       return post.sourceKind === source;
     };
@@ -1897,6 +1902,7 @@ export function createAppUi(context) {
     // is intended to be primary. We only return latestPlayable as a standby candidate.
     return latestPlayable;
   }
+
 
 
   function setHeroPost(post) {
