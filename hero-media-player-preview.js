@@ -605,7 +605,9 @@ export function renderHeroStagePreview(options = {}) {
   if (mode === "desktop") {
     if (desktopSnapshot?.active) {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
-      const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (desktopSnapshot.artworkUri || "");
+      // PRIORITIZE BRIDGE ARTWORK: The bridge has the live high-res thumbnail for what's actually playing.
+      // We only fall back to the matched feed item's artwork if the bridge is missing it.
+      const artworkUrl = desktopSnapshot.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
 
       commitCard(stage, {
         badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
@@ -618,6 +620,7 @@ export function renderHeroStagePreview(options = {}) {
 
       return;
     }
+
 
     if (options.showCompanionCard) {
       const card = createCompanionCard();

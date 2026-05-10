@@ -1467,13 +1467,18 @@ The companion bridge is designed with several security layers to keep your PC sa
     title = title.replace(/\s*\(official (video|audio|music video|lyric video)\)$/i, "").trim();
     title = title.replace(/\s*\[official (video|audio|music video|lyric video)\]$/i, "").trim();
 
-    const preferredSource = getPreferredHeroControlSource();
     const allPosts = typeof getAllPosts === "function" ? getAllPosts() : [];
 
-    // STRICT MATCHING: If locked to a platform, only match against feed items for that platform.
-    const posts = preferredSource
-      ? allPosts.filter(p => p.sourceKind === preferredSource)
-      : allPosts;
+    // RELAXED MATCHING: The bridge is already the authority on the platform (YouTube vs Spotify).
+    // We match against ALL posts to find the best metadata/artwork, but we prioritize
+    // posts that match the bridge's identified provider.
+    const snapshotProvider = normalizeText(snapshot.sourceProvider);
+
+    const posts = [...allPosts].sort((a, b) => {
+      const aMatch = a.sourceKind === snapshotProvider ? 1 : 0;
+      const bMatch = b.sourceKind === snapshotProvider ? 1 : 0;
+      return bMatch - aMatch;
+    });
 
     return posts.find((p) => {
       const pTitle = normalizeText(p.title);
@@ -1489,6 +1494,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       return false;
     }) || null;
   }
+
 
 
   function getLocalPlaybackState() {
