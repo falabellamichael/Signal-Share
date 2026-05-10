@@ -494,10 +494,11 @@ export function handlePreviousAction(context) {
       (preferredSource === "spotify" && systemIsSpotify)
     );
 
-    // If source is locked and bridge doesn't match, or bridge is idle, fall back to local step
-    const isSystemActive = snapshot?.active && (!isSourceLocked || bridgeMatchesLockedSource);
+    // If source is locked, we ALWAYS want to send the command to the bridge so it can target the correct app independently.
+    // If source is not locked ("All"), and system is idle, we fall back to local stepping.
+    const shouldSendToBridge = isSourceLocked || snapshot?.active;
 
-    if (!isSystemActive) {
+    if (!shouldSendToBridge) {
        // Fallback to local feed stepping
        if (target === "mini") {
           if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
@@ -573,10 +574,11 @@ export function handleNextAction(context) {
       (preferredSource === "spotify" && systemIsSpotify)
     );
 
-    // If source is locked and bridge doesn't match, or bridge is idle, fall back to local step
-    const isSystemActive = snapshot?.active && (!isSourceLocked || bridgeMatchesLockedSource);
+    // If source is locked, we ALWAYS want to send the command to the bridge so it can target the correct app independently.
+    // If source is not locked ("All"), and system is idle, we fall back to local stepping.
+    const shouldSendToBridge = isSourceLocked || snapshot?.active;
 
-    if (!isSystemActive) {
+    if (!shouldSendToBridge) {
        // Fallback to local feed stepping
        if (target === "mini") {
           if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
