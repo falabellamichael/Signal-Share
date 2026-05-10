@@ -339,10 +339,7 @@ function classifySessionProvider(session, preferredSource = "") {
   // we "claim" it for the target mode UNLESS it explicitly looks like the OTHER platform.
   if (isBrowserLikeSource(sourceAppId) || sourceAppId.includes("native-bridge")) {
     if (preferred === "youtube" && !looksLikeSpotify && !isSpotifyId) return "youtube";
-    if (preferred === "spotify" && !looksLikeYouTube && !isYouTubeId) return "spotify";
-
-    // Last ditch: if we ARE in a mode, and it's a browser, just give it to the mode.
-    if (preferred) return preferred;
+    // We no longer blindly claim for Spotify. Spotify Web Player always has "Spotify" in the title.
   }
 
 

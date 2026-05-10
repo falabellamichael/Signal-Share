@@ -2149,8 +2149,9 @@ The companion bridge is designed with several security layers to keep your PC sa
         syncArtist = nextCaption;
         syncArtwork = nativeSnapshot.artworkUri || "";
       } else {
-        nextTitle = "Device media idle";
-        nextCaption = "Start playback in any media app.";
+        const preferredSource = getPreferredHeroControlSource();
+        nextTitle = (preferredSource === "spotify" || preferredSource === "youtube") ? "Idle" : "Device media idle";
+        nextCaption = (preferredSource === "spotify" || preferredSource === "youtube") ? "Idle" : "Start playback in any media app.";
         nextStatus = modeLabel;
       }
     } else if (mode === "desktop") {
@@ -2159,7 +2160,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       const sourceProvider = normalizeText(desktopSnapshot?.sourceProvider);
 
       // STRICT FILTER: If locked to a source, ONLY show snapshot if it matches.
-      const isCorrectSource = !preferredSource || (sourceProvider === preferredSource);
+      const isCorrectSource = !preferredSource || isPreferredNowPlayingSnapshot(desktopSnapshot);
 
       if (desktopSnapshot?.active && isCorrectSource) {
         nextTitle = cleanSnapshotTitle(desktopSnapshot.title);
@@ -2169,11 +2170,11 @@ The companion bridge is designed with several security layers to keep your PC sa
         syncArtist = nextCaption;
         syncArtwork = desktopSnapshot.artworkUri || "";
       } else {
-        nextTitle = preferredSource ? `${preferredSource.charAt(0).toUpperCase()}${preferredSource.slice(1)} media idle` : "PC media idle";
+        nextTitle = (preferredSource === "spotify" || preferredSource === "youtube") ? "Idle" : "PC media idle";
         nextCaption = preferredSource === "spotify"
-          ? "Start Spotify playback on this PC."
+          ? "Idle"
           : preferredSource === "youtube"
-            ? "Start YouTube playback in your browser."
+            ? "Idle"
             : "Start playback in YouTube, Spotify, or another desktop app.";
         nextStatus = modeLabel;
       }

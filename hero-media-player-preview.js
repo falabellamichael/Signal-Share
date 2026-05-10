@@ -602,10 +602,10 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     const preferredSource = isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "");
-    const idleTitle = preferredSource ? `${preferredSource} idle` : "No active playback";
+    const idleTitle = (preferredSource === "Spotify" || preferredSource === "YouTube") ? "Idle" : "No active playback";
     const idleMeta = isSpotifyActive 
-      ? "Start Spotify on this phone to control playback here."
-      : (isYouTubeMode ? "Start YouTube on this phone to control playback here." : "Start a track in any media app on this device.");
+      ? "Idle"
+      : (isYouTubeMode ? "Idle" : "Start a track in any media app on this device.");
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "ON-DEVICE MEDIA",
@@ -643,10 +643,10 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     const preferredSource = isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "");
-    const idleTitle = preferredSource ? `${preferredSource} idle` : "Waiting for playback";
+    const idleTitle = (preferredSource === "Spotify" || preferredSource === "YouTube") ? "Idle" : "Waiting for playback";
     const idleMeta = isSpotifyActive 
-      ? "Start Spotify on this PC."
-      : (isYouTubeMode ? "Start YouTube on this PC." : "Start YouTube, Spotify, or another desktop app.");
+      ? "Idle"
+      : (isYouTubeMode ? "Idle" : "Start YouTube, Spotify, or another desktop app.");
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "PC SYSTEM MEDIA",
