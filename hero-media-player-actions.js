@@ -159,7 +159,7 @@ export function handleOpenPhoneAction(post, context) {
   // Launch the local Windows Phone Link app
   if (!isNativeCapacitorApp() && typeof performDesktopAction === "function") {
     console.log("[Hero] Launching Windows Phone Link app locally.");
-    performDesktopAction("open_uri", { uri: "mobilephonelink:" });
+    performDesktopAction("open_uri", { uri: "ms-phone:" });
   }
 
   // Cross-Device Handoff: PC -> Phone (via Supabase)

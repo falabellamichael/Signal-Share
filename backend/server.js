@@ -745,7 +745,24 @@ app.post("/api/system-media/action", (req, res) => {
     }
     const uri = `${req.body?.uri || ""}`.trim();
     if (!uri) return res.status(400).json({ ok: false });
-    spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
+    
+    // Improved PowerShell launcher with fallbacks for Phone Link
+    const psCommand = `
+      $uri = "${uri.replace(/"/g, '`"')}"
+      if ($uri -eq "mobilephonelink:" -or $uri -eq "ms-phone:") {
+        try { Start-Process "ms-phone:" -ErrorAction Stop } catch {
+          try { Start-Process "yourphone:" -ErrorAction Stop } catch {
+            try { explorer.exe shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App } catch {
+              Start-Process "https://www.microsoft.com/store/productId/9NMP3S0RLH54"
+            }
+          }
+        }
+      } else {
+        Start-Process $uri
+      }
+    `.trim();
+
+    spawn("powershell.exe", ["-NoProfile", "-Command", psCommand], { windowsHide: true });
     return res.json({ ok: true, queued: true });
   }
 
