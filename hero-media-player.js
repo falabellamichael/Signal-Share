@@ -1651,15 +1651,20 @@ The companion bridge is designed with several security layers to keep your PC sa
     elements.heroPlayerRefreshButton?.classList.add("loading");
 
     try {
+      // 0. Force the Stage to re-render by clearing its internal preview cache key
+      if (elements.heroPlayerStage) {
+        delete elements.heroPlayerStage.dataset.heroPreviewKey;
+      }
+
       // 1. Clear matched post cache temporarily to force a re-evaluation
       matchedPost = null;
 
-      // 2. Force immediate poll of available bridges
+      // 2. Force immediate refresh of available snapshots
       if (hasNativeSnapshotBridge()) {
-        await pollNativeSnapshot();
+        await refreshNativeSnapshot({ renderAfter: false });
       }
       if (canUseDesktopBridge()) {
-        await pollDesktopSnapshot();
+        await refreshDesktopSnapshot({ renderAfter: false, force: true });
       }
 
       // 3. Android: Explicitly poke the native layer to broadcast state
