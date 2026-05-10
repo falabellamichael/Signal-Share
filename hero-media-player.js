@@ -226,7 +226,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     const isPC = !isNativeCapacitorApp();
     if (isPC) {
       const meta = (desktopSnapshot?.meta || "").toLowerCase();
-      if (meta.includes("bluetooth") || meta.includes("via bluetooth") || meta.includes("phone link")) return "PHONE LINK MEDIA";
+      if (meta.includes("bluetooth") || meta.includes("via bluetooth") || meta.includes("phone link")) return "PHONE LINK";
       return "PC SYSTEM MEDIA";
     }
     return "ON-DEVICE MEDIA";

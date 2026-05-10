@@ -203,16 +203,7 @@ export function handleOpenPhoneAction(post, context) {
     }
   }
 
-  // Final fallback: attempt local open
-  const isSpotify = post?.sourceKind === "spotify";
-  if (isSpotify) {
-    const spotifyUri = "spotify:";
-    if (typeof window.Capacitor !== "undefined" && window.Capacitor.Plugins.App) {
-      window.Capacitor.Plugins.App.openUrl({ url: spotifyUri });
-    } else {
-      window.open(spotifyUri, "_system");
-    }
-  } else {
-    handleOpenMediaAction(post, context);
-  }
+  // Final fallback: If we reached here on PC, we've already tried opening Phone Link.
+  // We do NOT want to open the media locally on the PC as a fallback for "Open Phone".
+  return;
 }
