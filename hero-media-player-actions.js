@@ -207,3 +207,183 @@ export function handleOpenPhoneAction(post, context) {
   // We do NOT want to open the media locally on the PC as a fallback for "Open Phone".
   return;
 }
+export function handlePlayPauseAction(context, forcePlay) {
+  const {
+    state, elements, getControllablePlayerPost, getEffectiveHeroMode,
+    playHeroMedia, render, nativeSnapshot, performNativeAction,
+    NATIVE_ACTION_PLAY_PAUSE, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
+    performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE, isNativeCapacitorApp,
+    companionPromptDismissed, showCompanionPrompt, normalizePlaybackState,
+    getDesktopSnapshotSignature, toggleLocalPlayback, getFallbackPageMediaElement,
+    setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature
+  } = context;
+
+  const controllablePost = getControllablePlayerPost();
+  const mode = getEffectiveHeroMode(controllablePost);
+  console.log(`[Hero] handlePlayPause triggered. Mode: ${mode}, ForcePlay: ${forcePlay || "toggle"}`);
+
+  if (mode === "app") {
+    if (typeof playHeroMedia === "function") {
+      playHeroMedia();
+    }
+    return;
+  }
+
+  if (mode === "device") {
+    if (nativeSnapshot?.permissionRequired && typeof context.getNativeBridge === "function") {
+      try { context.getNativeBridge().openNowPlayingAccessSettings(); } catch { }
+      return;
+    }
+
+    const now = Date.now();
+    if (now - (context.lastNativeActionAt || 0) < NATIVE_ACTION_COOLDOWN_MS) return;
+
+    if (nativeSnapshot && typeof setNativeSnapshot === "function") {
+      const nextState = (nativeSnapshot.playbackState === "playing") ? "paused" : "playing";
+      setNativeSnapshot({ ...nativeSnapshot, playbackState: nextState });
+      render();
+    }
+    performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
+    return;
+  }
+
+  if (mode === "desktop") {
+    if (!isNativeCapacitorApp() && !desktopSnapshot && !companionPromptDismissed) {
+      if (typeof showCompanionPrompt === "function") showCompanionPrompt();
+      return;
+    }
+
+    const playbackStatus = normalizePlaybackState(desktopSnapshot?.playbackState);
+    const nextPlaybackState = playbackStatus === "playing" ? "paused" : "playing";
+
+    if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
+      const updated = { ...desktopSnapshot, active: true, playbackState: nextPlaybackState };
+      setDesktopSnapshot(updated);
+      if (typeof setDesktopSnapshotSignature === "function") {
+        setDesktopSnapshotSignature(context.getDesktopSnapshotSignature(updated));
+      }
+
+      if (elements.heroPlayerPlayPauseButton) {
+        elements.heroPlayerPlayPauseButton.classList.add('optimistic-pulse');
+        setTimeout(() => elements.heroPlayerPlayPauseButton.classList.remove('optimistic-pulse'), 400);
+      }
+      render();
+    }
+
+    performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
+    return;
+  }
+
+  if (typeof getFallbackPageMediaElement === "function" && getFallbackPageMediaElement() instanceof HTMLMediaElement) {
+    if (typeof toggleLocalPlayback === "function") toggleLocalPlayback(forcePlay);
+    render();
+  }
+}
+
+export function handlePreviousAction(context) {
+  const {
+    state, elements, getControllablePlayerPost, getEffectiveHeroMode,
+    stepHeroPlayer, render, nativeSnapshot, performNativeAction,
+    NATIVE_ACTION_PREVIOUS, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
+    performDesktopAction, DESKTOP_ACTION_PREVIOUS, getFallbackPageMediaElement,
+    setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
+    ensureControllablePost, stepMiniPlayer
+  } = context;
+
+  const controllablePost = getControllablePlayerPost();
+  const mode = getEffectiveHeroMode(controllablePost);
+
+  if (mode === "app") {
+    if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+    if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
+    render();
+    return;
+  }
+
+  if (mode === "device") {
+    if (Date.now() - (context.lastNativeActionAt || 0) < NATIVE_ACTION_COOLDOWN_MS) return;
+    if (nativeSnapshot && typeof setNativeSnapshot === "function") {
+      setNativeSnapshot({ ...nativeSnapshot, playbackState: "playing" });
+      render();
+    }
+    performNativeAction(NATIVE_ACTION_PREVIOUS);
+    return;
+  }
+
+  if (mode === "desktop") {
+    if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
+      const updated = { ...desktopSnapshot, active: true, playbackState: "playing" };
+      setDesktopSnapshot(updated);
+      if (typeof setDesktopSnapshotSignature === "function") {
+        setDesktopSnapshotSignature(context.getDesktopSnapshotSignature(updated));
+      }
+      render();
+    }
+    performDesktopAction(DESKTOP_ACTION_PREVIOUS);
+    return;
+  }
+
+  if (typeof getFallbackPageMediaElement === "function" && getFallbackPageMediaElement() instanceof HTMLMediaElement) {
+    render();
+    return;
+  }
+
+  if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
+    if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
+    render();
+  }
+}
+
+export function handleNextAction(context) {
+  const {
+    state, elements, getControllablePlayerPost, getEffectiveHeroMode,
+    stepHeroPlayer, render, nativeSnapshot, performNativeAction,
+    NATIVE_ACTION_NEXT, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
+    performDesktopAction, DESKTOP_ACTION_NEXT, getFallbackPageMediaElement,
+    setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
+    ensureControllablePost, stepMiniPlayer
+  } = context;
+
+  const controllablePost = getControllablePlayerPost();
+  const mode = getEffectiveHeroMode(controllablePost);
+
+  if (mode === "app") {
+    if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+    if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
+    render();
+    return;
+  }
+
+  if (mode === "device") {
+    if (Date.now() - (context.lastNativeActionAt || 0) < NATIVE_ACTION_COOLDOWN_MS) return;
+    if (nativeSnapshot && typeof setNativeSnapshot === "function") {
+      setNativeSnapshot({ ...nativeSnapshot, playbackState: "playing" });
+      render();
+    }
+    performNativeAction(NATIVE_ACTION_NEXT);
+    return;
+  }
+
+  if (mode === "desktop") {
+    if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
+      const updated = { ...desktopSnapshot, active: true, playbackState: "playing" };
+      setDesktopSnapshot(updated);
+      if (typeof setDesktopSnapshotSignature === "function") {
+        setDesktopSnapshotSignature(context.getDesktopSnapshotSignature(updated));
+      }
+      render();
+    }
+    performDesktopAction(DESKTOP_ACTION_NEXT);
+    return;
+  }
+
+  if (typeof getFallbackPageMediaElement === "function" && getFallbackPageMediaElement() instanceof HTMLMediaElement) {
+    render();
+    return;
+  }
+
+  if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
+    if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
+    render();
+  }
+}

@@ -332,18 +332,25 @@ function scoreSession(session, preferredSource = "") {
 
 function pickBestSession(sessions = [], preferredSource = "") {
   if (!Array.isArray(sessions) || !sessions.length) return null;
+  const preferred = normalizePreferredSource(preferredSource);
+  
+  // 1. Try to find a perfect match first
   const best = sessions.reduce((best, session) => {
     if (!best) return session;
     return scoreSession(session, preferredSource) > scoreSession(best, preferredSource) ? session : best;
   }, null);
 
-  const preferred = normalizePreferredSource(preferredSource);
-  if (preferred && best) {
+  if (best && preferred) {
     const provider = classifySessionProvider(best);
-    // If we are strictly targeting a provider and we found a DIFFERENT one, 
-    // ignore it and return null (which translates to 'Idle' for the requested mode).
-    if (provider && provider !== preferred) return null;
+    // If the top-scored session is a DIFFERENT platform, we check if it's playing
+    // If it's playing, we might want to return null to show 'Idle' for the requested mode
+    // BUT we should still return it if the user wants to 'take over' control.
+    if (provider && provider !== preferred) {
+       // If it's playing, we return null to enforce mode isolation in the UI
+       if (mapPlaybackState(best.playback?.playbackStatus) === "playing") return null;
+    }
   }
+
   return best;
 }
 
@@ -597,9 +604,12 @@ try {
   Add-Type -AssemblyName System.Runtime.WindowsRuntime
   $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime]
   $asTaskMethod = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
-    $_.ToString() -eq 'System.Threading.Tasks.Task\1[TResult] AsTask[TResult](Windows.Foundation.IAsyncOperation\1[TResult])'
+    $_.ToString() -eq 'System.Threading.Tasks.Task\ 1[TResult] AsTask[TResult](Windows.Foundation.IAsyncOperation\ 1[TResult])'
   } | Select-Object -First 1
 
+  $id = ""
+  $winRtSuccess = $false
+  
   if ($asTaskMethod -ne $null) {
     $managerOp = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
     $managerTask = $asTaskMethod.MakeGenericMethod(@([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])).Invoke($null, @($managerOp))

@@ -1,5 +1,8 @@
 import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js";
-import { handleOpenMediaAction, handleOpenPhoneAction } from "./hero-media-player-actions.js";
+import { 
+  handleOpenMediaAction, handleOpenPhoneAction, 
+  handlePlayPauseAction, handleNextAction, handlePreviousAction 
+} from "./hero-media-player-actions.js";
 
 
 
@@ -1789,9 +1792,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       },
       body: JSON.stringify({
         action,
-        appPackage: (preferredSource && desktopSnapshot?.sourceProvider && desktopSnapshot.sourceProvider !== preferredSource)
-          ? ""
-          : (desktopSnapshot?.appPackage || ""),
+        appPackage: desktopSnapshot?.appPackage || "",
         preferredSource,
         ...payload
       }),
@@ -1852,178 +1853,39 @@ The companion bridge is designed with several security layers to keep your PC sa
     return "app";
   }
 
+  function getActionContext() {
+    return {
+      state, elements, getControllablePlayerPost, getEffectiveHeroMode,
+      getFallbackPageMediaElement, playHeroMedia, render, 
+      nativeSnapshot, performNativeAction, NATIVE_ACTION_PLAY_PAUSE, 
+      NATIVE_ACTION_NEXT, NATIVE_ACTION_PREVIOUS, NATIVE_ACTION_COOLDOWN_MS,
+      desktopSnapshot, performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE, 
+      DESKTOP_ACTION_NEXT, DESKTOP_ACTION_PREVIOUS, DESKTOP_ACTION_COOLDOWN_MS,
+      isNativeCapacitorApp, companionPromptDismissed, showCompanionPrompt,
+      normalizePlaybackState, getDesktopSnapshotSignature, toggleLocalPlayback,
+      setDesktopSnapshot: (s) => { desktopSnapshot = s; },
+      setNativeSnapshot: (s) => { nativeSnapshot = s; },
+      setDesktopSnapshotSignature: (s) => { lastDesktopSnapshotSignature = s; },
+      lastNativeActionAt, lastDesktopActionAt, stepHeroPlayer, stepMiniPlayer,
+      ensureControllablePost, getNativeBridge, hasNativeSettingsBridge,
+      parseYouTubeUrl, performSupabaseDesktopAction
+    };
+  }
+
   function handlePlayPause(forcePlay) {
-    const controllablePost = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(controllablePost);
-    console.log(`[Hero] handlePlayPause triggered. Mode: ${mode}, ForcePlay: ${forcePlay || "toggle"}`);
-
-    if (mode === "app") {
-      if (typeof playHeroMedia === "function") {
-        playHeroMedia();
-      } else {
-        console.error("[Hero] playHeroMedia function is not provided in options.");
-      }
-      return;
-    }
-
-    if (mode === "device") {
-      if (nativeSnapshot?.permissionRequired && hasNativeSettingsBridge()) {
-        try { getNativeBridge().openNowPlayingAccessSettings(); } catch { }
-        return;
-      }
-
-      const now = Date.now();
-      if (now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) {
-        console.warn("[Hero] Native action throttled by cooldown.");
-        return;
-      }
-
-      if (nativeSnapshot) {
-        nativeSnapshot.playbackState = (nativeSnapshot.playbackState === "playing") ? "paused" : "playing";
-        render();
-      }
-      performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
-      return;
-    }
-
-    if (mode === "desktop") {
-      if (!isNativeCapacitorApp() && !desktopSnapshot && !companionPromptDismissed) {
-        showCompanionPrompt();
-        return;
-      }
-
-      const playbackStatus = normalizePlaybackState(desktopSnapshot?.playbackState);
-      const nextPlaybackState = playbackStatus === "playing" ? "paused" : "playing";
-      console.log(`[Hero] Desktop play/pause. Current: ${playbackStatus}, Next: ${nextPlaybackState}`);
-
-      if (desktopSnapshot) {
-        desktopSnapshot = {
-          ...desktopSnapshot,
-          active: true,
-          playbackState: nextPlaybackState,
-        };
-        lastDesktopSnapshotSignature = getDesktopSnapshotSignature(desktopSnapshot);
-
-        if (elements.heroPlayerPlayPauseButton) {
-          elements.heroPlayerPlayPauseButton.classList.add('optimistic-pulse');
-          setTimeout(() => elements.heroPlayerPlayPauseButton.classList.remove('optimistic-pulse'), 400);
-        }
-
-        render();
-      }
-
-      performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE).then(success => {
-        if (!success) {
-          console.warn("[Hero] Desktop action failed or was throttled.");
-        }
-      });
-      return;
-    }
-
-    if (getFallbackPageMediaElement() instanceof HTMLMediaElement) {
-      toggleLocalPlayback(forcePlay);
-      render();
-    }
+    handlePlayPauseAction(getActionContext(), forcePlay);
   }
 
   function handlePrevious() {
-    const controllablePost = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(controllablePost);
-
-    if (mode === "app") {
-      const wasActive = state.heroPlayerPostId && state.heroPlayerElement && elements.heroPlayerStage.contains(state.heroPlayerElement);
-      // Force preview update
-      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-      stepHeroPlayer(-1);
-      if (!wasActive) state.heroPlayerPlaybackState = "paused";
-      render();
-      return;
-    }
-
-    if (mode === "device") {
-      const now = Date.now();
-      if (now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) return;
-
-      if (nativeSnapshot) {
-        nativeSnapshot.playbackState = "playing"; // Optimistic
-        render();
-      }
-      performNativeAction(NATIVE_ACTION_PREVIOUS);
-      return;
-    }
-
-    if (mode === "desktop") {
-      if (desktopSnapshot) {
-        desktopSnapshot = { ...desktopSnapshot, active: true, playbackState: "playing" };
-        lastDesktopSnapshotSignature = getDesktopSnapshotSignature(desktopSnapshot);
-        render();
-      }
-      performDesktopAction(DESKTOP_ACTION_PREVIOUS);
-      return;
-    }
-
-    if (getFallbackPageMediaElement() instanceof HTMLMediaElement) {
-      render();
-      return;
-    }
-
-    if (ensureControllablePost()) {
-      stepMiniPlayer(-1);
-      state.heroPlayerPlaybackState = "paused";
-      render();
-    }
+    handlePreviousAction(getActionContext());
   }
 
   function handleNext() {
-    const controllablePost = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(controllablePost);
-
-    if (mode === "app") {
-      const wasActive = state.heroPlayerPostId && state.heroPlayerElement && elements.heroPlayerStage.contains(state.heroPlayerElement);
-      // Force preview update
-      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-      stepHeroPlayer(1);
-      if (!wasActive) state.heroPlayerPlaybackState = "paused";
-      render();
-      return;
-    }
-
-    if (mode === "device") {
-      const now = Date.now();
-      if (now - lastNativeActionAt < NATIVE_ACTION_COOLDOWN_MS) return;
-
-      if (nativeSnapshot) {
-        nativeSnapshot.playbackState = "playing"; // Optimistic
-        render();
-      }
-      performNativeAction(NATIVE_ACTION_NEXT);
-      return;
-    }
-
-    if (mode === "desktop") {
-      if (desktopSnapshot) {
-        desktopSnapshot = { ...desktopSnapshot, active: true, playbackState: "playing" };
-        lastDesktopSnapshotSignature = getDesktopSnapshotSignature(desktopSnapshot);
-        render();
-      }
-      performDesktopAction(DESKTOP_ACTION_NEXT);
-      return;
-    }
-
-    if (getFallbackPageMediaElement() instanceof HTMLMediaElement) {
-      render();
-      return;
-    }
-
-    if (ensureControllablePost()) {
-      stepMiniPlayer(1);
-      state.heroPlayerPlaybackState = "paused";
-      render();
-    }
+    handleNextAction(getActionContext());
   }
 
   function handleOpenPhone() {
-    handleOpenPhoneAction(getControllablePlayerPost(), { isNativeCapacitorApp, state, openViewer, desktopSnapshot, performDesktopAction });
+    handleOpenPhoneAction(getControllablePlayerPost(), getActionContext());
   }
 
   function handleOpenMedia() {
@@ -2039,7 +1901,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       post = findMatchedPost(nativeSnapshot);
     }
 
-    handleOpenMediaAction(post, { isNativeCapacitorApp, state, openViewer, desktopSnapshot, performDesktopAction, parseYouTubeUrl });
+    handleOpenMediaAction(post, getActionContext());
   }
 
   function handleVolumeInput(event) {
