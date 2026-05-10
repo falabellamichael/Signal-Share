@@ -226,7 +226,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     const isPC = !isNativeCapacitorApp();
     if (isPC) {
       const meta = (desktopSnapshot?.meta || "").toLowerCase();
-      if (meta.includes("bluetooth") || meta.includes("via bluetooth")) return "BLUETOOTH MEDIA";
+      if (meta.includes("bluetooth") || meta.includes("via bluetooth") || meta.includes("phone link")) return "PHONE LINK MEDIA";
       return "PC SYSTEM MEDIA";
     }
     return "ON-DEVICE MEDIA";
@@ -1032,7 +1032,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       }
     }
 
-    const genericPrefixPattern = /^(?:spotify[a-z0-9._!-]*|operasoftware\.[a-z0-9._!-]*|msedge(?:\.exe)?|chrome(?:\.exe)?|firefox(?:\.exe)?|bluetooth)\s*(?:[-:|]\s*)?/i;
+    const genericPrefixPattern = /^(?:spotify[a-z0-9._!-]*|operasoftware\.[a-z0-9._!-]*|msedge(?:\.exe)?|chrome(?:\.exe)?|firefox(?:\.exe)?|bluetooth|phone link)\s*(?:[-:|]\s*)?/i;
     const genericStripped = meta.replace(genericPrefixPattern, "").trim();
     if (genericStripped) meta = genericStripped;
 
