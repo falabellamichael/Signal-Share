@@ -417,7 +417,7 @@
                 <button class="button button-secondary" id="heroPlayerOpenMiniButton" type="button">
                   Open Player
                 </button>
-                <button class="button button-secondary" id="toggleHeroDeepDive" type="button" style="border-color: rgba(70, 130, 180, 0.4);">
+                <button class="button button-secondary" id="toggleHeroDeepDive" type="button" style="border-color: rgba(70, 130, 180, 0.4);" onclick="const p = document.getElementById('heroDeepDivePanel'); if(p) { const isH = p.style.display === 'none'; p.style.display = isH ? 'block' : 'none'; if(isH) p.scrollIntoView({behavior:'smooth', block:'nearest'}); }">
                   Dev Tools
                 </button>
                 <div class="hero-player-toggles-stack">

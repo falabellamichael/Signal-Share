@@ -85,7 +85,13 @@
       </ul>
     </section>
   
-   <div id="developer-tools-panel" class="questions-page-card" style="display: none; border-color: rgba(70, 130, 180, 0.4); background: rgba(70, 130, 180, 0.05);"></div>
+   <div id="developer-tools-panel" class="questions-page-card" style="display: none; border-color: rgba(70, 130, 180, 0.4); background: rgba(70, 130, 180, 0.05);">
+     <h2>Hero Player Deep Dive</h2>
+     <p>The Hero Player is a specialized media interface that abstracts multiple sources into a single control layer.</p>
+     <div class="questions-page-actions" style="justify-content: flex-start; gap: 10px; margin-top: 15px;">
+       <a class="questions-page-button" href="./hero-player-deepdive.html" style="background: #4682b4; color: white;">Open Technical Deep Dive</a>
+     </div>
+   </div>
   <p>
     For project setup notes, developer details, and full documentation on core features:
   </p>
@@ -94,30 +100,9 @@
     <a class="questions-page-button" href="./contact.html">Contact us</a>
     <a class="questions-page-button" href="./README.md">Open README</a>
     <!-- NEW COOL TOGGLE HERE -->
-    <button id="toggle-deepdive" class="questions-page-button toggle-button">Toggle Developer Tools</button>
+    <button id="toggle-deepdive" class="questions-page-button toggle-button" onclick="const p = document.getElementById('developer-tools-panel'); if(p) { const isH = p.style.display === 'none'; p.style.display = isH ? 'block' : 'none'; if(isH) p.scrollIntoView({behavior:'smooth'}); }">Toggle Developer Tools</button>
   </div>
 </main>
 
-<script>
-  document.getElementById('toggle-deepdive').addEventListener('click', function() {
-    const panel = document.getElementById('developer-tools-panel');
-    if (panel.style.display === 'none') {
-      panel.style.display = 'block';
-      if (!panel.innerHTML.trim()) {
-        panel.innerHTML = `
-          <h2>Hero Player Deep Dive</h2>
-          <p>The Hero Player is a specialized media interface that abstracts multiple sources into a single control layer.</p>
-          <div class="questions-page-actions" style="justify-content: flex-start; gap: 10px; margin-top: 15px;">
-            <a class="questions-page-button" href="./hero-player-deepdive.html" style="background: #4682b4; color: white;">Open Technical Deep Dive</a>
-          </div>
-        `;
-      }
-      panel.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      panel.style.display = 'none';
-    }
-  });
-</script>
 </body>
 </html>
-

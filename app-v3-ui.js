@@ -239,8 +239,6 @@ export function createAppUi(context) {
     heroPlayerVolumeSlider: document.querySelector("#heroPlayerVolumeSlider"),
     heroPlayerVolumeValue: document.querySelector("#heroPlayerVolumeValue"),
     heroPlayerOpenMiniButton: document.querySelector("#heroPlayerOpenMiniButton"),
-    toggleHeroDeepDive: document.querySelector("#toggleHeroDeepDive"),
-    heroDeepDivePanel: document.querySelector("#heroDeepDivePanel"),
     heroModeFeed: document.querySelector("#heroModeFeed"),
     heroModeMedia: document.querySelector("#heroModeMedia"),
     heroSourceYoutube: document.querySelector("#heroSourceYoutube"),
@@ -535,13 +533,6 @@ export function createAppUi(context) {
     elements.heroPlayerOpenMiniButton?.addEventListener("click", () => {
       const postId = state.heroPlayerPostId || getHeroPost()?.id;
       if (postId) openMiniPlayer(postId, elements.heroPlayerOpenMiniButton);
-    });
-    elements.toggleHeroDeepDive?.addEventListener("click", () => {
-      if (elements.heroDeepDivePanel) {
-        const isHidden = elements.heroDeepDivePanel.style.display === "none";
-        elements.heroDeepDivePanel.style.display = isHidden ? "block" : "none";
-        if (isHidden) elements.heroDeepDivePanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
     });
     elements.heroModeFeed?.addEventListener("click", () => setHeroControlMode("feed"));
     elements.heroModeMedia?.addEventListener("click", () => {
