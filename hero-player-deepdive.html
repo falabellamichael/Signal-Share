@@ -96,8 +96,11 @@
 
         <!-- Section 4: Local LLM Operation (AI Integration) -->
         <section class="questions-page-card" id="section-llm">
-            <h2>4. 🌐 Local LLM Operation (AI Integration)</h2>
-            <p>For advanced functionality like content generation or tagging suggestions, Signal Share supports integration with local Large Language Models (LLMs) running via tools like <strong>LM Studio</strong>.</p>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <h2 style="margin: 0;">4. 🌐 Local LLM Operation (AI Integration)</h2>
+                <span style="background: rgba(255, 255, 255, 0.1); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.6);">CURRENTLY INACTIVE</span>
+            </div>
+            <p>For advanced functionality like content generation or tagging suggestions, Signal Share is designed to support integration with local Large Language Models (LLMs) running via tools like <strong>LM Studio</strong>.</p>
 
             <h3>Core Principles:</h3>
             <ul>
@@ -128,9 +131,9 @@
                 <li><strong>Request Dispatch:</strong> On user action, package the request JSON exactly as defined (<code>{ "action": "GENERATE_TAGS", ... }</code>) and dispatch it to the established WebSocket/HTTP stream.</li>
                 <li><strong>Response Handling:</strong> Process streamed responses. Streaming is preferred over waiting for a single large payload, allowing immediate UI feedback on token generation.</li>
             </ol>
-            <div class="code-snippet" style="background: rgba(0,0,0,2); padding: 15px; border-radius: 12px; margin: 10px 0;">
+            <div class="code-snippet" style="background: rgba(0,0,0,0.25); padding: 15px; border-radius: 12px; margin: 10px 0;">
                 <strong>Conceptual Connection Setup (Client JS):</strong><br>
-                <code>const ws = new WebSocket("ws://localhost:12345/llm");\nws.onmessage = (event) => { /* Handle streamed text */ };</code>
+                <code>const ws = new WebSocket("ws://localhost:12345/llm");<br>ws.onmessage = (event) => { /* Handle streamed text */ };</code>
             </div>
 
             <h3>Technical Considerations:</h3>
