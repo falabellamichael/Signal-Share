@@ -291,27 +291,36 @@ function getSessionSourceText(session) {
 function classifySessionProvider(session) {
   const text = getSessionSourceText(session);
   const sourceAppId = `${session?.sourceAppUserModelId || session?.sourceAppId || ""}`.toLowerCase();
+  const media = session?.media || {};
 
-  // Primary check: Source ID
+  // Primary check: Source ID / App Name
   if (sourceAppId.includes("spotify")) return "spotify";
   if (sourceAppId.includes("youtube") || sourceAppId.includes("ytmusic") || sourceAppId.includes("google.android.youtube") || sourceAppId.includes("you.tube")) return "youtube";
 
-  // Secondary check: Metadata Text
-  if (text.includes("open.spotify.com") || text.includes("spotify")) return "spotify";
+  // Secondary check: Known browser session attributes for YouTube
+  const browserText = [
+    media.title,
+    media.artist,
+    media.albumArtist,
+    media.albumTitle,
+    session?.sourceAppId
+  ].filter(Boolean).join(" ").toLowerCase();
+
   if (
-    text.includes("youtube.com")
-    || text.includes("youtube -")
-    || text.includes("- youtube")
-    || text.includes("youtu.be")
-    || text.includes("music.youtube")
-    || text.includes("you tube")
-    || text.includes("ytmusic")
+    browserText.includes("youtube")
+    || browserText.includes("ytmusic")
+    || browserText.includes("youtu.be")
+    || browserText.includes("music.youtube")
+    || browserText.includes("you tube")
   ) return "youtube";
+
+  if (browserText.includes("spotify") || browserText.includes("open.spotify.com")) return "spotify";
 
   if (sourceAppId.includes("phone link") || sourceAppId.includes("bluetooth") || text.includes("phone link") || text.includes("bluetooth")) return "phone_link";
 
   return "";
 }
+
 
 function scoreSession(session, preferredSource = "") {
   const preferred = normalizePreferredSource(preferredSource);

@@ -618,12 +618,18 @@ The companion bridge is designed with several security layers to keep your PC sa
   function isPreferredNowPlayingSnapshot(snapshot = null) {
     if (!snapshot) return false;
     const preferredSource = getPreferredHeroControlSource();
+    const sourceProvider = normalizeText(snapshot.sourceProvider);
 
     if (!preferredSource) {
       return isPreferredNowPlayingAppPackage(snapshot.appPackage)
-        || isPreferredNowPlayingUri(snapshot.openUri);
+        || isPreferredNowPlayingUri(snapshot.openUri)
+        || sourceProvider === "youtube" || sourceProvider === "spotify";
     }
 
+    // 1. Explicit Provider Match (from Bridge classification)
+    if (sourceProvider === preferredSource) return true;
+
+    // 2. Fallback text heuristics
     const app = normalizeText(snapshot.appPackage);
     const uri = normalizeText(snapshot.openUri);
     const title = normalizeText(snapshot.title);
@@ -645,6 +651,7 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     return false;
   }
+
 
   function hasSnapshotPlaybackContext(snapshot = null) {
     if (!snapshot) return false;
@@ -1802,22 +1809,39 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function getEffectiveHeroMode(controllablePost) {
+    const preferredSource = getPreferredHeroControlSource();
+
     // 1. FORCED FEED MODE: Always use local app logic.
-    // Toggles (YouTube/Spotify) act as filters for the feed.
     if (state.heroControlMode === "feed") return "app";
 
     // 2. FORCED MEDIA MODE: Always use bridge logic.
-    // Toggles (YouTube/Spotify) act as system app selectors.
     if (state.heroControlMode === "media") {
       if (!isNativeCapacitorApp() && canUseDesktopBridge()) return "desktop";
       return "device";
     }
 
-    // 3. AUTO MODE (Fallback): Switch based on activity.
+    // 3. AUTO MODE or SOURCE-LOCKED logic:
+    // If the user has locked the source to 'YouTube' or 'Spotify', we prioritize the bridge
+    // for that specific platform to ensure "strict detection" of PC/Phone activity.
+    if (preferredSource) {
+      if (shouldUseNativeMode(controllablePost)) return "device";
+      if (shouldUseDesktopMode(controllablePost)) return "desktop";
+
+      // If bridge is idle but we have a matching local post (e.g. a YouTube Iframe), stay in app mode.
+      if (controllablePost && controllablePost.sourceKind === preferredSource) return "app";
+
+      // In source-locked mode, if nothing is active yet, default to the system mode
+      // rather than the app mode to allow "remote wake up".
+      if (!isNativeCapacitorApp() && canUseDesktopBridge()) return "desktop";
+      return "device";
+    }
+
+    // Default Auto behavior
     if (shouldUseNativeMode(controllablePost)) return "device";
     if (shouldUseDesktopMode(controllablePost)) return "desktop";
     return "app";
   }
+
 
 
 
