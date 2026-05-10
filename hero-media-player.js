@@ -1424,20 +1424,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     for (const element of candidates) {
       if (!(element instanceof HTMLMediaElement)) continue;
       if (element === activeMedia) continue;
-      // If the stage is locked by the hero player but a different post is incoming (e.g., after Next/Previous), clear the lock to allow preview update
-      if (stage.dataset.safeHeroLocked === "true") {
-        const lockedPostId = stage.dataset.safeHeroPostId || "";
-        const incomingPostId = post?.id || matchedPost?.id || "";
-        if (incomingPostId && incomingPostId !== lockedPostId) {
-          // Unlock the stage so the new preview can render
-          delete stage.dataset.safeHeroLocked;
-          delete stage.dataset.safeHeroPostId;
-          delete stage.dataset.safeHeroKey;
-        } else if (!incomingPostId || incomingPostId !== lockedPostId) {
-          return;
-        }
-        if (stage.dataset.safeHeroKey && stage.firstElementChild) return;
-      }
+      if (element.dataset?.heroPreview === "true") continue;
       if (!element.currentSrc && !element.src) continue;
       if (!firstCandidate) firstCandidate = element;
       if (!element.paused && !element.ended) return element;
