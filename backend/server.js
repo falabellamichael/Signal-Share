@@ -271,6 +271,8 @@ function getSessionSourceText(session) {
     media.artist,
     media.albumArtist,
     media.albumTitle,
+    // Add specific indicators for YouTube to help scoring
+    media.title?.toLowerCase().includes("youtube") ? "youtube-source" : "",
   ]
     .filter(Boolean)
     .join(" ")
@@ -395,6 +397,10 @@ function selectPreferredMediaSession(preferredSource = "") {
 function resolveMediaAppLabel(sourceAppId = "") {
   if (!sourceAppId) return "";
   const normalized = sourceAppId.toLowerCase();
+  
+  // If it's a numeric ID (common for some browser PWAs or profiles), don't show it as a label
+  if (/^\d+$/.test(sourceAppId.trim())) return "";
+
   if (normalized.includes("spotify")) return "Spotify";
   if (normalized.includes("youtube")) return "YouTube";
   if (normalized.includes("phone link") || normalized.includes("bluetooth")) return "Phone Link";

@@ -225,12 +225,16 @@ export function handlePlayPauseAction(context, forcePlay) {
     return;
   }
 
-  // SPECIAL: YouTube Mode fallback. If in YouTube mode and the desktop is idle,
-  // we attempt to play the relevant YouTube video within the app.
-  if (state.heroControlSource === "youtube" && mode === "desktop" && (!desktopSnapshot || !desktopSnapshot.active)) {
+  // SPECIAL: YouTube Mode fallback. If in YouTube mode and nothing is actively playing,
+  // we prioritize starting the YouTube video within the app.
+  if (state.heroControlSource === "youtube") {
+    const isDesktopPlaying = normalizePlaybackState(desktopSnapshot?.playbackState) === "playing";
     const post = getControllablePlayerPost();
-    if (post && post.sourceKind === "youtube") {
+    const isAppPlaying = post && state.activePlayerPostId === post.id; // Simple check for active player
+
+    if (!isDesktopPlaying && !isAppPlaying && post && post.sourceKind === "youtube") {
       if (typeof playHeroMedia === "function") {
+        console.log("[Hero] YouTube Mode: Starting local playback as bridge is idle.");
         playHeroMedia();
         return;
       }
