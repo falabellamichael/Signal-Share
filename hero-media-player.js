@@ -1854,6 +1854,8 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function getActionContext() {
+    const controllablePost = getControllablePlayerPost();
+    const heroMode = getEffectiveHeroMode(controllablePost);
     return {
       state, elements, getControllablePlayerPost, getEffectiveHeroMode,
       getFallbackPageMediaElement, playHeroMedia, render,
@@ -1868,7 +1870,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       setDesktopSnapshotSignature: (s) => { lastDesktopSnapshotSignature = s; },
       lastNativeActionAt, lastDesktopActionAt, stepHeroPlayer, stepMiniPlayer,
       ensureControllablePost, getNativeBridge, hasNativeSettingsBridge,
-      parseYouTubeUrl, performSupabaseDesktopAction
+      parseYouTubeUrl, performSupabaseDesktopAction, heroMode
     };
   }
 

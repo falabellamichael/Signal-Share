@@ -206,7 +206,7 @@ export function handleOpenPhoneAction(post, context) {
 
 export function handlePlayPauseAction(context, forcePlay) {
   const {
-    state, elements, getControllablePlayerPost, getEffectiveHeroMode,
+    state, elements, getControllablePlayerPost, heroMode,
     render, nativeSnapshot, performNativeAction,
     NATIVE_ACTION_PLAY_PAUSE, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
     performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE, isNativeCapacitorApp,
@@ -215,8 +215,7 @@ export function handlePlayPauseAction(context, forcePlay) {
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature
   } = context;
 
-  const controllablePost = getControllablePlayerPost();
-  const mode = getEffectiveHeroMode(controllablePost);
+  const mode = heroMode;
   console.log(`[Hero] handlePlayPause (Media Mode). Mode: ${mode}`);
 
   if (mode === "device") {
@@ -277,10 +276,10 @@ export function handlePreviousAction(context) {
     performDesktopAction, DESKTOP_ACTION_PREVIOUS, getFallbackPageMediaElement,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
     ensureControllablePost, stepMiniPlayer, getControllablePlayerPost,
-    getEffectiveHeroMode, getDesktopSnapshotSignature
+    getEffectiveHeroMode, getDesktopSnapshotSignature, heroMode
   } = context;
 
-  const mode = getEffectiveHeroMode(getControllablePlayerPost());
+  const mode = heroMode;
 
   if (mode === "device") {
     if (Date.now() - (context.lastNativeActionAt || 0) < NATIVE_ACTION_COOLDOWN_MS) return;
@@ -323,10 +322,10 @@ export function handleNextAction(context) {
     performDesktopAction, DESKTOP_ACTION_NEXT, getFallbackPageMediaElement,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
     ensureControllablePost, stepMiniPlayer, getControllablePlayerPost,
-    getEffectiveHeroMode, getDesktopSnapshotSignature
+    getEffectiveHeroMode, getDesktopSnapshotSignature, heroMode
   } = context;
 
-  const mode = getEffectiveHeroMode(getControllablePlayerPost());
+  const mode = heroMode;
 
   if (mode === "device") {
     if (Date.now() - (context.lastNativeActionAt || 0) < NATIVE_ACTION_COOLDOWN_MS) return;
