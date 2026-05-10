@@ -230,12 +230,16 @@ export function handlePlayPauseAction(context, forcePlay) {
     companionPromptDismissed, showCompanionPrompt, normalizePlaybackState,
     getDesktopSnapshotSignature, toggleLocalPlayback, getFallbackPageMediaElement,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
-    playHeroMedia
+    playHeroMedia, getNativeBridge
   } = context;
 
   const mode = heroMode;
+  const controllablePost = getControllablePlayerPost();
+  const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
 
-  // 1. App Mode Logic
+  console.log(`[Hero] handlePlayPause (Locked). Mode: ${mode}, Source: ${preferredSource}`);
+
+  // 1. App Mode (Website Player Only)
   if (mode === "app") {
     const isHeroActive = state.heroPlayerPostId
       && !!state.heroPlayerElement
@@ -250,23 +254,27 @@ export function handlePlayPauseAction(context, forcePlay) {
     return;
   }
 
-  // SPECIAL: YouTube Mode fallback. If in YouTube mode and nothing is actively playing,
-  // we prioritize starting the YouTube video within the app.
-  if (state.heroControlSource === "youtube") {
-    const isDesktopPlaying = normalizePlaybackState(desktopSnapshot?.playbackState) === "playing";
-    const post = getControllablePlayerPost();
-    const isAppPlaying = post && state.activePlayerPostId === post.id;
+  // 2. System Media Modes (Locked to Bridge/Native)
+  const isSystemActive = mode === "desktop" ? Boolean(desktopSnapshot?.active) : Boolean(nativeSnapshot?.active);
 
-    if (!isDesktopPlaying && !isAppPlaying && post && post.sourceKind === "youtube") {
-      if (typeof playHeroMedia === "function") {
-        console.log("[Hero] YouTube Mode: Starting local playback as bridge is idle.");
-        playHeroMedia();
-        return;
+  // If the system media is idle but we have a matching preview, "Wake up" that specific content
+  if (!isSystemActive && controllablePost && controllablePost.sourceKind === preferredSource) {
+      const url = controllablePost.externalUrl || controllablePost.embedUrl || controllablePost.src || (controllablePost.externalId ? `https://www.youtube.com/watch?v=${controllablePost.externalId}` : "");
+
+      if (url) {
+          if (isNativeCapacitorApp()) {
+              const bridge = getNativeBridge();
+              if (bridge && typeof bridge.openNowPlayingMediaApp === "function") {
+                  const pkg = preferredSource === "spotify" ? "com.spotify.music" : "com.google.android.youtube";
+                  bridge.openNowPlayingMediaApp(pkg, url, true);
+                  return;
+              }
+          } else {
+              window.open(url, "_blank");
+              return;
+          }
       }
-    }
   }
-
-  let actionHandled = false;
 
   if (mode === "desktop") {
     if (!isNativeCapacitorApp() && !desktopSnapshot && !companionPromptDismissed) {
@@ -286,7 +294,6 @@ export function handlePlayPauseAction(context, forcePlay) {
     }
 
     performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
-    actionHandled = true;
   } else if (mode === "device") {
     if (nativeSnapshot?.permissionRequired && typeof context.getNativeBridge === "function") {
       try { context.getNativeBridge().openNowPlayingAccessSettings(); } catch { }
@@ -300,137 +307,91 @@ export function handlePlayPauseAction(context, forcePlay) {
     const nextPlaybackState = playbackStatus === "playing" ? "paused" : "playing";
 
     if (nativeSnapshot && typeof setNativeSnapshot === "function") {
-      const updated = { ...nativeSnapshot, active: true, playbackState: nextPlaybackState };
-      setNativeSnapshot(updated);
+      setNativeSnapshot({ ...nativeSnapshot, active: true, playbackState: nextPlaybackState });
     }
 
     performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
-    actionHandled = true;
   }
 
-  // Fallback to local browser media
-  const localMedia = typeof getFallbackPageMediaElement === "function" ? getFallbackPageMediaElement() : null;
-  if (localMedia instanceof HTMLMediaElement && !actionHandled) {
-    if (typeof toggleLocalPlayback === "function") {
-      toggleLocalPlayback(forcePlay);
-      actionHandled = true;
-    }
-  }
-
-  if (actionHandled) render();
+  render();
 }
 
 export function handlePreviousAction(context) {
   const {
     render, nativeSnapshot, performNativeAction,
     NATIVE_ACTION_PREVIOUS, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
-    performDesktopAction, DESKTOP_ACTION_PREVIOUS, getFallbackPageMediaElement,
+    performDesktopAction, DESKTOP_ACTION_PREVIOUS,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
-    ensureControllablePost, stepMiniPlayer, getControllablePlayerPost,
-    getEffectiveHeroMode, getDesktopSnapshotSignature, heroMode,
-    stepHeroPlayer, elements
+    getControllablePlayerPost, getEffectiveHeroMode,
+    getDesktopSnapshotSignature, stepHeroPlayer, elements
   } = context;
 
-  const mode = heroMode;
-  let actionHandled = false;
+  const mode = getEffectiveHeroMode(getControllablePlayerPost());
+  console.log(`[Hero] handlePrevious (Locked). Mode: ${mode}`);
 
   if (mode === "app") {
     if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
     if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
-    render();
-    return;
-  }
-
-  if (mode === "desktop") {
+  } else if (mode === "desktop") {
     if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
       const updated = { ...desktopSnapshot, active: true, playbackState: "playing" };
       setDesktopSnapshot(updated);
       if (typeof setDesktopSnapshotSignature === "function") setDesktopSnapshotSignature(getDesktopSnapshotSignature(updated));
     }
     performDesktopAction(DESKTOP_ACTION_PREVIOUS);
-    actionHandled = true;
   } else if (mode === "device") {
     if (nativeSnapshot && typeof setNativeSnapshot === "function") {
       setNativeSnapshot({ ...nativeSnapshot, active: true, playbackState: "playing" });
     }
     performNativeAction(NATIVE_ACTION_PREVIOUS);
-    actionHandled = true;
   }
 
-  if (!actionHandled) {
-    const localMedia = typeof getFallbackPageMediaElement === "function" ? getFallbackPageMediaElement() : null;
-    if (localMedia instanceof HTMLMediaElement) {
-      actionHandled = true;
-    } else if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
-      if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
-      actionHandled = true;
-    }
-  }
-
-  if (actionHandled) render();
+  render();
 }
 
 export function handleNextAction(context) {
   const {
     render, nativeSnapshot, performNativeAction,
     NATIVE_ACTION_NEXT, NATIVE_ACTION_COOLDOWN_MS, desktopSnapshot,
-    performDesktopAction, DESKTOP_ACTION_NEXT, getFallbackPageMediaElement,
+    performDesktopAction, DESKTOP_ACTION_NEXT,
     setDesktopSnapshot, setNativeSnapshot, setDesktopSnapshotSignature,
-    ensureControllablePost, stepMiniPlayer, getControllablePlayerPost,
-    getEffectiveHeroMode, getDesktopSnapshotSignature, heroMode,
-    stepHeroPlayer, elements
+    getControllablePlayerPost, getEffectiveHeroMode,
+    getDesktopSnapshotSignature, stepHeroPlayer, elements
   } = context;
 
-  const mode = heroMode;
-  let actionHandled = false;
+  const mode = getEffectiveHeroMode(getControllablePlayerPost());
+  console.log(`[Hero] handleNext (Locked). Mode: ${mode}`);
 
   if (mode === "app") {
     if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
     if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
-    render();
-    return;
-  }
-
-  if (mode === "desktop") {
+  } else if (mode === "desktop") {
     if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
       const updated = { ...desktopSnapshot, active: true, playbackState: "playing" };
       setDesktopSnapshot(updated);
       if (typeof setDesktopSnapshotSignature === "function") setDesktopSnapshotSignature(getDesktopSnapshotSignature(updated));
     }
     performDesktopAction(DESKTOP_ACTION_NEXT);
-    actionHandled = true;
   } else if (mode === "device") {
     if (nativeSnapshot && typeof setNativeSnapshot === "function") {
       setNativeSnapshot({ ...nativeSnapshot, active: true, playbackState: "playing" });
     }
     performNativeAction(NATIVE_ACTION_NEXT);
-    actionHandled = true;
   }
 
-  if (!actionHandled) {
-    const localMedia = typeof getFallbackPageMediaElement === "function" ? getFallbackPageMediaElement() : null;
-    if (localMedia instanceof HTMLMediaElement) {
-      actionHandled = true;
-    } else if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
-      if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
-      actionHandled = true;
-    }
-  }
-
-  if (actionHandled) render();
+  render();
 }
 
 export function handleVolumeAction(context, event) {
   const {
-    state, getControllablePlayerPost, heroMode,
+    state, getControllablePlayerPost, getEffectiveHeroMode,
     normalizePlayerVolume, savePlayerVolume,
     getNativeBridge, applyPlayerVolumeToActiveElement,
     getFallbackPageMediaElement, getActivePlayerMediaElement,
     render
   } = context;
 
-  const post = getControllablePlayerPost();
-  const mode = heroMode;
+  const mode = getEffectiveHeroMode(getControllablePlayerPost());
 
   const rawValue = Number(event.target?.value);
   const volume = normalizePlayerVolume(rawValue / 100, state.playerVolume);
