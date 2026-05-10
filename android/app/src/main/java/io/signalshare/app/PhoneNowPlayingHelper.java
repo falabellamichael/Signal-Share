@@ -175,13 +175,26 @@ final class PhoneNowPlayingHelper {
 
     private static boolean resumeLastMediaSession(Context context, String preferredSource) {
         boolean isYouTube = "youtube".equalsIgnoreCase(preferredSource);
+        boolean isSpotify = "spotify".equalsIgnoreCase(preferredSource);
 
         // 1. Try to trigger playback via package-specific broadcasts or intents
         if (isYouTube) {
+            // Automatically open the YouTube app to ensure it's active and ready to play
+            launchYoutubeApp(context);
             // YouTube doesn't have a simple play broadcast, so we try to wake it with a media key
             return dispatchMediaKey(context, android.view.KeyEvent.KEYCODE_MEDIA_PLAY);
+        } else if (isSpotify) {
+            // Try to trigger Spotify directly
+            try {
+                Intent spotifyIntent = new Intent("com.spotify.mobile.android.ui.widget.PLAY");
+                spotifyIntent.setPackage(SPOTIFY_PACKAGE_NAME);
+                context.sendBroadcast(spotifyIntent);
+            } catch (Exception ignored) {}
+
+            // If the broadcast didn't wake it, launch the app
+            launchSpotifyApp(context);
         } else {
-            // Default to Spotify (original behavior)
+            // Default behavior if no source is locked
             try {
                 Intent spotifyIntent = new Intent("com.spotify.mobile.android.ui.widget.PLAY");
                 spotifyIntent.setPackage(SPOTIFY_PACKAGE_NAME);
