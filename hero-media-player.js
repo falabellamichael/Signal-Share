@@ -1624,32 +1624,33 @@ The companion bridge is designed with several security layers to keep your PC sa
     return getPostById(playableIds[0]);
   }
 
-  function toggleLocalPlayback(forcePlay) {
-    const mediaElement = getActivePlayerMediaElement() || getFallbackPageMediaElement();
-    if (mediaElement instanceof HTMLMediaElement) {
-      const shouldPlay = typeof forcePlay === "boolean" ? forcePlay : mediaElement.paused;
+  function toggleLocalPlayback(forcePlay, options = {}) {
+    const targetHint = options.target || "any";
+    const activeMedia = getActivePlayerMediaElement(targetHint);
+
+    if (activeMedia instanceof HTMLMediaElement) {
+      const shouldPlay = typeof forcePlay === "boolean" ? forcePlay : activeMedia.paused;
       const nextState = shouldPlay ? "playing" : "paused";
       if (shouldPlay) {
-        const playResult = mediaElement.play();
+        const playResult = activeMedia.play();
         if (playResult && typeof playResult.catch === "function") playResult.catch(() => { });
       } else {
-        mediaElement.pause();
+        activeMedia.pause();
       }
-      state.heroPlayerPlaybackState = nextState;
-      state.miniPlayerPlaybackState = nextState;
+      if (targetHint === "mini") state.miniPlayerPlaybackState = nextState;
+      else state.heroPlayerPlaybackState = nextState;
       return true;
     }
 
     const post = getControllablePlayerPost();
-    const activeMedia = getActivePlayerMediaElement();
     if (post?.sourceKind === "youtube" && activeMedia instanceof HTMLIFrameElement) {
       const isPlaying = activeMedia.dataset.playbackState === "playing" || state.miniPlayerPlaybackState === "playing" || state.heroPlayerPlaybackState === "playing";
       const shouldPlay = typeof forcePlay === "boolean" ? forcePlay : !isPlaying;
       const nextState = shouldPlay ? "playing" : "paused";
       postMessageToYouTubePlayer(activeMedia, shouldPlay ? "playVideo" : "pauseVideo");
       activeMedia.dataset.playbackState = nextState;
-      state.heroPlayerPlaybackState = nextState;
-      state.miniPlayerPlaybackState = nextState;
+      if (targetHint === "mini") state.miniPlayerPlaybackState = nextState;
+      else state.heroPlayerPlaybackState = nextState;
       return true;
     }
 
@@ -1880,7 +1881,8 @@ The companion bridge is designed with several security layers to keep your PC sa
       ensureControllablePost, getNativeBridge, hasNativeSettingsBridge,
       parseYouTubeUrl, performSupabaseDesktopAction, heroMode,
       findMatchedPost, openViewer, normalizePlayerVolume, savePlayerVolume,
-      applyPlayerVolumeToActiveElement, mountPersistentPlayer, destroyActivePlayer
+      applyPlayerVolumeToActiveElement, mountPersistentPlayer, destroyActivePlayer,
+      getPostById
     };
   }
 

@@ -2063,9 +2063,18 @@ export function createAppUi(context) {
 
 
 
-  function getActivePlayerMediaElement() {
-    // Priority: explicitly mounted hero element, then any shared active element (viewer/mini)
-    const activeEl = state.heroPlayerElement || state.activePlayerElement;
+  function getActivePlayerMediaElement(targetHint = "any") {
+    // If a target is specified, only look at that element.
+    // Otherwise, prioritize the hero player, then the mini/active player.
+    let activeEl = null;
+    if (targetHint === "mini") {
+      activeEl = state.activePlayerElement;
+    } else if (targetHint === "hero") {
+      activeEl = state.heroPlayerElement;
+    } else {
+      activeEl = state.heroPlayerElement || state.activePlayerElement;
+    }
+
     if (activeEl instanceof HTMLElement) {
       if (activeEl instanceof HTMLMediaElement) return activeEl;
 
@@ -2078,7 +2087,7 @@ export function createAppUi(context) {
       if (iframeElement instanceof HTMLIFrameElement) return iframeElement;
     }
     const heroStage = elements?.heroPlayerStage || document.querySelector("#heroPlayerStage");
-    if (heroStage) {
+    if (heroStage && targetHint !== "mini") {
       const media = heroStage.querySelector("video, audio, iframe");
       if (media instanceof HTMLElement) return media;
     }

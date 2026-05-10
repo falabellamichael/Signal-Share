@@ -618,7 +618,6 @@ function Is-Match-Source($session, [string]$source) {
   if ($source -eq "youtube") {
     if ($id -match "spotify" -or $text -match "spotify|open\\.spotify") { return $false }
     if ($id -match "youtube|ytmusic" -or $text -match "youtube|youtu\\.be|music\\.youtube") { return $true }
-    # Browser YouTube tabs often only expose the video title. Permit browser sessions as a YouTube fallback.
     return $isBrowser
   }
 
@@ -632,9 +631,6 @@ try {
     $_.ToString() -eq 'System.Threading.Tasks.Task\ 1[TResult] AsTask[TResult](Windows.Foundation.IAsyncOperation\ 1[TResult])'
   } | Select-Object -First 1
 
-  $id = ""
-  $winRtSuccess = $false
-  
   if ($asTaskMethod -ne $null) {
     $managerOp = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
     $managerTask = $asTaskMethod.MakeGenericMethod(@([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])).Invoke($null, @($managerOp))
@@ -650,12 +646,15 @@ try {
           if ($null -eq $candidate) { continue }
           try {
             $score = 0
-            $isTarget = [string]::IsNullOrWhiteSpace($targetApp) -or (Matches-AppId $candidate.SourceAppUserModelId $targetApp)
+            $candidateId = ""
+            try { $candidateId = $candidate.SourceAppUserModelId } catch {}
+
+            $isTarget = [string]::IsNullOrWhiteSpace($targetApp) -or (Matches-AppId $candidateId $targetApp)
             $isPreferred = [string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or (Is-Match-Source $candidate $preferred)
             
-            if ($isTarget -and $isPreferred) { $score += 1000 }
-            elseif ($isTarget) { $score += 500 }
-            elseif ($isPreferred) { $score += 300 }
+            if ($isTarget -and $isPreferred) { $score += 2000 }
+            elseif ($isTarget) { $score += 1000 }
+            elseif ($isPreferred) { $score += 500 }
 
             if ($candidate.PlaybackInfo.PlaybackStatus -eq [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus]::Playing) {
               $score += 5000
@@ -674,17 +673,15 @@ try {
       }
     }
 
-      if ($session -ne $null) {
-        try { $id = $session.SourceAppUserModelId } catch { $id = "" }
-        $actionMethod = $session.GetType().GetMethod('${winrtMethodName}', [Type[]]@())
-        if ($actionMethod -ne $null) {
-          try {
-            $actionOp = $actionMethod.Invoke($session, @())
-            $resultTask = $asTaskMethod.MakeGenericMethod(@([bool])).Invoke($null, @($actionOp))
-            $winRtSuccess = [bool]$resultTask.Result
-          } catch {
-            $winRtSuccess = $false
-          }
+    if ($session -ne $null) {
+      $actionMethod = $session.GetType().GetMethod('${winrtMethodName}', [Type[]]@())
+      if ($actionMethod -ne $null) {
+        try {
+          $actionOp = $actionMethod.Invoke($session, @())
+          $resultTask = $asTaskMethod.MakeGenericMethod(@([bool])).Invoke($null, @($actionOp))
+          $winRtSuccess = [bool]$resultTask.Result
+        } catch {
+          $winRtSuccess = $false
         }
       }
     }
@@ -693,10 +690,11 @@ try {
   $winRtSuccess = $false
 }
 
-# Skip actions need aggressive fallback because WinRT can report success while browsers ignore the command.
+# Skip and Toggle actions need aggressive fallback because WinRT can report success while browsers ignore the command.
 $isSkipAction = "${action}" -eq "next" -or "${action}" -eq "previous"
+$isToggleAction = "${action}" -eq "play_pause"
 
-if ($winRtSuccess -and -not $isSkipAction) {
+if ($winRtSuccess -and -not $isSkipAction -and -not $isToggleAction) {
   Write-Output "ok"
   exit 0
 }
@@ -707,32 +705,40 @@ using System.Runtime.InteropServices;
 public static class MediaKeySender {
   [DllImport("user32.dll", SetLastError=true)]
   public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+  [DllImport("user32.dll")]
+  public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
 }
 "@
 
-# Fallback to global media keys if WinRT targeting failed or if it's a skip action.
-# For skip actions, we prioritize the global key because it's more reliable for browser-based YouTube.
-if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or $winRtSuccess -eq $false -or $isSkipAction) {
+$HWND_BROADCAST = [IntPtr]0xffff
+$WM_APPCOMMAND = 0x0319
+$APPCOMMAND_MEDIA_PLAY_PAUSE = 14
+$APPCOMMAND_MEDIA_NEXTTRACK = 11
+$APPCOMMAND_MEDIA_PREVIOUSTRACK = 12
+
+function Send-AppCommand([int]$cmd) {
+  # Use current process HWND as sender
+  $currentHwnd = (Get-Process -Id $pid).MainWindowHandle
+  [MediaKeySender]::SendMessage($HWND_BROADCAST, $WM_APPCOMMAND, $currentHwnd, [IntPtr]($cmd -shl 16))
+}
+
+# Fallback to global media keys or AppCommands if WinRT targeting failed or if it's a skip/toggle action.
+if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or $winRtSuccess -eq $false -or $isSkipAction -or $isToggleAction) {
+  if ($isToggleAction) {
+    Send-AppCommand $APPCOMMAND_MEDIA_PLAY_PAUSE
+  } elseif ("${action}" -eq "next") {
+    Send-AppCommand $APPCOMMAND_MEDIA_NEXTTRACK
+  } elseif ("${action}" -eq "previous") {
+    Send-AppCommand $APPCOMMAND_MEDIA_PREVIOUSTRACK
+  }
+
   $KEYEVENTF_EXTENDEDKEY = 0x0001
   $KEYEVENTF_KEYUP = 0x0002
 
-  # Send global media key
+  # Also send global media key for maximum compatibility
   [MediaKeySender]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
   Start-Sleep -Milliseconds 45
   [MediaKeySender]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
-
-  # For Skip actions on YouTube, also try sending browser-specific shortcuts if a browser is focused or if preferred is youtube
-  $isBrowserId = ($null -ne $id -and $id -match "chrome|msedge|firefox")
-  if ($isSkipAction -and ($preferred -eq "youtube" -or $isBrowserId)) {
-    try {
-      $wshell = New-Object -ComObject WScript.Shell
-      if ("${action}" -eq "next") {
-        $wshell.SendKeys("+(N)") # Shift + N
-      } else {
-        $wshell.SendKeys("+(P)") # Shift + P
-      }
-    } catch {}
-  }
 
   Write-Output "ok-global"
   exit 0

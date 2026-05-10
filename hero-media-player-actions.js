@@ -233,7 +233,8 @@ export function handlePlayPauseAction(context, forcePlay) {
     playHeroMedia, getNativeBridge, target
   } = context;
 
-  const mode = heroMode;
+  // The Mini Player is ALWAYS in 'app' mode regardless of the global hero control mode.
+  const mode = target === "mini" ? "app" : heroMode;
   const controllablePost = getControllablePlayerPost();
   const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
 
@@ -245,7 +246,7 @@ export function handlePlayPauseAction(context, forcePlay) {
     if (target === "mini") {
         if (state.activePlayerPostId && state.activePlayerElement) {
             console.log("[Hero] App Mode (Mini): Toggling existing mini player playback.");
-            if (typeof toggleLocalPlayback === "function") toggleLocalPlayback(forcePlay);
+            if (typeof toggleLocalPlayback === "function") toggleLocalPlayback(forcePlay, { target });
         } else if (state.playerPostId) {
             // No player mounted yet, but we have a post selected for the mini player
             const post = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
@@ -263,7 +264,7 @@ export function handlePlayPauseAction(context, forcePlay) {
 
         if (isHeroActive) {
           console.log("[Hero] App Mode (Hero): Toggling existing hero playback.");
-          if (typeof toggleLocalPlayback === "function") toggleLocalPlayback(forcePlay);
+          if (typeof toggleLocalPlayback === "function") toggleLocalPlayback(forcePlay, { target });
         } else if (typeof playHeroMedia === "function") {
           console.log("[Hero] App Mode (Hero): No active player, launching Hero Media.");
           playHeroMedia();
@@ -346,7 +347,7 @@ export function handlePreviousAction(context) {
     ensureControllablePost, stepMiniPlayer, mountPersistentPlayer, target
   } = context;
 
-  const mode = getEffectiveHeroMode(getControllablePlayerPost());
+  const mode = target === "mini" ? "app" : getEffectiveHeroMode(getControllablePlayerPost());
   console.log(`[Hero] handlePrevious (Locked). Mode: ${mode}, Target: ${target || 'default'}`);
 
   if (mode === "app") {
@@ -395,7 +396,7 @@ export function handleNextAction(context) {
     ensureControllablePost, stepMiniPlayer, mountPersistentPlayer, target
   } = context;
 
-  const mode = getEffectiveHeroMode(getControllablePlayerPost());
+  const mode = target === "mini" ? "app" : getEffectiveHeroMode(getControllablePlayerPost());
   console.log(`[Hero] handleNext (Locked). Mode: ${mode}, Target: ${target || 'default'}`);
 
   if (mode === "app") {
@@ -439,10 +440,10 @@ export function handleVolumeAction(context, event) {
     normalizePlayerVolume, savePlayerVolume,
     getNativeBridge, applyPlayerVolumeToActiveElement,
     getFallbackPageMediaElement, getActivePlayerMediaElement,
-    render
+    render, target
   } = context;
 
-  const mode = getEffectiveHeroMode(getControllablePlayerPost());
+  const mode = target === "mini" ? "app" : getEffectiveHeroMode(getControllablePlayerPost());
 
   const rawValue = Number(event.target?.value);
   const volume = normalizePlayerVolume(rawValue / 100, state.playerVolume);
