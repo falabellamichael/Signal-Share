@@ -21,18 +21,18 @@
         <!-- Index/Table of Contents -->
         <div class="toc" style="margin: 20px 0; padding: 15px; border-left: 3px solid #ccc; background-color: #f9f9f9;">
             <h3>📋 Quick Jump Guide (Index)</h3>
-            <ul>
+            <ul style="list-style-type: none; padding-left: 0;">
                 <li><a href="#section-state">1. Component Overview & State Management</a></li>
                 <li><a href="#section-media">2. Media Source Integration Details</a></li>
                 <li><a href="#section-bridge">3. Desktop Bridge IPC (Inter-Process Communication)</a></li>
                 <li><a href="#section-llm">4. 🌐 Local LLM Operation (AI Integration)</a></li>
-                <li><a href="#section-debug">🐞 Hero Player Debugging Checklist</a></li>
+                <li><a href="#section-debug">5. 🐞 Hero Player Debugging Checklist</a></li>
             </ul>
         </div>
 
         <!-- Section 1: Core Component -->
         <section class="questions-page-card" id="section-state">
-            <h2 id="section-state">1. Component Overview & State Management</h2>
+            <h2>1. Component Overview & State Management</h2>
             <p>The Hero Player acts as the primary, unified media viewport. Its core responsibility is to abstract away the source complexity (YouTube embed vs. Spotify widget vs. local file upload) into a single, controllable playback interface.</p>
             
             <h3>State Variables (Client-Side Focus):</h3>
@@ -53,7 +53,7 @@
 
         <!-- Section 2: Source Specific Implementations -->
         <section class="questions-page-card" id="section-media">
-            <h2 id="section-media">2. Media Source Integration Details</h2>
+            <h2>2. Media Source Integration Details</h2>
             
             <h3>YouTube Player Module:</h3>
             <p>Uses the standard YouTube IFrame API (or embedded player object). The key interaction point is calling <code>player.playVideo()</code> and listening to <code>onStateChange</code> events (e.g., YT.PlayerState.ENDED) for state synchronization.</p>
@@ -73,7 +73,7 @@
 
         <!-- Section 3: Desktop Bridge Communication Protocol -->
         <section class="questions-page-card" id="section-bridge">
-            <h2 id="section-bridge">3. Desktop Bridge IPC (Inter-Process Communication)</h2>
+            <h2>3. Desktop Bridge IPC (Inter-Process Communication)</h2>
             <p>When <code>isDesktopBridgeActive</code> is true, the player switches control logic from client-side DOM controls to sending standardized commands over a local WebSocket connection established with the bridge service.</p>
 
             <h3>Protocol Details:</h3>
@@ -87,7 +87,7 @@
 
             <h4>Incoming Events (Bridge -> Client):</h4>
             <p>The client must listen for status updates from the bridge. Example event:</p>
-            <pre style="background-color: #eee; padding: 10px; color: #333;">{ "event": "STATE_UPDATED", "status": "PLAYING", "timeRemaining": 25 }</code></pre>
+            <pre style="background-color: #eee; padding: 10px; color: #333;">{ "event": "STATE_UPDATED", "status": "PLAYING", "timeRemaining": 25 }</pre>
 
             <h3>Security Note:</h3>
             <p>The optional <strong>Bridge Secret</strong> must be validated server-side (if using a dedicated backend endpoint to relay commands) or strictly checked against client input on the page level to prevent unauthorized control hijacking.</p>
@@ -95,8 +95,8 @@
 
         <!-- Section 4: Local LLM Operation (AI Integration) -->
         <section class="questions-page-card" id="section-llm">
-            <h2 id="section-llm">4. 🌐 Local LLM Operation (AI Integration)</h2>
-            <p>For advanced functionality like content generation or tagging suggestions, Signal Share supports integration with local Large Language Models (LLMs) running via tools like <strong class="important-term">LM Studio</strong>.</p>
+            <h2>4. 🌐 Local LLM Operation (AI Integration)</h2>
+            <p>For advanced functionality like content generation or tagging suggestions, Signal Share supports integration with local Large Language Models (LLMs) running via tools like <strong>LM Studio</strong>.</p>
 
             <h3>Core Principles:</h3>
             <ul>
@@ -114,7 +114,7 @@
 
             <h3>Prerequisites for Local LLM Execution:</h3>
             <ol>
-                <li><strong>LLM Runner Software:</strong> You must first install a local inference engine such as <strong class="important-term">LM Studio</strong>, Ollama, or llama.cpp setup. This software manages the loading and running of model weights.</li>
+                <li><strong>LLM Runner Software:</strong> You must first install a local inference engine such as <strong>LM Studio</strong>, Ollama, or llama.cpp setup. This software manages the loading and running of model weights.</li>
                 <li><strong>Model Weights:</strong> Download a quantized version of the target LLM (e.g., Llama 3 GGUF format) that is compatible with your hardware's capabilities (GPU/RAM). The size dictates performance vs. resource usage.</li>
                 <li><strong>Port Binding:</strong> Configure the LLM Runner to expose an accessible local API endpoint (typically a WebSocket or HTTP REST interface) on a specific port (e.g., 12345).</li>
             </ol>
@@ -127,7 +127,7 @@
                 <li><strong>Request Dispatch:</strong> On user action, package the request JSON exactly as defined (<code>{ "action": "GENERATE_TAGS", ... }</code>) and dispatch it to the established WebSocket/HTTP stream.</li>
                 <li><strong>Response Handling:</strong> Process streamed responses. Streaming is preferred over waiting for a single large payload, allowing immediate UI feedback on token generation.</li>
             </ol>
-            <div class="code-snippet" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin: 10px 0;">
+            <div class="code-snippet" style="background: rgba(0,0,0,2); padding: 15px; border-radius: 12px; margin: 10px 0;">
                 <strong>Conceptual Connection Setup (Client JS):</strong><br>
                 <code>const ws = new WebSocket("ws://localhost:12345/llm");\nws.onmessage = (event) => { /* Handle streamed text */ };</code>
             </div>
@@ -138,12 +138,12 @@
         
         <!-- Section 5: Debugging Checklist -->
         <section class="questions-page-card" id="section-debug">
-            <h2 id="section-debug">🐞 Hero Player Debugging Checklist</h2>
+            <h2>5. 🐞 Hero Player Debugging Checklist</h2>
             <ul style="list-style-type: disc;">
                 <li><strong>[INIT]</strong> Did the component successfully read the <code>playbackContextId</code> from the session state?</li>
                 <li><strong>[SOURCE VALIDATION]</strong> For YouTube/Spotify, is the source URL fully validated before attempting connection? (Check for malformed embed IDs).</li>
                 <li><strong>[STATE DRIFT]</strong> If playback seems stuck, manually force a state refresh by re-calling <code>loadMedia</code> with the current post data.</li>
-                <li><strong>[BRIDGE CHECK]</strong> Is the local desktop bridge running and accessible via WebSocket *before* attempting to send a command? Check console logs for connection errors on the client side.</li>
+                <li><strong>[BRIDGE CHECK]</strong> Is the local desktop bridge running and accessible via WebSocket <em>before</em> attempting to send a command? Check console logs for connection errors on the client side.</li>
             </ul>
         </section>
 
