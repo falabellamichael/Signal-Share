@@ -314,62 +314,87 @@ export function handlePlayPauseAction(context, forcePlay) {
   const now = Date.now();
   const mode = target === "mini" ? "app" : heroMode;
 
-  // Simple cooldown: prevent multiple executions within 500ms
-  if ((state._lastPlayPauseAt) && (now - state._lastPlayPauseAt < 500)) {
-    console.debug("[Hero] Play/Pause action throttled.");
-    return;
-  }
-  // Flag this timestamp globally to suppress incoming "stutter" sync messages
-  // from YouTube/Spotify iframes and bridge polls for the next 2.5 seconds.
+  // 1. AUTHORITATIVE COOLDOWN
+  // Prevent command flooding. We use a longer lockout for sync stabilization.
+  if (state._lastPlayPauseAt && (now - state._lastPlayPauseAt < 600)) return;
   state._lastPlayPauseAt = now;
-  state._mediaActionLockoutUntil = now + 2500;
+  state._mediaActionLockoutUntil = now + 2800;
 
-  console.log(`[Hero] Play/Pause Action. Mode: ${mode}, Target: ${target}`);
+  // 2. RESOLVE INTENT
+  // Determine if we are trying to Play or Pause.
+  // We look at the local state first as it's the most responsive.
+  const localState = target === "mini" ? state.miniPlayerPlaybackState : state.heroPlayerPlaybackState;
+  const isPlayingLocally = localState === "playing";
 
-  // 1. Try local playback first (website media elements)
-  if (typeof toggleLocalPlayback === "function") {
-    if (toggleLocalPlayback(forcePlay, { target })) {
-      render();
-      return;
-    }
+  // Also check system snapshots if we are in a bridge mode
+  const systemSnapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
+  const isPlayingOnSystem = systemSnapshot?.playbackState === "playing";
+
+  // If forcePlay is provided, use it. Otherwise, toggle based on current state.
+  // We consider "playing" if EITHER the local player OR the system bridge reports playing.
+  const currentlyPlaying = isPlayingLocally || isPlayingOnSystem;
+  const shouldPlay = (typeof forcePlay === "boolean") ? forcePlay : !currentlyPlaying;
+
+  console.log(`[Hero] Play/Pause Intent: ${shouldPlay ? "PLAY" : "PAUSE"} (Mode: ${mode}, Target: ${target || 'hero'})`);
+
+  // 3. OPTIMISTIC STATE UPDATE
+  // We update our local state immediately to suppress stutters and provide instant UI feedback.
+  const nextState = shouldPlay ? "playing" : "paused";
+  if (target === "mini") {
+    state.miniPlayerPlaybackState = nextState;
+  } else {
+    state.heroPlayerPlaybackState = nextState;
   }
 
-  // 2. App Mode: Mount or resume the local player stage
-  if (mode === "app") {
+  // 4. COMMAND DISPATCH
+  let handledLocally = false;
+
+  // A. Local Website Elements (Hosted videos, YouTube/Spotify Iframes)
+  if (typeof toggleLocalPlayback === "function") {
+    // We try to toggle local playback. This returns true if an active element was found and signaled.
+    handledLocally = toggleLocalPlayback(shouldPlay, { target });
+  }
+
+  // B. Local Player Activation (If nothing was playing locally but user pressed Play)
+  if (!handledLocally && shouldPlay && mode === "app") {
     if (target === "mini" && state.playerPostId) {
       const p = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
       if (p && typeof context.mountPersistentPlayer === "function") {
         context.mountPersistentPlayer(elements.miniPlayerStage, p, "mini", { autoplay: true });
-        state.miniPlayerPlaybackState = "playing";
+        handledLocally = true;
       }
     } else if (typeof playHeroMedia === "function") {
       playHeroMedia();
+      handledLocally = true;
     }
-    render();
-    return;
   }
 
-  // 3. Desktop Mode: Send command directly to system
-  if (mode === "desktop") {
-    if (!isNativeCapacitorApp() && !companionPromptDismissed && !desktopSnapshot) {
-      if (typeof showCompanionPrompt === "function") showCompanionPrompt();
-      return;
+  // C. Bridge Commands (Always send if in bridge mode, or as a secondary "pause all" measure)
+  // If we are pausing, we send the command to the system bridge TOO, even if handled locally,
+  // to ensure background audio is cleared.
+  const sendToBridge = (mode === "desktop" || mode === "device") || (!shouldPlay && (desktopSnapshot?.active || nativeSnapshot?.active));
+
+  if (sendToBridge) {
+    if (mode === "desktop") {
+      if (!isNativeCapacitorApp() && !companionPromptDismissed && !desktopSnapshot) {
+        if (shouldPlay && typeof showCompanionPrompt === "function") showCompanionPrompt();
+      } else {
+        console.log(`[Hero] Dispatching Bridge: Desktop ${shouldPlay ? "Play" : "Pause"}`);
+        performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
+      }
+    } else if (mode === "device") {
+      if (nativeSnapshot?.permissionRequired) {
+        if (shouldPlay && typeof getNativeBridge === "function") getNativeBridge()?.openNowPlayingAccessSettings();
+      } else {
+        console.log(`[Hero] Dispatching Bridge: Native ${shouldPlay ? "Play" : "Pause"}`);
+        performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
+      }
     }
-    console.log(`[Hero] Sending Desktop Play/Pause.`);
-    performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
-  } 
-  // 4. Device Mode: Send command to native bridge
-  else if (mode === "device") {
-    if (nativeSnapshot?.permissionRequired) {
-      if (typeof getNativeBridge === "function") getNativeBridge()?.openNowPlayingAccessSettings();
-      return;
-    }
-    console.log(`[Hero] Sending Native Play/Pause.`);
-    performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
   }
 
   render();
 }
+
 
 export function handlePreviousAction(context) {
   const {
