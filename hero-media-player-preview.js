@@ -186,7 +186,18 @@ function attachArtwork(card, title, artworkUrl) {
   image.loading = "lazy";
   image.decoding = "async";
   image.referrerPolicy = "strict-origin-when-cross-origin";
-  image.addEventListener("error", () => image.remove(), { once: true });
+
+  // Use a data attribute to keep track of the current artwork URL
+  card.dataset.currentArtwork = typeof artworkUrl === "string" ? artworkUrl : "async";
+
+  image.addEventListener("error", () => {
+    // If the image fails to load (404), remove it.
+    // This allows the CSS fallback background to show, and we could potentially
+    // trigger a metadata retry here.
+    image.remove();
+    console.warn(`[Hero] Failed to load artwork: ${image.src}`);
+  }, { once: true });
+
 
   const addImage = (url) => {
     const cleanUrl = toCleanString(url);
@@ -602,14 +613,13 @@ export function renderHeroStagePreview(options = {}) {
     return;
   }
 
-  if (mode === "desktop") {
     if (desktopSnapshot?.active) {
       const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
-      // PRIORITIZE BRIDGE ARTWORK: The bridge has the live high-res thumbnail for what's actually playing.
-      // We only fall back to the matched feed item's artwork if the bridge is missing it.
-      const artworkUrl = desktopSnapshot.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
+      // PRIORITIZE BRIDGE ARTWORK: The bridge has the live thumbnail for what's actually playing.
+      // We fall back to the matched feed item's artwork if the bridge is missing it.
+      let artworkUrl = desktopSnapshot.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
 
-      commitCard(stage, {
+      const card = commitCard(stage, {
         badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
         title: (desktopSnapshot.title || matchedPost?.title || "Now playing"),
         meta: (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : (desktopSnapshot.appPackage || "Desktop playback"))),
@@ -620,6 +630,7 @@ export function renderHeroStagePreview(options = {}) {
 
       return;
     }
+
 
 
     if (options.showCompanionCard) {

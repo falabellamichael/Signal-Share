@@ -213,22 +213,20 @@ function sanitizeMediaMeta(rawMeta = "", sourceAppId = "") {
 
 function extractYoutubeVideoId(value) {
   if (!value) return "";
-  // 1. Check for standard URL patterns
+  // 1. Check for standard URL patterns (The most reliable way)
   const ytMatch = value.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/|.*embed\/|.*shorts\/))([a-zA-Z0-9_-]{11})/i);
   if (ytMatch) return ytMatch[1];
 
-  // 2. Check for common browser window titles that include the ID
+  // 2. Check for common browser window titles that include the ID in brackets/parens
   const bracketMatch = value.match(/[\[\(\u3010]([a-zA-Z0-9_-]{11})[\]\)\u3011]/);
   if (bracketMatch) return bracketMatch[1];
 
-  // 3. Fallback: Search for a raw 11-char ID that isn't just a number
-  const directIdMatch = value.match(/[a-zA-Z0-9_-]{11}/);
-  if (directIdMatch && /[a-zA-Z_-]/.test(directIdMatch[0])) {
-    return directIdMatch[0];
-  }
+  // Note: We removed the loose 11-char pattern match because it caused
+  // false positives on regular words (like uploader names), leading to 404 errors.
 
   return "";
 }
+
 
 
 function normalizePreferredSource(value = "") {
@@ -543,15 +541,14 @@ function buildFreshSnapshotPayload(preferredSource = "") {
         openUri = `https://www.youtube.com/watch?v=${videoId}`;
 
         // OVERRIDE FOR ADVERTISEMENTS / LOW-RES ARTWORK:
-        // If we found a valid YouTube ID, we prefer the direct high-res thumbnail from YouTube's servers.
-        // This fixes the issue where an "Advertisement" thumbnail (often just a small icon) is shown
-        // instead of the actual video's thumbnail.
-        const isAd = title.toLowerCase().includes("advertisement") || title.toLowerCase() === "ad";
-        if (!artworkUri || isAd || sourceProvider === "youtube") {
+        // We prefer the direct high-res thumbnail from YouTube if we found a valid ID.
+        // This fixes the issue where an "Advertisement" thumbnail is shown instead of the video.
+        if (!artworkUri || title.toLowerCase().includes("advertisement") || sourceProvider === "youtube") {
            artworkUri = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
         }
       }
     }
+
 
 
     const payload = {
