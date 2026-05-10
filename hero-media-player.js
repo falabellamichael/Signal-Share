@@ -2,7 +2,7 @@ import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-p
 import { 
   handleOpenMediaAction, handleOpenPhoneAction, 
   handlePlayPauseAction, handleNextAction, handlePreviousAction,
-  handleVolumeAction
+  handleVolumeAction, handleRefreshAction
 } from "./hero-media-player-actions.js";
 
 
@@ -1909,6 +1909,10 @@ The companion bridge is designed with several security layers to keep your PC sa
   function handleVolumeInput(event) {
     handleVolumeAction(getActionContext(), event);
   }
+  
+  function handleRefresh(options = {}) {
+    handleRefreshAction({ ...getActionContext(), ...options });
+  }
 
   function renderStagePreview(mode, post, fallbackMedia) {
     renderHeroStagePreview(Object.assign({}, options, {
@@ -2303,6 +2307,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     handlePlayPause,
     handleNext,
     handlePrevious,
+    handleRefresh,
     handleVolumeInput,
     setHeroControlSource: (source) => { syncHeroControlSourceChange(source); },
     openNowPlayingMediaApp: (packageName, uri) => {

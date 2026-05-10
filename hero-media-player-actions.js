@@ -557,3 +557,50 @@ export function handleVolumeAction(context, event) {
   }
   render();
 }
+
+/**
+ * Hard-refreshes the current media player.
+ * For local videos: calls .load() and .play()
+ * For YouTube/Spotify: re-mounts the player stage to fix stuck streams.
+ */
+export function handleRefreshAction(context) {
+  const {
+    state, elements, getControllablePlayerPost,
+    mountPersistentPlayer, destroyActivePlayer, render, target
+  } = context;
+
+  const post = getControllablePlayerPost();
+  if (!post) return;
+
+  console.log(`[Hero] Refreshing media for post: ${post.id}`);
+
+  // 1. Check for local HTML5 media elements (Hosted Feed videos)
+  const activeMedia = state.heroPlayerElement || state.activePlayerElement;
+  const isHtml5 = activeMedia instanceof HTMLMediaElement || (activeMedia && activeMedia.querySelector("video, audio"));
+
+  if (isHtml5) {
+    try {
+      const el = activeMedia instanceof HTMLMediaElement ? activeMedia : activeMedia.querySelector("video, audio");
+      el.pause();
+      el.currentTime = 0;
+      el.load();
+      el.play().catch(() => {});
+    } catch (e) {
+      console.warn("[Hero] Local media refresh failed:", e);
+    }
+  } 
+  // 2. Fallback: Re-mount the entire player (fixes stuck Iframes for YouTube/Spotify)
+  else if (typeof mountPersistentPlayer === "function") {
+    // Force a full remount by clearing the active ID and destroying the current instance
+    if (typeof destroyActivePlayer === "function") {
+      destroyActivePlayer();
+    }
+    
+    const stage = (target === "mini" ? elements.miniPlayerStage : elements.heroPlayerStage);
+    if (stage) {
+      mountPersistentPlayer(stage, post, target || "hero", { autoplay: true });
+    }
+  }
+
+  render();
+}

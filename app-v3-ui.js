@@ -244,6 +244,8 @@ export function createAppUi(context) {
     heroSourceYoutube: document.querySelector("#heroSourceYoutube"),
     heroSourceSpotify: document.querySelector("#heroSourceSpotify"),
     heroPlayerOpenPhoneButton: document.querySelector("#heroPlayerOpenPhoneButton"),
+    heroPlayerRefreshButton: document.querySelector("#heroPlayerRefreshButton"),
+    miniRefreshButton: document.querySelector("#miniRefreshButton"),
   };
   
   let lastMediaActionAt = 0;
@@ -513,6 +515,11 @@ export function createAppUi(context) {
     elements.miniCloseButton.addEventListener("click", closeMiniPlayer);
     elements.miniPrevButton.addEventListener("click", () => heroMediaPlayerController.handlePrevious({ target: "mini" }));
     elements.miniPlayPauseButton.addEventListener("click", () => heroMediaPlayerController.handlePlayPause(null, { target: "mini" }));
+    elements.miniRefreshButton.addEventListener("click", () => {
+      if (heroMediaPlayerController && typeof heroMediaPlayerController.handleRefresh === "function") {
+        heroMediaPlayerController.handleRefresh({ target: "mini" });
+      }
+    });
     elements.miniNextButton.addEventListener("click", () => heroMediaPlayerController.handleNext({ target: "mini" }));
     elements.miniPlayerStage.addEventListener("click", handleMiniPlayerStageClick);
     elements.miniPlayerVolumeSlider.addEventListener("input", (event) => heroMediaPlayerController.handleVolumeInput(event));
