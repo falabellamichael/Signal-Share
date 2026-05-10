@@ -359,12 +359,12 @@ export async function handlePlayPauseAction(context, forcePlay) {
       || metaText.includes("youtube") || metaText.includes("ytmusic")
       || titleText.includes("youtube") || titleText.includes("ytmusic");
 
-    const bridgeMatchesLockedSource = isSourceLocked && (
-      (preferredSource === "youtube" && systemIsYouTube) ||
-      (preferredSource === "spotify" && systemIsSpotify)
-    );
+    // Improved Source Match Check: True if the system matches the lock, OR if no source is locked (i.e., 'all' mode) AND the system reports activity.
+    const sourceMatchesLock = isSourceLocked && 
+                                ((preferredSource === "youtube" && systemIsYouTube) || (preferredSource === "spotify" && systemIsSpotify));
 
-    const isPlayingOnSystem = snapshot?.playbackState === "playing" && (!isSourceLocked || bridgeMatchesLockedSource);
+    // Determine if the *system* should be controlling playback: it must be playing, and either we are not locked OR the lock matches what's playing.
+    const isPlayingOnSystem = snapshot?.playbackState === "playing" && (!isSourceLocked || sourceMatchesLock);
     shouldPlay = (typeof forcePlay === "boolean") ? forcePlay : !isPlayingOnSystem;
   }
 
