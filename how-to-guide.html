@@ -94,31 +94,30 @@
 
      <hr style="margin: 25px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.1);">
 
-     <!-- AI LOCAL MODEL GUIDE SECTION -->
-     <h3 style="margin-top: 20px;">🌐 Local LLM Operation (AI Integration)</h3>
-     <p>For advanced functionality, such as content generation, tagging suggestion, or advanced moderation, utilizing local Large Language Models (LLMs) running on the user's machine is becoming a crucial feature. This capability requires specialized client-side integration with tools like <strong>LM Studio</strong>.</p>
+     <!-- Developer Deep Dive Content Panel -->
+     <section id="developer-panel">
+       <h3 style="color: #ffffff;">🌐 Understanding Local LLM Inference (LM Studio Guide)</h3>
+       <p>This guide explains the concept of running Large Language Models (LLMs) locally using tools like LM Studio. This technology allows powerful AI capabilities to run entirely offline, providing maximum privacy and control over data.</p>
 
-     <h4>What does "Run AI Locally" mean for Signal Share?</h4>
-     <ol>
-         <li><strong>Privacy First:</strong> By processing text/media metadata locally, sensitive user data never needs to be transmitted to a third-party cloud API (like OpenAI), greatly enhancing user trust and compliance.</li>
-         <li><strong>Offline Capability:</strong> Core generative features remain usable even when the user has no internet connection.</li>
-         <li><strong>Performance Control:</strong> Latency is determined purely by local hardware (CPU/GPU) rather than external network congestion.</li>
-     </ol>
+       <h4 style="color: #4682b4;">What is Local LLM Inference?</h4>
+       <p>Local inference means that the entire process—from taking a prompt (input) to generating a response (output)—happens solely on your physical computer (CPU/GPU). The model weights are downloaded and stored locally, eliminating the need for continuous internet connectivity or sending private data to external cloud APIs.</p>
 
-     <h4>How it Works (Conceptual Flow):</h4>
-     <p>The system communicates with the locally running LLM instance via a dedicated WebSocket connection, similar to how we handle the Desktop Bridge.</p>
-     <ul>
-         <li><strong>Client Action:</strong> User clicks "Generate Tags" on a post draft.</li>
-         <li><strong>JS Execution:</strong> JavaScript sends the content text payload (e.g., <code>{ "action": "GENERATE_TAGS", "text": "..." }</code>) over WebSocket to <code>ws://localhost:[PORT]</code>.</li>
-         <li><strong>LM Studio/LLM Side:</strong> The local model processes this prompt using its installed quantized weights (e.g., Llama-3-8B).</li>
-         <li><strong>Response:</strong> The LLM sends back structured JSON data confirming the tags, which Signal Share then parses and displays to the user.</li>
-     </ul>
+       <h4 style="color: #4682b4;">Key Concepts Explained</h4>
+       <ul style="list-style-type: disc; margin-left: 20px;">
+         <li><strong style="display: block; margin-top: 10px; color: rgba(255,255,255,0.9);">Model Weights (e.g., GGUF):</strong> These are the massive files containing the "knowledge" of the AI. Different models excel at different tasks (coding, creative writing, summarization).</li>
+         <li><strong style="display: block; margin-top: 10px; color: rgba(255,255,255,0.9);">Quantization:</strong> This is the process of reducing the precision of model weights (e.g., from 32-bit to 4-bit). It significantly shrinks the file size and VRAM/RAM requirement, allowing massive models to run on consumer hardware.</li>
+         <li><strong style="display: block; margin-top: 10px; color: rgba(255,255,255,0.9);">Inference:</strong> This is the technical term for the act of running the model—the actual calculation process of predicting the next most statistically probable word based on your prompt.</li>
+       </ul>
 
-     <h4>Key Considerations for Implementation:</h4>
-     <ul>
-         <li><strong>Model Compatibility:</strong> Must ensure the client can detect supported model architectures (GGUF format is common).</li>
-         <li><strong>Resource Check:</strong> The system must prompt users to check local VRAM/RAM availability before initiating a connection, as LLMs are resource-intensive.</li>
-     </ul>
+       <h4 style="color: #4682b4; margin-top: 20px;">The General Workflow</h4>
+       <p>A typical workflow involves:</p>
+       <ol style="margin-left: 20px;">
+           <li><strong>Download/Select Model:</strong> Choosing a model optimized for the required task (e.g., Code generation vs. Chat).</li>
+           <li><strong>Load in Tool (LM Studio):</strong> Using the tool to load the quantized weights into memory.</li>
+           <li><strong>Prompt Input:</strong> Entering the user query.</li>
+           <li><strong>Generation:</strong> The tool handles the complex mathematical process, streaming the token output back to you word by word for near-instant feedback.</li>
+       </ol>
+     </section>
    </div>
   <p>
     For project setup notes, developer details, and full documentation on core features:
