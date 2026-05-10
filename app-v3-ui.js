@@ -1855,6 +1855,10 @@ export function createAppUi(context) {
     const heroPostId = state.heroPlayerPostId || localStorage.getItem(HERO_POST_KEY);
     const heroPost = heroPostId ? getPostById(heroPostId) : null;
 
+    // MIXING FIX: If a post is ALREADY MOUNTED in the hero player, return it regardless of filters.
+    // This prevents the UI from swapping metadata while a video is playing.
+    if (state.heroPlayerElement && heroPost) return heroPost;
+
     const matchesSourceFilter = (post) => {
       if (!post || !isPlayablePost(post)) return false;
       if (!state.heroControlSource || state.heroControlSource === "all") return true;
@@ -2102,17 +2106,21 @@ export function createAppUi(context) {
   }
 
   function getControllablePlayerPost() {
-    // Priority: explicitly mounted hero post, then standby preview post, then mini player post
-    const heroPost = typeof getHeroPost === "function" ? getHeroPost() : null;
-    const standby = typeof getStandbyPreviewPost === "function" ? getStandbyPreviewPost() : null;
+    // Priority: explicitly mounted hero post, then explicitly open mini player post, then standby preview post
+    const heroPost = (typeof getHeroPost === "function" ? getHeroPost() : null);
     const mini = getPostById(state.activePlayerPostId || state.playerPostId);
+    const standby = typeof getStandbyPreviewPost === "function" ? getStandbyPreviewPost() : null;
 
-    const active = heroPost || standby || mini;
+    // MIXING FIX: Prioritize explicitly active posts (playing or open in mini)
+    // and let them bypass source filters.
+    if (state.heroPlayerPostId && heroPost) return heroPost;
+    if (mini) return mini;
+
+    const active = heroPost || standby;
     const source = (state.heroControlSource || state.heroMediaSource || "").toLowerCase();
 
     if (source === "youtube" || source === "spotify") {
-      // If the active post doesn't match the source, don't return it as "controllable"
-      // This forces the player to fallback to a standby post that matches the source.
+      // If nothing is active, only return standby posts that match the source filter.
       if (active && active.sourceKind !== source) return null;
     }
     return active;
@@ -2132,96 +2140,6 @@ export function createAppUi(context) {
     return post.embedUrl || post.src || post.mediaUrl || "";
   }
 
-  function resolveNativeYouTubeOpenUri(post) {
-    const candidates = [post?.externalUrl, post?.embedUrl, post?.externalId, post?.mediaUrl, post?.src, post?.label, post?.caption, post?.title];
-    for (const candidate of candidates) {
-      if (typeof candidate !== "string" || !candidate.trim()) continue;
-      const parsed = parseYouTubeUrl(candidate);
-      const externalId = typeof parsed?.externalId === "string" ? parsed.externalId.trim() : "";
-      if (/^[a-zA-Z0-9_-]{11}$/.test(externalId)) return `vnd.youtube:${externalId}`;
-    }
-    return "";
-  }
-
-  function resolveNativeYouTubePackage(post) {
-    const candidates = [post?.externalUrl, post?.originalUrl, post?.embedUrl, post?.mediaUrl, post?.src, post?.label, post?.caption, post?.title];
-    for (const candidate of candidates) {
-      if (typeof candidate !== "string" || !candidate.trim()) continue;
-      const value = candidate.trim().toLowerCase();
-      if (value.includes("music.youtube.com") || value.includes("youtube music")) {
-        return "com.google.android.apps.youtube.music";
-      }
-    }
-    return "com.google.android.youtube";
-  }
-
-  function resolveNativeSpotifyOpenUri(post) {
-    const candidates = [post?.externalUrl, post?.originalUrl, post?.embedUrl, post?.externalId, post?.mediaUrl, post?.src, post?.label, post?.caption, post?.title];
-    for (const rawCandidate of candidates) {
-      if (typeof rawCandidate !== "string" || !rawCandidate.trim()) continue;
-      const candidate = rawCandidate.trim();
-
-      const spotifyUri = parseSpotifyUri(candidate);
-      if (spotifyUri) return `spotify:${spotifyUri.type}:${spotifyUri.externalId}`;
-
-      const parsed = parseSpotifyUrl(candidate);
-      if (parsed?.externalId) {
-        const inferredType = inferSpotifyTypeFromSource({
-          embedUrl: parsed.embedUrl,
-          externalUrl: parsed.originalUrl,
-          originalUrl: parsed.originalUrl,
-          externalId: parsed.externalId,
-          label: parsed.label,
-          caption: post?.caption ?? "",
-          title: post?.title ?? "",
-        });
-        if (isSpotifyEntityType(inferredType)) return `spotify:${inferredType}:${parsed.externalId}`;
-      }
-
-      try {
-        const candidateUrl = new URL(candidate);
-        const host = candidateUrl.hostname.replace(/^www\./i, "").replace(/^open\./i, "").replace(/^play\./i, "");
-        if (host !== "spotify.com") continue;
-        const segments = candidateUrl.pathname.split("/").filter(Boolean);
-        if (segments[0] && /^intl-[a-z]{2,5}$/i.test(segments[0])) segments.shift();
-        if (segments[0] === "embed") segments.shift();
-        const type = `${segments[0] || ""}`.trim().toLowerCase();
-        const externalId = `${segments[1] || ""}`.trim();
-        if (isSpotifyEntityType(type) && externalId) return `spotify:${type}:${externalId}`;
-      } catch { }
-    }
-    return "spotify:";
-  }
-
-  function launchNativeExternalMediaApp(post) {
-    if (!post) return false;
-
-    let packageName = "";
-    let openUri = "";
-    if (post.sourceKind === "youtube") {
-      packageName = resolveNativeYouTubePackage(post);
-      openUri = resolveNativeYouTubeOpenUri(post);
-    } else if (post.sourceKind === "spotify") {
-      packageName = "com.spotify.music";
-      openUri = resolveNativeSpotifyOpenUri(post);
-    }
-
-    if (heroMediaPlayerController && typeof heroMediaPlayerController.openNowPlayingMediaApp === "function") {
-      const handled = heroMediaPlayerController.openNowPlayingMediaApp(packageName, openUri);
-      if (handled) return true;
-    }
-
-    if (!isNativeCapacitorApp() || getCapacitorPlatform() !== "android") return false;
-    if (post.sourceKind !== "youtube" && post.sourceKind !== "spotify") return false;
-    if (!window.NativeBridge || typeof window.NativeBridge.openNowPlayingMediaApp !== "function") return false;
-
-    try {
-      window.NativeBridge.openNowPlayingMediaApp(packageName, openUri, true);
-      return true;
-    } catch {
-      return false;
-    }
-  }
 
   function buildPersistentPlayerSource(post) {
     let source = resolveExternalEmbedSource(post);
@@ -2448,12 +2366,18 @@ export function createAppUi(context) {
         stage.classList.add("external-preview-launchable");
         stage.setAttribute("role", "button");
         stage.setAttribute("tabindex", "0");
-        const launchNativeExternal = () => { void launchNativeExternalMediaApp(post); };
-        stage.addEventListener("click", launchNativeExternal);
+        const launchExternal = () => {
+          if (heroMediaPlayerController && typeof heroMediaPlayerController.handleOpenMedia === "function") {
+            heroMediaPlayerController.handleOpenMedia();
+          }
+        };
+        stage.addEventListener("click", launchExternal);
         stage.addEventListener("keydown", (event) => {
           if (event.key !== "Enter" && event.key !== " ") return;
           event.preventDefault();
-          launchNativeExternal();
+          if (heroMediaPlayerController && typeof heroMediaPlayerController.handleOpenMedia === "function") {
+            heroMediaPlayerController.handleOpenMedia();
+          }
         });
         return stage;
       };

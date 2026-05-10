@@ -1657,64 +1657,6 @@ The companion bridge is designed with several security layers to keep your PC sa
     return false;
   }
 
-  let isRefreshing = false;
-  async function handleRefresh() {
-    if (isRefreshing || !hasUi()) return;
-    isRefreshing = true;
-
-    // Visual feedback on the stage/status
-    const prevStatus = elements.heroPlayerStatus.textContent;
-    elements.heroPlayerStatus.textContent = "REFRESHING...";
-    elements.heroPlayerRefreshButton?.classList.add("loading");
-
-    try {
-      // 0. Force the Stage to re-render by clearing its internal preview cache key
-      if (elements.heroPlayerStage) {
-        delete elements.heroPlayerStage.dataset.heroPreviewKey;
-      }
-
-      // 1. Clear matched post cache temporarily to force a re-evaluation
-      matchedPost = null;
-
-      // 2. Force immediate refresh of available snapshots
-      if (hasNativeSnapshotBridge()) {
-        await refreshNativeSnapshot({ renderAfter: false });
-      }
-      if (canUseDesktopBridge()) {
-        await refreshDesktopSnapshot({ renderAfter: false, force: true });
-      }
-
-      // 3. Android: Explicitly poke the native layer to broadcast state
-      if (isNativeCapacitorApp()) {
-        const bridge = getNativeBridge();
-        if (bridge && typeof bridge.forceRefreshNowPlaying === "function") {
-          bridge.forceRefreshNowPlaying();
-        }
-      }
-
-      // 4. Re-render the UI
-      render();
-
-      if (typeof window.showNotification === "function") {
-        window.showNotification({
-          title: "Player Synchronized",
-          body: "Media session state has been refreshed.",
-          kind: "success"
-        });
-      }
-    } catch (error) {
-      console.error("[Hero] Refresh failed:", error);
-    } finally {
-      setTimeout(() => {
-        isRefreshing = false;
-        elements.heroPlayerRefreshButton?.classList.remove("loading");
-        // Restore status if it hasn't been changed by a newer poll
-        if (elements.heroPlayerStatus.textContent === "REFRESHING...") {
-          elements.heroPlayerStatus.textContent = prevStatus;
-        }
-      }, 800);
-    }
-  }
 
   function performNativeAction(action) {
     if (!hasNativeActionBridge()) return false;
@@ -1882,7 +1824,8 @@ The companion bridge is designed with several security layers to keep your PC sa
       parseYouTubeUrl, performSupabaseDesktopAction, heroMode,
       findMatchedPost, openViewer, normalizePlayerVolume, savePlayerVolume,
       applyPlayerVolumeToActiveElement, mountPersistentPlayer, destroyActivePlayer,
-      getPostById
+      getPostById, refreshNativeSnapshot, refreshDesktopSnapshot,
+      hasNativeSnapshotBridge, canUseDesktopBridge
     };
   }
 
@@ -1911,7 +1854,23 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
   
   function handleRefresh(options = {}) {
-    handleRefreshAction({ ...getActionContext(), ...options });
+    if (!hasUi()) return;
+
+    // Visual feedback on the stage/status
+    const prevStatus = elements.heroPlayerStatus.textContent;
+    elements.heroPlayerStatus.textContent = "REFRESHING...";
+    elements.heroPlayerRefreshButton?.classList.add("loading");
+
+    try {
+      handleRefreshAction({ ...getActionContext(), ...options });
+    } finally {
+      setTimeout(() => {
+        elements.heroPlayerRefreshButton?.classList.remove("loading");
+        if (elements.heroPlayerStatus.textContent === "REFRESHING...") {
+          elements.heroPlayerStatus.textContent = prevStatus;
+        }
+      }, 800);
+    }
   }
 
   function renderStagePreview(mode, post, fallbackMedia) {
