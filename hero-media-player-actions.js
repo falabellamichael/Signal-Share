@@ -82,10 +82,11 @@ export function handleOpenMediaAction(context) {
     const title = (desktopSnapshot.title || "").toLowerCase();
     const meta = (desktopSnapshot.meta || "").toLowerCase();
 
-    const isSpotify = appPackage.includes("spotify") || meta.includes("spotify") || prefersSpotify;
-    const isYouTube = appPackage.includes("youtube") || meta.includes("youtube") || title.includes("youtube") || prefersYouTube;
+    const systemIsSpotify = appPackage.includes("spotify") || meta.includes("spotify");
+    const systemIsYouTube = appPackage.includes("youtube") || meta.includes("youtube") || title.includes("youtube");
 
-    if (isYouTube) {
+    // Source Isolation: Respect the toggle strictly
+    if (prefersYouTube && (systemIsYouTube || (!systemIsSpotify && !post))) {
       // Prioritize direct link from bridge
       let youtubeUrl = resolveYouTubeUrl(desktopSnapshot.openUri);
       
@@ -107,7 +108,7 @@ export function handleOpenMediaAction(context) {
         const query = [title, meta].filter(Boolean).join(" ");
         targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
       }
-    } else if (isSpotify && !prefersYouTube) {
+    } else if (prefersSpotify && (systemIsSpotify || (!systemIsYouTube && !post))) {
       // Pop up Spotify app on PC
       if (typeof performDesktopAction === "function") {
         performDesktopAction("open_uri", { uri: "spotify:" });
@@ -267,6 +268,28 @@ export function handlePlayPauseAction(context, forcePlay) {
   }
 
   // 2. System Media Modes (Locked to Bridge/Native)
+  const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
+  const appPkg = (snapshot?.appPackage || "").toLowerCase();
+  const metaText = (snapshot?.meta || "").toLowerCase();
+  const titleText = (snapshot?.title || "").toLowerCase();
+  const systemIsSpotify = appPkg.includes("spotify") || metaText.includes("spotify");
+  const systemIsYouTube = appPkg.includes("youtube") || metaText.includes("youtube") || titleText.includes("youtube");
+
+  // Source Isolation: If YouTube mode is active, don't talk to Spotify
+  if (preferredSource === "youtube" && systemIsSpotify && !systemIsYouTube) {
+    console.log("[Hero] YouTube mode active. Ignoring system Spotify session.");
+    // Fallback: Control the "video it's previewing" (App mode) if it matches the source
+    if (controllablePost?.sourceKind === "youtube" && typeof toggleLocalPlayback === "function") {
+      toggleLocalPlayback(forcePlay, { target });
+    }
+    return;
+  }
+  // Source Isolation: If Spotify mode is active, don't talk to YouTube
+  if (preferredSource === "spotify" && systemIsYouTube && !systemIsSpotify) {
+    console.log("[Hero] Spotify mode active. Ignoring system YouTube session.");
+    return;
+  }
+
   const isSystemActive = mode === "desktop" ? Boolean(desktopSnapshot?.active) : Boolean(nativeSnapshot?.active);
   console.log(`[Hero] System Action Check. Active: ${isSystemActive}, Mode: ${mode}`);
 
@@ -340,7 +363,10 @@ export function handlePreviousAction(context) {
   } = context;
 
   const mode = target === "mini" ? "app" : heroMode;
-  console.log(`[Hero] handlePrevious. Mode: ${mode}, Target: ${target || 'default'}`);
+  const controllablePost = getControllablePlayerPost();
+  const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+  
+  console.log(`[Hero] handlePrevious. Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}`);
 
   if (mode === "app") {
     if (target === "mini") {
@@ -359,6 +385,26 @@ export function handlePreviousAction(context) {
     render();
     return;
   }
+
+  const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
+  const appPkg = (snapshot?.appPackage || "").toLowerCase();
+  const metaText = (snapshot?.meta || "").toLowerCase();
+  const titleText = (snapshot?.title || "").toLowerCase();
+  const systemIsSpotify = appPkg.includes("spotify") || metaText.includes("spotify");
+  const systemIsYouTube = appPkg.includes("youtube") || metaText.includes("youtube") || titleText.includes("youtube");
+
+  // Source Isolation
+  if (preferredSource === "youtube" && systemIsSpotify && !systemIsYouTube) {
+    if (controllablePost?.sourceKind === "youtube") {
+      if (target === "mini") {
+        if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
+      } else {
+        if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
+      }
+    }
+    return;
+  }
+  if (preferredSource === "spotify" && systemIsYouTube && !systemIsSpotify) return;
 
   if (mode === "desktop") {
     if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
@@ -389,7 +435,10 @@ export function handleNextAction(context) {
   } = context;
 
   const mode = target === "mini" ? "app" : heroMode;
-  console.log(`[Hero] handleNext. Mode: ${mode}, Target: ${target || 'default'}`);
+  const controllablePost = getControllablePlayerPost();
+  const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+
+  console.log(`[Hero] handleNext. Mode: ${mode}, Source: ${preferredSource}, Target: ${target || 'default'}`);
 
   if (mode === "app") {
     if (target === "mini") {
@@ -408,6 +457,26 @@ export function handleNextAction(context) {
     render();
     return;
   }
+
+  const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
+  const appPkg = (snapshot?.appPackage || "").toLowerCase();
+  const metaText = (snapshot?.meta || "").toLowerCase();
+  const titleText = (snapshot?.title || "").toLowerCase();
+  const systemIsSpotify = appPkg.includes("spotify") || metaText.includes("spotify");
+  const systemIsYouTube = appPkg.includes("youtube") || metaText.includes("youtube") || titleText.includes("youtube");
+
+  // Source Isolation
+  if (preferredSource === "youtube" && systemIsSpotify && !systemIsYouTube) {
+    if (controllablePost?.sourceKind === "youtube") {
+      if (target === "mini") {
+        if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
+      } else {
+        if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
+      }
+    }
+    return;
+  }
+  if (preferredSource === "spotify" && systemIsYouTube && !systemIsSpotify) return;
 
   if (mode === "desktop") {
     if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
