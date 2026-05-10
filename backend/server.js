@@ -189,12 +189,19 @@ function sanitizeMediaMeta(rawMeta = "", sourceAppId = "") {
   if (!meta) return "";
 
   for (const variant of getSourceAppIdVariants(sourceAppId)) {
-    const prefixPattern = new RegExp(`^${escapeRegex(variant)}\\s*(?:[-:|]\\s*)?`, "i");
-    const stripped = meta.replace(prefixPattern, "").trim();
-    if (stripped && stripped !== meta) {
-      meta = stripped;
-      break;
+    const pattern = new RegExp(`^${escapeRegex(variant)}\\s*(?:[-:|]\\s*)?|\\s*(?:[-:|]\\s*)?${escapeRegex(variant)}$`, "gi");
+    meta = meta.replace(pattern, "").trim();
+    
+    // Use a global loop to strip ALL occurrences if it's a numeric ID doubling/tripling
+    if (/^\d+$/.test(variant)) {
+      const midPattern = new RegExp(`(?:[-:|\\s]+)?${escapeRegex(variant)}(?:[-:|\\s]+)?`, "gi");
+      meta = meta.replace(midPattern, " ").trim();
     }
+  }
+
+  // If after sanitization the meta is just a bunch of separators or very short numeric garbage, clear it
+  if (meta && (/^[-\s:|]+$/.test(meta) || /^\d+$/.test(meta.replace(/[-\s:|]/g, "")))) {
+    meta = "";
   }
 
   const genericPrefixPattern = /^(?:spotify[a-z0-9._!-]*|operasoftware\.[a-z0-9._!-]*|msedge(?:\.exe)?|chrome(?:\.exe)?|firefox(?:\.exe)?|bluetooth|phone link)\s*(?:[-:|]\s*)?/i;
@@ -476,7 +483,7 @@ function buildFreshSnapshotPayload(preferredSource = "") {
     const sanitizedMeta = sanitizeMediaMeta(artist, sourceAppId);
     const sourceProvider = classifySessionProvider(session) || preferred;
 
-    const meta = (appLabel && sanitizedMeta && appLabel.toLowerCase() !== sanitizedMeta.toLowerCase())
+    const meta = (appLabel && sanitizedMeta && !/^\d+$/.test(appLabel) && appLabel.toLowerCase() !== sanitizedMeta.toLowerCase())
       ? `${appLabel} - ${sanitizedMeta}`
       : (sanitizedMeta || appLabel);
 
