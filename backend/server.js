@@ -294,7 +294,7 @@ function classifySessionProvider(session) {
 
   // Primary check: Source ID
   if (sourceAppId.includes("spotify")) return "spotify";
-  if (sourceAppId.includes("youtube") || sourceAppId.includes("ytmusic") || sourceAppId.includes("google.android.youtube")) return "youtube";
+  if (sourceAppId.includes("youtube") || sourceAppId.includes("ytmusic") || sourceAppId.includes("google.android.youtube") || sourceAppId.includes("you.tube")) return "youtube";
 
   // Secondary check: Metadata Text
   if (text.includes("open.spotify.com") || text.includes("spotify")) return "spotify";
@@ -304,6 +304,8 @@ function classifySessionProvider(session) {
     || text.includes("- youtube")
     || text.includes("youtu.be")
     || text.includes("music.youtube")
+    || text.includes("you tube")
+    || text.includes("ytmusic")
   ) return "youtube";
 
   if (sourceAppId.includes("phone link") || sourceAppId.includes("bluetooth") || text.includes("phone link") || text.includes("bluetooth")) return "phone_link";
@@ -325,8 +327,8 @@ function scoreSession(session, preferredSource = "") {
     const isMatch = (provider === preferred)
       || (preferred === "spotify" && sourceAppId.toLowerCase().includes("spotify"))
       || (preferred === "youtube" && /youtube|ytmusic|youtube\.music/i.test(sourceAppId))
-      || (preferred === "youtube" && isBrowser && provider !== "spotify" && text.includes("youtube"))
-      || (preferred === "spotify" && isBrowser && provider !== "youtube" && text.includes("spotify"));
+      || (preferred === "youtube" && isBrowser && provider !== "spotify" && (text.includes("youtube") || text.includes("youtu.be") || text.includes("video")))
+      || (preferred === "spotify" && isBrowser && provider !== "youtube" && (text.includes("spotify") || text.includes("open.spotify")));
 
     if (isMatch) {
       score += 10000; // Heavy boost for matching source

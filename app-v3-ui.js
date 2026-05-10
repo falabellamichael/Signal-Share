@@ -2360,7 +2360,7 @@ export function createAppUi(context) {
           title: displayTitle,
           meta: displayArtist ? `${displayArtist} · ${timestampOnly || "(Live on feed)"}` : baseMeta,
           note,
-          artworkUrl: metadata?.artworkUrl || artworkUrl
+          artworkUrl: metadata?.thumbnailUrl || metadata?.artworkUrl || artworkUrl
         });
 
         stage.classList.add("external-preview-launchable");
@@ -2418,7 +2418,7 @@ export function createAppUi(context) {
         title: displayTitle,
         meta: displayArtist || "",
         note: post.sourceKind === "youtube" ? "Video preview opens in the docked player." : "Music preview opens in the docked player.",
-        artworkUrl: metadata?.artworkUrl || artworkUrl,
+        artworkUrl: metadata?.thumbnailUrl || metadata?.artworkUrl || artworkUrl,
         showMetadata: variant === "card" || variant === "spotlight"
       });
     };
@@ -2547,7 +2547,20 @@ export function createAppUi(context) {
   }
 
 
-  async function fetchSpotifyPreviewOEmbedMetadata(sourceUrl) { return null; }
+  async function fetchSpotifyPreviewOEmbedMetadata(sourceUrl) {
+    if (!sourceUrl || typeof window.fetch !== "function") return null;
+    try {
+      const endpoint = `https://open.spotify.com/oembed?url=${encodeURIComponent(sourceUrl)}`;
+      const response = await window.fetch(endpoint, { method: "GET", cache: "force-cache" });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return {
+        title: typeof data.title === "string" ? data.title.trim() : "",
+        creator: typeof data.author_name === "string" ? data.author_name.trim() : "",
+        thumbnailUrl: typeof data.thumbnail_url === "string" ? data.thumbnail_url.trim() : ""
+      };
+    } catch { return null; }
+  }
 
   function getSpotifyPreviewMarket() { const locale = (Array.isArray(navigator.languages) && navigator.languages[0]) || navigator.language || navigator.userLanguage || ""; const match = `${locale}`.trim().match(/[-_]([A-Za-z]{2})$/); return match ? match[1].toUpperCase() : "US"; }
 

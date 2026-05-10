@@ -317,7 +317,6 @@ export function handlePlayPauseAction(context, forcePlay) {
   const mode = target === "mini" ? "app" : heroMode;
   const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   
-  // Memoized post resolution to minimize state lookups during rapid clicks
   const controllablePost = memoGet(`play_pause_post_${target}`, () => {
     const activeId = target === "mini" ? (state.activePlayerPostId || state.playerPostId) : (state.heroPlayerPostId || state.activePlayerPostId);
     const post = (activeId && typeof context.getPostById === "function") ? context.getPostById(activeId) : null;
@@ -329,7 +328,7 @@ export function handlePlayPauseAction(context, forcePlay) {
 
   console.log(`[Hero] Play/Pause Action. Mode: ${mode}, Source: ${preferredSource}, Target: ${target}`);
 
-  // 3. Local Priority: Control active website media elements (Videos/Audios)
+  // 3. Local Priority: Control active website media elements
   if (typeof toggleLocalPlayback === "function") {
     if (toggleLocalPlayback(forcePlay, { target })) {
       render();
@@ -352,7 +351,7 @@ export function handlePlayPauseAction(context, forcePlay) {
     return;
   }
 
-  // 5. System Bridge: Desktop / Native Device Control
+  // 5. System Bridge Control
   const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
   
   // Parse session metadata for source isolation
@@ -363,63 +362,43 @@ export function handlePlayPauseAction(context, forcePlay) {
   const isSpotify = app.includes("spotify") || meta.includes("spotify") || title.includes("spotify");
   const isYouTube = app.includes("youtube") || app.includes("ytmusic") || meta.includes("youtube") || title.includes("youtube") || title.includes("ytmusic");
 
-  // Enforce the "Media Toggle" Source Isolation rules
+  // Enforce Source Isolation
   let sourceMismatch = false;
-  if (preferredSource === "youtube" && isSpotify && !isYouTube) {
-    sourceMismatch = true;
-    console.log("[Hero] YouTube Mode active: Ignoring system Spotify session.");
-  } else if (preferredSource === "spotify" && isYouTube && !isSpotify) {
-    sourceMismatch = true;
-    console.log("[Hero] Spotify Mode active: Ignoring system YouTube session.");
-  }
+  if (preferredSource === "youtube" && isSpotify && !isYouTube) sourceMismatch = true;
+  else if (preferredSource === "spotify" && isYouTube && !isSpotify) sourceMismatch = true;
 
-  // Local Fallback: If system is idle or has wrong source, try to play the local post
-  const isSystemIdle = !snapshot?.active || sourceMismatch;
-  
-  console.log(`[Hero] Play/Pause Trace: Active=${snapshot?.active}, Idle=${isSystemIdle}, Mismatch=${sourceMismatch}, Source=${preferredSource}, System=${app}|${title}`);
-
-  if (isSystemIdle && controllablePost) {
-    const isCompatible = (preferredSource === "all" || !preferredSource) 
-      || (controllablePost.sourceKind === preferredSource)
-      || (controllablePost.sourceKind === "hosted");
-
-    if (isCompatible && typeof playHeroMedia === "function" && target !== "mini") {
-      console.log(`[Hero] Redirecting to local ${controllablePost.sourceKind} player.`);
-      playHeroMedia();
-      render();
-      return;
-    }
-  }
-
-  // If mismatch detected and no local player could wake up, block the command
   if (sourceMismatch) {
+    console.log(`[Hero] Play/Pause: Source mismatch (${preferredSource} mode vs ${isSpotify ? 'Spotify' : 'YouTube'} session). Ignoring bridge command.`);
+    
+    // If we have a local post matching the preferred mode, we can "wake up" to it
+    if (controllablePost && controllablePost.sourceKind === preferredSource && typeof playHeroMedia === "function" && target !== "mini") {
+        console.log(`[Hero] Waking up local ${preferredSource} player instead.`);
+        playHeroMedia();
+    }
     render();
     return;
   }
 
-  // 6. Final Execution via Bridge
+  // Bridge Execution
   if (mode === "desktop") {
-    // If we don't have a snapshot yet, try a blind command if the bridge is likely available
-    if (!desktopSnapshot) {
-      if (!isNativeCapacitorApp() && !companionPromptDismissed) {
-        if (typeof showCompanionPrompt === "function") showCompanionPrompt();
-        return;
-      }
-      console.log("[Hero] Sending blind Play/Pause bridge command.");
-      performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
-      render();
+    if (!isNativeCapacitorApp() && !companionPromptDismissed && !desktopSnapshot) {
+      if (typeof showCompanionPrompt === "function") showCompanionPrompt();
       return;
     }
-    
-    // Optimistic UI update: predict next playback state
-    const currentStatus = normalizePlaybackState(desktopSnapshot.playbackState);
-    const nextStatus = (typeof forcePlay === "boolean") ? (forcePlay ? "playing" : "paused") : (currentStatus === "playing" ? "paused" : "playing");
 
-    if (typeof setDesktopSnapshot === "function") {
-      const updated = { ...desktopSnapshot, active: true, playbackState: nextStatus };
-      setDesktopSnapshot(updated);
-      if (typeof setDesktopSnapshotSignature === "function") setDesktopSnapshotSignature(getDesktopSnapshotSignature(updated));
+    console.log(`[Hero] Sending Desktop Play/Pause. SnapshotActive: ${!!snapshot?.active}`);
+    
+    // Optimistic state update if a snapshot exists
+    if (desktopSnapshot) {
+      const currentStatus = normalizePlaybackState(desktopSnapshot.playbackState);
+      const nextStatus = (typeof forcePlay === "boolean") ? (forcePlay ? "playing" : "paused") : (currentStatus === "playing" ? "paused" : "playing");
+      if (typeof setDesktopSnapshot === "function") {
+        const updated = { ...desktopSnapshot, active: true, playbackState: nextStatus };
+        setDesktopSnapshot(updated);
+        if (typeof setDesktopSnapshotSignature === "function") setDesktopSnapshotSignature(getDesktopSnapshotSignature(updated));
+      }
     }
+
     performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
   } else if (mode === "device") {
     if (nativeSnapshot?.permissionRequired) {
@@ -427,18 +406,14 @@ export function handlePlayPauseAction(context, forcePlay) {
       return;
     }
     
-    if (!nativeSnapshot) {
-      console.log("[Hero] Sending blind Play/Pause native command.");
-      performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
-      render();
-      return;
-    }
+    console.log(`[Hero] Sending Native Play/Pause. SnapshotActive: ${!!snapshot?.active}`);
 
-    const currentStatus = normalizePlaybackState(nativeSnapshot.playbackState);
-    const nextStatus = (typeof forcePlay === "boolean") ? (forcePlay ? "playing" : "paused") : (currentStatus === "playing" ? "paused" : "playing");
-
-    if (typeof setNativeSnapshot === "function") {
-      setNativeSnapshot({ ...nativeSnapshot, active: true, playbackState: nextStatus });
+    if (nativeSnapshot) {
+      const currentStatus = normalizePlaybackState(nativeSnapshot.playbackState);
+      const nextStatus = (typeof forcePlay === "boolean") ? (forcePlay ? "playing" : "paused") : (currentStatus === "playing" ? "paused" : "playing");
+      if (typeof setNativeSnapshot === "function") {
+        setNativeSnapshot({ ...nativeSnapshot, active: true, playbackState: nextStatus });
+      }
     }
     performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
   }
