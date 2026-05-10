@@ -11,132 +11,125 @@
     <a class="questions-back-link" href="./index.html">← Back to site</a>
 
     <p class="questions-page-topline">Questions Guide</p>
-    <h1 id="how-to-title">How to use Signal Share</h1>
+    <h1>How to use Signal Share</h1>
     <p class="questions-page-lede">
       Signal Share is a media-sharing site built for creators, tech-focused communities, small companies,
       collaborators, and peers who want a simple place to post, discover, play, and share media.
     </p>
 
-    <!-- Section 1: Component Overview & State Management -->
-    <section class="questions-page-card" id="section-state">
-      <h2 id="section-state">1. Component Overview & State Management</h2>
-      <p>The Hero Player acts as the primary, unified media viewport. Its core responsibility is to abstract away the source complexity (YouTube embed vs. Spotify widget vs. local file upload) into a single, controllable playback interface.</p>
-      
-      <h3>State Variables (Client-Side Focus):</h3>
+    <section class="questions-page-card">
+      <h2>What Signal Share is for</h2>
+      <p>
+        Signal Share is designed as a lightweight media space where people can create profiles, post media,
+        share links, browse a feed, and interact with content. A normal media site helps users publish work,
+        discover creators, save or like content, build a profile, and keep media organized in one place.
+      </p>
+      <p>
+        The bigger goal is to support the tech industry, small companies, independent creators, and local teams
+        that need better ways to grow, present work, and share useful media among peers without overcomplicating
+        the experience.
+      </p>
+    </section>
+
+    <section class="questions-page-card">
+      <h2>Basic site use</h2>
+      <ol>
+        <li>Create or sign into your profile when account features are available.</li>
+        <li>Use the posting area to add a title, description, tags, and media.</li>
+        <li>Share supported media through uploaded files, YouTube links, or Spotify links.</li>
+        <li>Browse the feed to discover posts from other users.</li>
+        <li>Use the player area to preview or control supported media.</li>
+        <li>Use profile, save, like, and messaging features when they are enabled for your account.</li>
+      </ol>
+    </section>
+
+    <section class="questions-page-card">
+      <h2>Hero Player step-by-step guide</h2>
+      <p>
+        The Hero Player is the main media-control area. It can preview posted media and, when the desktop bridge
+        is running, control media playing on your Windows PC.
+      </p>
+
+      <h3>Option A: Play a post from the site</h3>
+      <ol>
+        <li>Find a YouTube or Spotify post in the feed.</li>
+        <li>Press the post/player action to load it into the Hero Player.</li>
+        <li>Use Play, Pause, Previous, or Next when the player has an active media item.</li>
+        <li>If the preview does not load, check that the post uses a valid YouTube or Spotify URL.</li>
+      </ol>
+
+      <h3>Option B: Control PC media with the desktop bridge</h3>
+      <ol>
+        <li>Download or open the desktop bridge package for your site.</li>
+        <li>Install the required packages with <strong>npm install</strong>.</li>
+        <li>Start the bridge with <strong>npm start</strong> or the start command included with your package.</li>
+        <li>Keep the bridge running while using PC media controls.</li>
+        <li>Open YouTube, Spotify, or another supported media app on the same Windows PC.</li>
+        <li>Return to Signal Share and switch the Hero Player to the PC/Desktop media mode.</li>
+        <li>Press Play, Pause, Previous, or Next. The command should control the active media session on your PC.</li>
+      </ol>
+
+      <h3>Bridge Secret</h3>
+      <p>
+        The Bridge Secret is an optional local security key. If your bridge has a secret configured, enter the same
+        value on the site so the page can talk to the local bridge. If no secret is configured, the field can be left empty.
+      </p>
+
+      <h3>Troubleshooting the Hero Player</h3>
       <ul>
-        <li><strong><code>currentMediaSource</code>: Determines the active playback mode ('youtube', 'spotify', 'local'). This dictates which embed/API is initialized.</li>
-        <li><strong><code>isPlaying</code>: Boolean state tracking whether playback is currently active or paused.</li>
-        <li><strong><code>playbackContextId</code>: A unique identifier generated upon loading a post, used to ensure that subsequent API calls target the correct session data within Supabase or locally.</li>
-        <li><strong><code>isDesktopBridgeActive</code>: Tracks connectivity status with the local desktop bridge service.</li>
-      </ul>
-
-      <h3>Playback Lifecycle Flow:</h3>
-      <ol>
-        <li><strong>Initialization:</strong> On page load, the component listens for initial state from the global store (or URL parameters). The player defaults to a neutral/placeholder view.</li>
-        <li><strong>Source Loading:</strong> When <code>loadMedia(postData)</code> is called, it first validates <code>postData.type</code> and <code>postData.url</code>. It then calls source-specific handlers (<code>initializeYoutubePlayer</code>, <code>initializeSpotifyClient</code>).</li>
-        <li><strong>State Update:</strong> Successful initialization updates the local state variables mentioned above, triggering a re-render of the player element.</li>
-      </ol>
-    </section>
-
-    <!-- Section 2: Media Source Integration Details -->
-    <section class="questions-page-card" id="section-media">
-      <h2 id="section-media">2. Media Source Integration Details</h2>
-      
-      <h3>YouTube Player Module:</h3>
-      <p>Uses the standard YouTube IFrame API (or embedded player object). The key interaction point is calling <code>player.playVideo()</code> and listening to <code>onStateChange</code> events (e.g., YT.PlayerState.ENDED) for state synchronization.</p>
-      <div class="code-snippet">
-        <strong>Key Functionality:</strong> Must handle API quota limits and gracefully degrade if the iframe cannot load metadata initially.
-      </div>
-
-      <h3>Spotify Integration Module:</h3>
-      <p>Relies on either a direct embedded widget or, for advanced control (e.g., track progress bar synchronization), requires interaction with an external Spotify Web API wrapper service.</p>
-      <div class="code-snippet">
-        <strong>Cross-Platform Concern:</strong> If using the official SDK, ensure session tokens are managed correctly upon page reload to prevent immediate disconnections from the music stream metadata.
-      </div>
-
-      <h3>Local/Uploaded Media:</h3>
-      <p>For uploaded files, the player defaults to a standard HTML5 <code>&lt;video&gt;</code> element. Playback control is handled directly via JavaScript DOM manipulation (e.g., <code>videoElement.play()</code>). This path is the most resilient against external API changes.</p>
-    </section>
-
-    <!-- Section 3: Desktop Bridge Communication Protocol -->
-    <section class="questions-page-card" id="section-bridge">
-      <h2 id="section-bridge">3. Desktop Bridge IPC (Inter-Process Communication)</h2>
-      <p>When <code>isDesktopBridgeActive</code> is true, the player switches control logic from client-side DOM controls to sending standardized commands over a local WebSocket connection established with the bridge service.</p>
-
-      <h3>Protocol Details:</h3>
-      <p>The communication uses JSON payloads sent over the local endpoint (typically <code>ws://localhost:PORT</code>).</p>
-      <h4>Outgoing Commands (Client -> Bridge):</h4>
-      <ul style="list-style-type: disc; margin-left: 20px;">
-        <li><strong>Play Command:</strong> <code>{ "command": "PLAY", "mediaId": "..." }</code></li>
-        <li><strong>Pause Command:</strong> <code>{ "command": "PAUSE" }</code></li>
-        <li><strong>Next/Previous:</strong> <code>{ "command": "SEEK_ADJACENT", "direction": "next" | "prev" }</code></li>
-      </ul>
-
-      <h4>Incoming Events (Bridge -> Client):</h4>
-      <p>The client must listen for status updates from the bridge. Example event:</p>
-      <pre style="background-color: #eee; padding: 10px; color: #333;">{ "event": "STATE_UPDATED", "status": "PLAYING", "timeRemaining": 25 }</pre>
-
-      <h3 style="margin-top: 20px;">Security Note:</h3>
-      <p>The optional <strong style="color: red;">Bridge Secret</strong> must be validated server-side (if using a dedicated backend endpoint to relay commands) or strictly checked against client input on the page level to prevent unauthorized control hijacking.</p>
-    </section>
-
-    <!-- Section 4: Local LLM Operation (AI Integration) -->
-    <section class="questions-page-card" id="section-llm">
-      <h2 id="section-llm">4. 🌐 Local LLM Operation (AI Integration)</h2>
-      <p>For advanced functionality like content generation or tagging suggestions, Signal Share supports integration with local Large Language Models (LLMs) running via tools like <strong style="color: blue;">LM Studio</strong>.</p>
-
-      <h3>Core Principles:</h3>
-      <ul style="list-style-type: disc; margin-left: 20px;">
-        <li><strong>Privacy:</strong> All processing happens on the user's hardware. No metadata is sent to external APIs.</li>
-        <li><strong>Latency:</strong> Zero network round-trip; speed is limited only by local GPU/CPU performance.</li>
-        <li><strong>Connectivity:</strong> Operates entirely offline using quantized model weights (GGUF).</li>
-      </ul>
-
-      <h3>Integration Pattern:</h3>
-      <p>Similar to the Desktop Bridge, the AI module establishes a local WebSocket or HTTP connection to the LLM runner.</p>
-      <div class="code-snippet" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin: 10px 0;">
-        <strong>Conceptual Request:</strong><br>
-        <code>{ "action": "GENERATE_TAGS", "text": "A sunset over a digital ocean" }</code>
-      </div>
-
-      <h3>Prerequisites for Local LLM Execution:</h3>
-      <ol>
-        <li><strong>LLM Runner Software:</strong> You must first install a local inference engine such as <strong style="color: blue;">LM Studio</strong>, Ollama, or llama.cpp setup. This software manages the loading and running of model weights.</li>
-        <li><strong>Model Weights:</strong> Download a quantized version of the target LLM (e.g., Llama 3 GGUF format) that is compatible with your hardware's capabilities (GPU/RAM). The size dictates performance vs. resource usage.</li>
-        <li><strong>Port Binding:</strong> Configure the LLM Runner to expose an accessible local API endpoint (typically a WebSocket or HTTP REST interface) on a specific port (e.g., 12345).</li>
-      </ol>
-
-      <h3>Execution Flow Checklist (Client Perspective):</h3>
-      <ol>
-        <li><strong>Discovery:</strong> The client-side JS must first attempt to connect to the designated local API endpoint using a <code>fetch</code> or WebSocket connection.</li>
-        <li><strong>Connection Test:</strong> Validate connectivity and check for initial handshake success/failure. If it fails, show the 'LLM Unavailable' warning.</li>
-        <li><strong>Authentication:</strong> If required by your setup (e.g., API keys), securely retrieve and use credentials stored in a client-side config store (but <strong style="color: red;">never</strong> hardcoded).</li>
-        <li><strong>Request Dispatch:</strong> On user action, package the request JSON exactly as defined (<code>{ "action": "GENERATE_TAGS", ... }</code>) and dispatch it to the established WebSocket/HTTP stream.</li>
-        <li><strong>Response Handling:</strong> Process streamed responses. Streaming is preferred over waiting for a single large payload, allowing immediate UI feedback on token generation.</li>
-      </ol>
-      <div class="code-snippet" style="background: rgba(0,0,0,2); padding: 15px; border-radius: 12px; margin: 10px 0;">
-        <strong>Conceptual Connection Setup (Client JS):</strong><br>
-        <code>const ws = new WebSocket("ws://localhost:12345/llm");\nws.onmessage = (event) => { /* Handle streamed text */ };</code>
-      </div>
-
-      <h3>Technical Considerations:</h3>
-      <p>Implementations must verify available VRAM before loading heavy models to prevent system instability. The UI should gracefully degrade to manual entry if the local AI service is unavailable.</p>
-    </section>
-    
-    <!-- Section 5: Debugging Checklist -->
-    <section class="questions-page-card" id="section-debug">
-      <h2 id="section-debug">5. 🐞 Hero Player Debugging Checklist</h2>
-      <ul style="list-style-type: disc;">
-        <li><strong>[INIT]</strong> Did the component successfully read the <code class="code-highlight">playbackContextId</code> from the session state?</li>
-        <li><strong>[SOURCE VALIDATION]</strong> For YouTube/Spotify, is the source URL fully validated before attempting connection? (Check for malformed embed IDs).</li>
-        <li><strong>[STATE DRIFT]</strong> If playback seems stuck, manually force a state refresh by re-calling <code class="code-highlight">loadMedia</code> with the current post data.</li>
-        <li><strong>[BRIDGE CHECK]</strong> Is the local desktop bridge running and accessible via WebSocket <em style="color: red;">before</em> attempting to send a command? Check console logs for connection errors on the client side.</li>
+        <li>Make sure the desktop bridge is running before using PC media controls.</li>
+        <li>Make sure the media app is open and has an active song or video.</li>
+        <li>Use the same browser/device where the bridge is available.</li>
+        <li>Refresh the page after starting the bridge if the site was already open.</li>
+        <li>For YouTube and Spotify posts, use full valid links when publishing.</li>
       </ul>
     </section>
+  
+   <div id="developer-tools-panel" class="questions-page-card" style="display: none; border-color: rgba(70, 130, 180, 0.4); background: rgba(70, 130, 180, 0.05);">
+     <h2>Hero Player Deep Dive</h2>
+     <p>The Hero Player is a specialized media interface that abstracts multiple sources into a single control layer.</p>
+     <div class="questions-page-actions" style="justify-content: flex-start; gap: 10px; margin-top: 15px;">
+       <a class="questions-page-button" href="./hero-player-deepdive.html" style="background: #4682b4; color: white;">Open Technical Deep Dive</a>
+     </div>
 
-    <div class="questions-page-actions" style="margin-top: 30px;">
-      <a class="questions-page-button" href="./how-to-guide.html">← Back to How To Guide</a>
-    </div>
-  </main>
+     <hr style="margin: 25px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.1);">
+
+     <!-- Developer Deep Dive Content Panel -->
+     <section id="developer-panel">
+       <h3 style="color: #ffffff;">🌐 Understanding Local LLM Inference (LM Studio Guide)</h3>
+       <p>This guide explains the concept of running Large Language Models (LLMs) locally using tools like LM Studio. This technology allows powerful AI capabilities to run entirely offline, providing maximum privacy and control over data.</p>
+
+       <h4 style="color: #4682b4;">What is Local LLM Inference?</h4>
+       <p>Local inference means that the entire process—from taking a prompt (input) to generating a response (output)—happens solely on your physical computer (CPU/GPU). The model weights are downloaded and stored locally, eliminating the need for continuous internet connectivity or sending private data to external cloud APIs.</p>
+
+       <h4 style="color: #4682b4;">Key Concepts Explained</h4>
+       <ul style="list-style-type: disc; margin-left: 20px;">
+         <li><strong style="display: block; margin-top: 10px; color: rgba(255,255,255,0.9);">Model Weights (e.g., GGUF):</strong> These are the massive files containing the "knowledge" of the AI. Different models excel at different tasks (coding, creative writing, summarization).</li>
+         <li><strong style="display: block; margin-top: 10px; color: rgba(255,255,255,0.9);">Quantization:</strong> This is the process of reducing the precision of model weights (e.g., from 32-bit to 4-bit). It significantly shrinks the file size and VRAM/RAM requirement, allowing massive models to run on consumer hardware.</li>
+         <li><strong style="display: block; margin-top: 10px; color: rgba(255,255,255,0.9);">Inference:</strong> This is the technical term for the act of running the model—the actual calculation process of predicting the next most statistically probable word based on your prompt.</li>
+       </ul>
+
+       <h4 style="color: #4682b4; margin-top: 20px;">The General Workflow</h4>
+       <p>A typical workflow involves:</p>
+       <ol style="margin-left: 20px;">
+           <li><strong>Download/Select Model:</strong> Choosing a model optimized for the required task (e.g., Code generation vs. Chat).</li>
+           <li><strong>Load in Tool (LM Studio):</strong> Using the tool to load the quantized weights into memory.</li>
+           <li><strong>Prompt Input:</strong> Entering the user query.</li>
+           <li><strong>Generation:</strong> The tool handles the complex mathematical process, streaming the token output back to you word by word for near-instant feedback.</li>
+       </ol>
+     </section>
+   </div>
+  <p>
+    For project setup notes, developer details, and full documentation on core features:
+  </p>
+  <div class="questions-page-actions">
+    <a class="questions-page-button" href="./index.html">Back to Signal Share</a>
+    <a class="questions-page-button" href="./contact.html">Contact us</a>
+    <a class="questions-page-button" href="./README.md">Open README</a>
+    <!-- NEW COOL TOGGLE HERE -->
+    <button id="toggle-deepdive" class="questions-page-button toggle-button" onclick="const p = document.getElementById('developer-tools-panel'); if(p) { const isH = p.style.display === 'none'; p.style.display = isH ? 'block' : 'none'; if(isH) p.scrollIntoView({behavior:'smooth'}); }">Toggle Developer Tools</button>
+  </div>
+</main>
+
 </body>
 </html>
