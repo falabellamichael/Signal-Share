@@ -280,28 +280,46 @@ export function handlePlayPauseAction(context, forcePlay) {
   const systemIsSpotify = appPkg.includes("spotify") || metaText.includes("spotify");
   const systemIsYouTube = appPkg.includes("youtube") || metaText.includes("youtube") || titleText.includes("youtube");
 
-  // Source Isolation: If YouTube mode is active, don't talk to Spotify
+  // Source Isolation: If we have a system session but it's the WRONG source,
+  // we treat the system as "idle" so we can trigger the "Wake Up" logic or local playback.
+  let isWrongSystemSource = false;
   if (preferredSource === "youtube" && systemIsSpotify && !systemIsYouTube) {
+    isWrongSystemSource = true;
     console.log("[Hero] YouTube mode active. Ignoring system Spotify session.");
-    // Fallback: Control the "video it's previewing" (App mode) if it matches the source
-    if (controllablePost?.sourceKind === "youtube" && typeof toggleLocalPlayback === "function") {
-      toggleLocalPlayback(forcePlay, { target });
-    }
-    render();
-    return;
-  }
-  // Source Isolation: If Spotify mode is active, don't talk to YouTube
-  if (preferredSource === "spotify" && systemIsYouTube && !systemIsSpotify) {
+  } else if (preferredSource === "spotify" && systemIsYouTube && !systemIsSpotify) {
+    isWrongSystemSource = true;
     console.log("[Hero] Spotify mode active. Ignoring system YouTube session.");
-    // Fallback: Control local Spotify preview if available
-    if (controllablePost?.sourceKind === "spotify" && typeof toggleLocalPlayback === "function") {
-      toggleLocalPlayback(forcePlay, { target });
-    }
-    render();
-    return;
   }
 
-  const isSystemActive = mode === "desktop" ? Boolean(desktopSnapshot?.active) : Boolean(nativeSnapshot?.active);
+  const isSystemActive = !isWrongSystemSource && (mode === "desktop" ? Boolean(desktopSnapshot?.active) : Boolean(nativeSnapshot?.active));
+  console.log(`[Hero] System Action Check. Active: ${isSystemActive}, Mode: ${mode}, WrongSource: ${isWrongSystemSource}`);
+
+  if (!isSystemActive && controllablePost && controllablePost.sourceKind === preferredSource) {
+      const url = controllablePost.externalUrl || controllablePost.embedUrl || controllablePost.src || (controllablePost.externalId ? `https://www.youtube.com/watch?v=${controllablePost.externalId}` : "");
+      if (url) {
+          console.log(`[Hero] Waking up idle system with: ${url}`);
+          if (isNativeCapacitorApp()) {
+              const bridge = getNativeBridge();
+              if (bridge && typeof bridge.openNowPlayingMediaApp === "function") {
+                  const pkg = preferredSource === "spotify" ? "com.spotify.music" : "com.google.android.youtube";
+                  bridge.openNowPlayingMediaApp(pkg, url, true);
+                  return;
+              }
+          } else {
+              window.open(url, "_blank");
+              return;
+          }
+      }
+  }
+
+  // If it was the wrong source and we didn't wake up anything, try local playback as a last resort
+  if (isWrongSystemSource) {
+    if (typeof toggleLocalPlayback === "function") {
+      toggleLocalPlayback(forcePlay, { target });
+    }
+    render();
+    return;
+  }
   console.log(`[Hero] System Action Check. Active: ${isSystemActive}, Mode: ${mode}`);
 
   if (!isSystemActive && controllablePost && controllablePost.sourceKind === preferredSource) {
