@@ -1,7 +1,8 @@
 import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js";
 import { 
   handleOpenMediaAction, handleOpenPhoneAction, 
-  handlePlayPauseAction, handleNextAction, handlePreviousAction 
+  handlePlayPauseAction, handleNextAction, handlePreviousAction,
+  handleVolumeAction
 } from "./hero-media-player-actions.js";
 
 
@@ -1857,7 +1858,8 @@ The companion bridge is designed with several security layers to keep your PC sa
     const heroMode = getEffectiveHeroMode(controllablePost);
     return {
       state, elements, getControllablePlayerPost, getEffectiveHeroMode,
-      getFallbackPageMediaElement, playHeroMedia, render,
+      getFallbackPageMediaElement, getActivePlayerMediaElement,
+      playHeroMedia, render,
       nativeSnapshot, performNativeAction, NATIVE_ACTION_PLAY_PAUSE,
       NATIVE_ACTION_NEXT, NATIVE_ACTION_PREVIOUS, NATIVE_ACTION_COOLDOWN_MS,
       desktopSnapshot, performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE,
@@ -1869,104 +1871,34 @@ The companion bridge is designed with several security layers to keep your PC sa
       setDesktopSnapshotSignature: (s) => { lastDesktopSnapshotSignature = s; },
       lastNativeActionAt, lastDesktopActionAt, stepHeroPlayer, stepMiniPlayer,
       ensureControllablePost, getNativeBridge, hasNativeSettingsBridge,
-      parseYouTubeUrl, performSupabaseDesktopAction, heroMode
+      parseYouTubeUrl, performSupabaseDesktopAction, heroMode,
+      findMatchedPost, openViewer, normalizePlayerVolume, savePlayerVolume,
+      applyPlayerVolumeToActiveElement
     };
   }
 
   function handlePlayPause(forcePlay) {
-    const controllablePost = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(controllablePost);
-
-    if (mode === "app") {
-      const isHeroActive = state.heroPlayerPostId
-        && !!state.heroPlayerElement
-        && elements.heroPlayerStage.contains(state.heroPlayerElement);
-
-      if (isHeroActive) {
-        toggleLocalPlayback(forcePlay);
-      } else if (typeof playHeroMedia === "function") {
-        playHeroMedia();
-      }
-      render();
-      return;
-    }
-
     handlePlayPauseAction(getActionContext(), forcePlay);
   }
 
   function handlePrevious() {
-    const controllablePost = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(controllablePost);
-
-    if (mode === "app") {
-      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-      stepHeroPlayer(-1);
-      render();
-      return;
-    }
-
     handlePreviousAction(getActionContext());
   }
 
   function handleNext() {
-    const controllablePost = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(controllablePost);
-
-    if (mode === "app") {
-      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
-      stepHeroPlayer(1);
-      render();
-      return;
-    }
-
     handleNextAction(getActionContext());
   }
 
   function handleOpenPhone() {
-    handleOpenPhoneAction(getControllablePlayerPost(), getActionContext());
+    handleOpenPhoneAction(getActionContext());
   }
 
   function handleOpenMedia() {
-    const controllablePost = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(controllablePost);
-    let post = null;
-
-    if (mode === "app") {
-      post = controllablePost;
-    } else if (mode === "desktop" && desktopSnapshot) {
-      post = findMatchedPost(desktopSnapshot);
-    } else if (mode === "device" && nativeSnapshot) {
-      post = findMatchedPost(nativeSnapshot);
-    }
-
-    handleOpenMediaAction(post, getActionContext());
+    handleOpenMediaAction(getActionContext());
   }
 
   function handleVolumeInput(event) {
-    const post = getControllablePlayerPost();
-    const mode = getEffectiveHeroMode(post);
-
-    const rawValue = Number(event.target?.value);
-    const volume = normalizePlayerVolume(rawValue / 100, state.playerVolume);
-
-    state.playerVolume = volume;
-    savePlayerVolume(state.playerVolume);
-
-    if (mode === "device") {
-      const bridge = getNativeBridge();
-      if (bridge && typeof bridge.setNowPlayingVolume === "function") {
-        bridge.setNowPlayingVolume(volume);
-      }
-    } else if (mode === "desktop" && desktopSnapshot?.available) {
-      // Windows SMTC does not expose reliable app volume control here; avoid flooding the bridge with unsupported set_volume requests.
-    } else if (mode === "app") {
-      applyPlayerVolumeToActiveElement();
-      const fallbackMedia = getFallbackPageMediaElement();
-      if (!(getActivePlayerMediaElement() instanceof HTMLMediaElement) && fallbackMedia instanceof HTMLMediaElement) {
-        try { fallbackMedia.volume = state.playerVolume; } catch { }
-      }
-    }
-    render();
+    handleVolumeAction(getActionContext(), event);
   }
 
   function renderStagePreview(mode, post, fallbackMedia) {

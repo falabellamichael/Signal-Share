@@ -4,8 +4,24 @@
  * and System Media control (Play/Pause, Next, Previous).
  */
 
-export function handleOpenMediaAction(post, context) {
-  const { isNativeCapacitorApp, openViewer, desktopSnapshot, performDesktopAction, parseYouTubeUrl, state } = context;
+export function handleOpenMediaAction(context) {
+  const {
+    isNativeCapacitorApp, openViewer, desktopSnapshot, nativeSnapshot,
+    performDesktopAction, parseYouTubeUrl, state, findMatchedPost,
+    getControllablePlayerPost, getEffectiveHeroMode
+  } = context;
+
+  const controllablePost = getControllablePlayerPost();
+  const mode = getEffectiveHeroMode(controllablePost);
+  let post = null;
+
+  if (mode === "app") {
+    post = controllablePost;
+  } else if (mode === "desktop" && desktopSnapshot) {
+    post = typeof findMatchedPost === "function" ? findMatchedPost(desktopSnapshot) : null;
+  } else if (mode === "device" && nativeSnapshot) {
+    post = typeof findMatchedPost === "function" ? findMatchedPost(nativeSnapshot) : null;
+  }
 
   if (!post && !desktopSnapshot?.available) {
     console.warn("handleOpenMediaAction: No active post or desktop session.");
@@ -126,8 +142,9 @@ export function handleOpenMediaAction(post, context) {
   }
 }
 
-export function handleOpenPhoneAction(post, context) {
-  const { isNativeCapacitorApp, state, performDesktopAction, parseYouTubeUrl } = context;
+export function handleOpenPhoneAction(context) {
+  const { isNativeCapacitorApp, state, performDesktopAction, getControllablePlayerPost } = context;
+  const post = getControllablePlayerPost();
 
   // 1. Android Native App -> "Open PC" Action
   if (isNativeCapacitorApp()) {
@@ -217,11 +234,19 @@ export function handlePlayPauseAction(context, forcePlay) {
   } = context;
 
   const mode = heroMode;
-  console.log(`[Hero] handlePlayPause (Media Mode). Mode: ${mode}, HeroControlMode: ${state.heroControlMode}, DesktopActive: ${Boolean(desktopSnapshot?.active)}`);
 
-  // Handle App mode first
+  // 1. App Mode Logic
   if (mode === "app") {
-    if (typeof playHeroMedia === "function") playHeroMedia();
+    const isHeroActive = state.heroPlayerPostId
+      && !!state.heroPlayerElement
+      && elements.heroPlayerStage.contains(state.heroPlayerElement);
+
+    if (isHeroActive) {
+      if (typeof toggleLocalPlayback === "function") toggleLocalPlayback(forcePlay);
+    } else if (typeof playHeroMedia === "function") {
+      playHeroMedia();
+    }
+    render();
     return;
   }
 
@@ -230,7 +255,7 @@ export function handlePlayPauseAction(context, forcePlay) {
   if (state.heroControlSource === "youtube") {
     const isDesktopPlaying = normalizePlaybackState(desktopSnapshot?.playbackState) === "playing";
     const post = getControllablePlayerPost();
-    const isAppPlaying = post && state.activePlayerPostId === post.id; // Simple check for active player
+    const isAppPlaying = post && state.activePlayerPostId === post.id;
 
     if (!isDesktopPlaying && !isAppPlaying && post && post.sourceKind === "youtube") {
       if (typeof playHeroMedia === "function") {
@@ -244,8 +269,6 @@ export function handlePlayPauseAction(context, forcePlay) {
   let actionHandled = false;
 
   if (mode === "desktop") {
-    // If bridge is detected but we don't have a snapshot yet, we still try the action
-    // but we can't do optimistic state updates without a snapshot.
     if (!isNativeCapacitorApp() && !desktopSnapshot && !companionPromptDismissed) {
       if (typeof showCompanionPrompt === "function") showCompanionPrompt();
       return;
@@ -285,9 +308,9 @@ export function handlePlayPauseAction(context, forcePlay) {
     actionHandled = true;
   }
 
-  // Fallback to local browser media if the primary action didn't resolve the play/pause request
+  // Fallback to local browser media
   const localMedia = typeof getFallbackPageMediaElement === "function" ? getFallbackPageMediaElement() : null;
-  if (localMedia instanceof HTMLMediaElement) {
+  if (localMedia instanceof HTMLMediaElement && !actionHandled) {
     if (typeof toggleLocalPlayback === "function") {
       toggleLocalPlayback(forcePlay);
       actionHandled = true;
@@ -319,22 +342,29 @@ export function handlePreviousAction(context) {
   }
 
   if (mode === "desktop") {
+    if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
+      const updated = { ...desktopSnapshot, active: true, playbackState: "playing" };
+      setDesktopSnapshot(updated);
+      if (typeof setDesktopSnapshotSignature === "function") setDesktopSnapshotSignature(getDesktopSnapshotSignature(updated));
+    }
     performDesktopAction(DESKTOP_ACTION_PREVIOUS);
     actionHandled = true;
   } else if (mode === "device") {
+    if (nativeSnapshot && typeof setNativeSnapshot === "function") {
+      setNativeSnapshot({ ...nativeSnapshot, active: true, playbackState: "playing" });
+    }
     performNativeAction(NATIVE_ACTION_PREVIOUS);
     actionHandled = true;
   }
 
-  // Fallback to local browser media or feed stepping
-  const localMedia = typeof getFallbackPageMediaElement === "function" ? getFallbackPageMediaElement() : null;
-  if (localMedia instanceof HTMLMediaElement) {
-    // If we have a local video/audio, we don't necessarily want to step the mini player
-    // unless the user specifically clicked a "Next/Prev" button on the card.
-    actionHandled = true;
-  } else if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
-    if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
-    actionHandled = true;
+  if (!actionHandled) {
+    const localMedia = typeof getFallbackPageMediaElement === "function" ? getFallbackPageMediaElement() : null;
+    if (localMedia instanceof HTMLMediaElement) {
+      actionHandled = true;
+    } else if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
+      if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
+      actionHandled = true;
+    }
   }
 
   if (actionHandled) render();
@@ -362,21 +392,65 @@ export function handleNextAction(context) {
   }
 
   if (mode === "desktop") {
+    if (desktopSnapshot && typeof setDesktopSnapshot === "function") {
+      const updated = { ...desktopSnapshot, active: true, playbackState: "playing" };
+      setDesktopSnapshot(updated);
+      if (typeof setDesktopSnapshotSignature === "function") setDesktopSnapshotSignature(getDesktopSnapshotSignature(updated));
+    }
     performDesktopAction(DESKTOP_ACTION_NEXT);
     actionHandled = true;
   } else if (mode === "device") {
+    if (nativeSnapshot && typeof setNativeSnapshot === "function") {
+      setNativeSnapshot({ ...nativeSnapshot, active: true, playbackState: "playing" });
+    }
     performNativeAction(NATIVE_ACTION_NEXT);
     actionHandled = true;
   }
 
-  // Fallback to local browser media or feed stepping
-  const localMedia = typeof getFallbackPageMediaElement === "function" ? getFallbackPageMediaElement() : null;
-  if (localMedia instanceof HTMLMediaElement) {
-    actionHandled = true;
-  } else if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
-    if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
-    actionHandled = true;
+  if (!actionHandled) {
+    const localMedia = typeof getFallbackPageMediaElement === "function" ? getFallbackPageMediaElement() : null;
+    if (localMedia instanceof HTMLMediaElement) {
+      actionHandled = true;
+    } else if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
+      if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
+      actionHandled = true;
+    }
   }
 
   if (actionHandled) render();
+}
+
+export function handleVolumeAction(context, event) {
+  const {
+    state, getControllablePlayerPost, heroMode,
+    normalizePlayerVolume, savePlayerVolume,
+    getNativeBridge, applyPlayerVolumeToActiveElement,
+    getFallbackPageMediaElement, getActivePlayerMediaElement,
+    render
+  } = context;
+
+  const post = getControllablePlayerPost();
+  const mode = heroMode;
+
+  const rawValue = Number(event.target?.value);
+  const volume = normalizePlayerVolume(rawValue / 100, state.playerVolume);
+
+  state.playerVolume = volume;
+  savePlayerVolume(state.playerVolume);
+
+  if (mode === "device") {
+    const bridge = getNativeBridge();
+    if (bridge && typeof bridge.setNowPlayingVolume === "function") {
+      bridge.setNowPlayingVolume(volume);
+    }
+  } else if (mode === "desktop") {
+    // Unsupported
+  } else if (mode === "app") {
+    if (typeof applyPlayerVolumeToActiveElement === "function") applyPlayerVolumeToActiveElement();
+    const fallbackMedia = getFallbackPageMediaElement();
+    if (!(getActivePlayerMediaElement() instanceof HTMLMediaElement) && fallbackMedia instanceof HTMLMediaElement) {
+      try { fallbackMedia.volume = state.playerVolume; } catch { }
+    }
+  }
+  render();
 }
