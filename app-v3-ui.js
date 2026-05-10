@@ -2395,7 +2395,8 @@ export function createAppUi(context) {
           title: displayTitle,
           meta: displayArtist ? `${displayArtist} · ${timestampOnly || "(Live on feed)"}` : baseMeta,
           note,
-          artworkUrl: metadata?.thumbnailUrl || metadata?.artworkUrl || artworkUrl
+          artworkUrl: metadata?.thumbnailUrl || metadata?.artworkUrl || artworkUrl,
+          showMetadata: true
         });
 
         stage.classList.add("external-preview-launchable");

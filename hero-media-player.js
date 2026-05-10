@@ -1809,18 +1809,17 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function getEffectiveHeroMode(controllablePost) {
-    const preferredSource = getPreferredHeroControlSource();
-
-    // 1. FORCED FEED MODE: Always use local app logic.
+    // 1. Explicit Mode Override (House/Waveform icons)
+    // If the user has manually selected a mode, we must respect it strictly.
     if (state.heroControlMode === "feed") return "app";
-
-    // 2. FORCED MEDIA MODE: Always use bridge logic.
     if (state.heroControlMode === "media") {
       if (!isNativeCapacitorApp() && canUseDesktopBridge()) return "desktop";
       return "device";
     }
 
-    // 3. AUTO MODE or SOURCE-LOCKED logic:
+    const preferredSource = getPreferredHeroControlSource();
+
+    // 2. AUTO MODE or SOURCE-LOCKED logic:
     // If the user has locked the source to 'YouTube' or 'Spotify', we prioritize the bridge
     // for that specific platform to ensure "strict detection" of PC/Phone activity.
     if (preferredSource) {
@@ -1836,11 +1835,12 @@ The companion bridge is designed with several security layers to keep your PC sa
       return "device";
     }
 
-    // Default Auto behavior
+    // 3. Default Auto behavior
     if (shouldUseNativeMode(controllablePost)) return "device";
     if (shouldUseDesktopMode(controllablePost)) return "desktop";
     return "app";
   }
+
 
 
 

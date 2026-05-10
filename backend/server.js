@@ -340,13 +340,14 @@ function scoreSession(session, preferredSource = "") {
       || (preferred === "spotify" && isBrowser && provider !== "youtube" && (text.includes("spotify") || text.includes("open.spotify")));
 
     if (isMatch) {
-      score += 10000; // Heavy boost for matching source
+      score += 50000; // Even heavier boost for matching source
     } else {
-      score -= 20000; // Heavy penalty for non-matching source when preferred is set
+      score -= 100000; // Even heavier penalty for non-matching source
     }
   } else if (isPreferredApp(sourceAppId)) {
     score += 500;
   }
+
 
   if (text.includes("spotify")) score += 120;
   if (text.includes("youtube") || text.includes("youtu.be")) score += 120;

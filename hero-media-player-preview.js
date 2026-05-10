@@ -553,9 +553,12 @@ export function renderHeroStagePreview(options = {}) {
     isSpotifyActive,
   };
 
-  const standbyPost = !post && typeof getStandbyPreviewPost === "function"
+  const preferredSourceLocked = isSpotifyActive || isYouTubeMode;
+
+  const standbyPost = (!post && !preferredSourceLocked && typeof getStandbyPreviewPost === "function")
     ? safeCall(getStandbyPreviewPost, null)
     : null;
+
 
   if (mode === "device") {
     if (nativeSnapshot?.permissionRequired) {
@@ -564,6 +567,7 @@ export function renderHeroStagePreview(options = {}) {
         title: "Enable access",
         meta: "Allow media access to control this device.",
         note: "Use Play to open settings.",
+        showMetadata: true
       });
       return;
     }
@@ -578,6 +582,7 @@ export function renderHeroStagePreview(options = {}) {
         meta: (nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback")),
         note: (nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
         artworkUrl: artworkUrl,
+        showMetadata: true
       });
       return;
     }
@@ -592,6 +597,7 @@ export function renderHeroStagePreview(options = {}) {
       badge: "ON-DEVICE MEDIA",
       title: idleTitle,
       meta: idleMeta,
+      showMetadata: true
     });
     return;
   }
@@ -604,10 +610,12 @@ export function renderHeroStagePreview(options = {}) {
       commitCard(stage, {
         badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
         title: (desktopSnapshot.title || matchedPost?.title || "Now playing"),
-        meta: (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Desktop playback")),
+        meta: (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : (desktopSnapshot.appPackage || "Desktop playback"))),
         note: (desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
         artworkUrl: artworkUrl,
+        showMetadata: true
       });
+
       return;
     }
 
@@ -627,9 +635,11 @@ export function renderHeroStagePreview(options = {}) {
       badge: "PC SYSTEM MEDIA",
       title: idleTitle,
       meta: idleMeta,
+      showMetadata: true
     });
     return;
   }
+
 
   if (!post && canUseFallbackMedia(fallbackMedia)) {
     const metadata = safeCall(getBrowserMediaMetadata, null);
@@ -645,6 +655,7 @@ export function renderHeroStagePreview(options = {}) {
       meta: metadata?.artist || "Active media",
       note: "",
       artworkUrl: metadata?.artworkUrl || "",
+      showMetadata: true
     });
     return;
   }
@@ -655,6 +666,7 @@ export function renderHeroStagePreview(options = {}) {
       title: "Ready",
       meta: "Select media to begin",
       note: "",
+      showMetadata: true
     });
     return;
   }
@@ -673,10 +685,12 @@ export function renderHeroStagePreview(options = {}) {
   let resolvedMetadata = externalMetadata;
   if (externalMetadata instanceof Promise) {
     commitCard(stage, {
+    commitCard(stage, {
       badge: "NOW PLAYING",
       title: post.title || "Now playing",
       meta: formatPostMeta(post, creatorSummary),
       artworkUrl: artworkUrl,
+      showMetadata: true
     });
 
     // Fetch metadata and update card when available
@@ -687,6 +701,7 @@ export function renderHeroStagePreview(options = {}) {
           title: metadata?.title || post.title || "Now playing",
           meta: metadata.creator || "",
           artworkUrl: metadata?.artworkUrl || artworkUrl,
+          showMetadata: true
         });
       }
     }).catch(() => {
@@ -700,5 +715,6 @@ export function renderHeroStagePreview(options = {}) {
     title: resolvedMetadata?.title || post.title || "Now playing",
     meta: resolvedMetadata?.creator || formatPostMeta(post, creatorSummary),
     artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
+    showMetadata: true
   });
 }
