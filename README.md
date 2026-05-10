@@ -196,7 +196,43 @@ The messenger will register the current browser/app instance against the signed-
 - Closed/background website notifications depend on browser push support. Desktop Chromium browsers work best; on iPhone/iPad, push requires the site to be added to the Home Screen.
 - If the push function is not deployed yet, messages still send normally; only the closed-app/background notification part is skipped.
 
-## Deploy to GitHub Pages
+## Direct Messenger
+
+The web app includes a real-time Direct Messenger with support for:
+
+- Local chiming when active in the foreground
+- Background push notifications via FCM (Android) or Web Push (Browser)
+- Supabase-powered message sync and delivery status
+
+## Remote Media & PC Bridge
+
+Signal Share can control playback on your local PC or Android device through dedicated media bridges.
+
+### Desktop Bridge (PC)
+
+The repository includes a Node.js-based bridge (`backend/server.js`) that:
+
+- Binds to your PC's local loopback for secure system-level media control
+- Supports Play, Pause, Next, and Previous actions for apps like Spotify and YouTube
+- Reports "Now Playing" snapshots (title, artist, artwork) back to the Signal Share UI
+- Includes a security-hardened setup script (`setup-companion.bat`) for easy installation
+
+### Native Bridge (Android)
+
+The Capacitor Android shell includes a native `PhoneNowPlayingHelper`:
+
+- Interfaces with the Android MediaSession system to observe background playback
+- Provides an "Open on Phone" handoff feature to launch web content directly into native apps
+- Supports cross-device synchronization via Supabase real-time actions
+
+### Mode Locking
+
+The player UI now supports "Mode Locking," which intelligently switches controls between:
+
+- `Feed Mode`: Controls the website's internal video/audio players
+- `Media Mode`: Directs playback commands to your system bridge (PC or Phone) based on the active source toggle (YouTube or Spotify)
+
+## Deployment to GitHub Pages
 
 1. Create a GitHub repository and upload the files in this folder.
 2. Push the repository to GitHub on the `main` branch.
