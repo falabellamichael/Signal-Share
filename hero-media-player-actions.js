@@ -35,6 +35,19 @@ export function memoGet(key, factory, ttl = 1000) {
   return value;
 }
 
+/**
+ * Shared debounce gate using ActionCache.
+ * Returns true if the action should be throttled.
+ */
+export function debounce(actionName, ttl = 600) {
+  const now = Date.now();
+  const key = `debounce_${actionName}`;
+  const entry = ActionCache.get(key);
+  if (entry && (now - entry.timestamp < ttl)) return true;
+  ActionCache.set(key, { value: true, timestamp: now });
+  return false;
+}
+
 export function handleOpenMediaAction(context) {
   const {
     isNativeCapacitorApp, openViewer, desktopSnapshot, nativeSnapshot,
@@ -301,7 +314,7 @@ export function handleOpenPhoneAction(context) {
   return;
 }
 
-export function handlePlayPauseAction(context, forcePlay) {
+export async function handlePlayPauseAction(context, forcePlay) {
   const {
     state, elements, getControllablePlayerPost, heroMode,
     render, nativeSnapshot, performNativeAction,
@@ -311,13 +324,12 @@ export function handlePlayPauseAction(context, forcePlay) {
     toggleLocalPlayback, playHeroMedia, getNativeBridge, target
   } = context;
 
-  const now = Date.now();
-
   // 1. AUTHORITATIVE COOLDOWN
-  if (state._lastPlayPauseAt && (now - state._lastPlayPauseAt < 600)) return;
-  state._lastPlayPauseAt = now;
-  state._mediaActionLockoutUntil = now + 300;  // Reduced lockout for faster UI updates
+  if (debounce("play-pause", 600)) return;
 
+  // 2. STABILIZATION LOCKOUT
+  const now = Date.now();
+  state._mediaActionLockoutUntil = now + 2800;
 
   // Identify modes and sources
   const isFeedMode = state.heroControlMode === "feed";
@@ -325,65 +337,92 @@ export function handlePlayPauseAction(context, forcePlay) {
   const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
 
-  // Mode Resolution: If no explicit mode, use heroMode auto-detection
+  // Mode Resolution
   const mode = target === "mini" ? "app" : (isFeedMode ? "app" : (isMediaMode ? (isNativeCapacitorApp() ? "device" : "desktop") : heroMode));
 
-  // 2. RESOLVE INTENT (Strictly based on resolved mode)
+  // 3. RESOLVE INTENT (Strictly based on resolved mode)
   let shouldPlay = true;
 
   if (mode === "app") {
     const localState = target === "mini" ? state.miniPlayerPlaybackState : state.heroPlayerPlaybackState;
     shouldPlay = (typeof forcePlay === "boolean") ? forcePlay : (localState !== "playing");
   } else {
+    // System state check with Source Isolation
     const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
-    const isPlayingOnSystem = snapshot?.playbackState === "playing";
+    const appPkg = (snapshot?.appPackage || "").toLowerCase();
+    const metaText = (snapshot?.meta || "").toLowerCase();
+    const titleText = (snapshot?.title || "").toLowerCase();
+    const provider = (snapshot?.sourceProvider || "").toLowerCase();
+
+    const systemIsSpotify = provider === "spotify" || appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
+    const systemIsYouTube = provider === "youtube" || appPkg.includes("youtube") || appPkg.includes("ytmusic")
+      || metaText.includes("youtube") || metaText.includes("ytmusic")
+      || titleText.includes("youtube") || titleText.includes("ytmusic");
+
+    const bridgeMatchesLockedSource = isSourceLocked && (
+      (preferredSource === "youtube" && systemIsYouTube) ||
+      (preferredSource === "spotify" && systemIsSpotify)
+    );
+
+    const isPlayingOnSystem = snapshot?.playbackState === "playing" && (!isSourceLocked || bridgeMatchesLockedSource);
     shouldPlay = (typeof forcePlay === "boolean") ? forcePlay : !isPlayingOnSystem;
   }
 
-  console.log(`[Hero] Intent: ${shouldPlay ? "PLAY" : "PAUSE"} (Mode: ${mode}, Target: ${target || 'hero'})`);
+  console.log(`[Hero] Intent: ${shouldPlay ? "PLAY" : "PAUSE"} (Mode: ${mode}, Locked: ${preferredSource || 'none'})`);
 
-  // 3. OPTIMISTIC STATE UPDATE
+  // 4. OPTIMISTIC STATE UPDATE & INSTANT RENDER
   const nextState = shouldPlay ? "playing" : "paused";
   if (target === "mini") state.miniPlayerPlaybackState = nextState;
   else state.heroPlayerPlaybackState = nextState;
 
-  // 4. COMMAND DISPATCH
+  render();
 
-  // CASE A: Local App Playback (Feed Mode or Mini Player)
-  if (mode === "app") {
-    let handled = false;
-    if (typeof toggleLocalPlayback === "function") {
-      handled = toggleLocalPlayback(shouldPlay, { target });
-    }
+  // 5. COMMAND DISPATCH
+  let handledLocally = false;
 
-    if (!handled && shouldPlay) {
-      if (target === "mini" && state.playerPostId) {
-        const p = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
-        if (p && typeof context.mountPersistentPlayer === "function") {
-          context.mountPersistentPlayer(elements.miniPlayerStage, p, "mini", { autoplay: true });
-        }
-      } else if (typeof playHeroMedia === "function") {
-        playHeroMedia();
+  // A. Local Website Elements (Hosted videos, YouTube/Spotify Iframes)
+  if (typeof toggleLocalPlayback === "function") {
+    handledLocally = toggleLocalPlayback(shouldPlay, { target });
+  }
+
+  // B. Local Player Activation (If nothing was playing locally but user pressed Play)
+  if (!handledLocally && shouldPlay && mode === "app") {
+    if (target === "mini" && state.playerPostId) {
+      const p = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
+      if (p && typeof context.mountPersistentPlayer === "function") {
+        context.mountPersistentPlayer(elements.miniPlayerStage, p, "mini", { autoplay: true });
+        handledLocally = true;
       }
+    } else if (typeof playHeroMedia === "function") {
+      playHeroMedia();
+      handledLocally = true;
     }
   }
-  // CASE B: System Bridge (Media Mode)
-  else {
-    if (mode === "desktop") {
-      if (!isNativeCapacitorApp() && !companionPromptDismissed && !desktopSnapshot) {
-        if (shouldPlay && typeof showCompanionPrompt === "function") showCompanionPrompt();
-      } else {
-        performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
+
+  // C. Bridge Commands
+  const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
+  const sendToBridge = (mode === "desktop" || mode === "device") || (!shouldPlay && (desktopSnapshot?.active || nativeSnapshot?.active));
+
+  if (sendToBridge) {
+    try {
+      if (mode === "desktop") {
+        if (!isNativeCapacitorApp() && !companionPromptDismissed && !desktopSnapshot) {
+          if (shouldPlay && typeof showCompanionPrompt === "function") showCompanionPrompt();
+        } else {
+          await performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
+        }
+      } else if (mode === "device") {
+        if (nativeSnapshot?.permissionRequired) {
+          if (shouldPlay && typeof getNativeBridge === "function") getNativeBridge()?.openNowPlayingAccessSettings();
+        } else {
+          performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
+        }
       }
-    } else if (mode === "device") {
-      if (nativeSnapshot?.permissionRequired) {
-        if (shouldPlay && typeof getNativeBridge === "function") getNativeBridge()?.openNowPlayingAccessSettings();
-      } else {
-        performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
-      }
+    } catch (error) {
+      console.warn("[Hero] Bridge action failed:", error);
     }
 
-    // Secondary Measure: If we are 'Pausing' on the bridge, also pause any local media
+    // Final Measure: If we are 'Pausing' on the bridge, ensure local is also stopped
     if (!shouldPlay && typeof toggleLocalPlayback === "function") {
       toggleLocalPlayback(false, { target });
     }
@@ -391,6 +430,7 @@ export function handlePlayPauseAction(context, forcePlay) {
 
   render();
 }
+
 
 
 
@@ -407,9 +447,9 @@ export function handlePreviousAction(context) {
     isNativeCapacitorApp
   } = context;
 
+  if (debounce("step", 500)) return;
+
   const now = Date.now();
-  if (state._lastStepAt && (now - state._lastStepAt < 500)) return;
-  state._lastStepAt = now;
   state._mediaActionLockoutUntil = now + 1500;
 
   // Mode Resolution
@@ -434,15 +474,45 @@ export function handlePreviousAction(context) {
         if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
     }
   } else {
-    if (mode === "desktop") {
-      performDesktopAction(DESKTOP_ACTION_PREVIOUS);
-    } else if (mode === "device") {
-      performNativeAction(NATIVE_ACTION_PREVIOUS);
+    // System state check with Source Isolation
+    const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+    const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
+
+    const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
+    const appPkg = (snapshot?.appPackage || "").toLowerCase();
+    const metaText = (snapshot?.meta || "").toLowerCase();
+    const titleText = (snapshot?.title || "").toLowerCase();
+    const provider = (snapshot?.sourceProvider || "").toLowerCase();
+
+    const systemIsSpotify = provider === "spotify" || appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
+    const systemIsYouTube = provider === "youtube" || appPkg.includes("youtube") || appPkg.includes("ytmusic")
+      || metaText.includes("youtube") || metaText.includes("ytmusic")
+      || titleText.includes("youtube") || titleText.includes("ytmusic");
+
+    const bridgeMatchesLockedSource = isSourceLocked && (
+      (preferredSource === "youtube" && systemIsYouTube) ||
+      (preferredSource === "spotify" && systemIsSpotify)
+    );
+
+    // If source is locked and bridge doesn't match, or bridge is idle, fall back to local step
+    const isSystemActive = snapshot?.active && (!isSourceLocked || bridgeMatchesLockedSource);
+
+    if (!isSystemActive) {
+       // Fallback to local feed stepping
+       if (target === "mini") {
+          if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
+       } else {
+          if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
+       }
+    } else {
+       if (mode === "desktop") performDesktopAction(DESKTOP_ACTION_PREVIOUS);
+       else if (mode === "device") performNativeAction(NATIVE_ACTION_PREVIOUS);
     }
   }
 
   render();
 }
+
 
 export function handleNextAction(context) {
   const {
@@ -456,9 +526,9 @@ export function handleNextAction(context) {
     isNativeCapacitorApp
   } = context;
 
+  if (debounce("step", 500)) return;
+
   const now = Date.now();
-  if (state._lastStepAt && (now - state._lastStepAt < 500)) return;
-  state._lastStepAt = now;
   state._mediaActionLockoutUntil = now + 1500;
 
   // Mode Resolution
@@ -483,15 +553,45 @@ export function handleNextAction(context) {
         if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
     }
   } else {
-    if (mode === "desktop") {
-      performDesktopAction(DESKTOP_ACTION_NEXT);
-    } else if (mode === "device") {
-      performNativeAction(NATIVE_ACTION_NEXT);
+    // System state check with Source Isolation
+    const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+    const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
+
+    const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
+    const appPkg = (snapshot?.appPackage || "").toLowerCase();
+    const metaText = (snapshot?.meta || "").toLowerCase();
+    const titleText = (snapshot?.title || "").toLowerCase();
+    const provider = (snapshot?.sourceProvider || "").toLowerCase();
+
+    const systemIsSpotify = provider === "spotify" || appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
+    const systemIsYouTube = provider === "youtube" || appPkg.includes("youtube") || appPkg.includes("ytmusic")
+      || metaText.includes("youtube") || metaText.includes("ytmusic")
+      || titleText.includes("youtube") || titleText.includes("ytmusic");
+
+    const bridgeMatchesLockedSource = isSourceLocked && (
+      (preferredSource === "youtube" && systemIsYouTube) ||
+      (preferredSource === "spotify" && systemIsSpotify)
+    );
+
+    // If source is locked and bridge doesn't match, or bridge is idle, fall back to local step
+    const isSystemActive = snapshot?.active && (!isSourceLocked || bridgeMatchesLockedSource);
+
+    if (!isSystemActive) {
+       // Fallback to local feed stepping
+       if (target === "mini") {
+          if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
+       } else {
+          if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
+       }
+    } else {
+       if (mode === "desktop") performDesktopAction(DESKTOP_ACTION_NEXT);
+       else if (mode === "device") performNativeAction(NATIVE_ACTION_NEXT);
     }
   }
 
   render();
 }
+
 
 export function handleVolumeAction(context, event) {
   const {
@@ -504,7 +604,7 @@ export function handleVolumeAction(context, event) {
 
   const mode = target === "mini" ? "app" : getEffectiveHeroMode(getControllablePlayerPost());
 
-  if (debounceAction(state, "volume", 100)) return;
+  if (debounce("volume", 100)) return;
 
   const rawValue = Number(event.target?.value);
   const volume = normalizePlayerVolume(rawValue / 100, state.playerVolume);
@@ -543,7 +643,7 @@ export function handleRefreshAction(context) {
     isNativeCapacitorApp, getNativeBridge
   } = context;
 
-  if (debounceAction(state, "refresh", 1000)) return;
+  if (debounce("refresh", 1000)) return;
 
   const post = getControllablePlayerPost();
 
