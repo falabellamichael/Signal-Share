@@ -75,7 +75,7 @@
         const floatingText = [];
 
         const ball = {
-            x: 365,
+            x: 385,
             y: 628,
             vx: 0,
             vy: 0,
@@ -132,26 +132,26 @@
         ];
 
         const targets = [
-            { x: 48, y: 220, w: 12, h: 34, color: COLORS.magenta, lit: false, points: 180 },
-            { x: 48, y: 264, w: 12, h: 34, color: COLORS.magenta, lit: false, points: 180 },
-            { x: 340, y: 220, w: 12, h: 34, color: COLORS.cyan, lit: false, points: 180 },
-            { x: 340, y: 264, w: 12, h: 34, color: COLORS.cyan, lit: false, points: 180 }
+            { x: 38, y: 220, w: 12, h: 34, color: COLORS.magenta, lit: false, points: 180 },
+            { x: 38, y: 264, w: 12, h: 34, color: COLORS.magenta, lit: false, points: 180 },
+            { x: 350, y: 220, w: 12, h: 34, color: COLORS.cyan, lit: false, points: 180 },
+            { x: 350, y: 264, w: 12, h: 34, color: COLORS.cyan, lit: false, points: 180 }
         ];
 
         const walls = [
             { x1: 100, y1: 36, x2: 300, y2: 36, color: COLORS.rail, thick: 4 },
             { x1: 20, y1: 120, x2: 100, y2: 36, color: COLORS.rail, thick: 4 },
-            { x1: 300, y1: 36, x2: 382, y2: 100, color: COLORS.rail, thick: 4 },
+            { x1: 300, y1: 36, x2: 398, y2: 100, color: COLORS.rail, thick: 4 },
             { x1: 20, y1: 570, x2: 20, y2: 120, color: COLORS.rail, thick: 4 },
-            { x1: 382, y1: 100, x2: 382, y2: 688, color: COLORS.rail, thick: 4 },
+            { x1: 398, y1: 100, x2: 398, y2: 688, color: COLORS.rail, thick: 4 },
             { x1: 20, y1: 570, x2: 118, y2: 626, color: COLORS.cyan, thick: 5 },
-            { x1: 350, y1: 570, x2: 282, y2: 626, color: COLORS.magenta, thick: 5 },
-            { x1: 78, y1: 472, x2: 78, y2: 574, color: COLORS.dim, thick: 3 },
-            { x1: 322, y1: 472, x2: 322, y2: 574, color: COLORS.dim, thick: 3 },
-            { x1: 350, y1: 118, x2: 350, y2: 666, color: 'rgba(255,215,0,0.72)', thick: 4 },
-            { x1: 382, y1: 36, x2: 382, y2: 688, color: 'rgba(255,215,0,0.54)', thick: 3 },
+            { x1: 372, y1: 570, x2: 282, y2: 626, color: COLORS.magenta, thick: 5 },
+            { x1: 65, y1: 472, x2: 65, y2: 600, color: COLORS.dim, thick: 3 },
+            { x1: 335, y1: 472, x2: 335, y2: 600, color: COLORS.dim, thick: 3 },
+            { x1: 372, y1: 118, x2: 372, y2: 666, color: 'rgba(255,215,0,0.72)', thick: 4 },
+            { x1: 398, y1: 36, x2: 398, y2: 688, color: 'rgba(255,215,0,0.54)', thick: 3 },
             { x1: 48, y1: 132, x2: 103, y2: 96, color: 'rgba(0,255,255,0.44)', thick: 4 },
-            { x1: 297, y1: 96, x2: 350, y2: 132, color: 'rgba(255,0,255,0.44)', thick: 4 },
+            { x1: 310, y1: 96, x2: 372, y2: 132, color: 'rgba(255,0,255,0.44)', thick: 4 },
             { x1: 88, y1: 420, x2: 130, y2: 496, color: 'rgba(0,255,157,0.32)', thick: 3 },
             { x1: 312, y1: 420, x2: 270, y2: 496, color: 'rgba(0,255,157,0.32)', thick: 3 }
         ];
@@ -190,7 +190,7 @@
         }
 
         function resetBall() {
-            ball.x = 365;
+            ball.x = 385;
             ball.y = 628;
             ball.vx = 0;
             ball.vy = 0;
@@ -343,7 +343,7 @@
             state.launchHolding = false;
             state.launchReady = false;
             state.launchCharge = 0;
-            explode(365, 648, COLORS.gold, 18);
+            explode(385, 648, COLORS.gold, 18);
         }
 
         window.addEventListener('keydown', (event) => {
@@ -451,12 +451,16 @@
             ball.y += ball.vy * dt;
             ball.spin += (ball.vx * 0.018 + ball.vy * 0.004) * dt;
 
-            if (ball.inShooter && ball.y < 108) {
-                ball.inShooter = false;
-            }
-            if (!ball.inShooter && ball.x > 354 && ball.y > 115) {
-                ball.inShooter = true;
-                state.launchReady = true;
+            // Dynamic Shooter Mode: Always active when ball is in the lane
+            if (ball.x > 374 && ball.y > 100) {
+                if (!ball.inShooter) {
+                    ball.inShooter = true;
+                    state.launchReady = true;
+                }
+            } else {
+                if (ball.inShooter && ball.y < 108) {
+                    ball.inShooter = false;
+                }
             }
 
             for (const wall of walls) checkSegmentCollision(wall, CFG.restitution);
@@ -472,7 +476,7 @@
             }
 
             if (ball.inShooter) {
-                ball.x = clamp(ball.x, 359, 373);
+                ball.x = clamp(ball.x, 379, 393);
                 if (ball.y > 642) {
                     ball.y = 642;
                     if (ball.vy > 0) ball.vy *= -0.25;
@@ -842,12 +846,12 @@
             ctx.lineWidth = 2;
             ctx.setLineDash([7, 8]);
             ctx.beginPath();
-            ctx.moveTo(365, 118);
-            ctx.lineTo(365, 666);
+            ctx.moveTo(385, 118);
+            ctx.lineTo(385, 666);
             ctx.stroke();
             ctx.setLineDash([]);
             ctx.fillStyle = 'rgba(255,215,0,0.08)';
-            roundRect(354, 132, 23, 516, 10, true, false);
+            roundRect(374, 132, 23, 516, 10, true, false);
             ctx.restore();
         }
 
