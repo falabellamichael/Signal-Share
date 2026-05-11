@@ -586,6 +586,13 @@
                                     <option value="playoff">Playoff (Level Based)</option>
                                 </select>
                             </div>
+                            <div>
+                                <label class="setting-label">Physics Mode</label>
+                                <select id="hoops-physics" class="steam-select">
+                                    <option value="arcade">Arcade (Assisted)</option>
+                                    <option value="pro" selected>Pro (Realistic)</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -1018,7 +1025,8 @@
         function launchBasketball() {
             recordLaunch('basketball');
             const mode = document.getElementById('hoops-mode').value;
-            openApp(`./basketball-game.html?mode=${mode}`, 'Neon Hoops', 'basketball_game_poster.png', 'basketball');
+            const physics = document.getElementById('hoops-physics').value;
+            openApp(`./basketball-game.html?mode=${mode}&physics=${physics}`, 'Neon Hoops', 'basketball_game_poster.png', 'basketball');
         }
 
         function launchCalc() {

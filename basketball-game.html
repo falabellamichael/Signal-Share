@@ -134,10 +134,20 @@
         <h1 style="font-size: 4rem; margin: 0; color: var(--neon-orange); text-shadow: 0 0 20px rgba(255,119,0,0.6); letter-spacing: -2px; text-align: center;" id="menu-title">NEON HOOPS</h1>
         <p style="opacity: 0.7; font-size: 1.2rem; text-align: center; margin-top: 10px;" id="menu-sub">Select your game mode</p>
         
-        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
-            <button class="play-btn" onclick="startGame('classic')">CLASSIC MODE</button>
-            <button class="play-btn mode-btn" onclick="startGame('timer')">TIMER MODE</button>
-            <button class="play-btn mode-btn" style="background: linear-gradient(to bottom, #75b022, #4a7015); box-shadow: 0 0 20px rgba(117, 176, 34, 0.4);" onclick="startGame('playoff')">PLAYOFF MODE</button>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px; align-items: center;">
+            <div style="display: flex; gap: 10px;">
+                <button class="play-btn" style="width: 150px;" onclick="startGame('classic')">CLASSIC</button>
+                <button class="play-btn mode-btn" style="width: 150px;" onclick="startGame('timer')">TIMER</button>
+                <button class="play-btn mode-btn" style="width: 150px; background: linear-gradient(to bottom, #75b022, #4a7015); box-shadow: 0 0 20px rgba(117, 176, 34, 0.4);" onclick="startGame('playoff')">PLAYOFF</button>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: center; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; border: 1px solid var(--border); width: 100%; max-width: 480px;">
+                <div style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.5; font-weight: 800; margin-bottom: 10px;">PHYSICS MODE</div>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button class="play-btn" id="physics-arcade" style="margin-top:0; font-size: 0.8rem; padding: 10px; width: 140px; opacity: 0.5;" onclick="setPhysics('arcade')">ARCADE</button>
+                    <button class="play-btn" id="physics-pro" style="margin-top:0; font-size: 0.8rem; padding: 10px; width: 140px;" onclick="setPhysics('pro')">PRO</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -160,6 +170,7 @@
         let streak = 0;
         let isPlaying = false;
         let gameMode = 'classic';
+        let physicsMode = 'pro';
         let timeLeft = 0;
         let level = 1;
         let targetScore = 0;
@@ -260,7 +271,9 @@
                     let dy = ball.y - hoop.y;
                     let dist = Math.sqrt(dx*dx + dy*dy);
                     
-                    if (dist < hoop.radius * 0.9) {
+                    let swishRadius = physicsMode === 'arcade' ? hoop.radius * 1.4 : hoop.radius * 0.9;
+                    
+                    if (dist < swishRadius) {
                         // SWISH
                         score += 1 + Math.floor(streak / 2);
                         streak++;
@@ -282,7 +295,7 @@
                         ball.z = 0.3; // lock depth to backboard
                         streak = 0;
                         streakEl.textContent = streak;
-                    } else if (dist < hoop.radius * 1.3) {
+                    } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 2.2 : hoop.radius * 1.3)) {
                         // Hit rim
                         ball.state = 'falling';
                         ball.vy = -ball.vy * 0.6;
@@ -481,18 +494,28 @@
                 if (dy > 20) {
                     ball.state = 'shooting';
                     
+                    // Power/Depth mechanic: dy now controls how "far" the ball goes (targetZ)
+                    // Sweet spot is around 220px drag
+                    let power = dy / 220;
+                    let targetZ = 1.0 - (0.7 * power);
+                    
                     // Realistic aiming: removing the assist and making it more sensitive
-                    let targetX = hoop.x - dx * 2.5; 
+                    let targetX;
+                    if (physicsMode === 'arcade') {
+                        let assistDx = Math.abs(dx) < 30 ? 0 : (dx > 0 ? dx - 30 : dx + 30);
+                        targetX = hoop.x - assistDx * 1.2;
+                    } else {
+                        targetX = hoop.x - dx * 2.5; 
+                    }
+                    
                     let targetY = hoop.y;
                     
                     // Arc height dampening: Use a square root to prevent the ball from flying too high
-                    // This ensures that even massive drags stay mostly within the viewport
                     let cappedDy = Math.max(dy, 20);
-                    let arcDampening = Math.sqrt(cappedDy) * 12; // Ceilings the height
+                    let arcDampening = Math.sqrt(cappedDy) * 12; 
                     let peak_y = Math.max(20, hoop.y - arcDampening); 
                     
-                    // Calculate precise initial velocity to hit target exactly on the way down
-                    // We increase gravity slightly for a Snappier feel
+                    // Calculate precise initial velocity to hit targetY at targetZ
                     const gravity = 1.2;
                     let initial_vy = -Math.sqrt(2 * gravity * (ball.y - peak_y));
                     let discriminant = (2 * gravity) * (targetY - peak_y);
@@ -500,7 +523,7 @@
                     
                     ball.vx = (targetX - ball.x) / t;
                     ball.vy = initial_vy;
-                    ball.vz = -0.7 / t;
+                    ball.vz = (targetZ - 1.0) / t; // Reaches targetZ at targetY
                     ball.vRot = dx * 0.01;
                 }
             }
@@ -555,6 +578,12 @@
             }, 300);
         }
 
+        function setPhysics(mode) {
+            physicsMode = mode;
+            document.getElementById('physics-arcade').style.opacity = mode === 'arcade' ? '1' : '0.5';
+            document.getElementById('physics-pro').style.opacity = mode === 'pro' ? '1' : '0.5';
+        }
+
         function startCountdown() {
             if (timerInterval) clearInterval(timerInterval);
             timerValEl.textContent = timeLeft;
@@ -603,6 +632,10 @@
         document.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const mode = params.get('mode');
+            const physics = params.get('physics');
+            if (physics && ['arcade', 'pro'].includes(physics)) {
+                setPhysics(physics);
+            }
             if (mode && ['classic', 'timer', 'playoff'].includes(mode)) {
                 startGame(mode);
             }
