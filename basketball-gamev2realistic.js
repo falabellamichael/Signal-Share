@@ -39,6 +39,7 @@ let dragStartX = 0;
 let dragStartY = 0;
 let dragStartTime = 0;
 let lastFrameTime = performance.now();
+const keys = {};
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -115,7 +116,12 @@ function resize() {
     hoop.boardInsetY = hoop.boardHeight * 0.78;
 
     setupNet();
-    if (ball.state === 'idle') resetBall();
+    if (ball.state === 'idle') {
+        const oldX = ball.x;
+        resetBall();
+        // Restore horizontal position relative to width after resize
+        ball.x = clamp(oldX, 60, width - 60);
+    }
 }
 window.addEventListener('resize', resize);
 
@@ -478,6 +484,22 @@ function updateBall(dt) {
     }
 }
 
+function updateIdle(dt) {
+    if (ball.state !== 'idle') return;
+
+    const moveSpeed = 450;
+    if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+        ball.x -= moveSpeed * dt;
+    }
+    if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+        ball.x += moveSpeed * dt;
+    }
+
+    const margin = getBallRadius() + 20;
+    ball.x = clamp(ball.x, margin, width - margin);
+    ball.prevX = ball.x; // Keep previous in sync for drag start
+}
+
 function update(dt) {
     if (!isPlaying) {
         updateNet(dt);
@@ -486,6 +508,7 @@ function update(dt) {
         return;
     }
 
+    updateIdle(dt);
     updateBall(dt);
     updateNet(dt);
     updateParticles(dt);
@@ -868,6 +891,14 @@ window.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
 window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
 window.addEventListener('mouseup', handleEnd);
 window.addEventListener('mouseleave', handleEnd);
+
+window.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.key] = false;
+});
 
 window.addEventListener('touchstart', (e) => {
     if (!e.touches.length) return;
