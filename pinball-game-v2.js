@@ -111,8 +111,8 @@ const ball = {
 };
 
 // Restored missing boundary logic in object initialization for exact physics rest/up calculation
-const leftFlipper = { side: 'left', x: 124, y: 630, angle: 0.46, rest: 0.46, up: -0.58, length: 66, width: 14, color: COLORS.primary, pressed: false };
-const rightFlipper = { side: 'right', x: 276, y: 630, angle: Math.PI - 0.46, rest: Math.PI - 0.46, up: Math.PI + 0.58, length: 66, width: 14, color: COLORS.secondary, pressed: false };
+const leftFlipper = { side: 'left', x: 124, y: 640, angle: 0.46, rest: 0.46, up: -0.58, length: 66, width: 14, color: COLORS.primary, pressed: false };
+const rightFlipper = { side: 'right', x: 276, y: 640, angle: Math.PI - 0.46, rest: Math.PI - 0.46, up: Math.PI + 0.58, length: 66, width: 14, color: COLORS.secondary, pressed: false };
 
 const BUMPER_LEVELS = [
     { color: '#3b82f6', pointsMult: 1.0 },  // 0: Blue
@@ -128,12 +128,12 @@ const BUMPER_LEVELS = [
 ];
 
 const bumpers = [
-    { x: 195, y: 260, r: 35, color: BUMPER_LEVELS[0].color, points: 500, pulse: 0, hits: 0, level: 0 },
-    { x: 195, y: 150, r: 30, color: BUMPER_LEVELS[0].color, points: 500, pulse: 0, hits: 0, level: 0 },
-    { x: 100, y: 310, r: 28, color: BUMPER_LEVELS[0].color, points: 300, pulse: 0, hits: 0, level: 0 },
-    { x: 290, y: 310, r: 28, color: BUMPER_LEVELS[0].color, points: 300, pulse: 0, hits: 0, level: 0 },
-    { x: 65, y: 390, r: 24, color: BUMPER_LEVELS[0].color, points: 400, pulse: 0, hits: 0, level: 0 },
-    { x: 325, y: 390, r: 24, color: BUMPER_LEVELS[0].color, points: 400, pulse: 0, hits: 0, level: 0 }
+    { x: 195, y: 260, r: 35, color: BUMPER_LEVELS[0].color, basePoints: 500, points: 500, pulse: 0, hits: 0, level: 0 },
+    { x: 195, y: 150, r: 30, color: BUMPER_LEVELS[0].color, basePoints: 500, points: 500, pulse: 0, hits: 0, level: 0 },
+    { x: 100, y: 310, r: 28, color: BUMPER_LEVELS[0].color, basePoints: 300, points: 300, pulse: 0, hits: 0, level: 0 },
+    { x: 290, y: 310, r: 28, color: BUMPER_LEVELS[0].color, basePoints: 300, points: 300, pulse: 0, hits: 0, level: 0 },
+    { x: 65, y: 390, r: 24, color: BUMPER_LEVELS[0].color, basePoints: 400, points: 400, pulse: 0, hits: 0, level: 0 },
+    { x: 325, y: 390, r: 24, color: BUMPER_LEVELS[0].color, basePoints: 400, points: 400, pulse: 0, hits: 0, level: 0 }
 ];
 
 // Reconfigured to spell "SHARE" spaced perfectly along the radial trajectory of the top arc
@@ -154,7 +154,7 @@ const targets = [
 
 const loop = {
     cx: 195,
-    cy: 370,
+    cy: 400,
     innerR: 45,
     midR: 62,
     outerR: 78,
@@ -209,10 +209,10 @@ const walls = [
     { x1: 338, y1: 526, x2: 278, y2: 584, color: COLORS.success, thick: 7, slingshot: true },
 
     // Return guides now connected directly to flipper pivots for a seamless look.
-    { x1: 20, y1: 558, x2: 124, y2: 630, color: COLORS.wall, thick: 5 },
-    { x1: 370, y1: 558, x2: 276, y2: 630, color: COLORS.wall, thick: 5 },
-    { x1: 40, y1: 645, x2: 115, y2: 668, color: COLORS.wall, thick: 5 },
-    { x1: 350, y1: 645, x2: 275, y2: 668, color: COLORS.wall, thick: 5 },
+    { x1: 20, y1: 558, x2: 124, y2: 640, color: COLORS.wall, thick: 5 },
+    { x1: 370, y1: 558, x2: 276, y2: 640, color: COLORS.wall, thick: 5 },
+    { x1: 40, y1: 655, x2: 115, y2: 678, color: COLORS.wall, thick: 5 },
+    { x1: 350, y1: 655, x2: 275, y2: 678, color: COLORS.wall, thick: 5 },
 
     // Loop crescents.
     ...createArc(195 - 35 / 2, loop.cy, 62, Math.PI * 0.7, Math.PI * 1.3, 12, COLORS.accent, 4),
@@ -289,7 +289,13 @@ function startGame() {
     state.launchCharge = 0;
     particles.length = 0;
     floatingText.length = 0;
-    bumpers.forEach((b) => { b.pulse = 0; });
+    bumpers.forEach((b) => { 
+        b.pulse = 0; 
+        b.hits = 0; 
+        b.level = 0; 
+        b.color = BUMPER_LEVELS[0].color;
+        b.points = b.basePoints;
+    });
     rollovers.forEach((r) => { r.lit = false; });
     targets.forEach((t) => { t.lit = false; });
     loop.gates.forEach((g) => { g.lit = false; });
@@ -414,20 +420,27 @@ function releaseLaunchCharge() {
 }
 
 window.addEventListener('keydown', (event) => {
-    if (['Space', 'ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'KeyT', 'ShiftLeft', 'ShiftRight'].includes(event.code)) event.preventDefault();
-    if (event.repeat && event.code !== 'Space') return;
+    if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', 'KeyA', 'KeyD', 'KeyS', 'KeyW', 'KeyT', 'ShiftLeft', 'ShiftRight'].includes(event.code)) event.preventDefault();
+    if (event.repeat && !['Space', 'ArrowDown', 'KeyS'].includes(event.code)) return;
     keys[event.code] = true;
-    if (event.code === 'Space') beginLaunchCharge();
-    if (event.code === 'KeyT' || event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+    
+    if (event.code === 'Space' || event.code === 'ArrowDown' || event.code === 'KeyS') {
+        beginLaunchCharge();
+    }
+    
+    if (event.code === 'KeyT' || event.code === 'ArrowUp' || event.code === 'KeyW' || event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
         const dir = event.code === 'ShiftLeft' ? -1 : event.code === 'ShiftRight' ? 1 : 0;
         nudge(dir);
     }
+    
     if (!state.running && event.code === 'Enter') startGame();
 }, { passive: false });
 
 window.addEventListener('keyup', (event) => {
     keys[event.code] = false;
-    if (event.code === 'Space') releaseLaunchCharge();
+    if (event.code === 'Space' || event.code === 'ArrowDown' || event.code === 'KeyS') {
+        releaseLaunchCharge();
+    }
 });
 
 function bindHoldButton(id, onDown, onUp) {
@@ -724,7 +737,7 @@ function checkBumperCollision(b) {
         explode(b.x, b.y, b.color, 40);
     }
 
-    const currentPoints = Math.round(b.points * BUMPER_LEVELS[b.level].pointsMult);
+    const currentPoints = Math.round(b.basePoints * BUMPER_LEVELS[b.level].pointsMult);
     addScore(currentPoints, b.x, b.y - b.r - 10, b.color, 'BUMP');
     explode(b.x, b.y, b.color, 30);
 }
@@ -926,11 +939,6 @@ function drawLoopObstacle() {
     ctx.arc(loop.cx + loop.gap / 2, loop.cy, loop.midR, Math.PI * 1.7 + loopTilt, Math.PI * 2.3 + loopTilt);
     ctx.stroke();
 
-    ctx.textAlign = 'center';
-    ctx.font = '900 12px Inter, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.fillText('SPLIT LOOP', loop.cx, loop.cy);
-
     const drawMarkers = (cx, startA, endA) => {
         const steps = 5;
         for (let i = 0; i <= steps; i++) {
@@ -974,7 +982,7 @@ function drawBackground() {
 function drawPlayfieldArt() {
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.font = '900 38px Inter, sans-serif';
+    ctx.font = '900 24px Inter, sans-serif';
 
     // Dynamic Multiplier Glow on central decal elements
     const glowIntensity = Math.min(1.0, (state.multiplier - 1) / 7);
@@ -985,8 +993,8 @@ function drawPlayfieldArt() {
         ctx.shadowBlur = glowIntensity * 20;
     }
 
-    ctx.fillText('SIGNAL', 195, 430);
-    ctx.fillText('SHARE', 195, 470);
+    ctx.fillText('SIGNAL', 195, 392);
+    ctx.fillText('SHARE', 195, 418);
 
     ctx.shadowBlur = 0;
     ctx.strokeStyle = `rgba(59, 130, 246, ${0.15 + glowIntensity * 0.35})`;
