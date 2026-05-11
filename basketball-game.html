@@ -562,32 +562,33 @@
                 if (dy > 20) {
                     ball.state = 'shooting';
 
-                    // Incorporate swipe speed into power calculation
-                    let dragDuration = Math.max((Date.now() - dragStartTime) / 1000, 0.05); // min 50ms to avoid div/0
-                    let dragSpeed = (dy / dragDuration) / 1000;
-
-                    // Power: Forgiving sweet spot with snap-to-perfect logic
-                    let combinedPower = (dy * 0.5) + (dragSpeed * 80 * 0.5);
-                    let power = combinedPower / 210; 
+                    // CALIBRATED POWER: Sweet spot is a ~300px drag at ~0.5s - 1.0s duration
+                    let dragDuration = Math.max((Date.now() - dragStartTime) / 1000, 0.05);
                     
-                    // SWEET SPOT SNAP: If power is anywhere near 1.0, snap it to perfect depth
-                    if (power > 0.7 && power < 1.3) {
+                    // Normalize speed: A 1.0s release is the baseline
+                    let speedFactor = 1.0 / dragDuration; 
+                    
+                    // Power: Focused on the ~300px distance shown in the visual reference
+                    // We want dy=300 and duration=0.75s to roughly equal 1.0 power
+                    let power = (dy / 300) * (speedFactor * 0.4 + 0.6); 
+                    
+                    // SWEET SPOT SNAP: Very generous range for the calibrated distance/time
+                    if (power > 0.65 && power < 1.35) {
                         power = 1.0;
                     }
                     
                     let targetZ = 1.0 - (0.7 * power); 
-                    
-                    // Broad clamp to ensure ball stays within scoring bounds
                     targetZ = Math.max(0.15, Math.min(0.45, targetZ)); 
 
-                    // Realistic aiming: removing the assist and making it more sensitive
+                    // Aiming logic: rewarding straight shots
                     let targetX;
                     if (physicsMode === 'arcade') {
-                        // Stronger Auto-Aim: dampen the horizontal deviation by 80%
-                        let assistDx = dx * 0.2; 
-                        targetX = hoop.x - assistDx;
+                        // Arcade: Almost perfect auto-centering if close to vertical
+                        let deviation = Math.abs(dx);
+                        let correction = deviation < 40 ? 0.05 : 0.2;
+                        targetX = hoop.x - (dx * correction);
                     } else {
-                        targetX = hoop.x - dx * 2.5;
+                        targetX = hoop.x - dx * 2.2;
                     }
 
                     let targetY = hoop.y;
