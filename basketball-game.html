@@ -368,12 +368,16 @@
             ctx.strokeRect(hoop.x - 30, hoop.y - 45, 60, 45);
             ctx.shadowBlur = 0;
 
-            // Draw ball (if far, draw behind rim front)
-            let currentRadius = Math.max(ball.radiusBase * 0.3, ball.radiusBase * (0.3 + 0.7 * ball.z));
-            
-            if (ball.z <= 0.3) drawHoopRimBack();
-            drawBall(currentRadius);
-            if (ball.z > 0.3) drawHoopRimBack();
+            // Correct 3D Depth Sorting
+            if (ball.z < 0.3) {
+                // Ball is behind the rim (e.g. hitting backboard)
+                drawBall(currentRadius);
+                drawHoopRimBack();
+            } else {
+                // Ball is in front of the rim (approaching)
+                drawHoopRimBack();
+                drawBall(currentRadius);
+            }
             
             drawHoopRimFront();
 

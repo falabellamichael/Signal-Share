@@ -515,7 +515,7 @@
                         <h3 style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.3; margin-bottom: 20px; font-weight: 900;">LAUNCH CONFIGURATION</h3>
                         <div class="config-grid">
                             <div>
-                                <label class="setting-label">Game Speed</label>
+                                <label for="snake-speed" class="setting-label">Game Speed</label>
                                 <select id="snake-speed" class="steam-select">
                                     <option value="150">Relaxed</option>
                                     <option value="100" selected>Classic</option>
@@ -524,7 +524,7 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="setting-label">Grid Density</label>
+                                <label for="snake-grid" class="setting-label">Grid Density</label>
                                 <select id="snake-grid" class="steam-select">
                                     <option value="40">Tiny (10x10)</option>
                                     <option value="20" selected>Standard (20x20)</option>
@@ -532,7 +532,7 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="setting-label">Obstacle Mode</label>
+                                <label for="snake-obstacles" class="setting-label">Obstacle Mode</label>
                                 <select id="snake-obstacles" class="steam-select" onchange="toggleObstCount(this.value)">
                                     <option value="none" selected>None</option>
                                     <option value="static">Static</option>
@@ -540,7 +540,7 @@
                                 </select>
                             </div>
                             <div id="snake-obst-count-row" style="display: none;">
-                                <label class="setting-label">Obstacle Count</label>
+                                <label for="snake-obst-count" class="setting-label">Obstacle Count</label>
                                 <input type="range" id="snake-obst-count" min="1" max="20" value="5" oninput="document.getElementById('obst-count-val').textContent = this.value" style="width: 100%; accent-color: var(--steam-light);">
                                 <span id="obst-count-val" style="font-size: 0.8rem; font-weight: 800; color: var(--steam-light);">5</span>
                             </div>
@@ -579,7 +579,7 @@
                         <h3 style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.3; margin-bottom: 20px; font-weight: 900;">LAUNCH CONFIGURATION</h3>
                         <div class="config-grid">
                             <div>
-                                <label class="setting-label">Game Mode</label>
+                                <label for="hoops-mode" class="setting-label">Game Mode</label>
                                 <select id="hoops-mode" class="steam-select">
                                     <option value="classic" selected>Classic (Endless)</option>
                                     <option value="timer">Timer (60s Challenge)</option>
@@ -587,7 +587,7 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="setting-label">Physics Mode</label>
+                                <label for="hoops-physics" class="setting-label">Physics Mode</label>
                                 <select id="hoops-physics" class="steam-select">
                                     <option value="arcade">Arcade (Assisted)</option>
                                     <option value="pro" selected>Pro (Realistic)</option>
