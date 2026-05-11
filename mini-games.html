@@ -918,40 +918,71 @@
             const grid = document.getElementById('leader-grid');
             if (!grid) return;
             grid.innerHTML = '';
+            grid.style.display = 'grid';
+            grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(320px, 1fr))';
+            grid.style.gap = '25px';
 
-            const gameScores = [
-                { id: 'snake', name: 'Neon Snake', best: localStorage.getItem('snake-best') || '0', unit: 'PTS' },
-                { id: 'basketball', name: 'Neon Hoops (Classic)', best: JSON.parse(localStorage.getItem('hoops-bests') || '{}').classic || '0', unit: 'PTS' },
-                { id: 'basketball-timer', name: 'Neon Hoops (Timer)', best: JSON.parse(localStorage.getItem('hoops-bests') || '{}').timer || '0', unit: 'PTS' },
-                { id: 'basketball-playoff', name: 'Neon Hoops (Playoff)', best: JSON.parse(localStorage.getItem('hoops-bests') || '{}').playoff || '0', unit: 'LVL' }
+            const hoopsData = JSON.parse(localStorage.getItem('hoops-bests') || '{"classic":0,"timer":0,"playoff":0}');
+            
+            const games = [
+                {
+                    title: 'Neon Snake',
+                    poster: 'snake_game_poster_1778466261855.png',
+                    stats: [
+                        { label: 'HIGH SCORE', val: localStorage.getItem('snake-best') || '0', unit: 'PTS' },
+                        { label: 'BEST STREAK', val: sessionStorage.getItem('snake-streak') || '0', unit: 'RUN' },
+                        { label: 'RANK PROGRESS', val: 'ELITE III', unit: '' }
+                    ]
+                },
+                {
+                    title: 'Neon Hoops',
+                    poster: 'basketball_game_poster.png',
+                    stats: [
+                        { label: 'CLASSIC BEST', val: hoopsData.classic || '0', unit: 'PTS' },
+                        { label: 'PLAYOFF MAX', val: hoopsData.playoff || '1', unit: 'LVL' },
+                        { label: 'TIMER RECORD', val: hoopsData.timer || '0', unit: 'PTS' }
+                    ]
+                }
             ];
 
-            gameScores.forEach((gs, i) => {
-                const row = document.createElement('div');
-                row.style.cssText = `
-                    background: rgba(255,255,255,0.03);
-                    padding: 20px 30px;
-                    border-radius: 8px;
+            games.forEach(game => {
+                const card = document.createElement('div');
+                card.style.cssText = `
+                    background: rgba(255,255,255,0.02);
+                    border: 1px solid rgba(255,255,255,0.08);
+                    border-radius: 16px;
+                    overflow: hidden;
                     display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    border: 1px solid rgba(255,255,255,0.05);
-                    transition: transform 0.2s;
+                    flex-direction: column;
+                    transition: transform 0.3s, border-color 0.3s;
                 `;
-                row.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 25px;">
-                        <span style="font-size: 1.2rem; font-weight: 900; opacity: 0.3; width: 30px;">#${i+1}</span>
-                        <div style="display: flex; flex-direction: column;">
-                            <span style="font-weight: 800; font-size: 1.1rem; letter-spacing: -0.5px;">${gs.name}</span>
-                            <span style="font-size: 0.65rem; color: var(--steam-light); font-weight: 900; letter-spacing: 1px;">GLOBAL ELITE RANK</span>
+
+                let statsHtml = game.stats.map(s => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+                        <span style="font-size: 0.7rem; font-weight: 800; opacity: 0.4; letter-spacing: 1.5px; text-transform: uppercase;">${s.label}</span>
+                        <div style="text-align: right;">
+                            <span style="font-weight: 900; font-size: 1.2rem; color: #fff;">${s.val}</span>
+                            <span style="font-size: 0.6rem; opacity: 0.3; margin-left: 3px; font-weight: 800;">${s.unit}</span>
                         </div>
                     </div>
-                    <div style="text-align: right;">
-                        <span style="font-size: 1.8rem; font-weight: 900; color: #fff;">${gs.best}</span>
-                        <span style="font-size: 0.7rem; font-weight: 800; opacity: 0.4; margin-left: 5px;">${gs.unit}</span>
+                `).join('');
+
+                card.innerHTML = `
+                    <div style="height: 140px; position: relative; overflow: hidden;">
+                        <img src="${game.poster}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.5; filter: grayscale(0.5) brightness(0.6);">
+                        <div style="position: absolute; inset: 0; background: linear-gradient(to top, #101822 10%, transparent 90%); padding: 25px; display: flex; align-items: flex-end;">
+                            <h3 style="margin: 0; font-size: 1.6rem; letter-spacing: -1.5px; font-weight: 900; text-transform: uppercase;">${game.title}</h3>
+                        </div>
+                    </div>
+                    <div style="padding: 25px;">
+                        ${statsHtml}
+                        <div style="margin-top: 20px; display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(164, 208, 7, 0.05); border-radius: 8px;">
+                            <div style="width: 8px; height: 8px; background: #a4d007; border-radius: 50%; box-shadow: 0 0 10px #a4d007;"></div>
+                            <span style="font-size: 0.65rem; color: #a4d007; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Verified Community Rank</span>
+                        </div>
                     </div>
                 `;
-                grid.appendChild(row);
+                grid.appendChild(card);
             });
         }
 
