@@ -1,4 +1,4 @@
-        window.__NEON_PINBALL_BUILD = 'revamped-functional-v1.3';
+        window.__NEON_PINBALL_BUILD = 'revamped-functional-v1.4';
         console.log('[Neon Pinball] Build:', window.__NEON_PINBALL_BUILD);
 
         const canvas = document.getElementById('pinballCanvas');
@@ -182,9 +182,9 @@
             { x1: 300, y1: 590, x2: 350, y2: 590, color: COLORS.green, thick: 4 },
             { x1: 350, y1: 590, x2: 350, y2: 540, color: COLORS.green, thick: 4 },
 
-            // Flipper guide walls
-            { x1: 20, y1: 570, x2: 100, y2: 615, color: COLORS.blue, thick: 4 },
-            { x1: 380, y1: 570, x2: 300, y2: 615, color: COLORS.blue, thick: 4 }
+            // Flipper guide walls - positioned to not overlap slingshots
+            { x1: 20, y1: 615, x2: 100, y2: 626, color: COLORS.blue, thick: 4 },
+            { x1: 372, y1: 615, x2: 300, y2: 626, color: COLORS.blue, thick: 4 }
         ];
 
         function setupCanvas() {
