@@ -286,7 +286,7 @@
                     let dy = ball.y - hoop.y;
                     let dist = Math.sqrt(dx*dx + dy*dy);
                     
-                    let swishRadius = physicsMode === 'arcade' ? hoop.radius * 1.5 : hoop.radius * 1.0;
+                    let swishRadius = physicsMode === 'arcade' ? hoop.radius * 1.6 : hoop.radius * 1.1;
                     
                     if (dist < swishRadius) {
                         // SWISH
@@ -312,7 +312,7 @@
                         ball.z = 0.3; // lock depth to backboard
                         streak = 0;
                         streakEl.textContent = streak;
-                    } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 2.3 : hoop.radius * 1.5)) {
+                    } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 2.5 : hoop.radius * 1.7)) {
                         // Hit rim
                         ball.state = 'falling';
                         ball.vy = -ball.vy * 0.6;
@@ -519,15 +519,13 @@
                     ball.state = 'shooting';
                     
                     // Incorporate swipe speed into power calculation
-                    let dragDuration = (Date.now() - dragStartTime) / 1000; // in seconds
-                    let dragSpeed = (dy / dragDuration) / 1000; // relative speed factor
+                    let dragDuration = Math.max((Date.now() - dragStartTime) / 1000, 0.05); // min 50ms to avoid div/0
+                    let dragSpeed = (dy / dragDuration) / 1000; 
                     
-                    // Combine distance and speed for power (weighted towards speed for "flick" feel)
-                    let combinedPower = (dy * 0.4) + (dragSpeed * 100 * 0.6);
-                    
-                    // Calibrate power: Sweet spot is now around 240 units
-                    let power = combinedPower / 240;
-                    let targetZ = 1.0 - (0.75 * power); // Slightly more range
+                    // Power: 50/50 mix of distance and speed. Sweet spot around 220 units.
+                    let combinedPower = (dy * 0.5) + (dragSpeed * 80 * 0.5);
+                    let power = combinedPower / 220;
+                    let targetZ = 1.0 - (0.7 * power); // Reach exactly 0.3 (hoop depth) at power 1.0
                     
                     // Realistic aiming: removing the assist and making it more sensitive
                     let targetX;
