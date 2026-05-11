@@ -33,19 +33,19 @@
         };
 
         const CFG = {
-            gravity: 0.28,
-            friction: 0.995,
-            restitution: 0.65, // Lowered for less chaotic bouncing
+            gravity: 0.25,
+            friction: 0.992, // Increased friction (lower value = more resistance)
+            restitution: 0.62,
             ballRadius: 8.8,
-            maxSpeed: 28,
-            bumperKick: 13.5,
-            flipperKick: 12.5, // Stronger flippers
-            flipperSnap: 0.45, // Snappier animation
-            tableTilt: 0.015,
+            maxSpeed: 23,
+            bumperKick: 11.0,
+            flipperKick: 10.5,
+            flipperSnap: 0.42,
+            tableTilt: 0.012,
             collisionSlop: 0.15,
             substepsMin: 4,
             substepsMax: 12,
-            slingshotForce: 14.5
+            slingshotForce: 11.5
         };
 
         let savedHighScore = 0;
@@ -416,9 +416,9 @@
                 return;
             }
             const power = clamp(state.launchCharge, 0.25, 1);
-            ball.vx = -1.2 - power * 0.8;
-            ball.vy = -18.5 - power * 9.5;
-            ball.spin = -0.25;
+            ball.vx = -1.0 - power * 0.7;
+            ball.vy = -16.0 - power * 8.0;
+            ball.spin = -0.22;
             state.launchHolding = false;
             state.launchReady = false;
             state.launchCharge = 0;
