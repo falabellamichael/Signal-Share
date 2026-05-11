@@ -1,4 +1,4 @@
-        window.__NEON_PINBALL_BUILD = 'revamped-functional-v1.4';
+        window.__NEON_PINBALL_BUILD = 'revamped-functional-v1.6';
         console.log('[Neon Pinball] Build:', window.__NEON_PINBALL_BUILD);
 
         const canvas = document.getElementById('pinballCanvas');
@@ -493,9 +493,11 @@
                 if (!ball.inShooter) {
                     ball.inShooter = true;
                 }
-                // Always ready to launch if ball is essentially stopped in the lane
-                if (Math.abs(ball.vy) < 0.2 && Math.abs(ball.vx) < 0.2) {
+                // Always ready to launch if ball is in the bottom section of lane
+                if (ball.y > 600) {
                     state.launchReady = true;
+                    // Dampen vibration to ensure it's "Ready"
+                    if (Math.abs(ball.vy) < 0.5) ball.vy = 0;
                 }
             } else if (ball.y < 120) {
                 if (ball.inShooter) {
@@ -519,7 +521,12 @@
             if (ball.y + floorCollideRadius > floorY) {
                 ball.y = floorY - floorCollideRadius;
                 if (ball.vy > 0) {
-                    ball.vy *= -CFG.restitution;
+                    if (ball.inShooter) {
+                        ball.vy = 0; // Solid stop in lane
+                        state.launchReady = true;
+                    } else {
+                        ball.vy *= -CFG.restitution;
+                    }
                     ball.vx *= 0.98;
                 }
             }
@@ -531,10 +538,6 @@
 
             if (ball.inShooter) {
                 ball.x = clamp(ball.x, 379, 393);
-                if (ball.y > 642) {
-                    ball.y = 642;
-                    if (ball.vy > 0) ball.vy *= -0.25;
-                }
             }
 
             capSpeed();
