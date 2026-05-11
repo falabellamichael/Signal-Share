@@ -56,6 +56,8 @@ const BACKBOARD_RESTITUTION = 0.62;
 const hoop = {
     x: 0,
     y: 0,
+    baseX: 0,
+    baseY: 0,
     radius: 48,
     boardWidth: 178,
     boardHeight: 112,
@@ -108,8 +110,10 @@ function resize() {
     canvas.style.height = `${height}px`;
     ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
 
-    hoop.x = width / 2;
-    hoop.y = height * 0.285;
+    hoop.baseX = width / 2;
+    hoop.baseY = height * 0.285;
+    hoop.x = hoop.baseX;
+    hoop.y = hoop.baseY;
     hoop.radius = clamp(width * 0.031, 42, 54);
     hoop.boardWidth = hoop.radius * 3.8;
     hoop.boardHeight = hoop.radius * 2.45;
@@ -500,6 +504,43 @@ function updateIdle(dt) {
     ball.prevX = ball.x; // Keep previous in sync for drag start
 }
 
+function updateHoop(dt) {
+    if (!isPlaying || level < 2) {
+        hoop.x = hoop.baseX;
+        hoop.y = hoop.baseY;
+        return;
+    }
+
+    const time = performance.now() / 1000;
+    
+    // Movement scales with level
+    if (level === 2) {
+        // Simple slow horizontal
+        hoop.x = hoop.baseX + Math.sin(time * 1.5) * 80;
+    } else if (level === 3) {
+        // Faster horizontal
+        hoop.x = hoop.baseX + Math.sin(time * 2.5) * 120;
+    } else if (level === 4) {
+        // Vertical + Horizontal (Circular)
+        hoop.x = hoop.baseX + Math.sin(time * 2.2) * 140;
+        hoop.y = hoop.baseY + Math.cos(time * 1.8) * 40;
+    } else if (level >= 5) {
+        // Complex figure-8 / fast movement
+        hoop.x = hoop.baseX + Math.sin(time * 2.8) * 160;
+        hoop.y = hoop.baseY + Math.sin(time * 5.6) * 60;
+    }
+
+    // Sync net anchors to moving hoop
+    const netCount = 6;
+    const spacing = (Math.PI * 2) / netCount;
+    for (let i = 0; i < netCount; i++) {
+        const node = netNodes[i];
+        const angle = i * spacing;
+        node.x = hoop.x + Math.cos(angle) * hoop.radius;
+        node.y = hoop.y + Math.sin(angle) * hoop.radius;
+    }
+}
+
 function update(dt) {
     if (!isPlaying) {
         updateNet(dt);
@@ -509,6 +550,7 @@ function update(dt) {
     }
 
     updateIdle(dt);
+    updateHoop(dt);
     updateBall(dt);
     updateNet(dt);
     updateParticles(dt);
