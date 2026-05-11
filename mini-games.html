@@ -592,7 +592,7 @@
                 <div id="store-locked-msg" class="store-locked">
                     <h2 style="font-size: 2rem; margin-bottom: 15px;">Store Restricted</h2>
                     <p style="opacity: 0.6; margin-bottom: 30px;">Sign in with your Signal Share account to access the store and premium tools.</p>
-                    <button class="play-btn" onclick="toggleAuth()" style="font-size: 1rem;">Sign In Now</button>
+                    <button class="play-btn" onclick="showAuth()" style="font-size: 1rem;">Sign In Now</button>
                 </div>
                 
                 <div id="store-content" style="display: none;">
@@ -635,7 +635,7 @@
                     <input type="text" id="login-user" class="auth-input" placeholder="Account Name / ID">
                     <input type="password" id="login-pass" class="auth-input" placeholder="Access Key">
                     <button class="play-btn" onclick="performLogin()" style="width: 100%; font-size: 1rem;">SIGN IN</button>
-                    <button onclick="toggleAuth()" style="background: none; border: none; color: rgba(255,255,255,0.4); font-size: 0.7rem; cursor: pointer;">CANCEL</button>
+                    <button onclick="hideAuth()" style="background: none; border: none; color: rgba(255,255,255,0.4); font-size: 0.7rem; cursor: pointer;">CANCEL</button>
                 </div>
                 
                 <div style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px; text-align: center;">
@@ -787,10 +787,17 @@
                     updateAuthUI();
                     setCategory('all');
                 }
-                return;
+            } else {
+                showAuth();
             }
-            const overlay = document.getElementById('auth-overlay');
-            overlay.style.display = (overlay.style.display === 'flex') ? 'none' : 'flex';
+        }
+
+        function showAuth() {
+            document.getElementById('auth-overlay').style.display = 'flex';
+        }
+
+        function hideAuth() {
+            document.getElementById('auth-overlay').style.display = 'none';
         }
 
         function performLogin() {
@@ -798,7 +805,7 @@
             currentUser = { name: user, id: 'ID-' + Math.floor(Math.random()*1000) };
             localStorage.setItem('ss-user', JSON.stringify(currentUser));
             updateAuthUI();
-            toggleAuth();
+            hideAuth();
             
             // Redirect to store if that was the intent
             if (currentCategory === 'store') setCategory('store');
