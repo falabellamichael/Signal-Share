@@ -319,45 +319,44 @@
                     // MASSIVELY expanded hitboxes for easier scoring (pure physics)
                     let swishRadius = physicsMode === 'arcade' ? hoop.radius * 2.5 : hoop.radius * 1.8;
 
-                        if (dist < swishRadius) {
-                            // SWISH
-                            let points = ball.isOnFire ? 3 : (1 + Math.floor(streak / 2));
-                            score += points;
-                            streak++;
-                            scoreEl.textContent = score;
-                            streakEl.textContent = streak;
-                            createParticles(hoop.x, hoop.y, ball.isOnFire ? '#ff4400' : '#00ff9d');
-                            ball.state = 'falling';
-                            ball.vx *= 0.5;
-                            ball.vy = 2; // slow drop down
-                            ball.isOnFire = false; // consume fire
+                    if (dist < swishRadius) {
+                        // SWISH
+                        let points = ball.isOnFire ? 3 : (1 + Math.floor(streak / 2));
+                        score += points;
+                        streak++;
+                        scoreEl.textContent = score;
+                        streakEl.textContent = streak;
+                        createParticles(hoop.x, hoop.y, ball.isOnFire ? '#ff4400' : '#00ff9d');
+                        ball.state = 'falling';
+                        ball.vx *= 0.5;
+                        ball.vy = 2; // slow drop down
+                        ball.isOnFire = false; // consume fire
 
-                            if (gameMode === 'playoff' && score >= targetScore) {
-                                nextLevel();
-                            }
-                        } else if (Math.abs(ball.y - (hoop.y - hoop.boardHeight / 2)) < hoop.boardHeight && Math.abs(dx) < hoop.boardWidth / 2) {
-                            // Hit backboard: Bounce back on Z
-                            ball.state = 'falling';
-                            ball.vy = -ball.vy * 0.4; 
-                            ball.vx = -ball.vx * 0.6 + (Math.random() - 0.5) * 3;
-                            ball.vz = 0.05; // Bounce forward slightly
-                            ball.z = 0.32; 
-                            streak = 0;
-                            streakEl.textContent = streak;
-                        } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 3.8 : hoop.radius * 2.8)) {
-                            // Hit rim: Bounce back on Z
-                            ball.state = 'falling';
-                            ball.vy = -ball.vy * 0.5;
-                            ball.vx = (Math.random() - 0.5) * 8;
-                            ball.vz = 0.04; // Bounce forward slightly
-                            streak = 0;
-                            streakEl.textContent = streak;
-                        } else {
-                            // Airball
-                            ball.state = 'falling';
-                            streak = 0;
-                            streakEl.textContent = streak;
+                        if (gameMode === 'playoff' && score >= targetScore) {
+                            nextLevel();
                         }
+                    } else if (Math.abs(ball.y - (hoop.y - hoop.boardHeight / 2)) < hoop.boardHeight && Math.abs(dx) < hoop.boardWidth / 2) {
+                        // Hit backboard: Bounce back on Z
+                        ball.state = 'falling';
+                        ball.vy = -ball.vy * 0.4; 
+                        ball.vx = -ball.vx * 0.6 + (Math.random() - 0.5) * 3;
+                        ball.vz = 0.05; // Bounce forward slightly
+                        ball.z = 0.32; 
+                        streak = 0;
+                        streakEl.textContent = streak;
+                    } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 3.8 : hoop.radius * 2.8)) {
+                        // Hit rim: Bounce back on Z
+                        ball.state = 'falling';
+                        ball.vy = -ball.vy * 0.5;
+                        ball.vx = (Math.random() - 0.5) * 8;
+                        ball.vz = 0.04; // Bounce forward slightly
+                        streak = 0;
+                        streakEl.textContent = streak;
+                    } else {
+                        // Airball
+                        ball.state = 'falling';
+                        streak = 0;
+                        streakEl.textContent = streak;
                     }
                 }
             }
