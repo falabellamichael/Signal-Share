@@ -1039,9 +1039,20 @@
                     transition: all 0.3s;
                 `;
                 card.innerHTML = `
-                    <div style=\"height: 140px; background: url('${game.poster}') center/cover; position: relative; overflow: hidden;\">
-                        <div style=\"position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); display: flex; align-items: flex-end; padding: 15px;\">
-                            <span style=\"font-size: 0.65rem; background: rgba(164, 208, 7, 0.2); color: #a4d007; padding: 4px 8px; border-radius: 4px; font-weight: 800;\">${game.tag}</span>\n                        </div>\n                    </div>\n                    <div style=\"padding: 15px;\">\n                        <h4 style=\"margin: 0 0 5px; font-size: 0.9rem; font-weight: 700;\">${game.title}</h4>\n                        <p style=\"margin: 0 0 10px; font-size: 0.75rem; opacity: 0.5;\">${game.description.substring(0, 60)}${game.description.length > 60 ? '...' : ''}</p>\n                        <div style=\"display: flex; gap: 8px; margin-top: 10px;\">\n                            <button class=\"play-btn\" onclick=\"launchCustomGame('${game.id}')\" style=\"flex: 1; font-size: 0.8rem; padding: 8px; margin: 0;\">PLAY</button>\n                            <button class=\"play-btn\" onclick=\"deleteCustomGame('${game.id}')\" style=\"flex: 0 0 auto; font-size: 0.8rem; padding: 8px 12px; margin: 0; background: rgba(255, 100, 100, 0.3);\">DEL</button>\n                        </div>\n                    </div>\n                `;
+                    <div style="height: 140px; background: url('${game.poster}') center/cover; position: relative; overflow: hidden;">
+                        <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); display: flex; align-items: flex-end; padding: 15px;">
+                            <span style="font-size: 0.65rem; background: rgba(164, 208, 7, 0.2); color: #a4d007; padding: 4px 8px; border-radius: 4px; font-weight: 800;">${game.tag}</span>
+                        </div>
+                    </div>
+                    <div style="padding: 15px;">
+                        <h4 style="margin: 0 0 5px; font-size: 0.9rem; font-weight: 700;">${game.title}</h4>
+                        <p style="margin: 0 0 10px; font-size: 0.75rem; opacity: 0.5;">${game.description.substring(0, 60)}${game.description.length > 60 ? '...' : ''}</p>
+                        <div style="display: flex; gap: 8px; margin-top: 10px;">
+                            <button class="play-btn" onclick="launchCustomGame('${game.id}')" style="flex: 1; font-size: 0.8rem; padding: 8px; margin: 0;">PLAY</button>
+                            <button class="play-btn" onclick="deleteCustomGame('${game.id}')" style="flex: 0 0 auto; font-size: 0.8rem; padding: 8px 12px; margin: 0; background: rgba(255, 100, 100, 0.3);">DEL</button>
+                        </div>
+                    </div>
+                `;
                 grid.appendChild(card);
             });
         }
@@ -1064,13 +1075,22 @@
                     <!DOCTYPE html>
                     <html>
                     <head>
-                        <meta charset=\"UTF-8\">
-                        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
                         <title>${game.title}</title>
                         <style>
                             * { margin: 0; padding: 0; box-sizing: border-box; }
                             body { background: #0a0e27; color: #fff; font-family: system-ui, sans-serif; }
-                        </style>\n                    </head>\n                    <body>\n                        <div id=\"app-container\"></div>\n                        <script>\n                            ${game.fileContent.split('data:text/javascript;base64,')[1] ? atob(game.fileContent.split('data:text/javascript;base64,')[1]) : game.fileContent}\n                        </script>\n                    </body>\n                    </html>\n                `;
+                        </style>
+                    </head>
+                    <body>
+                        <div id="app-container"></div>
+                        <script>
+                            ${game.fileContent.split('data:text/javascript;base64,')[1] ? atob(game.fileContent.split('data:text/javascript;base64,')[1]) : game.fileContent}
+                        <\/script>
+                    </body>
+                    </html>
+                `;
                 openApp(htmlWrapper, game.title, game.poster, gameId);
             }
         }
@@ -1085,6 +1105,7 @@
             localStorage.setItem('ss-custom-games', JSON.stringify(customGames));
             renderPublishedGames();
         }
+        function toggleAuth() {
             if (currentUser) {
                 if (confirm('Do you want to sign out?')) {
                     currentUser = null;
