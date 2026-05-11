@@ -325,8 +325,11 @@ function scoreShot(isPerfectShot) {
     ball.scoredThisShot = true;
 
     const clean = ball.rimHits === 0;
-    const perfect = isPerfectShot || (clean && ball.releaseQuality > 0.86);
-    const points = perfect ? 10 : (ball.isOnFire ? 3 : 1 + Math.floor(streak / 2));
+    // Tightened perfect threshold from 0.86 to 0.93
+    const perfect = isPerfectShot || (clean && ball.releaseQuality > 0.93);
+    
+    // Rebalanced scoring: Perfect = 3, Average/Normal = 2
+    const points = perfect ? 3 : 2;
 
     if (perfect) {
         showMessage('PERFECT!', hoop.x, hoop.y - 46, '#ff00ff');
@@ -393,7 +396,8 @@ function hitRimAndScore() {
     const centerInsideOpening = Math.abs(dx) < hoop.radius * 0.58;
 
     if (crossedRimPlane && centerInsideOpening) {
-        const perfect = Math.abs(dx) < hoop.radius * 0.17 && ball.rimHits === 0;
+        // Tightened physical perfect threshold from 0.17 to 0.11
+        const perfect = Math.abs(dx) < hoop.radius * 0.11 && ball.rimHits === 0;
         scoreShot(perfect);
         return;
     }
