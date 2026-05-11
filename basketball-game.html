@@ -283,9 +283,9 @@
                 }
 
                 if (ball.state === 'shooting' && ball.z <= 0.4 && ball.z >= 0.25) {
-                    // Magnetic Hoop Effect: Subtle pull towards center as it approaches
+                    // Magnetic Hoop Effect: Subtle pull towards center (Tuned down)
                     let dx = ball.x - hoop.x;
-                    let pullStrength = (physicsMode === 'arcade' ? 0.15 : 0.08);
+                    let pullStrength = (physicsMode === 'arcade' ? 0.11 : 0.04);
                     ball.vx -= dx * pullStrength;
                 }
 
@@ -295,8 +295,8 @@
                     let dy = ball.y - hoop.y;
                     let dist = Math.sqrt(dx * dx + dy * dy);
                     
-                    // Increased swish radius for easier scoring
-                    let swishRadius = physicsMode === 'arcade' ? hoop.radius * 3.2 : hoop.radius * 2.2;
+                    // Tuned swish radius (reduced from previous over-buff)
+                    let swishRadius = physicsMode === 'arcade' ? hoop.radius * 2.8 : hoop.radius * 1.95;
 
                     if (dist < swishRadius) {
                         let isPerfectShot = ball.isPerfect && dist < hoop.radius * 0.4;
@@ -330,9 +330,9 @@
                         ball.vx = -ball.vx * 0.6 + (Math.random() - 0.5) * 3;
                         ball.vz = 0.05; ball.z = 0.32;
                         streak = 0; streakEl.textContent = streak;
-                    } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 4.2 : hoop.radius * 3.2)) {
-                        // Forgiving Rim Logic: If it's a near miss, maybe it rolls in?
-                        if (physicsMode === 'arcade' && Math.random() > 0.6) {
+                    } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 4.0 : hoop.radius * 3.0)) {
+                        // Forgiving Rim Logic: Less likely to roll in than before
+                        if (physicsMode === 'arcade' && Math.random() > 0.78) {
                             ball.vx = (hoop.x - ball.x) * 0.1;
                             ball.vy = 2;
                             ball.vz = -0.02;
@@ -493,17 +493,17 @@
                     // A power of ~1.0 should hit the hoop
                     let power = distFactor * (speedFactor * 0.4 + 0.6);
                     
-                    // The "Perfect" Release Logic: Widened for easier triggers
-                    let isPerfectRelease = Math.abs(distFactor - 1.0) < 0.22 && 
-                                         dragDuration >= 0.05 && dragDuration <= 0.65 && 
-                                         Math.abs(dx) < 35;
+                    // The "Perfect" Release Logic: Tightened window for more skill
+                    let isPerfectRelease = Math.abs(distFactor - 1.0) < 0.18 && 
+                                         dragDuration >= 0.08 && dragDuration <= 0.55 && 
+                                         Math.abs(dx) < 30;
                     
                     if (isPerfectRelease) {
                         power = 1.0;
                         ball.isPerfect = true;
                         ball.isOnFire = true;
-                    } else if (power > 0.82 && power < 1.18) {
-                        // Widened soft snap for near-perfect shots
+                    } else if (power > 0.85 && power < 1.15) {
+                        // Narrowed soft snap
                         power = (power + 1.0) / 2;
                     }
 
@@ -516,8 +516,8 @@
                     let targetX;
                     if (physicsMode === 'arcade') {
                         let deviation = Math.abs(dx);
-                        // Even stronger aim assist: reduces horizontal error impact by 95% for small misses
-                        let correction = ball.isPerfect ? 0 : (deviation < 120 ? 0.05 : 0.15);
+                        // Tuned aim assist: slightly more error permitted to come through
+                        let correction = ball.isPerfect ? 0 : (deviation < 100 ? 0.08 : 0.18);
                         targetX = hoop.x - (dx * correction);
                     } else {
                         targetX = hoop.x - dx * 2.5;
