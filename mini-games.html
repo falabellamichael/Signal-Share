@@ -324,15 +324,15 @@
 
         <aside class="steam-sidebar">
             <div class="sidebar-nav">
-                <div class="nav-item active">
+                <div id="nav-all" class="nav-item active" onclick="setCategory('all')">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
                     All Games
                 </div>
-                <div class="nav-item">
+                <div id="nav-utilities" class="nav-item" onclick="setCategory('utilities')">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
                     Utilities
                 </div>
-                <div class="nav-item">
+                <div id="nav-recent" class="nav-item" onclick="setCategory('recent')">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     Recent
                 </div>
@@ -363,19 +363,12 @@
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                    <h3 style="margin: 0; font-size: 0.9rem; letter-spacing: 1.5px; opacity: 0.6;">MY LIBRARY</h3>
-                    <div style="font-size: 0.8rem; color: var(--steam-light);">View All</div>
+                    <h3 id="library-title" style="margin: 0; font-size: 0.9rem; letter-spacing: 1.5px; opacity: 0.6;">MY LIBRARY</h3>
+                    <div id="clear-recent" style="display: none; font-size: 0.8rem; color: #ff3e3e; cursor: pointer;" onclick="clearRecent()">Clear History</div>
                 </div>
 
-                <div class="game-grid" style="position: relative; z-index: 5;">
-                    <div class="steam-card" onclick="showGameDetails('snake')">
-                        <div class="poster-wrapper"><img src="snake_game_poster_1778466261855.png"></div>
-                        <div class="card-info"><div class="card-title">Neon Snake</div><div class="card-tag">ARCADE • READY</div></div>
-                    </div>
-                    <div class="steam-card" onclick="showGameDetails('calc')">
-                        <div class="poster-wrapper"><img src="calculator_tool_poster_1778466276736.png"></div>
-                        <div class="card-info"><div class="card-title">Scientific Calc</div><div class="card-tag">UTILITY</div></div>
-                    </div>
+                <div id="game-grid" class="game-grid" style="position: relative; z-index: 5;">
+                    <!-- Dynamically Rendered -->
                 </div>
             </div>
 
@@ -475,7 +468,7 @@
                                 <span style="font-size: 0.7rem; font-weight: 900; color: var(--steam-light); letter-spacing: 2px;">STATUS: STANDBY</span>
                                 <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">Universal Suite Ready</div>
                             </div>
-                            <button class="play-btn" onclick="window.open('./Calculator.html', '_blank')">Launch Utility</button>
+                            <button class="play-btn" onclick="launchCalc()">Launch Utility</button>
                         </div>
 
                         <h3 style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.3; margin-bottom: 20px; font-weight: 900;">UTILITY FEATURES</h3>
@@ -579,7 +572,7 @@
                             A professional-grade mathematical suite. Built to demonstrate high-fidelity UI design tokens and complex grid layouts.
                         </p>
                         
-                        <button onclick="window.open('./Calculator.html', '_blank')" class="play-btn">LAUNCH UTILITY</button>
+                        <button onclick="launchCalc()" class="play-btn">LAUNCH UTILITY</button>
                     </div>
                 </div>
             </div>
@@ -606,6 +599,75 @@
     </div>
 
     <script>
+        const GAMES = [
+            { id: 'snake', title: 'Neon Snake', category: 'ARCADE', poster: 'snake_game_poster_1778466261855.png', tag: 'ARCADE • READY', type: 'game' },
+            { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility' }
+        ];
+
+        let currentCategory = 'all';
+
+        function setCategory(cat) {
+            currentCategory = cat;
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(`nav-${cat}`).classList.add('active');
+            
+            // UI Tweaks for categories
+            const hero = document.querySelector('.featured-hero');
+            const title = document.getElementById('library-title');
+            const clearBtn = document.getElementById('clear-recent');
+            
+            hero.style.display = (cat === 'all') ? 'flex' : 'none';
+            title.textContent = cat.toUpperCase() + (cat === 'all' ? ' LIBRARY' : '');
+            clearBtn.style.display = (cat === 'recent') ? 'block' : 'none';
+            
+            renderLibrary();
+        }
+
+        function renderLibrary() {
+            const grid = document.getElementById('game-grid');
+            grid.innerHTML = '';
+            
+            let filtered = [];
+            if (currentCategory === 'all') filtered = GAMES;
+            else if (currentCategory === 'utilities') filtered = GAMES.filter(g => g.type === 'utility');
+            else if (currentCategory === 'recent') {
+                const history = JSON.parse(localStorage.getItem('launch-history') || '[]');
+                filtered = history.map(id => GAMES.find(g => g.id === id)).filter(Boolean);
+            }
+            
+            if (filtered.length === 0 && currentCategory === 'recent') {
+                grid.innerHTML = '<div style="grid-column: 1/-1; padding: 40px; text-align: center; opacity: 0.4;">No recent activity recorded.</div>';
+                return;
+            }
+
+            filtered.forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'steam-card';
+                card.onclick = () => showGameDetails(game.id);
+                card.innerHTML = `
+                    <div class="poster-wrapper"><img src="${game.poster}"></div>
+                    <div class="card-info">
+                        <div class="card-title">${game.title}</div>
+                        <div class="card-tag">${game.tag}</div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function recordLaunch(id) {
+            let history = JSON.parse(localStorage.getItem('launch-history') || '[]');
+            history = history.filter(item => item !== id);
+            history.unshift(id);
+            if (history.length > 8) history.pop();
+            localStorage.setItem('launch-history', JSON.stringify(history));
+        }
+
+        function clearRecent() {
+            localStorage.removeItem('launch-history');
+            renderLibrary();
+        }
+
         function showGameDetails(game) {
             const library = document.getElementById('library-view');
             const detail = document.getElementById('detail-view');
@@ -615,12 +677,8 @@
             detail.style.display = 'block';
             setTimeout(() => detail.style.opacity = '1', 10);
 
-            // Dynamic Backdrop
-            const posters = {
-                'snake': 'snake_game_poster_1778466261855.png',
-                'calc': 'calculator_tool_poster_1778466276736.png'
-            };
-            hubBg.style.backgroundImage = `url(${posters[game]})`;
+            const g = GAMES.find(x => x.id === game);
+            if (g) hubBg.style.backgroundImage = `url(${g.poster})`;
 
             document.getElementById('hub-snake').style.display = (game === 'snake') ? 'block' : 'none';
             document.getElementById('hub-calc').style.display = (game === 'calc') ? 'block' : 'none';
@@ -636,6 +694,7 @@
             setTimeout(() => {
                 detail.style.display = 'none';
                 library.style.display = 'block';
+                renderLibrary(); // Refresh grid state
             }, 300);
         }
 
@@ -644,6 +703,7 @@
         }
 
         function launchSnake() {
+            recordLaunch('snake');
             const speed     = document.getElementById('snake-speed').value;
             const grid      = document.getElementById('snake-grid').value;
             const neon      = document.getElementById('snake-neon').value;
@@ -652,8 +712,16 @@
             const wallwrap  = document.getElementById('snake-wallwrap').checked ? '1' : '0';
             
             const url = `./snake-game.html?speed=${speed}&grid=${grid}&neon=${neon}&obstacles=${obstacles}&obstCount=${obstCount}&wallwrap=${wallwrap}&autostart=1`;
-            window.open(url, 'snake_game'); // Use named window to reuse tab
+            window.open(url, 'snake_game');
         }
+
+        function launchCalc() {
+            recordLaunch('calc');
+            window.open('./Calculator.html', '_blank');
+        }
+
+        // Initialize
+        renderLibrary();
     </script>
 </body>
 </html>
