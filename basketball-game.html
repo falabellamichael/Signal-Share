@@ -598,6 +598,15 @@
         // Initialize
         resize();
         requestAnimationFrame(loop);
+
+        // Auto-start if mode is passed in URL
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const mode = params.get('mode');
+            if (mode && ['classic', 'timer', 'playoff'].includes(mode)) {
+                startGame(mode);
+            }
+        });
     </script>
 </body>
 </html>

@@ -575,6 +575,18 @@
                             </div>
                             <button class="play-btn" style="background: linear-gradient(to bottom, #ff7700 5%, #cc5500 95%);" onclick="launchBasketball()">Play Now</button>
                         </div>
+
+                        <h3 style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.3; margin-bottom: 20px; font-weight: 900;">LAUNCH CONFIGURATION</h3>
+                        <div class="config-grid">
+                            <div>
+                                <label class="setting-label">Game Mode</label>
+                                <select id="hoops-mode" class="steam-select">
+                                    <option value="classic" selected>Classic (Endless)</option>
+                                    <option value="timer">Timer (60s Challenge)</option>
+                                    <option value="playoff">Playoff (Level Based)</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Calculator Specific Content -->
@@ -1005,7 +1017,8 @@
 
         function launchBasketball() {
             recordLaunch('basketball');
-            openApp('./basketball-game.html', 'Neon Hoops', 'basketball_game_poster.png', 'basketball');
+            const mode = document.getElementById('hoops-mode').value;
+            openApp(`./basketball-game.html?mode=${mode}`, 'Neon Hoops', 'basketball_game_poster.png', 'basketball');
         }
 
         function launchCalc() {
