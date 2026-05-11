@@ -9,8 +9,12 @@ class SnakeGame {
         this.submessageEl = submessageEl;
         this.startBtn = startBtn;
 
-        // Constants & Configuration
-        this.gridSize = 20;
+        // Constants & Configuration (with URL parameter overrides)
+        const urlParams = new URLSearchParams(window.location.search);
+        this.gridSize = parseInt(urlParams.get('grid') || '20');
+        this.gameSpeed = parseInt(urlParams.get('speed') || '100');
+        this.neonIntensity = parseInt(urlParams.get('neon') || '10');
+        
         this.tileCount = this.canvas.width / this.gridSize;
         this.snake = [];
         this.food = { x: 5, y: 5 };
@@ -68,7 +72,7 @@ class SnakeGame {
         }
 
         // Food Drawing (Red Neon)
-        this.ctx.shadowBlur = 15;
+        this.ctx.shadowBlur = this.neonIntensity * 1.5;
         this.ctx.shadowColor = '#ff3e3e';
         this.ctx.fillStyle = '#ff3e3e';
         this.ctx.beginPath();
@@ -76,7 +80,7 @@ class SnakeGame {
         this.ctx.fill();
 
         // Snake Drawing (Green Neon)
-        this.ctx.shadowBlur = 10;
+        this.ctx.shadowBlur = this.neonIntensity;
         const snakeColor = '#00ff9d';
         this.ctx.shadowColor = snakeColor;
 
@@ -138,8 +142,8 @@ class SnakeGame {
         this.isRunning = true;
         this.overlay.classList.add('hidden');
         if (this.gameLoop) clearInterval(this.gameLoop);
-        // Game speed remains 100ms
-        this.gameLoop = setInterval(() => this.gameStep(), 100);
+        // Use the dynamic gameSpeed setting
+        this.gameLoop = setInterval(() => this.gameStep(), this.gameSpeed);
     }
 
     gameOver() {
@@ -189,9 +193,6 @@ class SnakeGame {
         this.nextDx = newDx;
         this.nextDy = newDy;
     }
-
-    // Initial setup call to run the game when loaded
-    this.startGame();
 }
 
 // Initialization: Run the game when the DOM is ready
@@ -204,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('startButton');
 
     // Instantiate the game logic with necessary DOM elements
-    new SnakeGame(
+    const game = new SnakeGame(
         'gameCanvas', 
         scoreEl, 
         bestEl, 
@@ -213,4 +214,10 @@ document.addEventListener('DOMContentLoaded', () => {
         submessageEl, 
         startBtn
     );
+
+    // Auto-start if requested via URL
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('autostart')) {
+        game.startGame();
+    }
 });

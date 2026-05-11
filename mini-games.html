@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Games and Tools | Signal Share</title>
+    <link rel="stylesheet" href="./questions-guide.css">
+    <style>
+        body {
+            background: #1b2838;
+            color: #fff;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .steam-shell {
+            max-width: 1200px;
+            margin: 0 auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .steam-header {
+            background: linear-gradient(to right, #171a21, #1b2838);
+            padding: 20px 40px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .steam-nav {
+            display: flex;
+            gap: 25px;
+            opacity: 0.6;
+        }
+
+        .steam-nav span {
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .steam-nav span:hover {
+            opacity: 1;
+        }
+
+        .steam-nav span.active {
+            color: #fff;
+            opacity: 1;
+            border-bottom: 2px solid #66c0f4;
+            padding-bottom: 5px;
+        }
+
+        .steam-content {
+            padding: 40px;
+            flex: 1;
+        }
+
+        .steam-card {
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .steam-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px rgba(102, 192, 244, 0.4);
+        }
+
+        .poster-wrapper {
+            aspect-ratio: 2/3;
+            background: #000;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .poster-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 30px;
+        }
+
+        .detail-overlay {
+            display: none;
+            background: #1b2838;
+            padding: 60px 40px;
+            border-top: 1px solid rgba(102,192,244,0.3);
+            animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .launch-box {
+            background: rgba(0,0,0,0.4);
+            padding: 30px;
+            border-radius: 12px;
+            margin-top: 30px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .setting-label {
+            display: block;
+            font-size: 0.75rem;
+            color: #fff;
+            margin-bottom: 10px;
+            opacity: 0.6;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .steam-select {
+            width: 100%;
+            background: #2a475e;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        .play-btn {
+            margin-top: 40px;
+            width: 100%;
+            background: linear-gradient(to right, #75b022, #588a1b);
+            color: #fff;
+            border: none;
+            padding: 20px;
+            font-weight: 800;
+            font-size: 1.2rem;
+            border-radius: 4px;
+            cursor: pointer;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            transition: filter 0.2s;
+        }
+
+        .play-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: #66c0f4;
+            text-decoration: none;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 10px;
+            background: #2a475e;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #66c0f4;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="steam-shell">
+        <header class="steam-header">
+            <h1 style="margin: 0; color: #fff; font-size: 1.3rem; letter-spacing: 1px;">Mini Games and Tools</h1>
+            <nav class="steam-nav">
+                <span>STORE</span>
+                <span class="active">LIBRARY</span>
+                <span>COMMUNITY</span>
+                <span id="user-name">USER</span>
+            </nav>
+        </header>
+
+        <main class="steam-content">
+            <a href="./llm-deepdive-2.html" class="back-link">← Back to LLM Info</a>
+
+            <div style="background: rgba(102, 192, 244, 0.05); padding: 25px; border-radius: 12px; border-left: 4px solid #66c0f4; margin-bottom: 40px;">
+                <h3 style="margin-top: 0; color: #66c0f4;">Local LLM Development Sandbox</h3>
+                <p style="margin-bottom: 0; opacity: 0.8; font-size: 0.95rem; line-height: 1.6;">
+                    These mini-games and utilities serve as proof-of-concept for Local LLM-assisted development. By utilizing local inference, developers can prototype logic and refactor UI components in a distraction-free, privacy-first environment.
+                </p>
+            </div>
+
+            <div class="game-grid">
+                <!-- Snake Game Card -->
+                <div class="steam-card" onclick="showGameDetails('snake')">
+                    <div class="poster-wrapper">
+                        <img src="snake_game_poster_1778466261855.png" alt="Neon Snake">
+                    </div>
+                    <div style="padding: 15px 5px;">
+                        <div style="font-weight: 700; color: #fff;">Neon Snake</div>
+                        <div style="font-size: 0.75rem; color: #66c0f4; margin-top: 4px;">READY TO PLAY</div>
+                    </div>
+                </div>
+
+                <!-- Calculator Card -->
+                <div class="steam-card" onclick="showGameDetails('calc')">
+                    <div class="poster-wrapper">
+                        <img src="calculator_tool_poster_1778466276736.png" alt="Calc Tool">
+                    </div>
+                    <div style="padding: 15px 5px;">
+                        <div style="font-weight: 700; color: #fff;">Scientific Calculator</div>
+                        <div style="font-size: 0.75rem; color: #66c0f4; margin-top: 4px;">UTILITY</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Detail Panels -->
+        <div id="game-details-overlay" class="detail-overlay">
+            <div id="details-snake" style="display: none;">
+                <div style="display: flex; gap: 60px; flex-wrap: wrap;">
+                    <img src="snake_game_poster_1778466261855.png" style="width: 280px; border-radius: 8px; box-shadow: 0 30px 60px rgba(0,0,0,0.8);">
+                    <div style="flex: 1; min-width: 300px;">
+                        <h2 style="color: #fff; margin-top: 0; font-size: 2.5rem; letter-spacing: -1px;">Neon Snake</h2>
+                        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                            <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 0.7rem;">ARCADE</span>
+                            <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 0.7rem;">NEON</span>
+                            <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 0.7rem;">SINGLE PLAYER</span>
+                        </div>
+                        <p style="color: rgba(255,255,255,0.7); font-size: 1rem; line-height: 1.6;">
+                            A premium arcade experience with input buffering, high-score persistence, and touch-optimized controls. 
+                            The core logic class was refactored and optimized using Local LLM code-review protocols.
+                        </p>
+                        
+                        <div class="launch-box">
+                            <h3 style="color: #66c0f4; font-size: 0.9rem; margin-top: 0; text-transform: uppercase; letter-spacing: 2px;">Launch Configuration</h3>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 30px; margin-top: 25px;">
+                                <div>
+                                    <label class="setting-label">Game Speed</label>
+                                    <select id="snake-speed" class="steam-select">
+                                        <option value="150">Relaxed (150ms)</option>
+                                        <option value="100" selected>Classic (100ms)</option>
+                                        <option value="60">Hyper (60ms)</option>
+                                        <option value="40">Insane (40ms)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="setting-label">Grid Density</label>
+                                    <select id="snake-grid" class="steam-select">
+                                        <option value="40">Tiny Grid (10x10)</option>
+                                        <option value="20" selected>Standard (20x20)</option>
+                                        <option value="10">Dense (40x40)</option>
+                                    </select>
+                                </div>
+                                <div style="grid-column: 1 / -1;">
+                                    <label class="setting-label">Neon Intensity</label>
+                                    <div style="display: flex; align-items: center; gap: 20px;">
+                                        <input type="range" id="snake-neon" min="0" max="30" value="10">
+                                        <span id="neon-val" style="width: 30px; font-weight: 700;">10</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button onclick="launchSnake()" class="play-btn">PLAY NOW</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="details-calc" style="display: none;">
+                <div style="display: flex; gap: 60px; flex-wrap: wrap;">
+                    <img src="calculator_tool_poster_1778466276736.png" style="width: 280px; border-radius: 8px; box-shadow: 0 30px 60px rgba(0,0,0,0.8);">
+                    <div style="flex: 1; min-width: 300px;">
+                        <h2 style="color: #fff; margin-top: 0; font-size: 2.5rem; letter-spacing: -1px;">Scientific Calculator</h2>
+                        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                            <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 0.7rem;">UTILITY</span>
+                            <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 0.7rem;">GLASSMORPHIC</span>
+                        </div>
+                        <p style="color: rgba(255,255,255,0.7); font-size: 1rem; line-height: 1.6;">
+                            A professional-grade mathematical suite. Built to demonstrate high-fidelity UI design tokens and complex grid layouts.
+                        </p>
+                        
+                        <button onclick="window.open('./Calculator.html', '_blank')" class="play-btn">LAUNCH UTILITY</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="questions-guide-footer" style="margin-top: auto; background: #171a21; border-top: 1px solid rgba(255,255,255,0.05); padding: 60px 20px;">
+            <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 20px;">
+                <a href="./index.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Back to Site</a>
+                <a href="./how-to-guide.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Back to How-To</a>
+                <a href="./hero-player-deepdive.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Back to Dev Tools</a>
+            </div>
+            <div style="text-align: center; opacity: 0.5; font-size: 0.8rem;">
+                <span>Signal Share Engineering Documentation</span><br>
+                <span>&copy; 2026 Deep Dive Series</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('snake-neon').addEventListener('input', (e) => {
+            document.getElementById('neon-val').textContent = e.target.value;
+        });
+
+        function showGameDetails(game) {
+            const overlay = document.getElementById('game-details-overlay');
+            const snake = document.getElementById('details-snake');
+            const calc = document.getElementById('details-calc');
+            
+            overlay.style.display = 'block';
+            snake.style.display = (game === 'snake') ? 'block' : 'none';
+            calc.style.display = (game === 'calc') ? 'block' : 'none';
+            
+            overlay.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function launchSnake() {
+            const speed = document.getElementById('snake-speed').value;
+            const grid = document.getElementById('snake-grid').value;
+            const neon = document.getElementById('snake-neon').value;
+            
+            const url = `./snake-game.html?speed=${speed}&grid=${grid}&neon=${neon}&autostart=1`;
+            window.open(url, '_blank');
+        }
+    </script>
+</body>
+</html>
