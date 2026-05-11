@@ -309,11 +309,16 @@
                 }
 
                 // Check collision / hoop crossing
-                if (ball.state === 'shooting' && ball.z <= 0.5) {
-                    // MAGNETIC RIM: If close, pull it in (Suction effect)
-                    let pullStrength = physicsMode === 'arcade' ? 0.35 : 0.15;
-                    ball.vx += (hoop.x - ball.x) * pullStrength;
-                    ball.vy += (hoop.y - ball.y) * pullStrength;
+                if (ball.state === 'shooting' && ball.z <= 0.6) {
+                    // MAGNETIC RIM: Subtle pull towards center (Distance-dependent)
+                    let pullFactor = physicsMode === 'arcade' ? 0.04 : 0.015;
+                    let distToHoop = Math.sqrt((hoop.x - ball.x)**2 + (hoop.y - ball.y)**2);
+                    
+                    // Only pull if reasonably close to the center line
+                    if (distToHoop < 150) {
+                        ball.vx += (hoop.x - ball.x) * pullFactor;
+                        ball.vy += (hoop.y - ball.y) * pullFactor;
+                    }
 
                     if (ball.z <= 0.35) {
                         ball.vz = 0; // stop going back
@@ -342,18 +347,20 @@
                                 nextLevel();
                             }
                         } else if (Math.abs(ball.y - (hoop.y - hoop.boardHeight / 2)) < hoop.boardHeight && Math.abs(dx) < hoop.boardWidth / 2) {
-                            // Hit backboard
+                            // Hit backboard: Bounce back on Z
                             ball.state = 'falling';
-                            ball.vy = -ball.vy * 0.5; // bounce slightly up
-                            ball.vx = -ball.vx * 0.8 + (Math.random() - 0.5) * 3;
-                            ball.z = 0.3; // lock depth to backboard
+                            ball.vy = -ball.vy * 0.4; 
+                            ball.vx = -ball.vx * 0.6 + (Math.random() - 0.5) * 3;
+                            ball.vz = 0.05; // Bounce forward slightly
+                            ball.z = 0.32; 
                             streak = 0;
                             streakEl.textContent = streak;
                         } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 3.8 : hoop.radius * 2.8)) {
-                            // Hit rim
+                            // Hit rim: Bounce back on Z
                             ball.state = 'falling';
-                            ball.vy = -ball.vy * 0.6;
-                            ball.vx = (Math.random() - 0.5) * 10;
+                            ball.vy = -ball.vy * 0.5;
+                            ball.vx = (Math.random() - 0.5) * 8;
+                            ball.vz = 0.04; // Bounce forward slightly
                             streak = 0;
                             streakEl.textContent = streak;
                         } else {
