@@ -24,7 +24,14 @@
             font-family: 'Inter', system-ui, sans-serif;
             display: flex;
             height: 100vh;
+            overflow: hidden;
         }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
         /* Sidebar & Navigation */
         .sidebar {
