@@ -1066,11 +1066,11 @@
 
             recordLaunch(gameId);
 
-            // For HTML files, load directly
             if (game.fileName.endsWith('.html') || game.fileType === 'text/html') {
                 openApp(game.fileContent, game.title, game.poster, gameId);
             } else {
-                // For JS files, wrap in HTML
+                // For JS files, wrap in HTML safely using string concatenation to avoid parser confusion
+                const jsContent = game.fileContent.split('data:text/javascript;base64,')[1] ? atob(game.fileContent.split('data:text/javascript;base64,')[1]) : game.fileContent;
                 const htmlWrapper = `
                     <!DOCTYPE html>
                     <html>
@@ -1086,11 +1086,12 @@
                     <body>
                         <div id="app-container"></div>
                         <script>
-                            ${game.fileContent.split('data:text/javascript;base64,')[1] ? atob(game.fileContent.split('data:text/javascript;base64,')[1]) : game.fileContent}
+                            ${jsContent}
                         <\/script>
                     </body>
                     </html>
-                `;
+                `.replace('<\/script>', '</scr' + 'ipt>').replace('<script>', '<scr' + 'ipt>');
+                
                 openApp(htmlWrapper, game.title, game.poster, gameId);
             }
         }
