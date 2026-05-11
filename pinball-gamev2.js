@@ -1,4 +1,4 @@
-        window.__NEON_PINBALL_BUILD = 'revamped-functional-v1.9';
+        window.__NEON_PINBALL_BUILD = 'revamped-functional-v2.0-loop-polish';
         console.log('[Neon Pinball] Build:', window.__NEON_PINBALL_BUILD);
 
         const canvas = document.getElementById('pinballCanvas');
@@ -141,7 +141,25 @@
             { x: 350, y: 264, w: 12, h: 34, color: COLORS.cyan, lit: false, points: 180 }
         ];
 
-        function createArc(cx, cy, r, startAngle, endAngle, segments, color, thick) {
+        const loop = {
+            cx: 200,
+            cy: 360,
+            innerR: 42,
+            midR: 58,
+            outerR: 74,
+            color: COLORS.gold,
+            accent: COLORS.magenta,
+            pulse: 0,
+            gateCooldown: 0,
+            gates: [
+                { label: 'IN', angle: 1.82, lit: false, points: 450 },
+                { label: 'ARC', angle: 2.92, lit: false, points: 550 },
+                { label: 'TOP', angle: -1.58, lit: false, points: 650 },
+                { label: 'OUT', angle: 0.16, lit: false, points: 750 }
+            ]
+        };
+
+        function createArc(cx, cy, r, startAngle, endAngle, segments, color, thick, extras = {}) {
             const arcWalls = [];
             const step = (endAngle - startAngle) / segments;
             for (let i = 0; i < segments; i++) {
@@ -153,37 +171,65 @@
                     x2: cx + Math.cos(a2) * r,
                     y2: cy + Math.sin(a2) * r,
                     color,
-                    thick
+                    thick,
+                    ...extras
                 });
             }
             return arcWalls;
         }
 
+        function createPolyline(points, color, thick, extras = {}) {
+            const segments = [];
+            for (let i = 0; i < points.length - 1; i += 1) {
+                segments.push({
+                    x1: points[i][0],
+                    y1: points[i][1],
+                    x2: points[i + 1][0],
+                    y2: points[i + 1][1],
+                    color,
+                    thick,
+                    ...extras
+                });
+            }
+            return segments;
+        }
+
+        const loopWalls = [
+            // Outer and inner rails leave a lower mouth so the ball can enter the loop channel.
+            ...createArc(loop.cx, loop.cy, loop.outerR, -Math.PI, 1.10, 34, loop.color, 5, { loopRail: true }),
+            ...createArc(loop.cx, loop.cy, loop.outerR, 2.02, Math.PI, 12, loop.color, 5, { loopRail: true }),
+            ...createArc(loop.cx, loop.cy, loop.innerR, -Math.PI, 1.08, 32, loop.accent, 4, { loopRail: true }),
+            ...createArc(loop.cx, loop.cy, loop.innerR, 2.04, Math.PI, 10, loop.accent, 4, { loopRail: true })
+        ];
+
         const walls = [
-            // Outer boundaries
-            { x1: 20, y1: 688, x2: 20, y2: 120, color: COLORS.cyan, thick: 6 }, // Left wall
-            { x1: 398, y1: 688, x2: 398, y2: 100, color: COLORS.cyan, thick: 6 }, // Right outer wall
+            // Cleaner outer cabinet: proportional, mostly vertical, and mirrored around the playfield.
+            ...createPolyline([[22, 688], [22, 144], [34, 103], [68, 64], [112, 42]], COLORS.cyan, 6),
+            { x1: 112, y1: 42, x2: 284, y2: 42, color: COLORS.cyan, thick: 6 },
+            ...createPolyline([[284, 42], [326, 64], [362, 105], [397, 130], [397, 688]], COLORS.cyan, 6),
 
-            // Shooter Lane inner wall
-            { x1: 372, y1: 688, x2: 372, y2: 140, color: COLORS.cyan, thick: 5 },
+            // Shooter lane is straighter and evenly spaced so it no longer looks pinched.
+            { x1: 372, y1: 688, x2: 372, y2: 146, color: COLORS.cyan, thick: 5 },
+            ...createArc(345, 145, 27, -0.1, Math.PI * 0.78, 12, COLORS.cyan, 5),
 
-            // Top curves (replaces diagonal walls)
-            ...createArc(100, 120, 80, Math.PI, Math.PI * 1.5, 12, COLORS.cyan, 5), // Top-left curve
-            { x1: 100, y1: 40, x2: 300, y2: 40, color: COLORS.cyan, thick: 5 }, // Top flat
-            ...createArc(300, 140, 98, Math.PI * 1.5, Math.PI * 2, 12, COLORS.cyan, 5), // Top-right curve
+            // Smooth ball-return guides.
+            ...createPolyline([[36, 490], [50, 525], [86, 560], [120, 594]], COLORS.blue, 4),
+            ...createPolyline([[364, 490], [350, 525], [314, 560], [280, 594]], COLORS.blue, 4),
 
-            // Slingshots (triangular bumpers above flippers)
-            { x1: 50, y1: 540, x2: 100, y2: 590, color: COLORS.green, thick: 6, slingshot: true },
-            { x1: 100, y1: 590, x2: 50, y2: 590, color: COLORS.green, thick: 4 },
-            { x1: 50, y1: 590, x2: 50, y2: 540, color: COLORS.green, thick: 4 },
+            // Symmetric slingshots above the flippers.
+            { x1: 54, y1: 528, x2: 112, y2: 578, color: COLORS.green, thick: 6, slingshot: true },
+            { x1: 112, y1: 578, x2: 68, y2: 602, color: COLORS.green, thick: 4 },
+            { x1: 68, y1: 602, x2: 54, y2: 528, color: COLORS.green, thick: 4 },
 
-            { x1: 350, y1: 540, x2: 300, y2: 590, color: COLORS.green, thick: 6, slingshot: true },
-            { x1: 300, y1: 590, x2: 350, y2: 590, color: COLORS.green, thick: 4 },
-            { x1: 350, y1: 590, x2: 350, y2: 540, color: COLORS.green, thick: 4 },
+            { x1: 346, y1: 528, x2: 288, y2: 578, color: COLORS.green, thick: 6, slingshot: true },
+            { x1: 288, y1: 578, x2: 332, y2: 602, color: COLORS.green, thick: 4 },
+            { x1: 332, y1: 602, x2: 346, y2: 528, color: COLORS.green, thick: 4 },
 
-            // Flipper guide walls - positioned to feed directly to flippers and close gap
-            { x1: 20, y1: 585, x2: 125, y2: 626, color: COLORS.blue, thick: 4 },
-            { x1: 372, y1: 585, x2: 275, y2: 626, color: COLORS.blue, thick: 4 }
+            // Lower guides feed the ball toward the flippers without the old stretched proportions.
+            { x1: 24, y1: 596, x2: 116, y2: 626, color: COLORS.blue, thick: 4 },
+            { x1: 376, y1: 596, x2: 284, y2: 626, color: COLORS.blue, thick: 4 },
+
+            ...loopWalls
         ];
 
         function setupCanvas() {
@@ -253,6 +299,9 @@
             bumpers.forEach((b) => { b.pulse = 0; });
             rollovers.forEach((r) => { r.lit = false; });
             targets.forEach((t) => { t.lit = false; });
+            loop.gates.forEach((g) => { g.lit = false; });
+            loop.pulse = 0;
+            loop.gateCooldown = 0;
             resetBall();
             updateUI();
             state.lastTime = performance.now();
@@ -263,7 +312,7 @@
             state.running = false;
             ui.overlay.classList.remove('hidden');
             ui.overlayTitle.innerHTML = `GAME OVER<br><span style="font-size:0.34em;color:var(--neon-cyan);letter-spacing:0;">${formatScore(state.score)}</span>`;
-            ui.overlaySub.textContent = `Best: ${formatScore(state.highScore)} â€¢ Press Start Session to replay`;
+            ui.overlaySub.textContent = `Best: ${formatScore(state.highScore)} • Press Start Session to replay`;
         }
 
         function loseBall() {
@@ -456,6 +505,8 @@
 
             bumpers.forEach((b) => { b.pulse = Math.max(0, b.pulse - 0.05 * dt); });
             walls.forEach((w) => { if (w.pulse) w.pulse = Math.max(0, w.pulse - 0.08 * dt); });
+            loop.pulse = Math.max(0, loop.pulse - 0.045 * dt);
+            loop.gateCooldown = Math.max(0, loop.gateCooldown - dt);
             updateParticles(dt);
             
             // Update ball trail
@@ -512,6 +563,7 @@
             for (const wall of walls) checkSegmentCollision(wall, CFG.restitution);
             for (const bumper of bumpers) checkBumperCollision(bumper);
             for (const rollover of rollovers) checkRollover(rollover);
+            checkLoopScoring();
             for (const target of targets) checkTargetCollision(target);
             checkFlipperCollision(leftFlipper, dt);
             checkFlipperCollision(rightFlipper, dt);
@@ -639,6 +691,52 @@
                     spawnText('SIGNAL BONUS', 200, 110, COLORS.green);
                     explode(200, 100, COLORS.green, 44);
                 }
+            }
+        }
+
+        function normalizeAngle(angle) {
+            let value = angle;
+            while (value <= -Math.PI) value += Math.PI * 2;
+            while (value > Math.PI) value -= Math.PI * 2;
+            return value;
+        }
+
+        function angleDistance(a, b) {
+            return Math.abs(normalizeAngle(a - b));
+        }
+
+        function checkLoopScoring() {
+            if (loop.gateCooldown > 0) return;
+
+            const dx = ball.x - loop.cx;
+            const dy = ball.y - loop.cy;
+            const dist = length(dx, dy);
+            const inLoopLane = dist > loop.innerR - ball.r * 0.8 && dist < loop.outerR + ball.r * 0.8;
+            if (!inLoopLane) return;
+
+            const angle = Math.atan2(dy, dx);
+            for (const gate of loop.gates) {
+                if (gate.lit) continue;
+                if (angleDistance(angle, gate.angle) > 0.17) continue;
+
+                gate.lit = true;
+                loop.gateCooldown = 10;
+                loop.pulse = Math.max(loop.pulse, 0.85);
+                const gx = loop.cx + Math.cos(gate.angle) * loop.midR;
+                const gy = loop.cy + Math.sin(gate.angle) * loop.midR;
+                addScore(gate.points, gx, gy, loop.color, `LOOP ${gate.label}`);
+                explode(gx, gy, loop.color, 18);
+
+                if (loop.gates.every((item) => item.lit)) {
+                    loop.gates.forEach((item) => { item.lit = false; });
+                    loop.pulse = 1.35;
+                    state.multiplier = Math.min(5, state.multiplier + 1);
+                    updateUI();
+                    addScore(2500, loop.cx, loop.cy, COLORS.green, 'LOOPTY BONUS');
+                    spawnText(`${state.multiplier}x MULTI`, loop.cx, loop.cy - 42, COLORS.green);
+                    explode(loop.cx, loop.cy, COLORS.green, 54);
+                }
+                break;
             }
         }
 
@@ -772,6 +870,7 @@
             drawBackground();
             drawPlayfieldArt();
             drawWalls();
+            drawLoopObstacle();
             drawRollovers();
             drawTargets();
             drawBumpers();
@@ -856,10 +955,10 @@
         function drawWalls() {
             walls.forEach((w) => {
                 ctx.save();
-                const pulse = w.pulse || 0;
+                const pulse = w.pulse || (w.loopRail ? loop.pulse * 0.75 : 0);
                 const color = w.color || COLORS.rail;
                 glowStroke(color, (w.thick || 3) + pulse * 4, 10 + pulse * 15);
-                if (pulse > 0) {
+                if (pulse > 0.95) {
                     ctx.shadowColor = '#ffffff';
                     ctx.strokeStyle = '#ffffff';
                 }
@@ -870,6 +969,59 @@
                 ctx.stroke();
                 ctx.restore();
             });
+        }
+
+        function drawLoopObstacle() {
+            const time = Date.now() * 0.004;
+            ctx.save();
+            ctx.globalAlpha = 0.9;
+
+            const trackGrad = ctx.createRadialGradient(loop.cx, loop.cy, loop.innerR, loop.cx, loop.cy, loop.outerR + 12);
+            trackGrad.addColorStop(0, 'rgba(255,0,255,0.025)');
+            trackGrad.addColorStop(0.55, 'rgba(255,215,0,0.08)');
+            trackGrad.addColorStop(1, 'rgba(0,255,255,0.035)');
+            ctx.fillStyle = trackGrad;
+            ctx.beginPath();
+            ctx.arc(loop.cx, loop.cy, loop.outerR - 2, 0, Math.PI * 2);
+            ctx.arc(loop.cx, loop.cy, loop.innerR + 2, Math.PI * 2, 0, true);
+            ctx.fill();
+
+            ctx.strokeStyle = `rgba(255, 215, 0, ${0.22 + loop.pulse * 0.28})`;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 9]);
+            ctx.lineDashOffset = -time * 8;
+            ctx.beginPath();
+            ctx.arc(loop.cx, loop.cy, loop.midR, 1.95, Math.PI * 2 + 1.05);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = '950 12px Inter, system-ui, sans-serif';
+            ctx.fillStyle = 'rgba(255,255,255,0.68)';
+            ctx.shadowColor = loop.color;
+            ctx.shadowBlur = 10 + loop.pulse * 18;
+            ctx.fillText('LOOPTY', loop.cx, loop.cy - 5);
+            ctx.fillText('LOOP', loop.cx, loop.cy + 11);
+
+            loop.gates.forEach((gate) => {
+                const gx = loop.cx + Math.cos(gate.angle) * loop.midR;
+                const gy = loop.cy + Math.sin(gate.angle) * loop.midR;
+                const color = gate.lit ? COLORS.green : loop.color;
+                ctx.save();
+                ctx.shadowColor = color;
+                ctx.shadowBlur = gate.lit ? 18 : 9;
+                ctx.fillStyle = gate.lit ? 'rgba(0,255,157,0.92)' : 'rgba(255,215,0,0.28)';
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(gx, gy, gate.lit ? 7.5 : 6.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            ctx.restore();
         }
 
         function drawRollovers() {
