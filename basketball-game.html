@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -20,7 +19,6 @@
             color: #fff;
             font-family: 'Inter', system-ui, sans-serif;
             touch-action: none;
-            /* Prevent scrolling on mobile */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -112,15 +110,12 @@
             gap: 15px;
         }
 
-        #timer-box,
-        #level-box {
+        #timer-box, #level-box {
             display: none;
         }
     </style>
 </head>
-
 <body>
-
     <div id="gameUI">
         <div class="stat-group">
             <div class="score-box">
@@ -129,20 +124,17 @@
             </div>
             <div class="score-box">
                 <div class="score-label">STREAK</div>
-                <div class="score-value" id="streak"
-                    style="color: var(--neon-blue); text-shadow: 0 0 10px rgba(0, 210, 255, 0.5);">0</div>
+                <div class="score-value" id="streak" style="color: var(--neon-blue); text-shadow: 0 0 10px rgba(0, 210, 255, 0.5);">0</div>
             </div>
         </div>
         <div class="stat-group">
             <div class="score-box" id="level-box">
                 <div class="score-label">LEVEL</div>
-                <div class="score-value" id="level-val"
-                    style="color: #00ff9d; text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);">1</div>
+                <div class="score-value" id="level-val" style="color: #00ff9d; text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);">1</div>
             </div>
             <div class="score-box" id="timer-box">
                 <div class="score-label">TIME</div>
-                <div class="score-value" id="timer-val"
-                    style="color: #ff3e3e; text-shadow: 0 0 10px rgba(255, 62, 62, 0.5);">60</div>
+                <div class="score-value" id="timer-val" style="color: #ff3e3e; text-shadow: 0 0 10px rgba(255, 62, 62, 0.5);">60</div>
             </div>
         </div>
     </div>
@@ -150,32 +142,21 @@
     <canvas id="gameCanvas"></canvas>
 
     <div id="overlay">
-        <h1 style="font-size: 4rem; margin: 0; color: var(--neon-orange); text-shadow: 0 0 20px rgba(255,119,0,0.6); letter-spacing: -2px; text-align: center;"
-            id="menu-title">NEON HOOPS</h1>
-        <p style="opacity: 0.7; font-size: 1.2rem; text-align: center; margin-top: 10px;" id="menu-sub">Select your game
-            mode</p>
-
+        <h1 style="font-size: 4rem; margin: 0; color: var(--neon-orange); text-shadow: 0 0 20px rgba(255,119,0,0.6); letter-spacing: -2px; text-align: center;" id="menu-title">NEON HOOPS</h1>
+        <p style="opacity: 0.7; font-size: 1.2rem; text-align: center; margin-top: 10px;" id="menu-sub">Select your game mode</p>
+        
         <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px; align-items: center;">
             <div style="display: flex; gap: 10px;">
                 <button class="play-btn" style="width: 150px;" onclick="startGame('classic')">CLASSIC</button>
                 <button class="play-btn mode-btn" style="width: 150px;" onclick="startGame('timer')">TIMER</button>
-                <button class="play-btn mode-btn"
-                    style="width: 150px; background: linear-gradient(to bottom, #75b022, #4a7015); box-shadow: 0 0 20px rgba(117, 176, 34, 0.4);"
-                    onclick="startGame('playoff')">PLAYOFF</button>
+                <button class="play-btn mode-btn" style="width: 150px; background: linear-gradient(to bottom, #75b022, #4a7015); box-shadow: 0 0 20px rgba(117, 176, 34, 0.4);" onclick="startGame('playoff')">PLAYOFF</button>
             </div>
-
-            <div
-                style="margin-top: 20px; text-align: center; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; border: 1px solid var(--border); width: 100%; max-width: 480px;">
-                <div
-                    style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.5; font-weight: 800; margin-bottom: 10px;">
-                    PHYSICS MODE</div>
+            
+            <div style="margin-top: 20px; text-align: center; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; border: 1px solid var(--border); width: 100%; max-width: 480px;">
+                <div style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.5; font-weight: 800; margin-bottom: 10px;">PHYSICS MODE</div>
                 <div style="display: flex; gap: 10px; justify-content: center;">
-                    <button class="play-btn" id="physics-arcade"
-                        style="margin-top:0; font-size: 0.8rem; padding: 10px; width: 140px; opacity: 0.5;"
-                        onclick="setPhysics('arcade')">ARCADE</button>
-                    <button class="play-btn" id="physics-pro"
-                        style="margin-top:0; font-size: 0.8rem; padding: 10px; width: 140px;"
-                        onclick="setPhysics('pro')">PRO</button>
+                    <button class="play-btn" id="physics-arcade" style="margin-top:0; font-size: 0.8rem; padding: 10px; width: 140px; opacity: 0.5;" onclick="setPhysics('arcade')">ARCADE</button>
+                    <button class="play-btn" id="physics-pro" style="margin-top:0; font-size: 0.8rem; padding: 10px; width: 140px;" onclick="setPhysics('pro')">PRO</button>
                 </div>
             </div>
         </div>
@@ -185,7 +166,6 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const overlay = document.getElementById('overlay');
-        const startBtn = document.getElementById('startBtn');
         const scoreEl = document.getElementById('score');
         const streakEl = document.getElementById('streak');
         const timerValEl = document.getElementById('timer-val');
@@ -221,31 +201,23 @@
             canvas.height = height;
             hoop.x = width / 2;
             hoop.y = height * 0.3;
-            if (ball.state === 'idle') {
-                resetBall();
-            }
+            if (ball.state === 'idle') resetBall();
         }
         window.addEventListener('resize', resize);
 
         const hoop = {
-            x: 0,
-            y: 0,
+            x: 0, y: 0,
             radius: 45,
             boardWidth: 160,
             boardHeight: 100
         };
 
         const ball = {
-            x: 0,
-            y: 0,
-            z: 1, // 1 is close (bottom), 0 is far (top/hoop)
-            vx: 0,
-            vy: 0,
-            vz: 0,
+            x: 0, y: 0, z: 1,
+            vx: 0, vy: 0, vz: 0,
             radiusBase: 70,
-            state: 'idle', // idle, shooting, falling
-            rotation: 0,
-            vRot: 0,
+            state: 'idle',
+            rotation: 0, vRot: 0,
             isOnFire: false
         };
 
@@ -255,24 +227,19 @@
             ball.x = width / 2;
             ball.y = height * 0.85;
             ball.z = 1;
-            ball.vx = 0;
-            ball.vy = 0;
-            ball.vz = 0;
+            ball.vx = 0; ball.vy = 0; ball.vz = 0;
             ball.state = 'idle';
-            ball.rotation = 0;
-            ball.vRot = 0;
+            ball.rotation = 0; ball.vRot = 0;
             ball.isOnFire = false;
         }
 
         function createParticles(x, y, color) {
             for (let i = 0; i < 30; i++) {
                 particles.push({
-                    x: x,
-                    y: y,
+                    x: x, y: y,
                     vx: (Math.random() - 0.5) * 12,
                     vy: (Math.random() - 0.5) * 12,
-                    life: 1,
-                    color: color
+                    life: 1, color: color
                 });
             }
         }
@@ -284,43 +251,32 @@
                 ball.x += ball.vx;
                 ball.y += ball.vy;
                 ball.z += ball.vz;
-
-                // Gravity
                 ball.vy += 1.2;
                 ball.rotation += ball.vRot;
 
-                // Add fire particles if on fire
                 if (ball.isOnFire && Math.random() > 0.3) {
                     particles.push({
                         x: ball.x + (Math.random() - 0.5) * ball.radiusBase * 0.5,
                         y: ball.y + (Math.random() - 0.5) * ball.radiusBase * 0.5,
-                        vx: (Math.random() - 0.5) * 5,
-                        vy: -Math.random() * 5 - 2,
-                        life: 0.8,
-                        color: Math.random() > 0.5 ? '#ff4400' : '#ffaa00'
+                        vx: (Math.random() - 0.5) * 5, vy: -Math.random() * 5 - 2,
+                        life: 0.8, color: Math.random() > 0.5 ? '#ff4400' : '#ffaa00'
                     });
                 }
 
-                // Stop if it goes out of bounds below screen
                 if (ball.y > height + ball.radiusBase * 2 && ball.vy > 0) {
-                    if (ball.state === 'shooting') streak = 0; // miss
+                    if (ball.state === 'shooting') streak = 0;
                     streakEl.textContent = streak;
                     resetBall();
                 }
 
-                // Check collision / hoop crossing
                 if (ball.state === 'shooting' && ball.z <= 0.35) {
-                    ball.vz = 0; // stop going back
-                    // Evaluate shot
+                    ball.vz = 0;
                     let dx = ball.x - hoop.x;
                     let dy = ball.y - hoop.y;
                     let dist = Math.sqrt(dx * dx + dy * dy);
-
-                    // MASSIVELY expanded hitboxes for easier scoring (pure physics)
                     let swishRadius = physicsMode === 'arcade' ? hoop.radius * 2.5 : hoop.radius * 1.8;
 
                     if (dist < swishRadius) {
-                        // SWISH
                         let points = ball.isOnFire ? 3 : (1 + Math.floor(streak / 2));
                         score += points;
                         streak++;
@@ -328,337 +284,186 @@
                         streakEl.textContent = streak;
                         createParticles(hoop.x, hoop.y, ball.isOnFire ? '#ff4400' : '#00ff9d');
                         ball.state = 'falling';
-                        ball.vx *= 0.5;
-                        ball.vy = 2; // slow drop down
-                        ball.isOnFire = false; // consume fire
-
-                        if (gameMode === 'playoff' && score >= targetScore) {
-                            nextLevel();
-                        }
+                        ball.vx *= 0.5; ball.vy = 2;
+                        ball.isOnFire = false;
+                        if (gameMode === 'playoff' && score >= targetScore) nextLevel();
                     } else if (Math.abs(ball.y - (hoop.y - hoop.boardHeight / 2)) < hoop.boardHeight && Math.abs(dx) < hoop.boardWidth / 2) {
-                        // Hit backboard: Bounce back on Z
                         ball.state = 'falling';
-                        ball.vy = -ball.vy * 0.4; 
+                        ball.vy = -ball.vy * 0.4;
                         ball.vx = -ball.vx * 0.6 + (Math.random() - 0.5) * 3;
-                        ball.vz = 0.05; // Bounce forward slightly
-                        ball.z = 0.32; 
-                        streak = 0;
-                        streakEl.textContent = streak;
+                        ball.vz = 0.05; ball.z = 0.32;
+                        streak = 0; streakEl.textContent = streak;
                     } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 3.8 : hoop.radius * 2.8)) {
-                        // Hit rim: Bounce back on Z
                         ball.state = 'falling';
                         ball.vy = -ball.vy * 0.5;
                         ball.vx = (Math.random() - 0.5) * 8;
-                        ball.vz = 0.04; // Bounce forward slightly
-                        streak = 0;
-                        streakEl.textContent = streak;
+                        ball.vz = 0.04;
+                        streak = 0; streakEl.textContent = streak;
                     } else {
-                        // Airball
                         ball.state = 'falling';
-                        streak = 0;
-                        streakEl.textContent = streak;
+                        streak = 0; streakEl.textContent = streak;
                     }
                 }
             }
 
-            // Update particles
             for (let i = particles.length - 1; i >= 0; i--) {
                 let p = particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life -= 0.03;
+                p.x += p.vx; p.y += p.vy; p.life -= 0.03;
                 if (p.life <= 0) particles.splice(i, 1);
             }
         }
 
         function draw() {
             ctx.clearRect(0, 0, width, height);
-
-            // Draw grid background for perspective
             ctx.strokeStyle = 'rgba(0, 210, 255, 0.05)';
             ctx.lineWidth = 1;
             ctx.beginPath();
             for (let i = 0; i < width; i += 40) {
-                ctx.moveTo(i, 0);
-                ctx.lineTo(width / 2 + (i - width / 2) * 2, height);
+                ctx.moveTo(i, 0); ctx.lineTo(width / 2 + (i - width / 2) * 2, height);
             }
             for (let i = 0; i < height; i += 40) {
-                ctx.moveTo(0, i);
-                ctx.lineTo(width, i + (height - i) * 0.2);
+                ctx.moveTo(0, i); ctx.lineTo(width, i + (height - i) * 0.2);
             }
             ctx.stroke();
 
-            // Draw hoop (Backboard)
             ctx.fillStyle = 'rgba(255,255,255,0.05)';
             ctx.strokeStyle = '#00d2ff';
             ctx.lineWidth = 3;
-            ctx.shadowColor = '#00d2ff';
-            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00d2ff'; ctx.shadowBlur = 10;
             ctx.fillRect(hoop.x - hoop.boardWidth / 2, hoop.y - hoop.boardHeight, hoop.boardWidth, hoop.boardHeight);
             ctx.strokeRect(hoop.x - hoop.boardWidth / 2, hoop.y - hoop.boardHeight, hoop.boardWidth, hoop.boardHeight);
-
-            // Inner board square
             ctx.strokeRect(hoop.x - 30, hoop.y - 45, 60, 45);
             ctx.shadowBlur = 0;
 
-            // Correct 3D Depth Sorting
             let currentRadius = Math.max(ball.radiusBase * 0.3, ball.radiusBase * (0.3 + 0.7 * ball.z));
-
             if (ball.z < 0.3) {
-                // Ball is behind the rim (e.g. hitting backboard)
-                drawBall(currentRadius);
-                drawHoopRimBack();
+                drawBall(currentRadius); drawHoopRimBack();
             } else {
-                // Ball is in front of the rim (approaching)
-                drawHoopRimBack();
-                drawBall(currentRadius);
+                drawHoopRimBack(); drawBall(currentRadius);
             }
-
             drawHoopRimFront();
 
-            // Draw particles
             particles.forEach(p => {
-                ctx.fillStyle = p.color;
-                ctx.globalAlpha = p.life;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 4 * p.life, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 4 * p.life, 0, Math.PI * 2); ctx.fill();
                 ctx.globalAlpha = 1;
             });
 
-            // Draw drag vector
             if (isDragging && ball.state === 'idle') {
                 ctx.strokeStyle = 'rgba(255, 119, 0, 0.5)';
-                ctx.lineWidth = 4;
-                ctx.setLineDash([10, 10]);
-                ctx.beginPath();
-                ctx.moveTo(ball.x, ball.y);
-
-                let dx = dragStartX - mouseX;
-                let dy = dragStartY - mouseY;
-                ctx.lineTo(ball.x - dx, ball.y - dy);
-                ctx.stroke();
+                ctx.lineWidth = 4; ctx.setLineDash([10, 10]);
+                ctx.beginPath(); ctx.moveTo(ball.x, ball.y);
+                let dx = dragStartX - mouseX; let dy = dragStartY - mouseY;
+                ctx.lineTo(ball.x - dx, ball.y - dy); ctx.stroke();
                 ctx.setLineDash([]);
             }
         }
 
         function drawHoopRimBack() {
-            ctx.strokeStyle = 'rgba(255, 50, 0, 0.5)';
-            ctx.lineWidth = 6;
-            ctx.beginPath();
-            ctx.ellipse(hoop.x, hoop.y, hoop.radius, hoop.radius / 2.5, 0, Math.PI, Math.PI * 2);
-            ctx.stroke();
+            ctx.strokeStyle = 'rgba(255, 50, 0, 0.5)'; ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.ellipse(hoop.x, hoop.y, hoop.radius, hoop.radius / 2.5, 0, Math.PI, Math.PI * 2); ctx.stroke();
         }
 
         function drawHoopRimFront() {
-            ctx.strokeStyle = '#ff3e3e';
-            ctx.lineWidth = 6;
-            ctx.shadowColor = '#ff3e3e';
-            ctx.shadowBlur = 15;
-            ctx.beginPath();
-            ctx.ellipse(hoop.x, hoop.y, hoop.radius, hoop.radius / 2.5, 0, 0, Math.PI);
-            ctx.stroke();
+            ctx.strokeStyle = '#ff3e3e'; ctx.lineWidth = 6;
+            ctx.shadowColor = '#ff3e3e'; ctx.shadowBlur = 15;
+            ctx.beginPath(); ctx.ellipse(hoop.x, hoop.y, hoop.radius, hoop.radius / 2.5, 0, 0, Math.PI); ctx.stroke();
             ctx.shadowBlur = 0;
-
-            // Net
-            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(hoop.x - hoop.radius, hoop.y);
-            ctx.lineTo(hoop.x - hoop.radius / 2, hoop.y + 45);
-            ctx.lineTo(hoop.x + hoop.radius / 2, hoop.y + 45);
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(hoop.x - hoop.radius, hoop.y);
+            ctx.lineTo(hoop.x - hoop.radius / 2, hoop.y + 45); ctx.lineTo(hoop.x + hoop.radius / 2, hoop.y + 45);
             ctx.lineTo(hoop.x + hoop.radius, hoop.y);
-
             for (let i = -hoop.radius; i <= hoop.radius; i += 15) {
-                ctx.moveTo(hoop.x + i, hoop.y);
-                ctx.lineTo(hoop.x + i * 0.5, hoop.y + 45);
+                ctx.moveTo(hoop.x + i, hoop.y); ctx.lineTo(hoop.x + i * 0.5, hoop.y + 45);
             }
             ctx.stroke();
         }
 
         function drawBall(radius) {
-            ctx.save();
-            ctx.translate(ball.x, ball.y);
-            ctx.rotate(ball.rotation);
-
-            // Ball glow
+            ctx.save(); ctx.translate(ball.x, ball.y); ctx.rotate(ball.rotation);
             ctx.shadowColor = ball.isOnFire ? '#ff4400' : '#ff7700';
             ctx.shadowBlur = (ball.isOnFire ? 40 : 20) * ball.z;
-
-            // Base ball
             let grad = ctx.createRadialGradient(-radius / 3, -radius / 3, radius / 10, 0, 0, radius);
             if (ball.isOnFire) {
-                grad.addColorStop(0, '#fff');
-                grad.addColorStop(0.5, '#ffcc00');
-                grad.addColorStop(1, '#ff4400');
+                grad.addColorStop(0, '#fff'); grad.addColorStop(0.5, '#ffcc00'); grad.addColorStop(1, '#ff4400');
             } else {
-                grad.addColorStop(0, '#ffaa00');
-                grad.addColorStop(1, '#cc4400');
+                grad.addColorStop(0, '#ffaa00'); grad.addColorStop(1, '#cc4400');
             }
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.shadowBlur = 0;
-
-            // Lines
-            ctx.strokeStyle = '#331100';
-            ctx.lineWidth = Math.max(1, 4 * ball.z);
-            ctx.beginPath();
-            // Vertical
-            ctx.moveTo(0, -radius);
-            ctx.lineTo(0, radius);
-            // Horizontal
-            ctx.moveTo(-radius, 0);
-            ctx.lineTo(radius, 0);
-            // Curves
-            ctx.moveTo(-radius, 0);
-            ctx.quadraticCurveTo(-radius / 2, -radius / 2, 0, -radius);
-            ctx.moveTo(radius, 0);
-            ctx.quadraticCurveTo(radius / 2, radius / 2, 0, radius);
-            ctx.stroke();
-
-            ctx.restore();
+            ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0; ctx.strokeStyle = '#331100'; ctx.lineWidth = Math.max(1, 4 * ball.z);
+            ctx.beginPath(); ctx.moveTo(0, -radius); ctx.lineTo(0, radius); ctx.moveTo(-radius, 0); ctx.lineTo(radius, 0);
+            ctx.moveTo(-radius, 0); ctx.quadraticCurveTo(-radius / 2, -radius / 2, 0, -radius);
+            ctx.moveTo(radius, 0); ctx.quadraticCurveTo(radius / 2, radius / 2, 0, radius);
+            ctx.stroke(); ctx.restore();
         }
 
-        function loop() {
-            update();
-            draw();
-            requestAnimationFrame(loop);
-        }
+        function loop() { update(); draw(); requestAnimationFrame(loop); }
 
-        // Interaction
         function handleStart(x, y) {
             if (ball.state === 'idle') {
-                isDragging = true;
-                dragStartX = x;
-                dragStartY = y;
-                dragStartTime = Date.now();
-                mouseX = x;
-                mouseY = y;
+                isDragging = true; dragStartX = x; dragStartY = y; dragStartTime = Date.now();
+                mouseX = x; mouseY = y;
             }
         }
 
-        function handleMove(x, y) {
-            if (isDragging) {
-                mouseX = x;
-                mouseY = y;
-            }
-        }
+        function handleMove(x, y) { if (isDragging) { mouseX = x; mouseY = y; } }
 
         function handleEnd() {
             if (isDragging && ball.state === 'idle') {
                 isDragging = false;
-                let dx = dragStartX - mouseX;
-                let dy = dragStartY - mouseY;
-
-                // Only shoot if dragged down (so vector is up) -> wait, drag down to shoot up? 
+                let dx = dragStartX - mouseX; let dy = dragStartY - mouseY;
                 if (dy > 20) {
                     ball.state = 'shooting';
-
-                    // CALIBRATED POWER: Sweet spot is a ~300px drag at ~0.5s - 1.0s duration
                     let dragDuration = Math.max((Date.now() - dragStartTime) / 1000, 0.05);
-                    
-                    // Normalize speed: A 1.0s release is the baseline
-                    let speedFactor = 1.0 / dragDuration; 
-                    
-                    // Power: Focused on the ~300px distance shown in the visual reference
-                    // We want dy=300 and duration=0.75s to roughly equal 1.0 power
-                    let power = (dy / 300) * (speedFactor * 0.4 + 0.6); 
-                    
-                    // SWEET SPOT SNAP: Very generous range for the calibrated distance/time
-                    if (power > 0.65 && power < 1.35) {
-                        power = 1.0;
-                    }
-                    
-                    let targetZ = 1.0 - (0.7 * power); 
-                    targetZ = Math.max(0.15, Math.min(0.45, targetZ)); 
-
-                    // Aiming logic: rewarding straight shots
+                    let speedFactor = 1.0 / dragDuration;
+                    let power = (dy / 300) * (speedFactor * 0.4 + 0.6);
+                    if (power > 0.65 && power < 1.35) power = 1.0;
+                    let targetZ = 1.0 - (0.7 * power);
+                    targetZ = Math.max(0.15, Math.min(0.45, targetZ));
                     let targetX;
                     if (physicsMode === 'arcade') {
-                        // Arcade: Almost perfect auto-centering if close to vertical
                         let deviation = Math.abs(dx);
                         let correction = deviation < 40 ? 0.05 : 0.2;
                         targetX = hoop.x - (dx * correction);
                     } else {
                         targetX = hoop.x - dx * 2.2;
                     }
-
                     let targetY = hoop.y;
-
-                    // Arc height dampening: Use a square root to prevent the ball from flying too high
                     let cappedDy = Math.max(dy, 20);
                     let arcDampening = Math.sqrt(cappedDy) * 12;
                     let peak_y = Math.max(20, hoop.y - arcDampening);
-
-                    // Calculate precise initial velocity to hit targetY at targetZ
                     const gravity = 1.2;
                     let initial_vy = -Math.sqrt(2 * gravity * (ball.y - peak_y));
                     let discriminant = (2 * gravity) * (targetY - peak_y);
                     let t = (-initial_vy + Math.sqrt(discriminant)) / gravity;
-
                     ball.vx = (targetX - ball.x) / t;
                     ball.vy = initial_vy;
-                    ball.vz = (targetZ - 1.0) / t; // Reaches targetZ at targetY
-                    ball.vRot = dx * 0.05; // Increased spin sensitivity
-
-                    // CATCH FIRE if spin is moderate (easier to trigger)
-                    if (Math.abs(dx) > 100) {
-                        ball.isOnFire = true;
-                    }
+                    ball.vz = (targetZ - 1.0) / t;
+                    ball.vRot = dx * 0.05;
+                    if (Math.abs(dx) > 100) ball.isOnFire = true;
                 }
             }
         }
 
-        // Mouse events
         window.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
         window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
         window.addEventListener('mouseup', handleEnd);
-
-        // Touch events
         window.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.touches[0].clientY), { passive: false });
-        window.addEventListener('touchmove', (e) => {
-            e.preventDefault(); // prevent scroll
-            handleMove(e.touches[0].clientX, e.touches[0].clientY);
-        }, { passive: false });
+        window.addEventListener('touchmove', (e) => { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
         window.addEventListener('touchend', handleEnd);
 
         function startGame(mode) {
-            gameMode = mode;
-            overlay.style.opacity = '0';
-
-            // Reset state
-            score = 0;
-            streak = 0;
-            level = 1;
-            scoreEl.textContent = '0';
-            streakEl.textContent = '0';
-
+            gameMode = mode; overlay.style.opacity = '0';
+            score = 0; streak = 0; level = 1;
+            scoreEl.textContent = '0'; streakEl.textContent = '0';
             if (mode === 'timer') {
-                timeLeft = 60;
-                timerBox.style.display = 'block';
-                levelBox.style.display = 'none';
-                startCountdown();
+                timeLeft = 60; timerBox.style.display = 'block'; levelBox.style.display = 'none'; startCountdown();
             } else if (mode === 'playoff') {
-                timeLeft = 30;
-                targetScore = 5;
-                timerBox.style.display = 'block';
-                levelBox.style.display = 'block';
-                levelValEl.textContent = '1';
-                startCountdown();
+                timeLeft = 30; targetScore = 5; timerBox.style.display = 'block'; levelBox.style.display = 'block'; levelValEl.textContent = '1'; startCountdown();
             } else {
-                timerBox.style.display = 'none';
-                levelBox.style.display = 'none';
+                timerBox.style.display = 'none'; levelBox.style.display = 'none';
             }
-
-            setTimeout(() => {
-                overlay.style.display = 'none';
-                isPlaying = true;
-                resize();
-                resetBall();
-            }, 300);
+            setTimeout(() => { overlay.style.display = 'none'; isPlaying = true; resize(); resetBall(); }, 300);
         }
 
         function setPhysics(mode) {
@@ -670,62 +475,35 @@
         function startCountdown() {
             if (timerInterval) clearInterval(timerInterval);
             timerValEl.textContent = timeLeft;
-
             timerInterval = setInterval(() => {
                 if (!isPlaying) return;
-
-                timeLeft--;
-                timerValEl.textContent = timeLeft;
-
-                if (timeLeft <= 0) {
-                    gameOver();
-                }
+                timeLeft--; timerValEl.textContent = timeLeft;
+                if (timeLeft <= 0) gameOver();
             }, 1000);
         }
 
         function nextLevel() {
-            level++;
-            levelValEl.textContent = level;
-            targetScore = 5 + (level * 5);
-            timeLeft += 15; // Bonus time
+            level++; levelValEl.textContent = level; targetScore = 5 + (level * 5); timeLeft += 15;
             createParticles(width / 2, height / 2, '#00ff9d');
         }
 
         function gameOver() {
-            isPlaying = false;
-            clearInterval(timerInterval);
-
-            // Save high score
+            isPlaying = false; clearInterval(timerInterval);
             if (score > bestScores[gameMode]) {
-                bestScores[gameMode] = score;
-                localStorage.setItem('hoops-bests', JSON.stringify(bestScores));
+                bestScores[gameMode] = score; localStorage.setItem('hoops-bests', JSON.stringify(bestScores));
             }
-
             menuTitle.textContent = "GAME OVER";
             menuSub.textContent = `Mode: ${gameMode.toUpperCase()} | Score: ${score} | Best: ${bestScores[gameMode]}`;
-            overlay.style.display = 'flex';
-            setTimeout(() => overlay.style.opacity = '1', 10);
+            overlay.style.display = 'flex'; setTimeout(() => overlay.style.opacity = '1', 10);
         }
 
-        // Initialize
-        resize();
-        requestAnimationFrame(loop);
-
-        // Auto-start if mode is passed in URL
+        resize(); loop();
         document.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
-            const mode = params.get('mode');
-            const physics = params.get('physics');
-            if (physics && ['arcade', 'pro'].includes(physics)) {
-                setPhysics(physics);
-            }
-            if (mode && ['classic', 'timer', 'playoff'].includes(mode)) {
-                startGame(mode);
-            }
+            const mode = params.get('mode'), physics = params.get('physics');
+            if (physics) setPhysics(physics);
+            if (mode) startGame(mode);
         });
     </script>
 </body>
-
-</html>
-
 </html>
