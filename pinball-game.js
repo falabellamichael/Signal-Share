@@ -44,13 +44,20 @@
             tableTilt: 0.015
         };
 
+        let savedHighScore = 0;
+        try {
+            savedHighScore = Number(localStorage.getItem('pinball-best') || 0);
+        } catch (e) {
+            console.warn("localStorage not available:", e);
+        }
+
         const state = {
             running: false,
             score: 0,
             balls: 3,
             multiplier: 1,
             combo: 0,
-            highScore: Number(localStorage.getItem('pinball-best') || 0),
+            highScore: savedHighScore,
             lastTime: 0,
             launchHolding: false,
             launchCharge: 0,
@@ -172,7 +179,9 @@
             ui.multi.textContent = `${state.multiplier}x`;
             if (state.score > state.highScore) {
                 state.highScore = state.score;
-                localStorage.setItem('pinball-best', String(state.highScore));
+                try {
+                    localStorage.setItem('pinball-best', String(state.highScore));
+                } catch (e) {}
                 ui.highScore.textContent = formatScore(state.highScore);
             }
         }
@@ -414,8 +423,8 @@
             for (const bumper of bumpers) checkBumperCollision(bumper);
             for (const rollover of rollovers) checkRollover(rollover);
             for (const target of targets) checkTargetCollision(target);
-            checkFlipperCollision(leftFlipper);
-            checkFlipperCollision(rightFlipper);
+            checkFlipperCollision(leftFlipper, dt);
+            checkFlipperCollision(rightFlipper, dt);
 
             if (!ball.inShooter && ball.y > 716) {
                 loseBall();
@@ -542,7 +551,7 @@
             };
         }
 
-        function checkFlipperCollision(f) {
+        function checkFlipperCollision(f, dt) {
             const tip = flipperTip(f);
             const dx = tip.x - f.x;
             const dy = tip.y - f.y;
