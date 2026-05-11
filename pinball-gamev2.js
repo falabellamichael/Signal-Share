@@ -1,4 +1,4 @@
-        window.__NEON_PINBALL_BUILD = 'revamped-functional-v1.8';
+        window.__NEON_PINBALL_BUILD = 'revamped-functional-v1.9';
         console.log('[Neon Pinball] Build:', window.__NEON_PINBALL_BUILD);
 
         const canvas = document.getElementById('pinballCanvas');
@@ -35,12 +35,12 @@
         const CFG = {
             gravity: 0.28,
             friction: 0.995,
-            restitution: 0.85,
+            restitution: 0.65, // Lowered for less chaotic bouncing
             ballRadius: 8.8,
-            maxSpeed: 24,
-            bumperKick: 12.8,
-            flipperKick: 10.5,
-            flipperSnap: 0.38,
+            maxSpeed: 28,
+            bumperKick: 13.5,
+            flipperKick: 12.5, // Stronger flippers
+            flipperSnap: 0.45, // Snappier animation
             tableTilt: 0.015,
             collisionSlop: 0.15,
             substepsMin: 4,
@@ -95,7 +95,7 @@
             side: 'left',
             x: 125,
             y: 626,
-            length: 65,
+            length: 75,
             width: 16,
             rest: 0.35,
             up: -0.55,
@@ -110,7 +110,7 @@
             side: 'right',
             x: 275,
             y: 626,
-            length: 65,
+            length: 75,
             width: 16,
             rest: Math.PI - 0.35,
             up: Math.PI + 0.55,
@@ -181,9 +181,9 @@
             { x1: 300, y1: 590, x2: 350, y2: 590, color: COLORS.green, thick: 4 },
             { x1: 350, y1: 590, x2: 350, y2: 540, color: COLORS.green, thick: 4 },
 
-            // Flipper guide walls - positioned to not overlap slingshots
-            { x1: 20, y1: 615, x2: 100, y2: 626, color: COLORS.blue, thick: 4 },
-            { x1: 372, y1: 615, x2: 300, y2: 626, color: COLORS.blue, thick: 4 }
+            // Flipper guide walls - positioned to feed directly to flippers and close gap
+            { x1: 20, y1: 585, x2: 125, y2: 626, color: COLORS.blue, thick: 4 },
+            { x1: 372, y1: 585, x2: 275, y2: 626, color: COLORS.blue, thick: 4 }
         ];
 
         function setupCanvas() {
@@ -788,19 +788,22 @@
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, W, H);
 
+            const t = Date.now() * 0.001;
             ctx.save();
-            ctx.strokeStyle = 'rgba(0,255,255,0.035)';
+            ctx.strokeStyle = 'rgba(0,255,255,0.05)';
             ctx.lineWidth = 1;
             for (let y = 38; y < H; y += 28) {
+                const wave = Math.sin(y * 0.02 + t) * 8;
                 ctx.beginPath();
-                ctx.moveTo(18, y);
-                ctx.lineTo(W - 18, y + Math.sin(y * 0.02) * 8);
+                ctx.moveTo(18, y + wave);
+                ctx.lineTo(W - 18, y + wave);
                 ctx.stroke();
             }
             for (let x = 34; x < W; x += 28) {
+                const wave = Math.sin(x * 0.04 + t) * 10;
                 ctx.beginPath();
-                ctx.moveTo(x, 34);
-                ctx.lineTo(x + Math.sin(x * 0.04) * 10, H - 30);
+                ctx.moveTo(x + wave, 34);
+                ctx.lineTo(x + wave, H - 30);
                 ctx.stroke();
             }
             ctx.restore();
@@ -995,10 +998,13 @@
                 for (let i = 1; i < ball.trail.length; i++) {
                     ctx.lineTo(ball.trail[i].x, ball.trail[i].y);
                 }
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-                ctx.lineWidth = ball.r * 1.2;
+                const speed = length(ball.vx, ball.vy);
+                ctx.strokeStyle = `rgba(0, 255, 255, ${Math.min(0.8, speed * 0.03)})`;
+                ctx.lineWidth = ball.r * 1.5;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
+                ctx.shadowColor = COLORS.cyan;
+                ctx.shadowBlur = 12;
                 ctx.stroke();
                 ctx.restore();
             }
@@ -1006,26 +1012,25 @@
             ctx.save();
             ctx.translate(ball.x, ball.y);
             ctx.rotate(ball.spin);
-            ctx.shadowColor = '#ffffff';
-            ctx.shadowBlur = 14;
-            const grad = ctx.createRadialGradient(-4, -5, 1, 0, 0, ball.r + 2);
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 18;
+            const grad = ctx.createRadialGradient(-3, -3, 1, 0, 0, ball.r + 1);
             grad.addColorStop(0, '#ffffff');
-            grad.addColorStop(0.28, '#dff7ff');
-            grad.addColorStop(0.74, '#7fb7ff');
-            grad.addColorStop(1, '#13244f');
+            grad.addColorStop(0.3, '#88ffff');
+            grad.addColorStop(0.8, '#0088ff');
+            grad.addColorStop(1, '#000033');
             ctx.fillStyle = grad;
             ctx.beginPath();
             ctx.arc(0, 0, ball.r, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.strokeStyle = 'rgba(0,255,255,0.54)';
-            ctx.lineWidth = 1.6;
+            
+            // metallic reflection lines
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
-            ctx.moveTo(-ball.r * 0.68, 0);
-            ctx.lineTo(ball.r * 0.68, 0);
-            ctx.moveTo(0, -ball.r * 0.68);
-            ctx.lineTo(0, ball.r * 0.68);
+            ctx.arc(0, 0, ball.r * 0.6, Math.PI * 1.1, Math.PI * 1.4);
             ctx.stroke();
+            
             ctx.restore();
         }
 
