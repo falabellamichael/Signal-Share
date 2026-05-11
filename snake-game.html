@@ -23,7 +23,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             min-height: 100vh;
             background: 
                 radial-gradient(circle at top left, rgba(0, 210, 255, 0.1), transparent 40%),
@@ -31,7 +31,7 @@
                 #08080b;
             color: #fff;
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            overflow: hidden;
+            overflow-x: hidden;
             touch-action: none;
         }
 
@@ -42,6 +42,8 @@
             align-items: center;
             gap: 20px;
             width: min(90vw, 420px);
+            margin-top: 30px;
+            margin-bottom: 30px;
         }
 
         .game-header {
@@ -277,9 +279,77 @@
                 display: none;
             }
         }
+
+        /* Signal Share Menu Bar Styles */
+        .runner-header {
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(20px);
+            padding: 12px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            width: 100%;
+            z-index: 1000;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+
+        .close-runner {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .close-runner:hover {
+            background: #ff3e3e;
+            border-color: transparent;
+        }
+
+        .runner-title-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .runner-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+
+        .runner-title {
+            font-weight: 900;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
+    <div class="runner-header">
+        <div class="runner-title-group">
+            <img src="snake_game_poster_1778466261855.png" class="runner-icon">
+            <span class="runner-title">Neon Snake</span>
+        </div>
+        <a href="mini-games.html" class="close-runner">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            EXIT SESSION
+        </a>
+    </div>
+
     <div class="game-container">
         <div class="game-header">
             <div style="display: flex; flex-direction: column;">
@@ -370,10 +440,10 @@
 
             // Iframe specific cleanup
             if (window.self !== window.top) {
-                const nav = document.querySelector('.btn-secondary')?.parentElement;
-                const footer = document.querySelector('.questions-guide-footer');
-                if (nav) nav.style.display = 'none';
-                if (footer) footer.style.display = 'none';
+                const header = document.querySelector('.runner-header');
+                const container = document.querySelector('.game-container');
+                if (header) header.style.display = 'none';
+                if (container) container.style.marginTop = '15px';
             }
         });
     </script>
