@@ -148,6 +148,24 @@ const targets = [
     { x: 352, y: 350, w: 10, h: 40, color: COLORS.success, lit: false, points: 180 }
 ];
 
+const loop = {
+    cx: 200,
+    cy: 330,
+    innerR: 45,
+    midR: 62,
+    outerR: 78,
+    gap: 35,
+    color: COLORS.accent,
+    pulse: 0,
+    gateCooldown: 0,
+    gates: [
+        { label: 'LEFT', angle: -2.2, lit: false, points: 650 },
+        { label: 'RIGHT', angle: -0.4, lit: false, points: 650 }
+    ]
+};
+
+const loopTilt = 0.3;
+
 function createArc(cx, cy, r, startAngle, endAngle, segments, color, thick) {
     const arcWalls = [];
     const step = (endAngle - startAngle) / segments;
@@ -186,9 +204,12 @@ const walls = [
     { x1: 280, y1: 575, x2: 330, y2: 575, color: COLORS.wall, thick: 4 },
     { x1: 330, y1: 575, x2: 330, y2: 515, color: COLORS.wall, thick: 4 },
 
-    // Funnel guides
     { x1: 20, y1: 530, x2: 130, y2: 625, color: COLORS.wall, thick: 5 },
-    { x1: 370, y1: 530, x2: 270, y2: 625, color: COLORS.wall, thick: 5 }
+    { x1: 370, y1: 530, x2: 270, y2: 625, color: COLORS.wall, thick: 5 },
+
+    // Dynamic Split Loop Walls (Crescents)
+    ...createArc(200 - 35/2, 330, 62, Math.PI * 0.7 + 0.3, Math.PI * 1.3 + 0.3, 12, COLORS.accent, 4),
+    ...createArc(200 + 35/2, 330, 62, Math.PI * 1.7 + 0.3, Math.PI * 2.3 + 0.3, 12, COLORS.accent, 4)
 ];
 
 function setupCanvas() {
@@ -421,6 +442,8 @@ function update(dt) {
 
     state.screenShake = Math.max(0, state.screenShake - 0.5 * dt);
     if (state.nudgeCooldown > 0) state.nudgeCooldown -= dt;
+
+    checkLoopScoring();
 }
 
 function updateFlipper(f, pressed, dt) {
@@ -699,6 +722,7 @@ function draw() {
 
     drawBackground();
     drawPlayfieldArt();
+    drawLoopObstacle();
     drawWalls();
     drawRollovers();
     drawTargets();
@@ -711,6 +735,74 @@ function draw() {
 
     ctx.restore();
     drawParticles(shakeX, shakeY);
+}
+
+function normalizeAngle(a) {
+    while (a < -Math.PI) a += Math.PI * 2;
+    while (a > Math.PI) a -= Math.PI * 2;
+    return a;
+}
+
+function checkLoopScoring() {
+    if (loop.gateCooldown > 0) {
+        loop.gateCooldown -= 1;
+        return;
+    }
+    const dx = ball.x - loop.cx;
+    const dy = ball.y - loop.cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Check if ball is in the loop radius
+    if (dist > loop.innerR && dist < loop.outerR) {
+        const angle = Math.atan2(dy, dx);
+        for (const gate of loop.gates) {
+            if (Math.abs(normalizeAngle(angle - gate.angle)) < 0.25) {
+                gate.lit = true;
+                loop.gateCooldown = 15;
+                loop.pulse = 1.0;
+                addScore(gate.points, ball.x, ball.y, loop.color, `LOOP ${gate.label}`);
+                explode(ball.x, ball.y, loop.color, 15);
+                
+                if (loop.gates.every(g => g.lit)) {
+                    loop.gates.forEach(g => g.lit = false);
+                    state.multiplier = Math.min(5, state.multiplier + 1);
+                    addScore(2000, loop.cx, loop.cy, COLORS.success, 'DOUBLE LOOP!');
+                    explode(loop.cx, loop.cy, COLORS.success, 40);
+                }
+                break;
+            }
+        }
+    }
+}
+
+function drawLoopObstacle() {
+    ctx.save();
+    loop.pulse = Math.max(0, loop.pulse - 0.05);
+    const glow = 5 + loop.pulse * 15;
+    
+    ctx.shadowBlur = glow;
+    ctx.shadowColor = loop.color;
+    ctx.strokeStyle = loop.color;
+    ctx.lineWidth = 4 + loop.pulse * 2;
+    ctx.lineCap = 'round';
+
+    // Left Crescent (C-shaped, facing right)
+    ctx.beginPath();
+    ctx.arc(loop.cx - loop.gap/2, loop.cy, loop.midR, Math.PI * 0.7 + loopTilt, Math.PI * 1.3 + loopTilt);
+    ctx.stroke();
+
+    // Right Crescent (C-shaped, facing left)
+    ctx.beginPath();
+    ctx.arc(loop.cx + loop.gap/2, loop.cy, loop.midR, Math.PI * 1.7 + loopTilt, Math.PI * 2.3 + loopTilt);
+    ctx.stroke();
+    
+    // Core text
+    ctx.textAlign = 'center';
+    ctx.font = '900 12px Inter, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillText('SPLIT LOOP', loop.cx, loop.cy);
+    
+    ctx.restore();
 }
 
 function drawBackground() {
