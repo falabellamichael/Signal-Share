@@ -1,4 +1,4 @@
-        window.__NEON_PINBALL_BUILD = 'revamped-functional-v1.7';
+        window.__NEON_PINBALL_BUILD = 'revamped-functional-v1.8';
         console.log('[Neon Pinball] Build:', window.__NEON_PINBALL_BUILD);
 
         const canvas = document.getElementById('pinballCanvas');
@@ -163,7 +163,6 @@
             // Outer boundaries
             { x1: 20, y1: 688, x2: 20, y2: 120, color: COLORS.cyan, thick: 6 }, // Left wall
             { x1: 398, y1: 688, x2: 398, y2: 100, color: COLORS.cyan, thick: 6 }, // Right outer wall
-            { x1: 0, y1: 688, x2: 400, y2: 688, color: COLORS.magenta, thick: 8 }, // Bottom drain
 
             // Shooter Lane inner wall
             { x1: 372, y1: 688, x2: 372, y2: 140, color: COLORS.cyan, thick: 5 },
