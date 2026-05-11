@@ -84,28 +84,61 @@
             text-transform: uppercase;
             box-shadow: 0 0 20px rgba(255, 119, 0, 0.4);
             margin-top: 20px;
+            width: 250px;
+            transition: transform 0.2s;
+        }
+        .play-btn:hover {
+            transform: scale(1.05);
+        }
+        .mode-btn {
+            background: linear-gradient(to bottom, var(--neon-blue), #0088aa);
+            box-shadow: 0 0 20px rgba(0, 210, 255, 0.4);
+        }
+        .stat-group {
+            display: flex;
+            gap: 15px;
+        }
+        #timer-box, #level-box {
+            display: none;
         }
     </style>
 </head>
 <body>
 
     <div id="gameUI">
-        <div class="score-box">
-            <div class="score-label">SCORE</div>
-            <div class="score-value" id="score">0</div>
+        <div class="stat-group">
+            <div class="score-box">
+                <div class="score-label">SCORE</div>
+                <div class="score-value" id="score">0</div>
+            </div>
+            <div class="score-box">
+                <div class="score-label">STREAK</div>
+                <div class="score-value" id="streak" style="color: var(--neon-blue); text-shadow: 0 0 10px rgba(0, 210, 255, 0.5);">0</div>
+            </div>
         </div>
-        <div class="score-box">
-            <div class="score-label">STREAK</div>
-            <div class="score-value" id="streak" style="color: var(--neon-blue); text-shadow: 0 0 10px rgba(0, 210, 255, 0.5);">0</div>
+        <div class="stat-group">
+            <div class="score-box" id="level-box">
+                <div class="score-label">LEVEL</div>
+                <div class="score-value" id="level-val" style="color: #00ff9d; text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);">1</div>
+            </div>
+            <div class="score-box" id="timer-box">
+                <div class="score-label">TIME</div>
+                <div class="score-value" id="timer-val" style="color: #ff3e3e; text-shadow: 0 0 10px rgba(255, 62, 62, 0.5);">60</div>
+            </div>
         </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
     <div id="overlay">
-        <h1 style="font-size: 4rem; margin: 0; color: var(--neon-orange); text-shadow: 0 0 20px rgba(255,119,0,0.6); letter-spacing: -2px; text-align: center;">NEON HOOPS</h1>
-        <p style="opacity: 0.7; font-size: 1.2rem; text-align: center; margin-top: 10px;">Drag down and release to shoot</p>
-        <button class="play-btn" id="startBtn">START GAME</button>
+        <h1 style="font-size: 4rem; margin: 0; color: var(--neon-orange); text-shadow: 0 0 20px rgba(255,119,0,0.6); letter-spacing: -2px; text-align: center;" id="menu-title">NEON HOOPS</h1>
+        <p style="opacity: 0.7; font-size: 1.2rem; text-align: center; margin-top: 10px;" id="menu-sub">Select your game mode</p>
+        
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+            <button class="play-btn" onclick="startGame('classic')">CLASSIC MODE</button>
+            <button class="play-btn mode-btn" onclick="startGame('timer')">TIMER MODE</button>
+            <button class="play-btn mode-btn" style="background: linear-gradient(to bottom, #75b022, #4a7015); box-shadow: 0 0 20px rgba(117, 176, 34, 0.4);" onclick="startGame('playoff')">PLAYOFF MODE</button>
+        </div>
     </div>
 
     <script>
@@ -115,11 +148,23 @@
         const startBtn = document.getElementById('startBtn');
         const scoreEl = document.getElementById('score');
         const streakEl = document.getElementById('streak');
+        const timerValEl = document.getElementById('timer-val');
+        const levelValEl = document.getElementById('level-val');
+        const timerBox = document.getElementById('timer-box');
+        const levelBox = document.getElementById('level-box');
+        const menuTitle = document.getElementById('menu-title');
+        const menuSub = document.getElementById('menu-sub');
 
         let width, height;
         let score = 0;
         let streak = 0;
         let isPlaying = false;
+        let gameMode = 'classic';
+        let timeLeft = 0;
+        let level = 1;
+        let targetScore = 0;
+        let timerInterval = null;
+        let bestScores = JSON.parse(localStorage.getItem('hoops-bests') || '{"classic":0,"timer":0,"playoff":0}');
         
         let mouseX = 0;
         let mouseY = 0;
@@ -197,7 +242,7 @@
                 ball.z += ball.vz;
                 
                 // Gravity
-                ball.vy += 0.8;
+                ball.vy += 1.2;
                 ball.rotation += ball.vRot;
 
                 // Stop if it goes out of bounds below screen
@@ -225,6 +270,10 @@
                         ball.state = 'falling';
                         ball.vx *= 0.5;
                         ball.vy = 2; // slow drop down
+
+                        if (gameMode === 'playoff' && score >= targetScore) {
+                            nextLevel();
+                        }
                     } else if (Math.abs(ball.y - (hoop.y - hoop.boardHeight/2)) < hoop.boardHeight && Math.abs(dx) < hoop.boardWidth/2) {
                         // Hit backboard
                         ball.state = 'falling';
@@ -437,14 +486,18 @@
                     let targetX = hoop.x - assistDx * 1.2;
                     let targetY = hoop.y;
                     
-                    // Arc height based on drag distance
-                    let cappedDy = Math.max(dy, 50);
-                    let peak_y = hoop.y - cappedDy * 0.8;
+                    // Arc height dampening: Use a square root to prevent the ball from flying too high
+                    // This ensures that even massive drags stay mostly within the viewport
+                    let cappedDy = Math.max(dy, 20);
+                    let arcDampening = Math.sqrt(cappedDy) * 12; // Ceilings the height
+                    let peak_y = Math.max(20, hoop.y - arcDampening); 
                     
                     // Calculate precise initial velocity to hit target exactly on the way down
-                    let initial_vy = -Math.sqrt(2 * 0.8 * (ball.y - peak_y));
-                    let discriminant = 1.6 * (targetY - peak_y);
-                    let t = (-initial_vy + Math.sqrt(discriminant)) / 0.8;
+                    // We increase gravity slightly for a Snappier feel
+                    const gravity = 1.2;
+                    let initial_vy = -Math.sqrt(2 * gravity * (ball.y - peak_y));
+                    let discriminant = (2 * gravity) * (targetY - peak_y);
+                    let t = (-initial_vy + Math.sqrt(discriminant)) / gravity;
                     
                     ball.vx = (targetX - ball.x) / t;
                     ball.vy = initial_vy;
@@ -467,19 +520,81 @@
         }, {passive: false});
         window.addEventListener('touchend', handleEnd);
 
-        startBtn.addEventListener('click', () => {
+        function startGame(mode) {
+            gameMode = mode;
             overlay.style.opacity = '0';
+            
+            // Reset state
+            score = 0;
+            streak = 0;
+            level = 1;
+            scoreEl.textContent = '0';
+            streakEl.textContent = '0';
+            
+            if (mode === 'timer') {
+                timeLeft = 60;
+                timerBox.style.display = 'block';
+                levelBox.style.display = 'none';
+                startCountdown();
+            } else if (mode === 'playoff') {
+                timeLeft = 30;
+                targetScore = 5;
+                timerBox.style.display = 'block';
+                levelBox.style.display = 'block';
+                levelValEl.textContent = '1';
+                startCountdown();
+            } else {
+                timerBox.style.display = 'none';
+                levelBox.style.display = 'none';
+            }
+
             setTimeout(() => {
                 overlay.style.display = 'none';
                 isPlaying = true;
                 resize();
                 resetBall();
-                score = 0;
-                streak = 0;
-                scoreEl.textContent = '0';
-                streakEl.textContent = '0';
             }, 300);
-        });
+        }
+
+        function startCountdown() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerValEl.textContent = timeLeft;
+            
+            timerInterval = setInterval(() => {
+                if (!isPlaying) return;
+                
+                timeLeft--;
+                timerValEl.textContent = timeLeft;
+                
+                if (timeLeft <= 0) {
+                    gameOver();
+                }
+            }, 1000);
+        }
+
+        function nextLevel() {
+            level++;
+            levelValEl.textContent = level;
+            targetScore = 5 + (level * 5);
+            timeLeft += 15; // Bonus time
+            createParticles(width/2, height/2, '#00ff9d');
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            clearInterval(timerInterval);
+            
+            // Save high score
+            if (score > bestScores[gameMode]) {
+                bestScores[gameMode] = score;
+                localStorage.setItem('hoops-bests', JSON.stringify(bestScores));
+            }
+            
+            menuTitle.textContent = "GAME OVER";
+            menuSub.textContent = `Mode: ${gameMode.toUpperCase()} | Score: ${score} | Best: ${bestScores[gameMode]}`;
+            overlay.style.display = 'flex';
+            setTimeout(() => overlay.style.opacity = '1', 10);
+        }
 
         // Initialize
         resize();
