@@ -309,26 +309,15 @@
                 }
 
                 // Check collision / hoop crossing
-                if (ball.state === 'shooting' && ball.z <= 0.6) {
-                    // MAGNETIC RIM: Subtle pull towards center (Distance-dependent)
-                    let pullFactor = physicsMode === 'arcade' ? 0.04 : 0.015;
-                    let distToHoop = Math.sqrt((hoop.x - ball.x)**2 + (hoop.y - ball.y)**2);
-                    
-                    // Only pull if reasonably close to the center line
-                    if (distToHoop < 150) {
-                        ball.vx += (hoop.x - ball.x) * pullFactor;
-                        ball.vy += (hoop.y - ball.y) * pullFactor;
-                    }
+                if (ball.state === 'shooting' && ball.z <= 0.35) {
+                    ball.vz = 0; // stop going back
+                    // Evaluate shot
+                    let dx = ball.x - hoop.x;
+                    let dy = ball.y - hoop.y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
 
-                    if (ball.z <= 0.35) {
-                        ball.vz = 0; // stop going back
-                        // Evaluate shot
-                        let dx = ball.x - hoop.x;
-                        let dy = ball.y - hoop.y;
-                        let dist = Math.sqrt(dx * dx + dy * dy);
-
-                        // MASSIVELY expanded hitboxes for easier scoring
-                        let swishRadius = physicsMode === 'arcade' ? hoop.radius * 2.5 : hoop.radius * 1.8;
+                    // MASSIVELY expanded hitboxes for easier scoring (pure physics)
+                    let swishRadius = physicsMode === 'arcade' ? hoop.radius * 2.5 : hoop.radius * 1.8;
 
                         if (dist < swishRadius) {
                             // SWISH
