@@ -122,16 +122,9 @@
         };
 
         const bumpers = [
-            { x: 134, y: 164, r: 25, color: COLORS.magenta, points: 150, pulse: 0 },
-            { x: 266, y: 164, r: 25, color: COLORS.cyan, points: 150, pulse: 0 },
-            { x: 200, y: 250, r: 30, color: COLORS.green, points: 300, pulse: 0 },
-            { x: 90, y: 360, r: 19, color: COLORS.blue, points: 100, pulse: 0 },
-            { x: 310, y: 360, r: 19, color: COLORS.blue, points: 100, pulse: 0 },
-            { x: 140, y: 420, r: 22, color: COLORS.orange, points: 200, pulse: 0 },
-            { x: 260, y: 420, r: 22, color: COLORS.orange, points: 200, pulse: 0 },
-            { x: 200, y: 480, r: 20, color: COLORS.magenta, points: 150, pulse: 0 },
-            { x: 110, y: 540, r: 18, color: COLORS.cyan, points: 120, pulse: 0 },
-            { x: 290, y: 540, r: 18, color: COLORS.cyan, points: 120, pulse: 0 }
+            { x: 200, y: 140, r: 34, color: COLORS.magenta, points: 500, pulse: 0 },
+            { x: 125, y: 230, r: 30, color: COLORS.cyan, points: 300, pulse: 0 },
+            { x: 275, y: 230, r: 30, color: COLORS.cyan, points: 300, pulse: 0 }
         ];
 
         const rollovers = [
@@ -365,7 +358,7 @@
         }
 
         function beginLaunchCharge() {
-            if (!state.running || !ball.inShooter || !state.launchReady) return;
+            if (!state.running || !state.launchReady) return;
             state.launchHolding = true;
         }
 
@@ -496,16 +489,20 @@
             ball.spin += (ball.vx * 0.018 + ball.vy * 0.004) * dt;
 
             // Improved Shooter Gate Logic
-            if (ball.x > 370 && ball.y > 600) {
+            if (ball.x > 368 && ball.y > 500) {
                 if (!ball.inShooter) {
                     ball.inShooter = true;
+                }
+                // Always ready to launch if ball is essentially stopped in the lane
+                if (Math.abs(ball.vy) < 0.2 && Math.abs(ball.vx) < 0.2) {
                     state.launchReady = true;
                 }
             } else if (ball.y < 120) {
                 if (ball.inShooter) {
                     ball.inShooter = false;
-                    // Give a slight horizontal boost when exiting to ensure it clears the lane
-                    if (ball.vy < 0) ball.vx -= 1.5;
+                    state.launchReady = false; 
+                    // Give a significant horizontal boost when exiting to ensure it clears the lane
+                    if (ball.vy < 0) ball.vx -= 2.8;
                 }
             }
 
@@ -576,10 +573,14 @@
                 ball.vy -= (1 + restitution) * vn * ny;
                 
                 // Add spin influence to bounce
+                const tx = -ny;
+                const ty = nx;
+                const vrt = ball.vx * tx + ball.vy * ty;
+                
                 ball.vx += ny * ball.spin * 15;
                 ball.vy -= nx * ball.spin * 15;
                 ball.spin *= 0.85; // Friction on spin
-                ball.spin += (vrt || 0) * 0.008;
+                ball.spin += vrt * 0.008;
 
                 // Slingshot logic
                 if (seg.slingshot && Math.abs(vn) > 1.2) {
@@ -937,12 +938,20 @@
             ctx.stroke();
             ctx.setLineDash([]);
             
-            // Lane bottom glow
+            // Lane highlight
             const grad = ctx.createLinearGradient(372, 600, 398, 688);
             grad.addColorStop(0, 'rgba(255,215,0,0)');
             grad.addColorStop(1, 'rgba(255,215,0,0.12)');
             ctx.fillStyle = grad;
             ctx.fillRect(372, 140, 26, 548);
+
+            // Ready indicator
+            if (state.launchReady && ball.inShooter) {
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
+                ctx.beginPath();
+                ctx.arc(385, 628, 15, 0, Math.PI * 2);
+                ctx.fill();
+            }
             ctx.restore();
         }
 
