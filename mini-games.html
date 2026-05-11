@@ -834,17 +834,13 @@
         }
 
         function setCategory(cat, skipPush = false) {
-            if (cat === 'store' && !currentUser) {
-                // Show locked store
-            } else if (cat === 'store' && currentUser) {
-                // Good to            }
-            
             currentCategory = cat;
+            
+            // UI Updates
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             const navEl = document.getElementById(`nav-${cat}`);
             if (navEl) navEl.classList.add('active');
             
-            // UI Tweaks for categories
             const hero = document.querySelector('.featured-hero');
             const library = document.getElementById('library-view');
             const store = document.getElementById('store-view');
@@ -867,6 +863,7 @@
             } else {
                 library.style.display = 'block';
                 hero.style.display = (cat === 'all') ? 'flex' : 'none';
+                
                 let displayTitle = cat.toUpperCase();
                 if (cat === 'all') displayTitle = 'ALL GAMES & UTILITIES';
                 if (cat === 'games') displayTitle = 'GAMES';
