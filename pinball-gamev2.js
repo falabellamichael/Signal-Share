@@ -1,4 +1,4 @@
-        window.__NEON_PINBALL_BUILD = 'revamped-functional-v1.6';
+        window.__NEON_PINBALL_BUILD = 'revamped-functional-v1.7';
         console.log('[Neon Pinball] Build:', window.__NEON_PINBALL_BUILD);
 
         const canvas = document.getElementById('pinballCanvas');
@@ -489,22 +489,21 @@
             ball.spin += (ball.vx * 0.018 + ball.vy * 0.004) * dt;
 
             // Improved Shooter Gate Logic
-            if (ball.x > 368 && ball.y > 500) {
+            if (ball.x > 368 && ball.y > 150) {
                 if (!ball.inShooter) {
                     ball.inShooter = true;
                 }
                 // Always ready to launch if ball is in the bottom section of lane
                 if (ball.y > 600) {
                     state.launchReady = true;
-                    // Dampen vibration to ensure it's "Ready"
                     if (Math.abs(ball.vy) < 0.5) ball.vy = 0;
                 }
-            } else if (ball.y < 120) {
+            } else if (ball.y < 150) {
                 if (ball.inShooter) {
                     ball.inShooter = false;
                     state.launchReady = false; 
-                    // Give a significant horizontal boost when exiting to ensure it clears the lane
-                    if (ball.vy < 0) ball.vx -= 2.8;
+                    // Nudge it slightly left to ensure it clears the lane wall
+                    if (ball.vy < 0) ball.vx -= 1.2;
                 }
             }
 
@@ -536,8 +535,8 @@
                 return;
             }
 
-            if (ball.inShooter) {
-                ball.x = clamp(ball.x, 379, 393);
+            if (ball.inShooter && ball.y > 150) {
+                ball.x = clamp(ball.x, 376, 396);
             }
 
             capSpeed();
