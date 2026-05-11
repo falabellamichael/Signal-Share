@@ -1,4 +1,4 @@
-        window.__NEON_PINBALL_BUILD = 'revamped-functional-v2.0-loop-polish';
+        window.__NEON_PINBALL_BUILD = 'revamped-functional-v2.1-flipper-skill';
         console.log('[Neon Pinball] Build:', window.__NEON_PINBALL_BUILD);
 
         const canvas = document.getElementById('pinballCanvas');
@@ -37,15 +37,22 @@
             friction: 0.992, // Increased friction (lower value = more resistance)
             restitution: 0.62,
             ballRadius: 8.8,
-            maxSpeed: 23,
+            maxSpeed: 32,
             bumperKick: 11.0,
             flipperKick: 10.5,
-            flipperSnap: 0.42,
+            flipperSnap: 0.48,
             tableTilt: 0.012,
             collisionSlop: 0.15,
             substepsMin: 4,
-            substepsMax: 12,
-            slingshotForce: 11.5
+            substepsMax: 14,
+            slingshotForce: 11.5,
+            flipperCatchSpeed: 11.5,
+            flipperHoldFriction: 0.86,
+            flipperCradleGravity: 0.035,
+            flipperShotBase: 3.8,
+            flipperShotTipBonus: 12.8,
+            flipperShotSpeedBonus: 0.28,
+            flipperShotSwingBonus: 0.035
         };
 
         let savedHighScore = 0;
@@ -71,7 +78,9 @@
             tilted: false,
             nudgeCooldown: 0,
             message: '',
-            messageTimer: 0
+            messageTimer: 0,
+            lastFlipHit: null,
+            hitMeterTimer: 0
         };
 
         const keys = Object.create(null);
@@ -88,6 +97,7 @@
             inShooter: true,
             active: true,
             flipperCooldown: 0,
+            heldByFlipper: '',
             trail: []
         };
 
@@ -274,6 +284,7 @@
             ball.inShooter = true;
             ball.active = true;
             ball.flipperCooldown = 0;
+            ball.heldByFlipper = '';
             state.launchReady = true;
             state.launchCharge = 0;
         }
@@ -294,6 +305,8 @@
             state.nudgeCooldown = 0;
             state.launchHolding = false;
             state.launchCharge = 0;
+            state.lastFlipHit = null;
+            state.hitMeterTimer = 0;
             particles.length = 0;
             floatingText.length = 0;
             bumpers.forEach((b) => { b.pulse = 0; });
@@ -516,6 +529,7 @@
             state.screenShake = Math.max(0, state.screenShake - 0.45 * dt);
             if (state.messageTimer > 0) state.messageTimer -= dt;
             if (state.nudgeCooldown > 0) state.nudgeCooldown -= dt;
+            if (state.hitMeterTimer > 0) state.hitMeterTimer -= dt;
         }
 
         function updateFlipper(f, pressed, dt) {
@@ -773,12 +787,39 @@
             };
         }
 
+        function recordFlipperHit(f, hitPower, contactT, impulse, contactX, contactY, incomingSpeed) {
+            const pct = Math.round(clamp(hitPower, 0, 1) * 100);
+            const zone = contactT > 0.78 ? 'TIP' : contactT > 0.42 ? 'MID' : 'BASE';
+            const label = pct >= 86
+                ? `${zone} RIP ${pct}%`
+                : pct >= 64
+                    ? `${zone} HARD ${pct}%`
+                    : pct >= 38
+                        ? `${zone} SHOT ${pct}%`
+                        : `${zone} SOFT ${pct}%`;
+
+            state.lastFlipHit = {
+                power: clamp(hitPower, 0, 1),
+                zone,
+                impulse,
+                incomingSpeed,
+                color: f.color,
+                life: 1
+            };
+            state.hitMeterTimer = 72;
+            spawnText(label, contactX, contactY - 22, f.color);
+        }
+
         function checkFlipperCollision(f, dt) {
             const tip = flipperTip(f);
             const dx = tip.x - f.x;
             const dy = tip.y - f.y;
+            const segLen = Math.hypot(dx, dy);
             const lenSq = dx * dx + dy * dy;
-            if (lenSq <= 0.001) return;
+            if (lenSq <= 0.001 || segLen <= 0.001) return;
+
+            const axisX = dx / segLen;
+            const axisY = dy / segLen;
             const t = clamp(((ball.x - f.x) * dx + (ball.y - f.y) * dy) / lenSq, 0, 1);
             const cx = f.x + dx * t;
             const cy = f.y + dy * t;
@@ -787,7 +828,10 @@
             let dist = length(nx, ny);
             const contactRadius = ball.r + f.width * 0.5;
 
-            if (dist >= contactRadius) return;
+            if (dist >= contactRadius) {
+                if (ball.heldByFlipper === f.side) ball.heldByFlipper = '';
+                return;
+            }
 
             if (dist < 0.001) {
                 nx = f.side === 'left' ? 0.35 : -0.35;
@@ -803,41 +847,94 @@
             ball.y += ny * penetration;
 
             const omega = ((f.angle - f.prevAngle) / (dt || 1)) * 1.15;
-            const vfx = -omega * (cy - f.y);
-            const vfy = omega * (cx - f.x);
+            const contactArmX = cx - f.x;
+            const contactArmY = cy - f.y;
+            const contactDistance = Math.hypot(contactArmX, contactArmY);
+            const vfx = -omega * contactArmY;
+            const vfy = omega * contactArmX;
 
             const vrx = ball.vx - vfx;
             const vry = ball.vy - vfy;
             const vrn = vrx * nx + vry * ny;
+            const incomingSpeed = length(vrx, vry);
+            const isSwingingUp = (f.side === 'left' && omega < -0.02) || (f.side === 'right' && omega > 0.02);
+            const isRaised = Math.abs(f.angle - f.up) < 0.12;
+            const isCatchable = f.pressed && isRaised && !isSwingingUp && incomingSpeed <= CFG.flipperCatchSpeed;
+
+            if (isCatchable) {
+                const tangentVelocity = ball.vx * axisX + ball.vy * axisY;
+                const normalVelocity = ball.vx * nx + ball.vy * ny;
+                const holdFriction = t < 0.62 ? 0.74 : CFG.flipperHoldFriction;
+                const settledTangentVelocity = tangentVelocity * Math.pow(holdFriction, dt);
+                const tangentDelta = settledTangentVelocity - tangentVelocity;
+
+                ball.vx += tangentDelta * axisX;
+                ball.vy += tangentDelta * axisY;
+
+                if (normalVelocity < 0.6) {
+                    ball.vx -= normalVelocity * nx;
+                    ball.vy -= normalVelocity * ny;
+                }
+
+                // A tiny downhill component lets the ball roll naturally toward the flipper base,
+                // while the damping makes it possible to trap/cradle the ball instead of bouncing it away.
+                ball.vx += axisX * axisY * CFG.flipperCradleGravity * dt;
+                ball.vy += axisY * axisY * CFG.flipperCradleGravity * dt;
+                ball.spin *= Math.pow(0.90, dt);
+                ball.heldByFlipper = f.side;
+                return;
+            }
 
             if (vrn < 0) {
-                const isHitting = (f.side === 'left' && omega < -0.02) || (f.side === 'right' && omega > 0.02);
-                const e = isHitting ? 0.65 : 0.35;
-                
-                const j = -(1 + e) * vrn;
+                const tipFactor = Math.pow(t, 1.55);
+                const baseDamping = 0.48 + tipFactor * 0.72;
+                const e = isSwingingUp ? 0.48 + tipFactor * 0.28 : 0.18;
+                const j = -(1 + e) * vrn * baseDamping;
 
                 ball.vx += j * nx;
                 ball.vy += j * ny;
 
-                // Horizontal boost for flipper tips
-                const tipFactor = t; // t is 0..1 from base to tip
-                if (isHitting) {
-                    ball.vx += dx * 0.12 * tipFactor;
+                if (isSwingingUp) {
+                    const flipperSurfaceSpeed = Math.abs(omega) * contactDistance;
+                    const hitPower = clamp(
+                        (flipperSurfaceSpeed * 0.038) +
+                        (incomingSpeed * 0.026) +
+                        (tipFactor * 0.48),
+                        0.12,
+                        1
+                    );
+                    const shotImpulse = (
+                        CFG.flipperShotBase +
+                        CFG.flipperShotTipBonus * tipFactor +
+                        incomingSpeed * CFG.flipperShotSpeedBonus
+                    ) * (0.58 + hitPower * 0.58);
+
+                    ball.vx += nx * shotImpulse + vfx * CFG.flipperShotSwingBonus;
+                    ball.vy += ny * shotImpulse + vfy * CFG.flipperShotSwingBonus;
+
+                    // Tip hits get a sharper cross-table launch; base hits stay intentionally softer.
+                    if (t > 0.68) {
+                        const crossTable = f.side === 'left' ? 1 : -1;
+                        ball.vx += crossTable * shotImpulse * 0.18 * tipFactor;
+                        ball.vy -= shotImpulse * 0.08 * tipFactor;
+                    }
+
+                    if (ball.flipperCooldown <= 0) {
+                        ball.flipperCooldown = 3;
+                        state.screenShake = Math.max(state.screenShake, clamp(2 + hitPower * 6, 0, 8));
+                        explode(cx, cy, f.color, Math.floor(clamp(8 + hitPower * 30, 8, 42)));
+                        recordFlipperHit(f, hitPower, t, shotImpulse, cx, cy, incomingSpeed);
+                    }
                 }
 
                 const tx = -ny;
                 const ty = nx;
                 const vrt = vrx * tx + vry * ty;
-                
-                ball.vx -= vrt * 0.18 * tx;
-                ball.vy -= vrt * 0.18 * ty;
-                ball.spin += vrt * 0.12;
 
-                if (isHitting && ball.flipperCooldown <= 0 && j > 6) {
-                    ball.flipperCooldown = 2;
-                    state.screenShake = Math.max(state.screenShake, clamp(j * 0.15, 0, 5));
-                    explode(cx, cy, f.color, Math.floor(clamp(j * 0.5, 5, 30)));
-                }
+                ball.vx -= vrt * (isSwingingUp ? 0.14 : 0.24) * tx;
+                ball.vy -= vrt * (isSwingingUp ? 0.14 : 0.24) * ty;
+                ball.spin += vrt * (isSwingingUp ? 0.15 : 0.08);
+                ball.heldByFlipper = '';
             }
         }
 
@@ -879,6 +976,7 @@
             drawFlipper(rightFlipper);
             drawBall();
             drawPlungerMeter();
+            drawFlipperHitMeter();
 
             ctx.restore();
             drawParticles(shakeX, shakeY);
@@ -1209,6 +1307,42 @@
             ctx.rotate(-Math.PI / 2);
             ctx.fillText('PLUNGER', 0, 0);
             ctx.restore();
+            ctx.restore();
+        }
+
+        function drawFlipperHitMeter() {
+            if (!state.lastFlipHit || state.hitMeterTimer <= 0) return;
+            const hit = state.lastFlipHit;
+            const alpha = clamp(state.hitMeterTimer / 72, 0, 1);
+            const meterW = 124;
+            const meterH = 10;
+            const x = 138;
+            const y = 654;
+            const fillW = meterW * clamp(hit.power, 0, 1);
+            const label = `${hit.zone} FLIP POWER ${Math.round(hit.power * 100)}%`;
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = 'rgba(0,0,0,0.34)';
+            roundRect(x - 10, y - 24, meterW + 20, 42, 12, true, false);
+            ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+            ctx.lineWidth = 1;
+            roundRect(x - 10, y - 24, meterW + 20, 42, 12, false, true);
+
+            ctx.font = '900 9px Inter, system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(255,255,255,0.82)';
+            ctx.shadowColor = hit.color;
+            ctx.shadowBlur = 8;
+            ctx.fillText(label, x + meterW / 2, y - 9);
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(255,255,255,0.12)';
+            roundRect(x, y, meterW, meterH, 5, true, false);
+            ctx.fillStyle = hit.color;
+            ctx.shadowColor = hit.color;
+            ctx.shadowBlur = 12;
+            roundRect(x, y, fillW, meterH, 5, true, false);
             ctx.restore();
         }
 
