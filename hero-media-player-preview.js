@@ -467,8 +467,8 @@ function createPostStandbyPreview(post, options = {}) {
 
   const cardData = {
     badge: badge,
-    title: post.title || "Next playable post",
-    meta: meta,
+    title: "",
+    meta: "",
     note: "Press Play to start playback.",
     artworkUrl,
   };
@@ -592,8 +592,8 @@ export function renderHeroStagePreview(options = {}) {
 
       commitCard(stage, {
         badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
-        title: (nativeSnapshot.title || matchedPost?.title || "Now playing"),
-        meta: (nativeSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : "Current device playback")),
+        title: "",
+        meta: "",
         note: (nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
         artworkUrl: artworkUrl,
         showMetadata: true
@@ -609,8 +609,8 @@ export function renderHeroStagePreview(options = {}) {
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "ON-DEVICE MEDIA",
-      title: idleTitle,
-      meta: idleMeta,
+      title: "",
+      meta: "",
       showMetadata: true
     });
     return;
@@ -625,8 +625,8 @@ export function renderHeroStagePreview(options = {}) {
 
       commitCard(stage, {
         badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
-        title: (desktopSnapshot.title || matchedPost?.title || "Now playing"),
-        meta: (desktopSnapshot.meta || (matchedPost ? formatPostMeta(matchedPost, creatorSummary, formatTimestamp) : (desktopSnapshot.appPackage || "Desktop playback"))),
+        title: "",
+        meta: "",
         note: (desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
         artworkUrl: artworkUrl,
         showMetadata: true
@@ -650,8 +650,8 @@ export function renderHeroStagePreview(options = {}) {
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "PC SYSTEM MEDIA",
-      title: idleTitle,
-      meta: idleMeta,
+      title: "",
+      meta: "",
       showMetadata: true
     });
     return;
@@ -669,8 +669,8 @@ export function renderHeroStagePreview(options = {}) {
 
     commitCard(stage, {
       badge: "",
-      title: fallbackTitle,
-      meta: metadata?.artist || "Active media",
+      title: "",
+      meta: "",
       note: "",
       artworkUrl: metadata?.artworkUrl || "",
       showMetadata: true
@@ -681,8 +681,8 @@ export function renderHeroStagePreview(options = {}) {
   if (!post) {
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "",
-      title: "Ready",
-      meta: "Select media to begin",
+      title: "",
+      meta: "",
       note: "",
       showMetadata: true
     });
@@ -704,8 +704,8 @@ export function renderHeroStagePreview(options = {}) {
   if (externalMetadata instanceof Promise) {
     commitCard(stage, {
       badge: "NOW PLAYING",
-      title: post.title || "Now playing",
-      meta: formatPostMeta(post, creatorSummary),
+      title: "",
+      meta: "",
       artworkUrl: artworkUrl,
       showMetadata: true
     });
@@ -715,8 +715,8 @@ export function renderHeroStagePreview(options = {}) {
       if (metadata) {
         commitCard(stage, {
           badge: "NOW PLAYING",
-          title: metadata?.title || post.title || "Now playing",
-          meta: metadata.creator || "",
+          title: "",
+          meta: "",
           artworkUrl: metadata?.artworkUrl || artworkUrl,
           showMetadata: true
         });
@@ -729,8 +729,8 @@ export function renderHeroStagePreview(options = {}) {
 
   commitCard(stage, {
     badge: "NOW PLAYING",
-    title: resolvedMetadata?.title || post.title || "Now playing",
-    meta: resolvedMetadata?.creator || formatPostMeta(post, creatorSummary),
+    title: "",
+    meta: "",
     artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
     showMetadata: true
   });
