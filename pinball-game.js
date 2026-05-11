@@ -347,7 +347,7 @@
         }
 
         window.addEventListener('keydown', (event) => {
-            if (['Space', 'ArrowLeft', 'ArrowRight', 'KeyT', 'KeyX', 'ShiftLeft', 'ShiftRight'].includes(event.code)) event.preventDefault();
+            if (['Space', 'ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'KeyT', 'KeyX', 'ShiftLeft', 'ShiftRight'].includes(event.code)) event.preventDefault();
             if (event.repeat && event.code !== 'Space') return;
             keys[event.code] = true;
             if (event.code === 'Space') beginLaunchCharge();
@@ -608,7 +608,15 @@
             let ny = ball.y - cy;
             let dist = length(nx, ny);
             const contactRadius = ball.r + f.width * 0.5;
+
             if (dist >= contactRadius) return;
+
+            // Flipper Bias: If ball is falling fast, it might cross the center line.
+            // We force the normal to point "up" to prevent tunnelling through the bottom.
+            if (ny > 0 && ball.vy > 0) {
+                 ny = -ny;
+                 nx = -nx; // Flip the whole vector to point away from the top
+            }
 
             if (dist < 0.001) {
                 nx = f.side === 'left' ? 0.35 : -0.35;
