@@ -1198,8 +1198,9 @@
                 const desc = (game.description || '').substring(0, 80);
                 const descSuffix = (game.description || '').length > 80 ? '...' : '';
 
+                const posterUrl = (game.poster && !game.poster.includes('${')) ? game.poster : 'icon-512.png';
                 card.innerHTML = 
-                    '<div style="height: 160px; background: url(\'' + game.poster + '\') center/cover; position: relative; overflow: hidden;">' +
+                    '<div style="height: 160px; background: url(\'' + posterUrl + '\') center/cover; position: relative; overflow: hidden;">' +
                         '<div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(16, 24, 34, 0.9), transparent); display: flex; align-items: flex-end; padding: 15px;">' +
                             '<span style="font-size: 0.6rem; background: rgba(102, 192, 244, 0.2); color: var(--steam-light); padding: 4px 8px; border-radius: 4px; font-weight: 800; letter-spacing: 1px;">' + game.tag + '</span>' +
                         '</div>' +
@@ -1254,8 +1255,8 @@
                         // Replace <script src="filename.js">
                         if (f.name.endsWith('.js')) {
                             const js = f.content.split('base64,')[1] ? atob(f.content.split('base64,')[1]) : f.content;
-                            const scriptRegex = new RegExp('<script[^>]*src=["\']' + escapedName + '["\'][^>]*></scr' + 'ipt>', 'gi');
-                            content = content.replace(scriptRegex, '<script>' + js + '</script>');
+                            const scriptRegex = new RegExp('<scr' + 'ipt[^>]*src=["\']' + escapedName + '["\'][^>]*></scr' + 'ipt>', 'gi');
+                            content = content.replace(scriptRegex, '<scr' + 'ipt>' + js + '</scr' + 'ipt>');
                         }
                         
                         // Replace <link href="filename.css">
@@ -1433,8 +1434,9 @@
                 const card = document.createElement('div');
                 card.className = 'steam-card';
                 card.onclick = () => showGameDetails(game.id);
+                const posterUrl = (game.poster && !game.poster.includes('${')) ? game.poster : 'icon-512.png';
                 card.innerHTML = `
-                    <div class="poster-wrapper"><img src="${game.poster}"></div>
+                    <div class="poster-wrapper"><img src="${posterUrl}"></div>
                     <div class="card-info">
                         <div class="card-title">${game.title}</div>
                         <div class="card-tag">${game.tag}</div>
