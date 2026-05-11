@@ -143,17 +143,7 @@
             { x1: 20, y1: 120, x2: 100, y2: 36, color: COLORS.rail, thick: 4 },
             { x1: 300, y1: 36, x2: 398, y2: 100, color: COLORS.rail, thick: 4 },
             { x1: 20, y1: 570, x2: 20, y2: 120, color: COLORS.rail, thick: 4 },
-            { x1: 398, y1: 100, x2: 398, y2: 688, color: COLORS.rail, thick: 4 },
-            { x1: 20, y1: 570, x2: 118, y2: 626, color: COLORS.cyan, thick: 5 },
-            { x1: 372, y1: 570, x2: 282, y2: 626, color: COLORS.magenta, thick: 5 },
-            { x1: 65, y1: 472, x2: 65, y2: 600, color: COLORS.dim, thick: 3 },
-            { x1: 335, y1: 472, x2: 335, y2: 600, color: COLORS.dim, thick: 3 },
-            { x1: 372, y1: 118, x2: 372, y2: 666, color: 'rgba(255,215,0,0.72)', thick: 4 },
-            { x1: 398, y1: 36, x2: 398, y2: 688, color: 'rgba(255,215,0,0.54)', thick: 3 },
-            { x1: 48, y1: 132, x2: 103, y2: 96, color: 'rgba(0,255,255,0.44)', thick: 4 },
-            { x1: 310, y1: 96, x2: 372, y2: 132, color: 'rgba(255,0,255,0.44)', thick: 4 },
-            { x1: 88, y1: 420, x2: 130, y2: 496, color: 'rgba(0,255,157,0.32)', thick: 3 },
-            { x1: 312, y1: 420, x2: 270, y2: 496, color: 'rgba(0,255,157,0.32)', thick: 3 }
+            { x1: 398, y1: 100, x2: 398, y2: 688, color: COLORS.rail, thick: 4 }
         ];
 
         function setupCanvas() {
