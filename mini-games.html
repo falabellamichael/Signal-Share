@@ -240,6 +240,53 @@
             border-color: transparent;
         }
 
+        /* Auth & Store Views */
+        .auth-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            z-index: 3000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .auth-modal {
+            background: #171a21;
+            width: 400px;
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .auth-input {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--border);
+            padding: 14px;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        .auth-input:focus { border-color: var(--steam-light); }
+
+        .store-locked {
+            text-align: center;
+            padding: 80px 40px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 16px;
+            border: 1px dashed var(--border);
+        }
+
+        .nav-item.locked { opacity: 0.4; cursor: not-allowed; }
+        .nav-item.locked:hover { background: none; color: inherit; }
+
         /* Grid & Cards */
         .game-grid {
             display: grid;
@@ -362,10 +409,13 @@
     <div class="steam-shell">
         <header class="steam-header">
             <h1 style="margin: 0; color: #fff; font-size: 1.1rem; letter-spacing: 1px; font-weight: 900; text-transform: uppercase; opacity: 0.8;">Signal Share <span style="font-weight: 300; opacity: 0.5;">Launcher</span></h1>
-            <div style="display: flex; align-items: center; gap: 20px; opacity: 0.6; font-size: 0.8rem; font-weight: 600;">
-                <span style="color: var(--steam-light);">LIBRARY</span>
-                <span>COLLECTIONS</span>
-                <span id="user-name">USER</span>
+            <div style="display: flex; align-items: center; gap: 20px; font-size: 0.8rem; font-weight: 600;">
+                <span class="nav-link" onclick="setCategory('all')" style="color: var(--steam-light); cursor: pointer;">LIBRARY</span>
+                <span class="nav-link" style="opacity: 0.4; cursor: not-allowed;">COLLECTIONS</span>
+                <div id="user-pill" onclick="toggleAuth()" style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); padding: 6px 14px; border-radius: 20px; cursor: pointer; border: 1px solid rgba(255,255,255,0.05);">
+                    <div id="user-avatar" style="width: 20px; height: 20px; background: #66c0f4; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #000;">?</div>
+                    <span id="user-name">Sign In</span>
+                </div>
             </div>
         </header>
 
@@ -382,6 +432,10 @@
                 <div id="nav-recent" class="nav-item" onclick="setCategory('recent')">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     Recent
+                </div>
+                <div id="nav-store" class="nav-item locked" onclick="setCategory('store')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                    Store
                 </div>
             </div>
             
@@ -532,7 +586,63 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Store View -->
+            <div id="store-view" style="display: none;">
+                <div id="store-locked-msg" class="store-locked">
+                    <h2 style="font-size: 2rem; margin-bottom: 15px;">Store Restricted</h2>
+                    <p style="opacity: 0.6; margin-bottom: 30px;">Sign in with your Signal Share account to access the store and premium tools.</p>
+                    <button class="play-btn" onclick="toggleAuth()" style="font-size: 1rem;">Sign In Now</button>
+                </div>
+                
+                <div id="store-content" style="display: none;">
+                    <h2 style="font-size: 2rem; letter-spacing: -1px; margin-bottom: 30px;">Premium Store</h2>
+                    <div class="game-grid">
+                        <div class="steam-card">
+                            <div class="poster-wrapper" style="position: relative;">
+                                <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; color: var(--steam-light);">COMING SOON</div>
+                                <img src="icon-512.png" style="opacity: 0.3;">
+                            </div>
+                            <div class="card-info"><div class="card-title">Realtime Neural Bridge</div><div class="card-tag">PREMIUM CORE</div></div>
+                        </div>
+                        <div class="steam-card">
+                            <div class="poster-wrapper" style="position: relative;">
+                                <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; color: var(--steam-light);">UPCOMING</div>
+                                <img src="icon-512.png" style="opacity: 0.3;">
+                            </div>
+                            <div class="card-info"><div class="card-title">Pro-Grade Logic Analyzer</div><div class="card-tag">DEVELOPER TOOL</div></div>
+                        </div>
+                        <div class="steam-card">
+                            <div class="poster-wrapper" style="position: relative;">
+                                <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; color: var(--steam-light);">PRE-ORDER</div>
+                                <img src="icon-512.png" style="opacity: 0.3;">
+                            </div>
+                            <div class="card-info"><div class="card-title">Cinematic UI Engine v3</div><div class="card-tag">DESIGN SUITE</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
+
+        <div id="auth-overlay" class="auth-overlay">
+            <div class="auth-modal">
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <h2 style="margin: 0; font-size: 1.5rem; letter-spacing: -0.5px;">Account Sign-In</h2>
+                    <p style="font-size: 0.75rem; opacity: 0.4; margin-top: 5px;">SIGNAL SHARE UNIFIED ID</p>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <input type="text" id="login-user" class="auth-input" placeholder="Account Name / ID">
+                    <input type="password" id="login-pass" class="auth-input" placeholder="Access Key">
+                    <button class="play-btn" onclick="performLogin()" style="width: 100%; font-size: 1rem;">SIGN IN</button>
+                    <button onclick="toggleAuth()" style="background: none; border: none; color: rgba(255,255,255,0.4); font-size: 0.7rem; cursor: pointer;">CANCEL</button>
+                </div>
+                
+                <div style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px; text-align: center;">
+                    <p style="font-size: 0.65rem; opacity: 0.3; line-height: 1.5;">Access to the Signal Share Store requires an active developer license or a verified community ID.</p>
+                </div>
+            </div>
+        </div>
 
         <!-- Detail Panels -->
         <div id="game-details-overlay" class="detail-overlay">
@@ -666,26 +776,88 @@
         ];
 
         let currentCategory = 'all';
+        let currentUser = JSON.parse(localStorage.getItem('ss-user') || 'null');
+
+        function toggleAuth() {
+            if (currentUser) {
+                if (confirm('Do you want to sign out?')) {
+                    currentUser = null;
+                    localStorage.removeItem('ss-user');
+                    updateAuthUI();
+                    setCategory('all');
+                }
+                return;
+            }
+            const overlay = document.getElementById('auth-overlay');
+            overlay.style.display = (overlay.style.display === 'flex') ? 'none' : 'flex';
+        }
+
+        function performLogin() {
+            const user = document.getElementById('login-user').value || 'Developer';
+            currentUser = { name: user, id: 'ID-' + Math.floor(Math.random()*1000) };
+            localStorage.setItem('ss-user', JSON.stringify(currentUser));
+            updateAuthUI();
+            toggleAuth();
+            
+            // Redirect to store if that was the intent
+            if (currentCategory === 'store') setCategory('store');
+        }
+
+        function updateAuthUI() {
+            const nameEl = document.getElementById('user-name');
+            const avatarEl = document.getElementById('user-avatar');
+            const storeNav = document.getElementById('nav-store');
+            
+            if (currentUser) {
+                nameEl.textContent = currentUser.name.toUpperCase();
+                avatarEl.textContent = currentUser.name.charAt(0).toUpperCase();
+                avatarEl.style.background = '#a4d007'; // Success green for signed in
+                storeNav.classList.remove('locked');
+            } else {
+                nameEl.textContent = 'Sign In';
+                avatarEl.textContent = '?';
+                avatarEl.style.background = '#66c0f4';
+                storeNav.classList.add('locked');
+            }
+        }
 
         function setCategory(cat) {
+            if (cat === 'store' && !currentUser) {
+                // Show locked store
+            } else if (cat === 'store' && currentUser) {
+                // Good to go
+            }
+            
             currentCategory = cat;
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             document.getElementById(`nav-${cat}`).classList.add('active');
             
             // UI Tweaks for categories
             const hero = document.querySelector('.featured-hero');
+            const library = document.getElementById('library-view');
+            const store = document.getElementById('store-view');
             const title = document.getElementById('library-title');
             const clearBtn = document.getElementById('clear-recent');
             
             hero.style.display = (cat === 'all') ? 'flex' : 'none';
-            title.textContent = cat.toUpperCase() + (cat === 'all' ? ' LIBRARY' : '');
-            clearBtn.style.display = (cat === 'recent') ? 'block' : 'none';
+            library.style.display = (['all','utilities','recent'].includes(cat)) ? 'block' : 'none';
+            store.style.display = (cat === 'store') ? 'block' : 'none';
+            
+            if (cat === 'store') {
+                document.getElementById('store-locked-msg').style.display = currentUser ? 'none' : 'block';
+                document.getElementById('store-content').style.display = currentUser ? 'block' : 'none';
+            }
+            
+            if (title) title.textContent = cat.toUpperCase() + (cat === 'all' ? ' LIBRARY' : '');
+            if (clearBtn) clearBtn.style.display = (cat === 'recent') ? 'block' : 'none';
             
             renderLibrary();
         }
 
         function renderLibrary() {
+            if (currentCategory === 'store') return; // Handled by setCategory
             const grid = document.getElementById('game-grid');
+            if (!grid) return;
             grid.innerHTML = '';
             
             let filtered = [];
@@ -802,6 +974,7 @@
         }
 
         // Initialize
+        updateAuthUI();
         renderLibrary();
     </script>
 </body>
