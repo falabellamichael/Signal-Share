@@ -82,6 +82,37 @@
             transition: opacity 0.3s;
         }
 
+        /* Hero Section */
+        .featured-hero {
+            height: 350px;
+            background: linear-gradient(45deg, #000, #1b2838);
+            border-radius: 16px;
+            margin-bottom: 50px;
+            position: relative; /* CRITICAL: Anchor for background */
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            padding: 60px;
+            border: 1px solid var(--border);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+
+        .hero-bg {
+            position: absolute;
+            inset: 0;
+            opacity: 0.4;
+            filter: blur(20px);
+            z-index: 0; /* Stays behind content */
+            pointer-events: none; /* Never blocks clicks */
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2; /* Sits above background */
+            max-width: 500px;
+        }
+
         /* Immersive Hub View */
         #detail-view {
             display: none;
@@ -320,14 +351,14 @@
             <!-- Library View -->
             <div id="library-view">
                 <div class="featured-hero" onclick="showGameDetails('snake')">
-                    <img src="snake_game_poster_1778466261855.png" class="hero-bg" style="position: absolute; inset: 0; opacity: 0.4; filter: blur(20px); z-index: 0;">
-                    <div style="position: relative; z-index: 1; max-width: 500px;">
+                    <img src="snake_game_poster_1778466261855.png" class="hero-bg">
+                    <div class="hero-content">
                         <span class="hero-tag" style="background: var(--steam-light); color: #000; font-size: 0.65rem; font-weight: 900; padding: 4px 10px; border-radius: 4px; text-transform: uppercase; letter-spacing: 1px;">MOST PLAYED THIS WEEK</span>
-                        <h2 style="font-size: 3.5rem; margin: 15px 0; letter-spacing: -2px;">Neon Snake</h2>
+                        <h2 style="font-size: 3.5rem; margin: 15px 0; letter-spacing: -2px; font-weight: 900;">Neon Snake</h2>
                         <p style="color: rgba(255,255,255,0.7); line-height: 1.6; margin-bottom: 30px;">
                             The ultimate local arcade experience. High-fidelity neon aesthetics meet optimized input buffering.
                         </p>
-                        <button class="play-btn" style="padding: 12px 30px; font-size: 1rem;">View Details</button>
+                        <button class="play-btn" style="padding: 12px 30px; font-size: 1rem; position: relative; z-index: 10;">View Details</button>
                     </div>
                 </div>
 
@@ -336,7 +367,7 @@
                     <div style="font-size: 0.8rem; color: var(--steam-light);">View All</div>
                 </div>
 
-                <div class="game-grid">
+                <div class="game-grid" style="position: relative; z-index: 5;">
                     <div class="steam-card" onclick="showGameDetails('snake')">
                         <div class="poster-wrapper"><img src="snake_game_poster_1778466261855.png"></div>
                         <div class="card-info"><div class="card-title">Neon Snake</div><div class="card-tag">ARCADE • READY</div></div>
