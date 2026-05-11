@@ -488,21 +488,24 @@
             ball.spin += (ball.vx * 0.018 + ball.vy * 0.004) * dt;
 
             // Improved Shooter Gate Logic
-            if (ball.x > 368 && ball.y > 150) {
-                if (!ball.inShooter) {
-                    ball.inShooter = true;
-                }
+            if (ball.inShooter) {
                 // Always ready to launch if ball is in the bottom section of lane
                 if (ball.y > 600) {
                     state.launchReady = true;
                     if (Math.abs(ball.vy) < 0.5) ball.vy = 0;
                 }
-            } else if (ball.y < 150) {
-                if (ball.inShooter) {
+                
+                // Exit shooter lane at the top
+                if (ball.y < 140) {
                     ball.inShooter = false;
                     state.launchReady = false; 
                     // Nudge it slightly left to ensure it clears the lane wall
-                    if (ball.vy < 0) ball.vx -= 1.2;
+                    if (ball.vy < 0) ball.vx -= 1.5;
+                }
+            } else {
+                // ONLY enter shooter lane from the top (above the inner wall)
+                if (ball.y < 140 && ball.x > 376) {
+                    ball.inShooter = true;
                 }
             }
 
@@ -513,19 +516,21 @@
             checkFlipperCollision(leftFlipper, dt);
             checkFlipperCollision(rightFlipper, dt);
 
-            // Explicit floor boundary constraint
+            // Explicit floor boundary constraint (only for shooter lane)
             const floorY = 688;
             const floorCollideRadius = ball.r + 4;
             if (ball.y + floorCollideRadius > floorY) {
-                ball.y = floorY - floorCollideRadius;
-                if (ball.vy > 0) {
-                    if (ball.inShooter) {
-                        ball.vy = 0; // Solid stop in lane
-                        state.launchReady = true;
-                    } else {
-                        ball.vy *= -CFG.restitution;
+                if (ball.inShooter || ball.x > 374) {
+                    ball.y = floorY - floorCollideRadius;
+                    if (ball.vy > 0) {
+                        if (ball.inShooter) {
+                            ball.vy = 0; // Solid stop in lane
+                            state.launchReady = true;
+                        } else {
+                            ball.vy *= -CFG.restitution;
+                        }
+                        ball.vx *= 0.98;
                     }
-                    ball.vx *= 0.98;
                 }
             }
 
