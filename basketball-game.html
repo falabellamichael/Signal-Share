@@ -197,7 +197,7 @@
                 ball.z += ball.vz;
                 
                 // Gravity
-                ball.vy += 0.5;
+                ball.vy += 0.8;
                 ball.rotation += ball.vRot;
 
                 // Stop if it goes out of bounds below screen
@@ -215,7 +215,7 @@
                     let dy = ball.y - hoop.y;
                     let dist = Math.sqrt(dx*dx + dy*dy);
                     
-                    if (dist < hoop.radius) {
+                    if (dist < hoop.radius * 1.4) {
                         // SWISH
                         score += 1 + Math.floor(streak / 2);
                         streak++;
@@ -233,7 +233,7 @@
                         ball.z = 0.3; // lock depth to backboard
                         streak = 0;
                         streakEl.textContent = streak;
-                    } else if (dist < hoop.radius * 1.5) {
+                    } else if (dist < hoop.radius * 2.2) {
                         // Hit rim
                         ball.state = 'falling';
                         ball.vy = -ball.vy * 0.6;
@@ -432,10 +432,13 @@
                 // Let's do Angry Birds style: drag down/back to shoot up/forward
                 if (dy > 20) {
                     ball.state = 'shooting';
-                    // We pull back so the ball goes in the opposite direction of the pull
-                    ball.vx = -dx * 0.15;
-                    ball.vy = -dy * 0.18;
-                    ball.vz = -0.018; // move away
+                    // Cap the drag distance to prevent shooting too high
+                    let cappedDx = Math.max(Math.min(-dx, 300), -300);
+                    let cappedDy = Math.min(dy, 350);
+                    
+                    ball.vx = cappedDx * 0.1;
+                    ball.vy = -cappedDy * 0.16;
+                    ball.vz = -0.022; // move away slightly faster
                     ball.vRot = dx * 0.01;
                 }
             }
