@@ -105,8 +105,8 @@
             side: 'left',
             x: 125,
             y: 640,
-            length: 75,
-            width: 16,
+            length: 62,
+            width: 20,
             rest: 0.35,
             up: -0.55,
             angle: 0.35,
@@ -120,8 +120,8 @@
             side: 'right',
             x: 275,
             y: 640,
-            length: 75,
-            width: 16,
+            length: 62,
+            width: 20,
             rest: Math.PI - 0.35,
             up: Math.PI + 0.55,
             angle: Math.PI - 0.35,
@@ -502,9 +502,6 @@
             const leftPressed = state.tilted ? false : Boolean(keys.KeyA || keys.ArrowLeft || keys.TouchLeft);
             const rightPressed = state.tilted ? false : Boolean(keys.KeyD || keys.ArrowRight || keys.TouchRight);
 
-            updateFlipper(leftFlipper, leftPressed, dt);
-            updateFlipper(rightFlipper, rightPressed, dt);
-
             if (state.launchHolding) {
                 state.launchCharge = clamp(state.launchCharge + 0.016 * dt, 0, 1);
             }
@@ -513,6 +510,8 @@
             const steps = clamp(Math.ceil(speed / 6.5), CFG.substepsMin, CFG.substepsMax);
             const subDt = dt / steps;
             for (let i = 0; i < steps; i += 1) {
+                updateFlipper(leftFlipper, leftPressed, subDt);
+                updateFlipper(rightFlipper, rightPressed, subDt);
                 stepBall(subDt);
             }
 
