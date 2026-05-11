@@ -85,8 +85,8 @@ const ball = {
 };
 
 const net = {
-    rows: 8,
-    cols: 12,
+    rows: 6,
+    cols: 10,
     points: [],
     lastPunchAt: 0,
 };
@@ -170,7 +170,7 @@ function netRestPosition(row, col) {
     const bottomRadiusY = hoop.radius * 0.23;
     const radiusX = lerp(topRadiusX, bottomRadiusX, rowT);
     const radiusY = lerp(topRadiusY, bottomRadiusY, rowT);
-    const drop = 13 + rowT * hoop.radius * 2.15;
+    const drop = 13 + rowT * hoop.radius * 1.85;
 
     return {
         x: hoop.x + Math.cos(angle) * radiusX,
