@@ -79,46 +79,67 @@
             max-width: 1200px;
             margin: 0 auto;
             width: 100%;
+            transition: opacity 0.3s;
         }
 
-        /* Hero Section */
-        .featured-hero {
-            height: 350px;
-            background: linear-gradient(45deg, #000, #1b2838);
-            border-radius: 16px;
-            margin-bottom: 50px;
-            position: relative;
-            overflow: hidden;
+        #detail-view {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        /* Game Detail Hub */
+        .game-hub-header {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 50px;
+            margin-bottom: 40px;
+        }
+
+        .hub-poster {
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.6);
+            border: 1px solid var(--border);
+        }
+
+        .play-bar {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 25px 35px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
-            padding: 60px;
+            justify-content: space-between;
+            margin-bottom: 40px;
             border: 1px solid var(--border);
-            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
         }
 
-        .hero-bg {
-            position: absolute;
-            inset: 0;
-            opacity: 0.4;
-            filter: blur(20px);
-            z-index: 0;
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 25px;
+            background: var(--glass);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
         }
 
-        .hero-content {
-            position: relative;
-            z-index: 1;
-            max-width: 500px;
+        .hub-back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--steam-light);
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 25px;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.2s;
         }
 
-        .hero-tag {
-            background: var(--steam-light);
-            color: #000;
-            font-size: 0.65rem;
-            font-weight: 900;
-            padding: 4px 10px;
-            border-radius: 4px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+        .hub-back-btn:hover {
+            opacity: 1;
         }
 
         /* Grid & Cards */
@@ -276,43 +297,125 @@
         </aside>
 
         <main class="steam-content">
-            <div class="featured-hero" onclick="showGameDetails('snake')">
-                <img src="snake_game_poster_1778466261855.png" class="hero-bg">
-                <div class="hero-content">
-                    <span class="hero-tag">MOST PLAYED THIS WEEK</span>
-                    <h2 style="font-size: 3.5rem; margin: 15px 0; letter-spacing: -2px;">Neon Snake</h2>
-                    <p style="color: rgba(255,255,255,0.7); line-height: 1.6; margin-bottom: 30px;">
-                        The ultimate local arcade experience. High-fidelity neon aesthetics meet optimized input buffering. Refactored using advanced LLM reasoning protocols.
-                    </p>
-                    <button class="play-btn" style="padding: 12px 30px; font-size: 1rem;">Launch Configuration</button>
-                </div>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                <h3 style="margin: 0; font-size: 0.9rem; letter-spacing: 1.5px; opacity: 0.6;">MY LIBRARY</h3>
-                <div style="font-size: 0.8rem; color: var(--steam-light);">View All</div>
-            </div>
-
-            <div class="game-grid">
-                <!-- Snake Game Card -->
-                <div class="steam-card" onclick="showGameDetails('snake')">
-                    <div class="poster-wrapper">
-                        <img src="snake_game_poster_1778466261855.png" alt="Neon Snake">
-                    </div>
-                    <div class="card-info">
-                        <div class="card-title">Neon Snake</div>
-                        <div class="card-tag">ARCADE • READY</div>
+            <!-- Library View -->
+            <div id="library-view">
+                <div class="featured-hero" onclick="showGameDetails('snake')">
+                    <img src="snake_game_poster_1778466261855.png" class="hero-bg" style="position: absolute; inset: 0; opacity: 0.4; filter: blur(20px); z-index: 0;">
+                    <div style="position: relative; z-index: 1; max-width: 500px;">
+                        <span class="hero-tag" style="background: var(--steam-light); color: #000; font-size: 0.65rem; font-weight: 900; padding: 4px 10px; border-radius: 4px; text-transform: uppercase; letter-spacing: 1px;">MOST PLAYED THIS WEEK</span>
+                        <h2 style="font-size: 3.5rem; margin: 15px 0; letter-spacing: -2px;">Neon Snake</h2>
+                        <p style="color: rgba(255,255,255,0.7); line-height: 1.6; margin-bottom: 30px;">
+                            The ultimate local arcade experience. High-fidelity neon aesthetics meet optimized input buffering.
+                        </p>
+                        <button class="play-btn" style="padding: 12px 30px; font-size: 1rem;">View Details</button>
                     </div>
                 </div>
 
-                <!-- Calculator Card -->
-                <div class="steam-card" onclick="showGameDetails('calc')">
-                    <div class="poster-wrapper">
-                        <img src="calculator_tool_poster_1778466276736.png" alt="Calc Tool">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                    <h3 style="margin: 0; font-size: 0.9rem; letter-spacing: 1.5px; opacity: 0.6;">MY LIBRARY</h3>
+                    <div style="font-size: 0.8rem; color: var(--steam-light);">View All</div>
+                </div>
+
+                <div class="game-grid">
+                    <div class="steam-card" onclick="showGameDetails('snake')">
+                        <div class="poster-wrapper"><img src="snake_game_poster_1778466261855.png"></div>
+                        <div class="card-info"><div class="card-title">Neon Snake</div><div class="card-tag">ARCADE • READY</div></div>
                     </div>
-                    <div class="card-info">
-                        <div class="card-title">Scientific Calc</div>
-                        <div class="card-tag">UTILITY</div>
+                    <div class="steam-card" onclick="showGameDetails('calc')">
+                        <div class="poster-wrapper"><img src="calculator_tool_poster_1778466276736.png"></div>
+                        <div class="card-info"><div class="card-title">Scientific Calc</div><div class="card-tag">UTILITY</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detail Hub View -->
+            <div id="detail-view">
+                <div class="hub-back-btn" onclick="showLibrary()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Back to Library
+                </div>
+
+                <div id="hub-snake" style="display: none;">
+                    <div class="game-hub-header">
+                        <img src="snake_game_poster_1778466261855.png" class="hub-poster">
+                        <div>
+                            <h1 style="font-size: 3rem; margin: 0 0 15px 0; letter-spacing: -2px;">Neon Snake</h1>
+                            <div style="display: flex; gap: 10px; margin-bottom: 25px;">
+                                <span class="badge" style="background: var(--glass); padding: 4px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; opacity: 0.6;">ARCADE</span>
+                                <span class="badge" style="background: var(--glass); padding: 4px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; opacity: 0.6;">SINGLE PLAYER</span>
+                            </div>
+                            <p style="color: rgba(255,255,255,0.7); line-height: 1.8; font-size: 1rem;">
+                                Experience the classic snake game reimagined with high-fidelity neon aesthetics and advanced input buffering. Features multiple grid densities, obstacle modes, and high-score persistence.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="play-bar">
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="font-size: 0.7rem; font-weight: 800; color: #75b022; letter-spacing: 1px;">READY TO PLAY</span>
+                            <span style="font-size: 0.85rem; opacity: 0.5;">Last played: Today</span>
+                        </div>
+                        <button class="play-btn" onclick="launchSnake()">Play Now</button>
+                    </div>
+
+                    <h3 style="font-size: 0.8rem; letter-spacing: 1.5px; opacity: 0.4; margin-bottom: 20px;">LAUNCH CONFIGURATION</h3>
+                    <div class="config-grid">
+                        <div>
+                            <label class="setting-label">Game Speed</label>
+                            <select id="snake-speed" class="steam-select">
+                                <option value="150">Relaxed (150ms)</option>
+                                <option value="100" selected>Classic (100ms)</option>
+                                <option value="60">Hyper (60ms)</option>
+                                <option value="40">Insane (40ms)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="setting-label">Grid Density</label>
+                            <select id="snake-grid" class="steam-select">
+                                <option value="40">Tiny Grid (10x10)</option>
+                                <option value="20" selected>Standard (20x20)</option>
+                                <option value="10">Dense (40x40)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="setting-label">Obstacle Mode</label>
+                            <select id="snake-obstacles" class="steam-select" onchange="toggleObstCount(this.value)">
+                                <option value="none" selected>None</option>
+                                <option value="static">Static</option>
+                                <option value="dynamic">Dynamic</option>
+                            </select>
+                        </div>
+                        <div id="snake-obst-count-row" style="display: none;">
+                            <label class="setting-label">Obstacle Count</label>
+                            <div style="display: flex; align-items: center; gap: 20px;">
+                                <input type="range" id="snake-obst-count" min="1" max="20" value="5" oninput="document.getElementById('obst-count-val').textContent = this.value">
+                                <span id="obst-count-val" style="width: 30px; font-weight: 700;">5</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 14px; padding-top: 22px;">
+                            <input type="checkbox" id="snake-wallwrap" style="width: 18px; height: 18px; accent-color: #66c0f4;">
+                            <label for="snake-wallwrap" class="setting-label" style="margin-bottom: 0;">Wall Wrap</label>
+                        </div>
+                        <div style="grid-column: 1 / -1;">
+                            <label class="setting-label">Neon Intensity</label>
+                            <div style="display: flex; align-items: center; gap: 20px;">
+                                <input type="range" id="snake-neon" min="0" max="30" value="10" oninput="document.getElementById('neon-val').textContent = this.value">
+                                <span id="neon-val" style="width: 30px; font-weight: 700;">10</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="hub-calc" style="display: none;">
+                    <div class="game-hub-header">
+                        <img src="calculator_tool_poster_1778466276736.png" class="hub-poster">
+                        <div>
+                            <h1 style="font-size: 3rem; margin: 0 0 15px 0; letter-spacing: -2px;">Scientific Calc</h1>
+                            <p style="color: rgba(255,255,255,0.7); line-height: 1.8;">
+                                Professional mathematical suite with persistent history and unit conversion.
+                            </p>
+                            <button class="play-btn" onclick="window.open('./Calculator.html', '_blank')" style="margin-top: 30px;">Launch Utility</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -430,28 +533,33 @@
     </div>
 
     <script>
-        document.getElementById('snake-neon').addEventListener('input', (e) => {
-            document.getElementById('neon-val').textContent = e.target.value;
-        });
+        function showGameDetails(game) {
+            const library = document.getElementById('library-view');
+            const detail = document.getElementById('detail-view');
+            
+            library.style.display = 'none';
+            detail.style.display = 'block';
+            setTimeout(() => detail.style.opacity = '1', 10);
 
-        document.getElementById('snake-obst-count').addEventListener('input', (e) => {
-            document.getElementById('obst-count-val').textContent = e.target.value;
-        });
+            document.getElementById('hub-snake').style.display = (game === 'snake') ? 'block' : 'none';
+            document.getElementById('hub-calc').style.display = (game === 'calc') ? 'block' : 'none';
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function showLibrary() {
+            const library = document.getElementById('library-view');
+            const detail = document.getElementById('detail-view');
+            
+            detail.style.opacity = '0';
+            setTimeout(() => {
+                detail.style.display = 'none';
+                library.style.display = 'block';
+            }, 300);
+        }
 
         function toggleObstCount(mode) {
             document.getElementById('snake-obst-count-row').style.display = (mode === 'none') ? 'none' : 'block';
-        }
-
-        function showGameDetails(game) {
-            const overlay = document.getElementById('game-details-overlay');
-            const snake = document.getElementById('details-snake');
-            const calc = document.getElementById('details-calc');
-            
-            overlay.style.display = 'block';
-            snake.style.display = (game === 'snake') ? 'block' : 'none';
-            calc.style.display = (game === 'calc') ? 'block' : 'none';
-            
-            overlay.scrollIntoView({ behavior: 'smooth' });
         }
 
         function launchSnake() {
@@ -463,7 +571,7 @@
             const wallwrap  = document.getElementById('snake-wallwrap').checked ? '1' : '0';
             
             const url = `./snake-game.html?speed=${speed}&grid=${grid}&neon=${neon}&obstacles=${obstacles}&obstCount=${obstCount}&wallwrap=${wallwrap}&autostart=1`;
-            window.open(url, '_blank');
+            window.open(url, 'snake_game'); // Use named window to reuse tab
         }
     </script>
 </body>
