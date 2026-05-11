@@ -139,11 +139,12 @@
         ];
 
         const walls = [
-            { x1: 100, y1: 36, x2: 300, y2: 36, color: COLORS.rail, thick: 4 },
-            { x1: 20, y1: 120, x2: 100, y2: 36, color: COLORS.rail, thick: 4 },
-            { x1: 300, y1: 36, x2: 398, y2: 100, color: COLORS.rail, thick: 4 },
-            { x1: 20, y1: 570, x2: 20, y2: 120, color: COLORS.rail, thick: 4 },
-            { x1: 398, y1: 100, x2: 398, y2: 688, color: COLORS.rail, thick: 4 }
+            { x1: 100, y1: 36, x2: 300, y2: 36, color: COLORS.cyan, thick: 5 },
+            { x1: 20, y1: 120, x2: 100, y2: 36, color: COLORS.cyan, thick: 5 },
+            { x1: 300, y1: 36, x2: 398, y2: 100, color: COLORS.cyan, thick: 5 },
+            { x1: 20, y1: 570, x2: 20, y2: 120, color: COLORS.cyan, thick: 5 },
+            { x1: 398, y1: 100, x2: 398, y2: 688, color: COLORS.cyan, thick: 5 },
+            { x1: 0, y1: 688, x2: 400, y2: 688, color: COLORS.magenta, thick: 6 }
         ];
 
         function setupCanvas() {
