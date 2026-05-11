@@ -777,6 +777,7 @@
 
         let currentCategory = 'all';
         let currentUser = JSON.parse(localStorage.getItem('ss-user') || 'null');
+        let isNavigatingHistory = false;
 
         function toggleAuth() {
             if (currentUser) {
@@ -821,7 +822,7 @@
             }
         }
 
-        function setCategory(cat) {
+        function setCategory(cat, skipPush = false) {
             if (cat === 'store' && !currentUser) {
                 // Show locked store
             } else if (cat === 'store' && currentUser) {
@@ -830,27 +831,40 @@
             
             currentCategory = cat;
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            document.getElementById(`nav-${cat}`).classList.add('active');
+            const navEl = document.getElementById(`nav-${cat}`);
+            if (navEl) navEl.classList.add('active');
             
             // UI Tweaks for categories
             const hero = document.querySelector('.featured-hero');
             const library = document.getElementById('library-view');
             const store = document.getElementById('store-view');
+            const detail = document.getElementById('detail-view');
+            const runner = document.getElementById('app-runner');
             const title = document.getElementById('library-title');
             const clearBtn = document.getElementById('clear-recent');
             
-            hero.style.display = (cat === 'all') ? 'flex' : 'none';
-            library.style.display = (['all','utilities','recent'].includes(cat)) ? 'block' : 'none';
-            store.style.display = (cat === 'store') ? 'block' : 'none';
-            
+            // Reset visibility
+            library.style.display = 'none';
+            store.style.display = 'none';
+            detail.style.display = 'none';
+            runner.style.display = 'none';
+            document.body.style.overflow = 'auto';
+
             if (cat === 'store') {
+                store.style.display = 'block';
                 document.getElementById('store-locked-msg').style.display = currentUser ? 'none' : 'block';
                 document.getElementById('store-content').style.display = currentUser ? 'block' : 'none';
+            } else {
+                library.style.display = 'block';
+                hero.style.display = (cat === 'all') ? 'flex' : 'none';
+                if (title) title.textContent = cat.toUpperCase() + (cat === 'all' ? ' LIBRARY' : '');
+                if (clearBtn) clearBtn.style.display = (cat === 'recent') ? 'block' : 'none';
             }
             
-            if (title) title.textContent = cat.toUpperCase() + (cat === 'all' ? ' LIBRARY' : '');
-            if (clearBtn) clearBtn.style.display = (cat === 'recent') ? 'block' : 'none';
-            
+            if (!skipPush && !isNavigatingHistory) {
+                history.pushState({ type: 'category', cat: cat }, '');
+            }
+
             renderLibrary();
         }
 
@@ -950,10 +964,10 @@
 
         function launchCalc() {
             recordLaunch('calc');
-            openApp('./Calculator.html', 'Scientific Calc', 'calculator_tool_poster_1778466276736.png');
+            openApp('./Calculator.html', 'Scientific Calc', 'calculator_tool_poster_1778466276736.png', 'calc');
         }
 
-        function openApp(url, title, icon) {
+        function openApp(url, title, icon, appId, skipPush = false) {
             const runner = document.getElementById('app-runner');
             const frame = document.getElementById('app-frame');
             document.getElementById('runner-title').textContent = title;
@@ -962,19 +976,48 @@
             frame.src = url;
             runner.style.display = 'flex';
             document.body.style.overflow = 'hidden';
+
+            if (!skipPush && !isNavigatingHistory) {
+                history.pushState({ type: 'app', url, title, icon, appId }, '');
+            }
         }
 
-        function closeApp() {
+        function closeApp(skipPush = false) {
             const runner = document.getElementById('app-runner');
             const frame = document.getElementById('app-frame');
             runner.style.display = 'none';
             frame.src = '';
             document.body.style.overflow = 'auto';
-            renderLibrary(); // Refresh state
+
+            if (!skipPush && !isNavigatingHistory) {
+                // If closing app, we probably want to go back to detail view of that app
+                // But for now, just let history handle it if they press back
+                // If they click EXIT, we should probably go back one in history?
+                // Actually, if they click EXIT, we just go back to where they were.
+                history.back();
+            } else {
+                renderLibrary();
+            }
         }
+
+        window.onpopstate = function(event) {
+            isNavigatingHistory = true;
+            if (event.state) {
+                const s = event.state;
+                if (s.type === 'category') setCategory(s.cat, true);
+                else if (s.type === 'detail') showGameDetails(s.game, true);
+                else if (s.type === 'app') openApp(s.url, s.title, s.icon, s.appId, true);
+            } else {
+                // Default initial state
+                setCategory('all', true);
+            }
+            isNavigatingHistory = false;
+        };
 
         // Initialize
         updateAuthUI();
+        // Set initial state so back button works even on first load
+        history.replaceState({ type: 'category', cat: 'all' }, '');
         renderLibrary();
     </script>
 </body>
