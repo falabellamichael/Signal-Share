@@ -309,51 +309,59 @@
                 }
 
                 // Check collision / hoop crossing
-                if (ball.state === 'shooting' && ball.z <= 0.3) {
-                    ball.vz = 0; // stop going back
-                    // Evaluate shot
-                    let dx = ball.x - hoop.x;
-                    let dy = ball.y - hoop.y;
-                    let dist = Math.sqrt(dx * dx + dy * dy);
+                if (ball.state === 'shooting' && ball.z <= 0.5) {
+                    // MAGNETIC RIM: If close, pull it in (Suction effect)
+                    let pullStrength = physicsMode === 'arcade' ? 0.35 : 0.15;
+                    ball.vx += (hoop.x - ball.x) * pullStrength;
+                    ball.vy += (hoop.y - ball.y) * pullStrength;
 
-                    let swishRadius = physicsMode === 'arcade' ? hoop.radius * 1.6 : hoop.radius * 1.1;
+                    if (ball.z <= 0.35) {
+                        ball.vz = 0; // stop going back
+                        // Evaluate shot
+                        let dx = ball.x - hoop.x;
+                        let dy = ball.y - hoop.y;
+                        let dist = Math.sqrt(dx * dx + dy * dy);
 
-                    if (dist < swishRadius) {
-                        // SWISH
-                        let points = ball.isOnFire ? 3 : (1 + Math.floor(streak / 2));
-                        score += points;
-                        streak++;
-                        scoreEl.textContent = score;
-                        streakEl.textContent = streak;
-                        createParticles(hoop.x, hoop.y, ball.isOnFire ? '#ff4400' : '#00ff9d');
-                        ball.state = 'falling';
-                        ball.vx *= 0.5;
-                        ball.vy = 2; // slow drop down
-                        ball.isOnFire = false; // consume fire
+                        // MASSIVELY expanded hitboxes for easier scoring
+                        let swishRadius = physicsMode === 'arcade' ? hoop.radius * 2.5 : hoop.radius * 1.8;
 
-                        if (gameMode === 'playoff' && score >= targetScore) {
-                            nextLevel();
+                        if (dist < swishRadius) {
+                            // SWISH
+                            let points = ball.isOnFire ? 3 : (1 + Math.floor(streak / 2));
+                            score += points;
+                            streak++;
+                            scoreEl.textContent = score;
+                            streakEl.textContent = streak;
+                            createParticles(hoop.x, hoop.y, ball.isOnFire ? '#ff4400' : '#00ff9d');
+                            ball.state = 'falling';
+                            ball.vx *= 0.5;
+                            ball.vy = 2; // slow drop down
+                            ball.isOnFire = false; // consume fire
+
+                            if (gameMode === 'playoff' && score >= targetScore) {
+                                nextLevel();
+                            }
+                        } else if (Math.abs(ball.y - (hoop.y - hoop.boardHeight / 2)) < hoop.boardHeight && Math.abs(dx) < hoop.boardWidth / 2) {
+                            // Hit backboard
+                            ball.state = 'falling';
+                            ball.vy = -ball.vy * 0.5; // bounce slightly up
+                            ball.vx = -ball.vx * 0.8 + (Math.random() - 0.5) * 3;
+                            ball.z = 0.3; // lock depth to backboard
+                            streak = 0;
+                            streakEl.textContent = streak;
+                        } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 3.8 : hoop.radius * 2.8)) {
+                            // Hit rim
+                            ball.state = 'falling';
+                            ball.vy = -ball.vy * 0.6;
+                            ball.vx = (Math.random() - 0.5) * 10;
+                            streak = 0;
+                            streakEl.textContent = streak;
+                        } else {
+                            // Airball
+                            ball.state = 'falling';
+                            streak = 0;
+                            streakEl.textContent = streak;
                         }
-                    } else if (Math.abs(ball.y - (hoop.y - hoop.boardHeight / 2)) < hoop.boardHeight && Math.abs(dx) < hoop.boardWidth / 2) {
-                        // Hit backboard
-                        ball.state = 'falling';
-                        ball.vy = -ball.vy * 0.5; // bounce slightly up
-                        ball.vx = -ball.vx * 0.8 + (Math.random() - 0.5) * 3;
-                        ball.z = 0.3; // lock depth to backboard
-                        streak = 0;
-                        streakEl.textContent = streak;
-                    } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 2.5 : hoop.radius * 1.7)) {
-                        // Hit rim
-                        ball.state = 'falling';
-                        ball.vy = -ball.vy * 0.6;
-                        ball.vx = (Math.random() - 0.5) * 10;
-                        streak = 0;
-                        streakEl.textContent = streak;
-                    } else {
-                        // Airball
-                        ball.state = 'falling';
-                        streak = 0;
-                        streakEl.textContent = streak;
                     }
                 }
             }
@@ -558,16 +566,26 @@
                     let dragDuration = Math.max((Date.now() - dragStartTime) / 1000, 0.05); // min 50ms to avoid div/0
                     let dragSpeed = (dy / dragDuration) / 1000;
 
-                    // Power: 50/50 mix of distance and speed. Sweet spot around 220 units.
+                    // Power: Forgiving sweet spot with snap-to-perfect logic
                     let combinedPower = (dy * 0.5) + (dragSpeed * 80 * 0.5);
-                    let power = combinedPower / 220;
-                    let targetZ = 1.0 - (0.7 * power); // Reach exactly 0.3 (hoop depth) at power 1.0
+                    let power = combinedPower / 210; 
+                    
+                    // SWEET SPOT SNAP: If power is anywhere near 1.0, snap it to perfect depth
+                    if (power > 0.7 && power < 1.3) {
+                        power = 1.0;
+                    }
+                    
+                    let targetZ = 1.0 - (0.7 * power); 
+                    
+                    // Broad clamp to ensure ball stays within scoring bounds
+                    targetZ = Math.max(0.15, Math.min(0.45, targetZ)); 
 
                     // Realistic aiming: removing the assist and making it more sensitive
                     let targetX;
                     if (physicsMode === 'arcade') {
-                        let assistDx = Math.abs(dx) < 30 ? 0 : (dx > 0 ? dx - 30 : dx + 30);
-                        targetX = hoop.x - assistDx * 1.2;
+                        // Stronger Auto-Aim: dampen the horizontal deviation by 80%
+                        let assistDx = dx * 0.2; 
+                        targetX = hoop.x - assistDx;
                     } else {
                         targetX = hoop.x - dx * 2.5;
                     }
@@ -590,8 +608,8 @@
                     ball.vz = (targetZ - 1.0) / t; // Reaches targetZ at targetY
                     ball.vRot = dx * 0.05; // Increased spin sensitivity
 
-                    // CATCH FIRE if spin is high enough
-                    if (Math.abs(dx) > 150) {
+                    // CATCH FIRE if spin is moderate (easier to trigger)
+                    if (Math.abs(dx) > 100) {
                         ball.isOnFire = true;
                     }
                 }
