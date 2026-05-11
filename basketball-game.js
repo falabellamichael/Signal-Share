@@ -29,6 +29,10 @@ let dragStartX = 0;
 let dragStartY = 0;
 let dragStartTime = 0;
 
+// Re-implementing the "300px Sweet-Spot" and "Z-Axis Bounce" logic
+const GRAVITY = 0.8;
+const HOOP_Z = 0.35;
+
 const hoop = {
     x: 0, y: 0,
     radius: 45,
@@ -86,17 +90,13 @@ function createParticles(x, y, color) {
     }
 }
 
-function scoreShot(isPerfectShot, isBankShot = false) {
+function scoreShot(isPerfectShot) {
     let points = isPerfectShot ? 10 : (ball.isOnFire ? 3 : (1 + Math.floor(streak / 2)));
     
     if (isPerfectShot) {
         showMessage("PERFECT!", hoop.x, hoop.y - 40, "#ff00ff");
         createParticles(hoop.x, hoop.y, "#ff00ff");
         streak += 2;
-    } else if (isBankShot) {
-        showMessage("BANK SHOT!", hoop.x, hoop.y - 40, "#00d2ff");
-        createParticles(hoop.x, hoop.y, "#00d2ff");
-        streak++;
     } else {
         streak++;
         createParticles(hoop.x, hoop.y, ball.isOnFire ? '#ff4400' : '#00ff9d');
@@ -115,8 +115,10 @@ function scoreShot(isPerfectShot, isBankShot = false) {
 }
 
 function resetStreak() {
-    if (ball.state === 'shooting') streak = 0;
-    streakEl.textContent = streak;
+    if (ball.state === 'shooting') {
+        streak = 0;
+        streakEl.textContent = streak;
+    }
 }
 
 function update() {
@@ -126,79 +128,60 @@ function update() {
         ball.x += ball.vx;
         ball.y += ball.vy;
         ball.z += ball.vz;
-        ball.vy += 1.0; // gravity (slower for more natural arc)
+        ball.vy += GRAVITY;
         ball.rotation += ball.vRot;
 
         if (ball.isOnFire && Math.random() > 0.3) {
             particles.push({
-                x: ball.x + (Math.random() - 0.5) * ball.radiusBase * 0.5,
-                y: ball.y + (Math.random() - 0.5) * ball.radiusBase * 0.5,
+                x: ball.x + (Math.random() - 0.5) * ball.radiusBase * ball.z * 0.5,
+                y: ball.y + (Math.random() - 0.5) * ball.radiusBase * ball.z * 0.5,
                 vx: (Math.random() - 0.5) * 5, vy: -Math.random() * 5 - 2,
                 life: 0.8, color: Math.random() > 0.5 ? '#ff4400' : '#ffaa00'
             });
         }
 
-        if (ball.y > height + ball.radiusBase * 2 && ball.vy > 0) {
+        if (ball.y > height + 200) {
             resetStreak();
             resetBall();
         }
 
-        // Magnetic Hoop Effect
-        if (ball.state === 'shooting' && ball.z <= 0.4 && ball.z >= 0.25) {
-            let dx = ball.x - hoop.x;
-            let pullStrength = (physicsMode === 'arcade' ? 0.1 : 0.03);
-            ball.vx -= dx * pullStrength;
-        }
-
-        // Depth Collision Logic
-        if (ball.state === 'shooting' && ball.z <= 0.35) {
-            ball.vz = 0;
-            
+        // Z-Axis Depth Collision (The "300px sweet-spot" companion logic)
+        if (ball.state === 'shooting' && ball.z <= HOOP_Z) {
             let dx = ball.x - hoop.x;
             let dy = ball.y - hoop.y;
             let dist = Math.sqrt(dx * dx + dy * dy);
             
-            // Hoop & Board Metrics
-            let boardTop = hoop.y - hoop.boardHeight;
-            let boardBottom = hoop.y;
-            let boardLeft = hoop.x - hoop.boardWidth / 2;
-            let boardRight = hoop.x + hoop.boardWidth / 2;
+            // Tuned swish/rim thresholds
+            let swishRadius = physicsMode === 'arcade' ? hoop.radius * 1.5 : hoop.radius * 0.8;
+            let rimRadius = hoop.radius * 2.0;
 
-            let isSwish = dist < hoop.radius * 1.2; // tighter swish window
-            let hitRim = dist >= hoop.radius * 1.2 && dist < hoop.radius * 2.5;
-            let hitBackboard = ball.x > boardLeft && ball.x < boardRight && ball.y > boardTop && ball.y < boardBottom;
-
-            if (ball.isPerfect || isSwish) {
-                scoreShot(ball.isPerfect);
-            } else if (hitRim) {
-                if (physicsMode === 'arcade' && Math.random() > 0.5) {
-                    // Forgiving Rim Bounce (Rolls in)
-                    scoreShot(false);
-                } else {
-                    // Bounce Out
-                    ball.state = 'falling';
-                    ball.vy = -ball.vy * 0.4;
-                    ball.vx = (Math.random() - 0.5) * 8;
-                    ball.vz = 0.05;
-                    resetStreak();
-                }
-            } else if (hitBackboard) {
-                if (physicsMode === 'arcade' && Math.abs(dx) < hoop.radius * 1.5 && dy < 0) {
-                    // Bank Shot
-                    scoreShot(false, true);
-                } else {
-                    // Brick
-                    ball.state = 'falling';
-                    ball.vy = -ball.vy * 0.5;
-                    ball.vx = -ball.vx * 0.6 + (Math.random() - 0.5) * 3;
-                    ball.vz = 0.05;
-                    ball.z = 0.36; 
-                    resetStreak();
-                }
-            } else {
-                // Airball
+            if (dist < swishRadius) {
+                scoreShot(ball.isPerfect || dist < 10);
+            } else if (dist < rimRadius) {
+                // Bounce Logic
                 ball.state = 'falling';
+                ball.vz = 0.05; // Bounce back
+                ball.vy = -ball.vy * 0.4;
+                ball.vx = dx * 0.1 + (Math.random() - 0.5) * 4;
                 resetStreak();
+            } else {
+                // Backboard Check
+                let boardLeft = hoop.x - hoop.boardWidth / 2;
+                let boardRight = hoop.x + hoop.boardWidth / 2;
+                let boardTop = hoop.y - hoop.boardHeight;
+                let boardBottom = hoop.y;
+
+                if (ball.x > boardLeft && ball.x < boardRight && ball.y > boardTop && ball.y < boardBottom) {
+                    ball.state = 'falling';
+                    ball.vz = 0.08; 
+                    ball.vx = -ball.vx * 0.5;
+                    ball.vy *= 0.5;
+                    resetStreak();
+                } else {
+                    // Passed the depth without hitting anything
+                    ball.state = 'falling';
+                    resetStreak();
+                }
             }
         }
     }
@@ -219,7 +202,6 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, width, height);
     
-    // Draw Background Grid
     ctx.strokeStyle = 'rgba(0, 210, 255, 0.05)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -231,7 +213,7 @@ function draw() {
     }
     ctx.stroke();
 
-    // Draw Backboard
+    // Backboard
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     ctx.strokeStyle = '#00d2ff';
     ctx.lineWidth = 3;
@@ -241,37 +223,33 @@ function draw() {
     ctx.strokeRect(hoop.x - 30, hoop.y - 45, 60, 45);
     ctx.shadowBlur = 0;
 
-    let currentRadius = Math.max(ball.radiusBase * 0.3, ball.radiusBase * (0.3 + 0.7 * ball.z));
-    if (ball.z < 0.35) {
-        drawBall(currentRadius); drawHoopRimBack();
-    } else {
-        drawHoopRimBack(); drawBall(currentRadius);
-    }
-    drawHoopRimFront();
+    let ballScale = Math.max(0.2, ball.z);
+    let currentRadius = ball.radiusBase * ballScale;
 
-    // Draw Particles
+    if (ball.z < HOOP_Z) {
+        drawBall(currentRadius); drawHoopRimBack(); drawHoopRimFront();
+    } else {
+        drawHoopRimBack(); drawBall(currentRadius); drawHoopRimFront();
+    }
+
     particles.forEach(p => {
         ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
         ctx.beginPath(); ctx.arc(p.x, p.y, 4 * p.life, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
     });
 
-    // Draw Messages
     messages.forEach(m => {
         ctx.fillStyle = m.color;
         ctx.globalAlpha = m.life;
         ctx.font = `bold ${24 + (1 - m.life) * 20}px Inter`;
         ctx.textAlign = 'center';
-        ctx.shadowColor = m.color;
-        ctx.shadowBlur = 15;
+        ctx.shadowColor = m.color; ctx.shadowBlur = 15;
         ctx.fillText(m.text, m.x, m.y);
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
     });
 
-    // Draw Aim Line
     if (isDragging && ball.state === 'idle') {
-        ctx.strokeStyle = 'rgba(255, 119, 0, 0.5)';
+        ctx.strokeStyle = 'rgba(255, 119, 0, 0.4)';
         ctx.lineWidth = 4; ctx.setLineDash([10, 10]);
         ctx.beginPath(); ctx.moveTo(ball.x, ball.y);
         let dx = dragStartX - mouseX; let dy = dragStartY - mouseY;
@@ -290,25 +268,12 @@ function drawHoopRimFront() {
     ctx.shadowColor = '#ff3e3e'; ctx.shadowBlur = 15;
     ctx.beginPath(); ctx.ellipse(hoop.x, hoop.y, hoop.radius, hoop.radius / 2.5, 0, 0, Math.PI); ctx.stroke();
     ctx.shadowBlur = 0;
-    
-    // Draw Net
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); 
-    ctx.moveTo(hoop.x - hoop.radius, hoop.y);
-    ctx.lineTo(hoop.x - hoop.radius / 2, hoop.y + 45); 
-    ctx.lineTo(hoop.x + hoop.radius / 2, hoop.y + 45);
-    ctx.lineTo(hoop.x + hoop.radius, hoop.y);
-    for (let i = -hoop.radius; i <= hoop.radius; i += 15) {
-        ctx.moveTo(hoop.x + i, hoop.y); ctx.lineTo(hoop.x + i * 0.5, hoop.y + 45);
-    }
-    ctx.stroke();
 }
 
 function drawBall(radius) {
     ctx.save(); ctx.translate(ball.x, ball.y); ctx.rotate(ball.rotation);
     ctx.shadowColor = ball.isOnFire ? '#ff4400' : '#ff7700';
     ctx.shadowBlur = (ball.isOnFire ? 40 : 20) * ball.z;
-    
     let grad = ctx.createRadialGradient(-radius / 3, -radius / 3, radius / 10, 0, 0, radius);
     if (ball.isOnFire) {
         grad.addColorStop(0, '#fff'); grad.addColorStop(0.5, '#ffcc00'); grad.addColorStop(1, '#ff4400');
@@ -317,14 +282,10 @@ function drawBall(radius) {
     }
     ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0; 
-    
-    // Ball Lines
     ctx.strokeStyle = '#331100'; ctx.lineWidth = Math.max(1, 4 * ball.z);
     ctx.beginPath(); 
     ctx.moveTo(0, -radius); ctx.lineTo(0, radius); 
     ctx.moveTo(-radius, 0); ctx.lineTo(radius, 0);
-    ctx.moveTo(-radius, 0); ctx.quadraticCurveTo(-radius / 2, -radius / 2, 0, -radius);
-    ctx.moveTo(radius, 0); ctx.quadraticCurveTo(radius / 2, radius / 2, 0, radius);
     ctx.stroke(); ctx.restore();
 }
 
@@ -342,70 +303,35 @@ function handleMove(x, y) { if (isDragging) { mouseX = x; mouseY = y; } }
 function handleEnd() {
     if (isDragging && ball.state === 'idle') {
         isDragging = false;
-        let dx = dragStartX - mouseX; // positive means swipe left
-        let dy = dragStartY - mouseY; // positive means swipe up
+        let dx = dragStartX - mouseX;
+        let dy = dragStartY - mouseY;
         
-        if (dy > 20) {
+        if (dy > 40) {
             ball.state = 'shooting';
-            let dragDuration = Math.max((Date.now() - dragStartTime) / 1000, 0.02);
             
-            // Physics Mechanics: 
-            // - Swipe Distance (dy) controls base power
-            // - Swipe Speed (dy/duration) scales the power 
-            let swipeSpeed = dy / dragDuration;
-            
-            // Normalize relative to screen height
-            let screenFactor = dy / (height * 0.4); 
-            let speedFactor = Math.min(Math.max(swipeSpeed / 1000, 0.5), 2.5);
-            
-            // Combined Power
-            let power = screenFactor * speedFactor * 1.5;
-            
-            // "Perfect" shot window
-            let isPerfectRelease = Math.abs(power - 1.0) < 0.12 && Math.abs(dx) < 30;
+            // THE 300PX SWEET-SPOT Logic
+            let power = dy / 300;
+            let t = 1.6; // Human flight time
+            let targetX = hoop.x - (dx * 1.3);
+            let targetZ = 1.0 - (0.65 * power);
 
-            if (isPerfectRelease) {
-                power = 1.0;
+            // Assist
+            if (Math.abs(power - 1.0) < 0.15 && Math.abs(dx) < 40) {
+                targetZ = HOOP_Z;
+                targetX = hoop.x;
                 ball.isPerfect = true;
                 ball.isOnFire = true;
-            } else if (power > 0.88 && power < 1.12) {
-                // Soft assist for close shots
-                power = (power + 1.0) / 2;
             }
 
-            // Map power to Target Z depth
-            let targetZ = 1.0 - (0.65 * power);
-            targetZ = Math.max(0.05, Math.min(0.95, targetZ));
-
-            // Map horizontal direction
-            let targetX = hoop.x - (dx * 1.8);
-            if (physicsMode === 'arcade') {
-                // Aim assist
-                let correction = ball.isPerfect ? 1.0 : 0.4;
-                targetX += (hoop.x - targetX) * correction;
-            }
-
-            // Flight Time depends on the visual arc we want. Slower for more human feel.
-            let t = 1.4 + dragDuration * 0.5;
-            t = Math.max(1.2, Math.min(2.2, t));
-
-            let gravity = 1.0; // matching update gravity
-            let targetY = hoop.y;
-
-            // Apply Projectile Motion
+            // Projectile Equations
             ball.vx = (targetX - ball.x) / t;
-            ball.vy = (targetY - ball.y - 0.5 * gravity * t * t) / t;
             ball.vz = (targetZ - 1.0) / t;
+            ball.vy = (hoop.y - ball.y - 0.5 * GRAVITY * t * t) / t;
             ball.vRot = dx * 0.05;
-
-            if (!ball.isPerfect && Math.abs(dx) > 100) {
-                ball.isOnFire = true; // Fun visual for crazy wide shots
-            }
         }
     }
 }
 
-// Event Listeners
 window.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
 window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
 window.addEventListener('mouseup', handleEnd);
@@ -413,12 +339,10 @@ window.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e
 window.addEventListener('touchmove', (e) => { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
 window.addEventListener('touchend', handleEnd);
 
-// Game State Management
 function startGame(mode) {
     gameMode = mode; overlay.style.opacity = '0';
     score = 0; streak = 0; level = 1;
     scoreEl.textContent = '0'; streakEl.textContent = '0';
-    
     if (mode === 'timer') {
         timeLeft = 60; timerBox.style.display = 'block'; levelBox.style.display = 'none'; startCountdown();
     } else if (mode === 'playoff') {
@@ -460,10 +384,7 @@ function gameOver() {
     overlay.style.display = 'flex'; setTimeout(() => overlay.style.opacity = '1', 10);
 }
 
-// Initialize
-resize(); 
-loop();
-
+resize(); loop();
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     const mode = params.get('mode'), physics = params.get('physics');
