@@ -405,15 +405,6 @@
             to { transform: translateY(0); opacity: 1; }
         }
 
-        .setting-label {
-            display: block;
-            font-size: 0.65rem;
-            color: rgba(255,255,255,0.4);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            font-weight: 800;
-        }
 
         .steam-select {
             width: 100%;
@@ -467,11 +458,40 @@
         .form-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 25px;
+            gap: 40px 30px;
+        }
+
+        .setting-label {
+            display: block;
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.3);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 900;
         }
 
         .form-row-full {
             grid-column: 1 / -1;
+        }
+
+        .form-input {
+            width: 100%;
+            background: rgba(35, 60, 81, 0.5);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            background: rgba(35, 60, 81, 0.8);
+            border-color: var(--steam-light);
+            box-shadow: 0 0 15px rgba(102, 192, 244, 0.1);
         }
 
         .upload-dropzone {
@@ -836,16 +856,16 @@
 
                     <!-- Game Details Form -->
                     <div class="form-section">
-                        <h3 style="margin: 0 0 30px; font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; opacity: 0.4; font-weight: 900;">GAME METADATA</h3>
+                        <h3 style="margin: 0 0 40px; font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; opacity: 0.4; font-weight: 900;">GAME METADATA</h3>
                         
                         <div class="form-grid">
                             <div>
                                 <label class="setting-label">Display Title</label>
-                                <input type="text" id="game-title" placeholder="e.g. Neon Pinball v2" style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 14px; border-radius: 6px; font-size: 0.9rem; outline: none;">
+                                <input type="text" id="game-title" placeholder="e.g. Neon Pinball v2" class="form-input">
                             </div>
                             <div>
                                 <label class="setting-label">Primary Category</label>
-                                <select id="game-category" class="steam-select">
+                                <select id="game-category" class="steam-select form-input" style="appearance: none;">
                                     <option value="GAME">Game</option>
                                     <option value="UTILITY">Utility</option>
                                     <option value="TOOL">Tool</option>
@@ -855,16 +875,16 @@
                             
                             <div class="form-row-full">
                                 <label class="setting-label">Short Description</label>
-                                <textarea id="game-description" placeholder="A brief overview of your game and its mechanics..." style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 14px; border-radius: 6px; font-size: 0.9rem; outline: none; resize: vertical; min-height: 100px; font-family: inherit;"></textarea>
+                                <textarea id="game-description" placeholder="A brief overview of your game and its mechanics..." class="form-input" style="min-height: 120px; resize: vertical;"></textarea>
                             </div>
 
                             <div>
                                 <label class="setting-label">Poster URL (1000x1500)</label>
-                                <input type="text" id="game-thumbnail" placeholder="https://source.unsplash.com/random/..." style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 14px; border-radius: 6px; font-size: 0.9rem; outline: none;">
+                                <input type="text" id="game-thumbnail" placeholder="https://source.unsplash.com/random/..." class="form-input">
                             </div>
                             <div>
                                 <label class="setting-label">Discovery Tags</label>
-                                <input type="text" id="game-tags" placeholder="arcade, physics, retro" style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 14px; border-radius: 6px; font-size: 0.9rem; outline: none;">
+                                <input type="text" id="game-tags" placeholder="arcade, physics, retro" class="form-input">
                             </div>
                         </div>
 
