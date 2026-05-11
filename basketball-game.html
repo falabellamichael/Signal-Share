@@ -182,6 +182,7 @@
         let isDragging = false;
         let dragStartX = 0;
         let dragStartY = 0;
+        let dragStartTime = 0;
 
         function resize() {
             width = window.innerWidth;
@@ -271,7 +272,7 @@
                     let dy = ball.y - hoop.y;
                     let dist = Math.sqrt(dx*dx + dy*dy);
                     
-                    let swishRadius = physicsMode === 'arcade' ? hoop.radius * 1.4 : hoop.radius * 0.9;
+                    let swishRadius = physicsMode === 'arcade' ? hoop.radius * 1.5 : hoop.radius * 1.0;
                     
                     if (dist < swishRadius) {
                         // SWISH
@@ -295,7 +296,7 @@
                         ball.z = 0.3; // lock depth to backboard
                         streak = 0;
                         streakEl.textContent = streak;
-                    } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 2.2 : hoop.radius * 1.3)) {
+                    } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 2.3 : hoop.radius * 1.5)) {
                         // Hit rim
                         ball.state = 'falling';
                         ball.vy = -ball.vy * 0.6;
@@ -472,6 +473,7 @@
                 isDragging = true;
                 dragStartX = x;
                 dragStartY = y;
+                dragStartTime = Date.now();
                 mouseX = x;
                 mouseY = y;
             }
@@ -494,10 +496,16 @@
                 if (dy > 20) {
                     ball.state = 'shooting';
                     
-                    // Power/Depth mechanic: dy now controls how "far" the ball goes (targetZ)
-                    // Sweet spot is around 220px drag
-                    let power = dy / 220;
-                    let targetZ = 1.0 - (0.7 * power);
+                    // Incorporate swipe speed into power calculation
+                    let dragDuration = (Date.now() - dragStartTime) / 1000; // in seconds
+                    let dragSpeed = (dy / dragDuration) / 1000; // relative speed factor
+                    
+                    // Combine distance and speed for power (weighted towards speed for "flick" feel)
+                    let combinedPower = (dy * 0.4) + (dragSpeed * 100 * 0.6);
+                    
+                    // Calibrate power: Sweet spot is now around 240 units
+                    let power = combinedPower / 240;
+                    let targetZ = 1.0 - (0.75 * power); // Slightly more range
                     
                     // Realistic aiming: removing the assist and making it more sensitive
                     let targetX;
