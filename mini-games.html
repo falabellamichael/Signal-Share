@@ -30,7 +30,9 @@
         .steam-shell {
             display: grid;
             grid-template-columns: 240px 1fr;
-            min-height: 100vh;
+            grid-template-rows: var(--header-height) 1fr;
+            height: 100vh;
+            overflow: hidden;
         }
 
         @media (max-width: 768px) {
@@ -86,9 +88,7 @@
             display: flex;
             flex-direction: column;
             gap: 30px;
-            position: sticky;
-            top: var(--header-height);
-            height: calc(100vh - var(--header-height));
+            height: 100%;
             overflow-y: auto;
             scrollbar-width: thin;
             scrollbar-color: rgba(255,255,255,0.1) transparent;
@@ -137,7 +137,11 @@
             max-width: 1200px;
             margin: 0 auto;
             width: 100%;
+            height: 100%;
+            overflow-y: auto;
             transition: opacity 0.3s;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.1) transparent;
         }
 
         /* Hero Section */
@@ -861,9 +865,14 @@
                     <div class="upload-dropzone" onclick="document.getElementById('game-file-input').click()">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                         <h3 style="margin: 0 0 10px; font-size: 1.4rem; font-weight: 800; color: #fff;">Upload Game Source</h3>
-                        <p style="opacity: 0.5; margin-bottom: 20px; font-size: 0.95rem;">Drag & drop your .html or .js file here to begin</p>
-                        <input type="file" id="game-file-input" accept=".html,.js" style="display: none;">
-                        <button class="play-btn" style="font-size: 0.9rem; padding: 12px 24px;">SELECT FILE</button>
+                        <p style="opacity: 0.5; margin-bottom: 20px; font-size: 0.95rem;">Drag & drop your .html, .js, or .css files here</p>
+                        <input type="file" id="game-file-input" accept=".html,.js,.css" multiple style="display: none;">
+                        <button class="play-btn" style="font-size: 0.9rem; padding: 12px 24px;">SELECT FILES</button>
+                    </div>
+
+                    <div id="file-list-preview" style="display: none; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 40px;">
+                        <div style="font-size: 0.65rem; color: rgba(255,255,255,0.3); margin-bottom: 15px; font-weight: 900; letter-spacing: 1px;">SELECTED ASSETS</div>
+                        <div id="file-items-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
                     </div>
 
                     <!-- Game Details Form -->
@@ -921,9 +930,6 @@
                             <p style="opacity: 0.2; margin-top: 10px; font-size: 0.8rem;">Upload a game source above to get started.</p>
                         </div>
                     </div>
-                </div>
-            </div>
-
             <!-- Leaderboard View -->
             <div id="leaderboard-view" style="display: none;">
                 <div id="leader-locked-msg" class="store-locked">
@@ -947,6 +953,25 @@
                     <div id="leader-grid" style="display: flex; flex-direction: column; gap: 15px;">
                         <!-- Dynamically populated -->
                     </div>
+                </div>
+            </div>
+
+            <div class="questions-guide-footer" style="margin-top: 80px; background: var(--steam-dark); border-top: 1px solid var(--border); padding: 60px 40px; width: calc(100% + 80px); margin-left: -40px; margin-bottom: -40px;">
+                <div style="display: flex; justify-content: center; gap: 40px; margin-bottom: 30px;">
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <span style="font-size: 0.65rem; font-weight: 900; color: var(--steam-light); letter-spacing: 1px;">NAVIGATION</span>
+                        <a href="./index.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Main Hub</a>
+                        <a href="./how-to-guide.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Documentation</a>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <span style="font-size: 0.65rem; font-weight: 900; color: var(--steam-light); letter-spacing: 1px;">DEVELOPER</span>
+                        <a href="./hero-player-deepdive.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Media Bridge</a>
+                        <a href="./llm-deepdive-2.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Inference Logs</a>
+                    </div>
+                </div>
+                <div style="text-align: center; opacity: 0.3; font-size: 0.7rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 30px;">
+                    <span>Signal Share Engineering Documentation Suite</span><br>
+                    <span>&copy; 2026 Deep Dive Series • Local Instance Only</span>
                 </div>
             </div>
         </main>
@@ -985,24 +1010,7 @@
             <iframe id="app-frame" class="runner-frame" src=""></iframe>
         </div>
 
-        <div class="questions-guide-footer" style="margin-top: auto; background: var(--steam-dark); border-top: 1px solid var(--border); padding: 60px 40px; grid-column: 1 / -1;">
-            <div style="display: flex; justify-content: center; gap: 40px; margin-bottom: 30px;">
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <span style="font-size: 0.65rem; font-weight: 900; color: var(--steam-light); letter-spacing: 1px;">NAVIGATION</span>
-                    <a href="./index.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Main Hub</a>
-                    <a href="./how-to-guide.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Documentation</a>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <span style="font-size: 0.65rem; font-weight: 900; color: var(--steam-light); letter-spacing: 1px;">DEVELOPER</span>
-                    <a href="./hero-player-deepdive.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Media Bridge</a>
-                    <a href="./llm-deepdive-2.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Inference Logs</a>
-                </div>
-            </div>
-            <div style="text-align: center; opacity: 0.3; font-size: 0.7rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 30px;">
-                <span>Signal Share Engineering Documentation Suite</span><br>
-                <span>&copy; 2026 Deep Dive Series • Local Instance Only</span>
-            </div>
-        </div>
+
     </div>
 
     <script>
@@ -1017,7 +1025,7 @@
         let currentUser = JSON.parse(localStorage.getItem('ss-user') || 'null');
         let isNavigatingHistory = false;
         let customGames = JSON.parse(localStorage.getItem('ss-custom-games') || '[]');
-        let currentUploadedFile = null;
+        let uploadedFiles = [];
 
         // Load custom games on startup
         function loadCustomGames() {
@@ -1036,23 +1044,67 @@
             if (fileInput) {
                 fileInput.addEventListener('change', function(e) {
                     if (this.files.length > 0) {
-                        currentUploadedFile = this.files[0];
-                        // Update UI to show file is selected
-                        const filename = currentUploadedFile.name;
-                        console.log('File selected:', filename);
+                        Array.from(this.files).forEach(file => {
+                            if (!uploadedFiles.find(f => f.name === file.name)) {
+                                uploadedFiles.push(file);
+                            }
+                        });
+                        updateFilePreview();
                     }
                 });
             }
         });
 
-        function publishCustomGame() {
+        function updateFilePreview() {
+            const container = document.getElementById('file-items-container');
+            const preview = document.getElementById('file-list-preview');
+            if (!container || !preview) return;
+
+            if (uploadedFiles.length === 0) {
+                preview.style.display = 'none';
+                return;
+            }
+
+            preview.style.display = 'block';
+            container.innerHTML = '';
+
+            uploadedFiles.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); padding: 10px 15px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);';
+                
+                const type = file.name.split('.').pop().toUpperCase();
+                const typeColor = type === 'HTML' ? '#ff4b2b' : type === 'JS' ? '#f1e05a' : '#563d7c';
+
+                item.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="font-size: 0.6rem; font-weight: 900; background: ${typeColor}; color: #000; padding: 2px 6px; border-radius: 3px;">${type}</div>
+                        <span style="font-size: 0.85rem; color: #fff; font-weight: 500;">${file.name}</span>
+                        <span style="font-size: 0.7rem; opacity: 0.3;">(${(file.size / 1024).toFixed(1)} KB)</span>
+                    </div>
+                    <button onclick="removeUploadedFile(${index})" style="background: none; border: none; color: rgba(255,255,255,0.2); cursor: pointer; padding: 5px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function removeUploadedFile(index) {
+            uploadedFiles.splice(index, 1);
+            updateFilePreview();
+            if (uploadedFiles.length === 0) {
+                document.getElementById('game-file-input').value = '';
+            }
+        }
+
+        async function publishCustomGame() {
             if (!currentUser) {
                 alert('Please sign in to publish games');
                 return;
             }
 
-            if (!currentUploadedFile) {
-                alert('Please select a game file (HTML or JS)');
+            if (uploadedFiles.length === 0) {
+                alert('Please select at least one game file');
                 return;
             }
 
@@ -1062,11 +1114,28 @@
             const thumbnail = document.getElementById('game-thumbnail').value || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22%3E%3Crect fill=%22%23233c51%22 width=%22200%22 height=%22300%22/%3E%3C/svg%3E';
             const tags = document.getElementById('game-tags').value || '';
 
-            // Read file and convert to data URL
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const fileContent = e.target.result;
+            // Read all files
+            try {
+                const filePromises = uploadedFiles.map(file => {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve({
+                            name: file.name,
+                            content: e.target.result,
+                            type: file.type
+                        });
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                });
+
+                const processedFiles = await Promise.all(filePromises);
                 const gameId = 'custom_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+
+                // Find entry point
+                let entryFile = processedFiles.find(f => f.name.toLowerCase() === 'index.html') || 
+                                processedFiles.find(f => f.name.endsWith('.html')) ||
+                                processedFiles[0];
 
                 const newGame = {
                     id: gameId,
@@ -1078,9 +1147,8 @@
                     description: description,
                     tags: tags,
                     author: currentUser.name,
-                    fileContent: fileContent,
-                    fileName: currentUploadedFile.name,
-                    fileType: currentUploadedFile.type,
+                    files: processedFiles,
+                    entryFile: entryFile.name,
                     publishedAt: new Date().toISOString()
                 };
 
@@ -1098,13 +1166,16 @@
                 document.getElementById('game-thumbnail').value = '';
                 document.getElementById('game-tags').value = '';
                 document.getElementById('game-file-input').value = '';
-                currentUploadedFile = null;
+                uploadedFiles = [];
+                updateFilePreview();
 
                 // Refresh published games list
                 renderPublishedGames();
-                alert('Game published successfully!');
-            };
-            reader.readAsDataURL(currentUploadedFile);
+                alert('Game published successfully with ' + processedFiles.length + ' assets!');
+            } catch (err) {
+                console.error('Publish error:', err);
+                alert('Failed to process files. Please try again.');
+            }
         }
 
         function renderPublishedGames() {
@@ -1147,21 +1218,70 @@
 
         function launchCustomGame(gameId) {
             const game = GAMES.find(g => g.id === gameId);
-            if (!game || !game.fileContent) {
-                alert('Game file not found');
+            if (!game) {
+                alert('Game not found');
                 return;
             }
 
             recordLaunch(gameId);
 
-            if (game.fileName.endsWith('.html') || game.fileType === 'text/html') {
-                openApp(game.fileContent, game.title, game.poster, gameId);
-            } else {
-                // For JS files, wrap in HTML safely using string concatenation to avoid parser confusion
-                const jsContent = game.fileContent.split('base64,')[1] ? atob(game.fileContent.split('base64,')[1]) : game.fileContent;
-                const htmlWrapper = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>' + game.title + '</title><style>* { margin: 0; padding: 0; box-sizing: border-box; } body { background: #0a0e27; color: #fff; font-family: system-ui, sans-serif; }</style></head><body><div id="app-container"></div><scr' + 'ipt>' + jsContent + '</scr' + 'ipt></body></html>';
+            // Legacy single-file support
+            if (game.fileContent) {
+                if (game.fileName.endsWith('.html')) {
+                    openApp(game.fileContent, game.title, game.poster, gameId);
+                } else {
+                    const jsContent = game.fileContent.split('base64,')[1] ? atob(game.fileContent.split('base64,')[1]) : game.fileContent;
+                    const htmlWrapper = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>' + game.title + '</title><style>* { margin: 0; padding: 0; box-sizing: border-box; } body { background: #0a0e27; color: #fff; font-family: system-ui, sans-serif; }</style></head><body><div id="app-container"></div><scr' + 'ipt>' + jsContent + '</scr' + 'ipt></body></html>';
+                    openApp(htmlWrapper, game.title, game.poster, gameId);
+                }
+                return;
+            }
+
+            // Multi-file support
+            if (game.files && game.files.length > 0) {
+                const entry = game.files.find(f => f.name === game.entryFile) || game.files[0];
                 
-                openApp(htmlWrapper, game.title, game.poster, gameId);
+                if (entry.name.endsWith('.html')) {
+                    let content = entry.content.split('base64,')[1] ? atob(entry.content.split('base64,')[1]) : entry.content;
+                    
+                    // Asset resolution for JS, CSS, and Images
+                    game.files.forEach(f => {
+                        if (f.name === entry.name) return;
+                        
+                        // Escape filename for regex
+                        const escapedName = f.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+                        // Replace <script src="filename.js">
+                        if (f.name.endsWith('.js')) {
+                            const js = f.content.split('base64,')[1] ? atob(f.content.split('base64,')[1]) : f.content;
+                            const scriptRegex = new RegExp('<script[^>]*src=["\']' + escapedName + '["\'][^>]*></script>', 'gi');
+                            content = content.replace(scriptRegex, '<script>' + js + '</script>');
+                        }
+                        
+                        // Replace <link href="filename.css">
+                        else if (f.name.endsWith('.css')) {
+                            const css = f.content.split('base64,')[1] ? atob(f.content.split('base64,')[1]) : f.content;
+                            const styleRegex = new RegExp('<link[^>]*href=["\']' + escapedName + '["\'][^>]*>', 'gi');
+                            content = content.replace(styleRegex, '<style>' + css + '</style>');
+                        }
+
+                        // Replace image sources: <img src="filename.png"> or background-image: url('filename.png')
+                        else {
+                            const srcRegex = new RegExp('(["\'])' + escapedName + '(["\'])', 'g');
+                            content = content.replace(srcRegex, '$1' + f.content + '$2');
+                            
+                            const urlRegex = new RegExp('url\\(["\']?' + escapedName + '["\']?\\)', 'g');
+                            content = content.replace(urlRegex, 'url(' + f.content + ')');
+                        }
+                    });
+                    
+                    openApp(content, game.title, game.poster, gameId);
+                } else {
+                    // Fallback for non-HTML entry points
+                    const js = entry.content.split('base64,')[1] ? atob(entry.content.split('base64,')[1]) : entry.content;
+                    const htmlWrapper = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + game.title + '</title></head><body><scr' + 'ipt>' + js + '</scr' + 'ipt></body></html>';
+                    openApp(htmlWrapper, game.title, game.poster, gameId);
+                }
             }
         }
 
