@@ -457,50 +457,74 @@
         function handleEnd() {
             if (isDragging && ball.state === 'idle') {
                 isDragging = false;
-                let dx = dragStartX - mouseX; let dy = dragStartY - mouseY;
+                let dx = dragStartX - mouseX;
+                let dy = dragStartY - mouseY;
+                
                 if (dy > 20) {
                     ball.state = 'shooting';
-                    let dragDuration = Math.max((Date.now() - dragStartTime) / 1000, 0.05);
-                    let speedFactor = 1.0 / dragDuration;
-                    let power = (dy / 300) * (speedFactor * 0.4 + 0.6);
+                    let dragDuration = (Date.now() - dragStartTime) / 1000;
                     
-                    // The "Perfect" Snap Logic
-                    let isPerfectRelease = Math.abs(power - 1.0) < 0.03 && Math.abs(dx) < 15;
+                    // User requested "halfway to the net" for perfect shot
+                    let ballToHoopDist = ball.y - hoop.y;
+                    let perfectDy = ballToHoopDist * 0.5;
+                    let distFactor = dy / perfectDy;
+                    
+                    // User requested speed of 100ms to 500ms
+                    // We'll use 0.3s as the "ideal" midpoint
+                    let speedFactor = 0.3 / Math.max(dragDuration, 0.05);
+                    
+                    // Calculate power: combines distance and flick speed
+                    // A power of ~1.0 should hit the hoop
+                    let power = distFactor * (speedFactor * 0.4 + 0.6);
+                    
+                    // The "Perfect" Release Logic
+                    // Check if dy is close to perfectDy and duration is in 100-500ms range
+                    let isPerfectRelease = Math.abs(distFactor - 1.0) < 0.15 && 
+                                         dragDuration >= 0.1 && dragDuration <= 0.5 && 
+                                         Math.abs(dx) < 25;
+                    
                     if (isPerfectRelease) {
                         power = 1.0;
                         ball.isPerfect = true;
-                    } else if (power > 0.85 && power < 1.15) {
-                        // Soft snap for "near-perfect" shots
+                        ball.isOnFire = true;
+                    } else if (power > 0.88 && power < 1.12) {
+                        // Soft snap for near-perfect shots
                         power = (power + 1.0) / 2;
                     }
 
+                    // Map power to target Z (depth)
+                    // Hoop is at 0.35, so 0.3 is a clean swish
                     let targetZ = 1.0 - (0.7 * power);
-                    targetZ = Math.max(0.15, Math.min(0.45, targetZ));
+                    targetZ = Math.max(0.1, Math.min(0.9, targetZ));
+
+                    // Target X (horizontal)
                     let targetX;
                     if (physicsMode === 'arcade') {
                         let deviation = Math.abs(dx);
-                        let correction = ball.isPerfect ? 0 : (deviation < 40 ? 0.05 : 0.2);
+                        let correction = ball.isPerfect ? 0 : (deviation < 50 ? 0.1 : 0.3);
                         targetX = hoop.x - (dx * correction);
                     } else {
-                        targetX = hoop.x - dx * 2.2;
+                        targetX = hoop.x - dx * 2.5;
                     }
-                    let targetY = hoop.y;
-                    let cappedDy = Math.max(dy, 20);
-                    let arcDampening = Math.sqrt(cappedDy) * 12;
-                    let peak_y = Math.max(20, hoop.y - arcDampening);
+
+                    // Flight Time (t)
+                    // Scales with drag duration so slow flicks = slow shots, fast = fast
+                    // Fixed the "too fast" issue by setting a reasonable floor and range
+                    let t = 0.6 + dragDuration * 1.2; 
+                    t = Math.max(0.5, Math.min(1.8, t));
+
                     const gravity = 1.2;
-                    let initial_vy = -Math.sqrt(2 * gravity * (ball.y - peak_y));
-                    let discriminant = (2 * gravity) * (targetY - peak_y);
-                    let t = (-initial_vy + Math.sqrt(discriminant)) / gravity;
+                    let targetY = hoop.y;
+
+                    // Projectile motion equations:
+                    // vy = (targetY - ball.y - 0.5 * gravity * t^2) / t
                     ball.vx = (targetX - ball.x) / t;
-                    ball.vy = initial_vy;
+                    ball.vy = (targetY - ball.y - 0.5 * gravity * t * t) / t;
                     ball.vz = (targetZ - 1.0) / t;
                     ball.vRot = dx * 0.05;
                     
-                    if (ball.isPerfect) {
-                        ball.isOnFire = true; // Perfect shots instantly ignite the ball
-                    } else if (Math.abs(dx) > 120) {
-                        ball.isOnFire = true;
+                    if (!ball.isPerfect && Math.abs(dx) > 150) {
+                        ball.isOnFire = true; // Still reward crazy bank shots or long range
                     }
                 }
             }
