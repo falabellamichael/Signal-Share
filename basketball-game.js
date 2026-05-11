@@ -30,7 +30,7 @@ let dragStartY = 0;
 let dragStartTime = 0;
 
 // GRACEFUL PHYSICS CONSTANTS
-const GRAVITY = 1.2; 
+const GRAVITY = 3.5; 
 const HOOP_Z = 0.35;
 
 const hoop = {
