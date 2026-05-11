@@ -744,11 +744,17 @@ function drawDragGuide() {
 
     const dx = dragStartX - mouseX;
     const dy = dragStartY - mouseY;
+    const duration = (performance.now() - dragStartTime) / 1000;
+    const idealDuration = 0.62;
+    const timingMultiplier = clamp(1.0 - Math.abs(duration - idealDuration) * 1.6, 0.45, 1.0);
+    
     const pull = clamp(hypot(dx, dy), 0, 520);
-    const power = pull / 520;
+    const power = (pull / 520) * timingMultiplier;
 
     ctx.save();
-    ctx.strokeStyle = `rgba(255, 119, 0, ${0.35 + power * 0.45})`;
+    // Guide color shifts if the shot is getting "stale" or too fast
+    const colorAlpha = 0.35 + power * 0.45;
+    ctx.strokeStyle = timingMultiplier < 0.8 ? `rgba(255, 62, 62, ${colorAlpha})` : `rgba(255, 119, 0, ${colorAlpha})`;
     ctx.lineWidth = 4;
     ctx.setLineDash([12, 10]);
     ctx.beginPath();
@@ -798,6 +804,10 @@ function releaseShot() {
     let dx = dragStartX - mouseX;
     let dy = dragStartY - mouseY;
     const duration = Math.max((performance.now() - dragStartTime) / 1000, 0.045);
+    
+    // Timing Sweet Spot: ~0.6 seconds. Before or after this, the shot gets weaker.
+    const idealDuration = 0.62;
+    const timingMultiplier = clamp(1.0 - Math.abs(duration - idealDuration) * 1.6, 0.45, 1.0);
 
     dx = clamp(dx, -260, 260);
     dy = clamp(dy, 0, 560);
@@ -805,10 +815,11 @@ function releaseShot() {
     if (dy < 38) return;
 
     const pull = clamp(hypot(dx, dy), 50, 620);
-    const power = clamp(pull / 520, 0, 1);
+    const power = clamp((pull / 520) * timingMultiplier, 0, 1.15);
     const flickSpeed = dy / duration;
     const idealSpeed = 1180;
     const speedQuality = 1 - clamp(Math.abs(flickSpeed - idealSpeed) / 1250, 0, 1);
+    const timingQuality = timingMultiplier;
     const straightQuality = 1 - clamp(Math.abs(dx) / 250, 0, 1);
 
     ball.state = 'shooting';
@@ -817,7 +828,7 @@ function releaseShot() {
     ball.shotAge = 0;
     ball.isPerfect = false;
     ball.isOnFire = false;
-    ball.releaseQuality = clamp(speedQuality * 0.55 + straightQuality * 0.45, 0, 1);
+    ball.releaseQuality = clamp(speedQuality * 0.4 + straightQuality * 0.3 + timingQuality * 0.3, 0, 1);
 
     // Flight time and target bias tuned to feel like a real set shot/flick.
     const flightTime = lerp(1.15, 1.65, power);
