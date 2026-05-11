@@ -231,6 +231,19 @@
             ball.state = 'idle';
             ball.rotation = 0; ball.vRot = 0;
             ball.isOnFire = false;
+            ball.isPerfect = false;
+        }
+
+        const messages = [];
+
+        function showMessage(text, x, y, color = '#fff') {
+            messages.push({
+                text: text,
+                x: x, y: y,
+                life: 1.0,
+                color: color,
+                vy: -2
+            });
         }
 
         function createParticles(x, y, color) {
@@ -277,15 +290,30 @@
                     let swishRadius = physicsMode === 'arcade' ? hoop.radius * 2.5 : hoop.radius * 1.8;
 
                     if (dist < swishRadius) {
-                        let points = ball.isOnFire ? 3 : (1 + Math.floor(streak / 2));
+                        let isPerfectShot = ball.isPerfect && dist < hoop.radius * 0.4;
+                        let points = isPerfectShot ? 10 : (ball.isOnFire ? 3 : (1 + Math.floor(streak / 2)));
+                        
+                        if (isPerfectShot) {
+                            showMessage("PERFECT!", hoop.x, hoop.y - 40, "#ff00ff");
+                            createParticles(hoop.x, hoop.y, "#ff00ff");
+                            streak += 2;
+                        } else {
+                            streak++;
+                            createParticles(hoop.x, hoop.y, ball.isOnFire ? '#ff4400' : '#00ff9d');
+                        }
+
                         score += points;
-                        streak++;
                         scoreEl.textContent = score;
                         streakEl.textContent = streak;
-                        createParticles(hoop.x, hoop.y, ball.isOnFire ? '#ff4400' : '#00ff9d');
+                        
                         ball.state = 'falling';
                         ball.vx *= 0.5; ball.vy = 2;
                         ball.isOnFire = false;
+                        ball.isPerfect = false;
+                        
+                        if (streak >= 3 && !ball.isOnFire) {
+                             // Streak bonus or feedback?
+                        }
                         if (gameMode === 'playoff' && score >= targetScore) nextLevel();
                     } else if (Math.abs(ball.y - (hoop.y - hoop.boardHeight / 2)) < hoop.boardHeight && Math.abs(dx) < hoop.boardWidth / 2) {
                         ball.state = 'falling';
@@ -310,6 +338,12 @@
                 let p = particles[i];
                 p.x += p.vx; p.y += p.vy; p.life -= 0.03;
                 if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            for (let i = messages.length - 1; i >= 0; i--) {
+                let m = messages[i];
+                m.y += m.vy; m.life -= 0.02;
+                if (m.life <= 0) messages.splice(i, 1);
             }
         }
 
@@ -346,6 +380,18 @@
             particles.forEach(p => {
                 ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
                 ctx.beginPath(); ctx.arc(p.x, p.y, 4 * p.life, 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = 1;
+            });
+
+            messages.forEach(m => {
+                ctx.fillStyle = m.color;
+                ctx.globalAlpha = m.life;
+                ctx.font = `bold ${24 + (1 - m.life) * 20}px Inter`;
+                ctx.textAlign = 'center';
+                ctx.shadowColor = m.color;
+                ctx.shadowBlur = 15;
+                ctx.fillText(m.text, m.x, m.y);
+                ctx.shadowBlur = 0;
                 ctx.globalAlpha = 1;
             });
 
@@ -417,13 +463,23 @@
                     let dragDuration = Math.max((Date.now() - dragStartTime) / 1000, 0.05);
                     let speedFactor = 1.0 / dragDuration;
                     let power = (dy / 300) * (speedFactor * 0.4 + 0.6);
-                    if (power > 0.65 && power < 1.35) power = 1.0;
+                    
+                    // The "Perfect" Snap Logic
+                    let isPerfectRelease = Math.abs(power - 1.0) < 0.03 && Math.abs(dx) < 15;
+                    if (isPerfectRelease) {
+                        power = 1.0;
+                        ball.isPerfect = true;
+                    } else if (power > 0.85 && power < 1.15) {
+                        // Soft snap for "near-perfect" shots
+                        power = (power + 1.0) / 2;
+                    }
+
                     let targetZ = 1.0 - (0.7 * power);
                     targetZ = Math.max(0.15, Math.min(0.45, targetZ));
                     let targetX;
                     if (physicsMode === 'arcade') {
                         let deviation = Math.abs(dx);
-                        let correction = deviation < 40 ? 0.05 : 0.2;
+                        let correction = ball.isPerfect ? 0 : (deviation < 40 ? 0.05 : 0.2);
                         targetX = hoop.x - (dx * correction);
                     } else {
                         targetX = hoop.x - dx * 2.2;
@@ -440,7 +496,12 @@
                     ball.vy = initial_vy;
                     ball.vz = (targetZ - 1.0) / t;
                     ball.vRot = dx * 0.05;
-                    if (Math.abs(dx) > 100) ball.isOnFire = true;
+                    
+                    if (ball.isPerfect) {
+                        ball.isOnFire = true; // Perfect shots instantly ignite the ball
+                    } else if (Math.abs(dx) > 120) {
+                        ball.isOnFire = true;
+                    }
                 }
             }
         }
