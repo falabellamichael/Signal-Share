@@ -44,7 +44,7 @@
             tableTilt: 0.012,
             collisionSlop: 0.20,
             substepsMin: 4,
-            substepsMax: 14,
+            substepsMax: 30,
             slingshotForce: 11.5,
             flipperCatchSpeed: 11.5,
             flipperHoldFriction: 0.86,
@@ -105,7 +105,7 @@
             side: 'left',
             x: 125,
             y: 640,
-            length: 62,
+            length: 52,
             width: 20,
             rest: 0.35,
             up: -0.55,
@@ -120,7 +120,7 @@
             side: 'right',
             x: 275,
             y: 640,
-            length: 62,
+            length: 52,
             width: 20,
             rest: Math.PI - 0.35,
             up: Math.PI + 0.55,
@@ -1011,12 +1011,6 @@
         }
 
         function drawPlayfieldArt() {
-            ctx.save();
-            ctx.globalAlpha = 0.82;
-            glowStroke(COLORS.blue, 2, 12);
-            roundRect(62, 46, 276, 590, 26, false, true);
-            ctx.restore();
-
             ctx.save();
             ctx.textAlign = 'center';
             ctx.font = '900 28px Inter, system-ui, sans-serif';
