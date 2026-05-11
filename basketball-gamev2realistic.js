@@ -290,7 +290,8 @@ function updateNet(dt) {
     // Ball/net contact. This makes the mesh visibly move while the ball passes through.
     if (ball.state === 'shooting' || ball.state === 'falling') {
         const radius = getBallRadius() * 0.85;
-        const inNetArea = Math.abs(ball.x - hoop.x) < hoop.radius * 1.7 && ball.y > hoop.y - 8 && ball.y < hoop.y + hoop.radius * 2.8;
+        // Only interact if moving downward (avoids hitting the net while rising)
+        const inNetArea = ball.vy > 0 && Math.abs(ball.x - hoop.x) < hoop.radius * 1.7 && ball.y > hoop.y - 8 && ball.y < hoop.y + hoop.radius * 2.8;
         if (inNetArea) {
             for (const row of net.points) {
                 for (const p of row) {
