@@ -143,6 +143,27 @@
             transform: scale(0.95);
         }
 
+        .btn-secondary {
+            background: var(--glass);
+            color: #fff;
+            border: 1px solid var(--border);
+            padding: 10px 24px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s, transform 0.1s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-2px);
+        }
+
         /* Mobile Controls */
         .controls-pad {
             display: grid;
@@ -196,11 +217,28 @@
 <body>
     <div class="game-container">
         <div class="game-header">
-            <h1 class="game-title">Neon Snake</h1>
-            <div class="stat-pill">
-                <span>Score <span class="stat-val" id="scoreVal">0</span></span>
-                <span>Best <span class="stat-val" id="bestVal">0</span></span>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <h1 class="game-title">Neon Snake</h1>
+                <div id="setting-badges" style="display: flex; gap: 6px; opacity: 0.4; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <!-- Populated by JS -->
+                </div>
             </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                <div class="stat-pill">
+                    <span>Score <span class="stat-val" id="scoreVal">0</span></span>
+                    <span>Best <span class="stat-val" id="bestVal">0</span></span>
+                </div>
+                <div style="display: flex; gap: 12px; opacity: 0.8; font-size: 0.75rem; font-weight: 700;">
+                    <span>FOOD <span id="statFood" class="stat-val">0</span></span>
+                    <span>LVL <span id="statSpeed" class="stat-val">1</span></span>
+                </div>
+            </div>
+        </div>
+
+        <div style="width: 100%; display: flex; gap: 15px; opacity: 0.6; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 0 10px;">
+            <span>Time <span id="statTime">00:00</span></span>
+            <span>Moves <span id="statMoves">0</span></span>
+            <span>Streak <span id="statStreak">0</span></span>
         </div>
 
         <div style="position: relative; width: 100%;">
@@ -228,7 +266,13 @@
             </div>
         </div>
 
-        <a href="./index.html" style="color: rgba(255,255,255,0.4); text-decoration: none; font-size: 0.8rem; margin-top: 10px;">Back to Signal Share</a>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 20px;">
+            <a href="./mini-games.html" target="mini-games" class="btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                Return to Library
+            </a>
+            <a href="./index.html" style="color: rgba(255,255,255,0.3); text-decoration: none; font-size: 0.75rem; font-weight: 500;">Back to Signal Share</a>
+        </div>
     </div>
 
         <div class="questions-guide-footer" style="margin-top: 60px; text-align: center;">
@@ -243,5 +287,25 @@
     </div>
 
     <script src="gameLogic.js"></script>
+    <script>
+        // Populate settings badges from URL
+        document.addEventListener('DOMContentLoaded', () => {
+            const p = new URLSearchParams(window.location.search);
+            const badges = document.getElementById('setting-badges');
+            
+            const addBadge = (label, val) => {
+                const s = document.createElement('span');
+                s.textContent = `${label}: ${val}`;
+                s.style.border = '1px solid rgba(255,255,255,0.1)';
+                s.style.padding = '2px 6px';
+                s.style.borderRadius = '4px';
+                badges.appendChild(s);
+            };
+
+            if (p.has('grid')) addBadge('Grid', p.get('grid') === '20' ? 'Standard' : (p.get('grid') === '40' ? 'Tiny' : 'Dense'));
+            if (p.has('obstacles')) addBadge('Mode', p.get('obstacles'));
+            if (p.has('wallwrap')) addBadge('Walls', p.get('wallwrap') === '1' ? 'Wrap' : 'Solid');
+        });
+    </script>
 </body>
 </html>

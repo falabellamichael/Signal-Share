@@ -27,7 +27,8 @@ class SnakeGame {
         this.obstacleCount = parseInt(p.get('obstCount') || '5');
         this.wallWrap      = p.get('wallwrap') === '1';               // wrap-around walls
 
-        this.tileCount = this.canvas.width / this.gridSize;
+        this.tileCount = Math.floor(this.canvas.width / this.gridSize);
+        this.center    = Math.floor(this.tileCount / 2);
 
         // Runtime state
         this.snake     = [];
@@ -81,9 +82,9 @@ class SnakeGame {
 
     init() {
         this.snake = [
-            { x: 10, y: 10 },
-            { x: 9,  y: 10 },
-            { x: 8,  y: 10 }
+            { x: this.center,     y: this.center },
+            { x: this.center - 1, y: this.center },
+            { x: this.center - 2, y: this.center }
         ];
         this.dx = 1; this.dy = 0;
         this.nextDx = 1; this.nextDy = 0;
@@ -95,6 +96,7 @@ class SnakeGame {
         this.updateStats();
         this.placeFood();
         this.generateObstacles();
+        this.draw(); // Draw initial state immediately
     }
 
     startGame() {
@@ -212,8 +214,8 @@ class SnakeGame {
             attempts++;
             const x = Math.floor(Math.random() * this.tileCount);
             const y = Math.floor(Math.random() * this.tileCount);
-            // Keep a safety zone around starting position
-            if (Math.abs(x - 10) < 3 && Math.abs(y - 10) < 3) continue;
+            // Keep a safety zone around starting position (center)
+            if (Math.abs(x - this.center) < 3 && Math.abs(y - this.center) < 3) continue;
             if (!occupied.has(`${x},${y}`)) {
                 this.obstacles.push({ x, y });
                 occupied.add(`${x},${y}`);
