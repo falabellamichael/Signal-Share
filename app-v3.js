@@ -2,7 +2,8 @@ import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase
 import { createAppUi } from './app-v3-ui.js';
 import { 
   getMessageAttachmentKind, isPlayablePost, formatTimestamp, 
-  formatFileSize, formatKind, formatProviderName 
+  formatFileSize, formatKind, formatProviderName,
+  formatPostBadge, formatPostMeta
 } from './shared-utils.js';
 
 // Ban Helper Functions
