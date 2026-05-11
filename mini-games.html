@@ -1254,7 +1254,7 @@
                         // Replace <script src="filename.js">
                         if (f.name.endsWith('.js')) {
                             const js = f.content.split('base64,')[1] ? atob(f.content.split('base64,')[1]) : f.content;
-                            const scriptRegex = new RegExp('<script[^>]*src=["\']' + escapedName + '["\'][^>]*></script>', 'gi');
+                            const scriptRegex = new RegExp('<script[^>]*src=["\']' + escapedName + '["\'][^>]*></scr' + 'ipt>', 'gi');
                             content = content.replace(scriptRegex, '<script>' + js + '</script>');
                         }
                         
