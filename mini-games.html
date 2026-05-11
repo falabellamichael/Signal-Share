@@ -688,13 +688,11 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
                     <!-- Pinball Specific Content -->
                     <div id="hub-pinball" style="display: none;">
                         <div class="game-hub-header">
-                            <img src="pinball_poster_1778481948543.png" class="hub-poster">
+                            <img src="neon_pinball_v2_poster.png" class="hub-poster">
                             <div>
                                 <h1 style="font-size: 4rem; margin: 0 0 10px 0; letter-spacing: -3px; font-weight: 900;">Neon Pinball</h1>
                                 <div style="display: flex; gap: 10px; margin-bottom: 30px;">
@@ -851,7 +849,7 @@
         const GAMES = [
             { id: 'snake', title: 'Neon Snake', category: 'ARCADE', poster: 'snake_game_poster_1778466261855.png', tag: 'ARCADE • READY', type: 'game' },
             { id: 'basketball', title: 'Neon Hoops', category: 'ARCADE', poster: 'basketball_game_poster.png', tag: 'ARCADE • 3D', type: 'game' },
-            { id: 'pinball', title: 'Neon Pinball', category: 'ARCADE', poster: 'pinball_poster_1778481948543.png', tag: 'ARCADE • NEW', type: 'game' },
+            { id: 'pinball', title: 'Neon Pinball', category: 'ARCADE', poster: 'neon_pinball_v2_poster.png', tag: 'ARCADE • NEW', type: 'game' },
             { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility' }
         ];
 
@@ -1060,11 +1058,11 @@
                 },
                 {
                     title: 'Neon Pinball',
-                    poster: 'pinball_poster_1778481948543.png',
+                    poster: 'neon_pinball_v2_poster.png',
                     stats: [
                         { label: 'HIGH SCORE', val: localStorage.getItem('pinball-best') || '0', unit: 'PTS' },
                         { label: 'AVG SCORE', val: '4,200', unit: 'PTS' },
-                        { label: 'GLOBAL RANK', val: 'LEGENDARY I', unit: '' }
+                        { label: 'RANK', val: calculateRank(parseInt(localStorage.getItem('pinball-best') || '0')).name, unit: '' }
                     ]
                 }
             ];
