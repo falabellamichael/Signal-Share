@@ -1,8 +1,8 @@
 /**
- * Professional Pinball Engine - Ultra-Realistic Physics Build v4 (Newtonian Edition)
+ * Professional Pinball Engine - Ultra-Realistic Physics Build v5 (Newtonian Edition)
  * Developed by your Apprentice.
  */
-window.__NEON_PINBALL_BUILD = 'pro-physics-v4-newtonian';
+window.__NEON_PINBALL_BUILD = 'pro-physics-v5-newtonian';
 console.log('[Pro Pinball] Engine Initialized:', window.__NEON_PINBALL_BUILD);
 
 const canvas = document.getElementById('pinballCanvas');
@@ -41,18 +41,18 @@ const COLORS = {
 // Pure Newtonian Physics Settings
 const CFG = {
     gravity: 0.35,
-    friction: 0.994,         // Table rolling friction (air resistance)
-    restitution: 0.58,       // True bounce of steel on hard surfaces
+    friction: 0.994,         
+    restitution: 0.58,       
     ballRadius: 9.2,         
     maxSpeed: 28,            
     bumperKick: 12.0,        
-    flipperSnap: 0.45,       // Flipper rotational speed
+    flipperSnap: 0.45,       
     tableTilt: 0.015,
-    collisionSlop: 0.03,     // Very tight collision resolution   
-    substepsMin: 8,          
+    collisionSlop: 0.03,        
+    substepsMin: 12,          
     slingshotForce: 13.0,
-    wallFriction: 0.08,      // Steel sliding on plastic/wood
-    flipperFriction: 0.25    // Steel sliding on flipper rubber
+    wallFriction: 0.08,      
+    flipperFriction: 0.25    
 };
 
 let savedHighScore = 0;
@@ -86,7 +86,7 @@ const particles = [];
 const floatingText = [];
 
 const ball = {
-    x: 385,
+    x: 384, // Centered perfectly in the 370-398 shooter lane gap
     y: 628,
     vx: 0,
     vy: 0,
@@ -98,59 +98,36 @@ const ball = {
     trail: []
 };
 
-const leftFlipper = {
-    side: 'left',
-    x: 135,
-    y: 630,
-    length: 68,
-    width: 14,
-    rest: 0.40,
-    up: -0.50,
-    angle: 0.40,
-    prevAngle: 0.40,
-    target: 0.40,
-    pressed: false,
-    color: COLORS.primary
-};
+// Restored missing boundary logic in object initialization for exact physics rest/up calculation
+const leftFlipper = { side: 'left', x: 130, y: 645, angle: 0.5, rest: 0.5, up: -0.5, length: 65, width: 14, color: COLORS.primary, pressed: false };
+const rightFlipper = { side: 'right', x: 260, y: 645, angle: Math.PI - 0.5, rest: Math.PI - 0.5, up: Math.PI + 0.5, length: 65, width: 14, color: COLORS.secondary, pressed: false };
 
-const rightFlipper = {
-    side: 'right',
-    x: 265,
-    y: 630,
-    length: 68,
-    width: 14,
-    rest: Math.PI - 0.40,
-    up: Math.PI + 0.50,
-    angle: Math.PI - 0.40,
-    prevAngle: Math.PI - 0.40,
-    target: Math.PI - 0.40,
-    pressed: false,
-    color: COLORS.primary
-};
-
+// Bumpers repositioned higher and spread for better playfield flow
 const bumpers = [
-    { x: 200, y: 160, r: 32, color: COLORS.secondary, points: 500, pulse: 0 },
-    { x: 130, y: 250, r: 28, color: COLORS.primary, points: 300, pulse: 0 },
-    { x: 270, y: 250, r: 28, color: COLORS.primary, points: 300, pulse: 0 }
+    { x: 195, y: 160, r: 30, color: COLORS.secondary, points: 500, pulse: 0 },
+    { x: 120, y: 240, r: 28, color: COLORS.primary, points: 300, pulse: 0 },
+    { x: 270, y: 240, r: 28, color: COLORS.primary, points: 300, pulse: 0 }
 ];
 
+// Reconfigured to spell "SHARE" spaced perfectly along the radial trajectory of the top arc
 const rollovers = [
-    { x: 130, y: 80, r: 12, label: 'P', lit: false, points: 250 },
-    { x: 176, y: 65, r: 12, label: 'R', lit: false, points: 250 },
-    { x: 224, y: 65, r: 12, label: 'O', lit: false, points: 250 },
-    { x: 270, y: 80, r: 12, label: 'X', lit: false, points: 250 }
+    { x: 78, y: 115, r: 12, label: 'S', lit: false, points: 250 },
+    { x: 130, y: 71, r: 12, label: 'H', lit: false, points: 250 },
+    { x: 195, y: 55, r: 12, label: 'A', lit: false, points: 250 },
+    { x: 260, y: 71, r: 12, label: 'R', lit: false, points: 250 },
+    { x: 312, y: 115, r: 12, label: 'E', lit: false, points: 250 }
 ];
 
 const targets = [
-    { x: 38, y: 300, w: 10, h: 40, color: COLORS.accent, lit: false, points: 180 },
-    { x: 38, y: 350, w: 10, h: 40, color: COLORS.accent, lit: false, points: 180 },
-    { x: 352, y: 300, w: 10, h: 40, color: COLORS.success, lit: false, points: 180 },
-    { x: 352, y: 350, w: 10, h: 40, color: COLORS.success, lit: false, points: 180 }
+    { x: 30, y: 340, w: 10, h: 40, color: COLORS.accent, lit: false, points: 180 },
+    { x: 30, y: 390, w: 10, h: 40, color: COLORS.accent, lit: false, points: 180 },
+    { x: 350, y: 340, w: 10, h: 40, color: COLORS.success, lit: false, points: 180 },
+    { x: 350, y: 390, w: 10, h: 40, color: COLORS.success, lit: false, points: 180 }
 ];
 
 const loop = {
-    cx: 200,
-    cy: 330,
+    cx: 195,
+    cy: 370,
     innerR: 45,
     midR: 62,
     outerR: 78,
@@ -164,7 +141,7 @@ const loop = {
     ]
 };
 
-const loopTilt = 0.3;
+const loopTilt = 0;
 
 function createArc(cx, cy, r, startAngle, endAngle, segments, color, thick) {
     const arcWalls = [];
@@ -185,31 +162,39 @@ function createArc(cx, cy, r, startAngle, endAngle, segments, color, thick) {
 }
 
 const walls = [
-    { x1: 20, y1: 688, x2: 20, y2: 120, color: COLORS.wall, thick: 8 }, 
-    { x1: 398, y1: 688, x2: 398, y2: 100, color: COLORS.wall, thick: 8 }, 
+    // Vertical side rails bounding the playfield 
+    { x1: 20, y1: 688, x2: 20, y2: 200, color: COLORS.wall, thick: 8 }, 
+    { x1: 398, y1: 688, x2: 398, y2: 200, color: COLORS.wall, thick: 8 }, 
     { x1: 0, y1: 695, x2: 400, y2: 695, color: COLORS.danger, thick: 12 }, 
 
-    { x1: 370, y1: 688, x2: 370, y2: 140, color: COLORS.wall, thick: 6 }, 
+    // Shooter lane inner barrier
+    { x1: 370, y1: 688, x2: 370, y2: 200, color: COLORS.wall, thick: 6 }, 
 
-    ...createArc(100, 120, 80, Math.PI, Math.PI * 1.5, 16, COLORS.wall, 6), 
-    { x1: 100, y1: 40, x2: 300, y2: 40, color: COLORS.wall, thick: 6 }, 
-    ...createArc(300, 140, 98, Math.PI * 1.5, Math.PI * 2, 16, COLORS.wall, 6), 
+    // Perfect symmetrical top arc covering the playfield (Center: 195, 200)
+    ...createArc(195, 200, 175, Math.PI, Math.PI * 2, 24, COLORS.wall, 6), 
+    
+    // Outer upper-right arc smoothly guiding the launched ball into the top playfield
+    ...createArc(195, 200, 203, Math.PI * 1.5, Math.PI * 2, 12, COLORS.wall, 8),
 
-    // Slingshots (Moved up and closer per earlier physics adjustment)
+    // Slanted One-Way Plunger Lock Gate. Forces ball left into playfield if it falls back.
+    { x1: 398, y1: 170, x2: 370, y2: 200, color: COLORS.accent, thick: 4, isGate: true },
+
+    // Centered Slingshots
     { x1: 70, y1: 515, x2: 120, y2: 575, color: COLORS.success, thick: 6, slingshot: true },
     { x1: 120, y1: 575, x2: 70, y2: 575, color: COLORS.wall, thick: 4 },
     { x1: 70, y1: 575, x2: 70, y2: 515, color: COLORS.wall, thick: 4 },
 
-    { x1: 330, y1: 515, x2: 280, y2: 575, color: COLORS.success, thick: 6, slingshot: true },
-    { x1: 280, y1: 575, x2: 330, y2: 575, color: COLORS.wall, thick: 4 },
-    { x1: 330, y1: 575, x2: 330, y2: 515, color: COLORS.wall, thick: 4 },
+    { x1: 320, y1: 515, x2: 270, y2: 575, color: COLORS.success, thick: 6, slingshot: true },
+    { x1: 270, y1: 575, x2: 320, y2: 575, color: COLORS.wall, thick: 4 },
+    { x1: 320, y1: 575, x2: 320, y2: 515, color: COLORS.wall, thick: 4 },
 
+    // Bottom lane returns
     { x1: 20, y1: 530, x2: 130, y2: 625, color: COLORS.wall, thick: 5 },
-    { x1: 370, y1: 530, x2: 270, y2: 625, color: COLORS.wall, thick: 5 },
+    { x1: 370, y1: 530, x2: 260, y2: 625, color: COLORS.wall, thick: 5 },
 
-    // Dynamic Split Loop Walls (Crescents)
-    ...createArc(200 - 35/2, 330, 62, Math.PI * 0.7 + 0.3, Math.PI * 1.3 + 0.3, 12, COLORS.accent, 4),
-    ...createArc(200 + 35/2, 330, 62, Math.PI * 1.7 + 0.3, Math.PI * 2.3 + 0.3, 12, COLORS.accent, 4)
+    // Loop Crescents
+    ...createArc(195 - 35/2, loop.cy, 62, Math.PI * 0.7, Math.PI * 1.3, 12, COLORS.accent, 4),
+    ...createArc(195 + 35/2, loop.cy, 62, Math.PI * 1.7, Math.PI * 2.3, 12, COLORS.accent, 4)
 ];
 
 function setupCanvas() {
@@ -246,7 +231,7 @@ function updateUI() {
 }
 
 function resetBall() {
-    ball.x = 385;
+    ball.x = 384; // Lock directly within the new tight shooter lane bounds
     ball.y = 628;
     ball.vx = 0;
     ball.vy = 0;
@@ -254,6 +239,10 @@ function resetBall() {
     ball.inShooter = true;
     ball.active = true;
     ball.flipperCooldown = 0;
+    
+    leftFlipper.angle = leftFlipper.rest;
+    rightFlipper.angle = rightFlipper.rest;
+    
     state.launchReady = true;
     state.launchCharge = 0;
     ball.trail = [];
@@ -295,7 +284,7 @@ function gameOver() {
 
 function loseBall() {
     state.screenShake = Math.max(state.screenShake, 12);
-    spawnText('BALL LOST', 200, 564, COLORS.danger);
+    spawnText('BALL LOST', 195, 564, COLORS.danger);
     explode(ball.x, Math.min(ball.y, 665), COLORS.danger, 30);
     state.balls -= 1;
     state.combo = 0;
@@ -316,7 +305,7 @@ function addScore(points, x, y, color = COLORS.white, label = '') {
     state.combo += 1;
     if (state.combo > 0 && state.combo % 10 === 0) {
         state.multiplier = Math.min(8, state.multiplier + 1);
-        spawnText(`MULTIPLIER ${state.multiplier}x`, 200, 140, COLORS.accent);
+        spawnText(`MULTIPLIER ${state.multiplier}x`, 195, 160, COLORS.accent);
     }
     updateUI();
     spawnText(label || `+${value}`, x, y, color);
@@ -339,9 +328,9 @@ function nudge(direction = 0) {
     
     if (state.tiltWarnings > 4) {
         state.tilted = true;
-        spawnText("TILT FAULT", 200, 350, COLORS.danger);
+        spawnText("TILT FAULT", 195, 350, COLORS.danger);
     } else if (state.tiltWarnings > 2) {
-        spawnText("WARNING", 200, 350, COLORS.accent);
+        spawnText("WARNING", 195, 350, COLORS.accent);
     }
 }
 
@@ -384,13 +373,13 @@ function releaseLaunchCharge() {
         return;
     }
     const power = clamp(state.launchCharge, 0.3, 1.0);
-    ball.vx = -1.5 - power * 1.2;
-    ball.vy = -20.0 - power * 11.0;
-    ball.spin = -power * 0.2; // Visual cue
+    ball.vx = 0.2; // Slight right-lean to hug the outer rail for a smooth arc
+    ball.vy = -22.0 - power * 12.0;
+    ball.spin = -power * 0.3; 
     state.launchHolding = false;
     state.launchReady = false;
     state.launchCharge = 0;
-    explode(385, 648, COLORS.accent, 25);
+    explode(384, 648, COLORS.accent, 25);
 }
 
 window.addEventListener('keydown', (event) => {
@@ -461,25 +450,21 @@ function stepBall(dt) {
     ball.vy += CFG.gravity * dt;
     ball.vx += CFG.tableTilt * dt;
     
-    // Pure table rolling friction (air resistance)
     ball.vx *= Math.pow(CFG.friction, dt);
     ball.vy *= Math.pow(CFG.friction, dt);
     
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
     
-    // Gradual visual spin bleed-off (simulating rolling friction)
     ball.spin *= Math.pow(0.95, dt);
 
     if (ball.x > 365 && ball.y > 450) {
         if (!ball.inShooter) ball.inShooter = true;
         if (Math.abs(ball.vy) < 0.2 && Math.abs(ball.vx) < 0.2) state.launchReady = true;
-    } else if (ball.y < 130) {
-        if (ball.inShooter) {
-            ball.inShooter = false;
-            state.launchReady = false; 
-            if (ball.vy < 0) ball.vx -= 3.5; 
-        }
+    } else if (ball.inShooter && ball.y < 185) {
+        // Exit shooter mode as soon as the ball clears the inner wall (y=200)
+        ball.inShooter = false;
+        state.launchReady = false; 
     }
 
     for (const wall of walls) checkSegmentCollision(wall, CFG.restitution);
@@ -495,7 +480,7 @@ function stepBall(dt) {
     }
 
     if (ball.inShooter) {
-        ball.x = clamp(ball.x, 378, 394);
+        ball.x = clamp(ball.x, 378, 390); // Keep heavily constrained inside the physical rails
         if (ball.y > 640) {
             ball.y = 640;
             if (ball.vy > 0) ball.vy *= -0.3;
@@ -505,6 +490,9 @@ function stepBall(dt) {
 }
 
 function checkSegmentCollision(seg, restitution) {
+    // If it's the plunger lock gate, and the ball is still shooting, let it ghost through
+    if (seg.isGate && ball.inShooter) return; 
+
     const dx = seg.x2 - seg.x1;
     const dy = seg.y2 - seg.y1;
     const lenSq = dx * dx + dy * dy;
@@ -537,24 +525,20 @@ function checkSegmentCollision(seg, restitution) {
         ny = -ny;
     }
 
-    // Resolving position rigidly
     const penetration = radius - dist + CFG.collisionSlop;
     ball.x += nx * penetration;
     ball.y += ny * penetration;
     
     const vn = ball.vx * nx + ball.vy * ny;
     if (vn < 0) {
-        // Normal Impulse (Bounce)
         ball.vx -= (1 + restitution) * vn * nx;
         ball.vy -= (1 + restitution) * vn * ny;
         
-        // Tangential Impulse (True sliding friction)
         const tx = -ny, ty = nx;
         const vt = ball.vx * tx + ball.vy * ty;
         ball.vx -= vt * CFG.wallFriction * tx;
         ball.vy -= vt * CFG.wallFriction * ty;
         
-        // Visual spin mathematically derived from friction grip
         ball.spin += (vt * CFG.wallFriction) / ball.r;
 
         if (seg.slingshot && Math.abs(vn) > 1.5) {
@@ -601,8 +585,8 @@ function checkRollover(r) {
             rollovers.forEach((item) => { item.lit = false; });
             state.multiplier = Math.min(8, state.multiplier + 1);
             updateUI();
-            spawnText('LANE BONUS', 200, 110, COLORS.success);
-            explode(200, 100, COLORS.success, 50);
+            spawnText('LANE BONUS', 195, 130, COLORS.success);
+            explode(195, 120, COLORS.success, 50);
         }
     }
 }
@@ -660,31 +644,25 @@ function checkFlipperCollision(f, dt) {
     ball.x += nx * (contactRadius - dist + CFG.collisionSlop);
     ball.y += ny * (contactRadius - dist + CFG.collisionSlop);
 
-    // Calculate flipper rotational velocity at contact point
     const omega = ((f.angle - f.prevAngle) / (dt || 1)) * 1.1;
     const vfx = -omega * (cy - f.y), vfy = omega * (cx - f.x);
     
-    // Relative velocity of ball to flipper
     const vrx = ball.vx - vfx, vry = ball.vy - vfy;
     const vrn = vrx * nx + vry * ny;
 
     if (vrn < 0) {
-        // Pure Newtonian Impulse Response
         const isHitting = (f.side === 'left' && omega < -0.01) || (f.side === 'right' && omega > 0.01);
         const e = isHitting ? 0.65 : 0.4;
         const j = -(1 + e) * vrn;
 
-        // Apply normal force
         ball.vx += j * nx;
         ball.vy += j * ny;
 
-        // Apply true tangential friction (rubber grip)
         const tx = -ny, ty = nx;
         const vrt = vrx * tx + vry * ty;
         ball.vx -= vrt * CFG.flipperFriction * tx;
         ball.vy -= vrt * CFG.flipperFriction * ty;
         
-        // Spin is now derived solely from friction, not forcing movement
         ball.spin += (vrt * CFG.flipperFriction) / ball.r;
 
         if (isHitting && ball.flipperCooldown <= 0 && j > 5) {
@@ -752,7 +730,6 @@ function checkLoopScoring() {
     const dy = ball.y - loop.cy;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
-    // Check if ball is in the loop radius
     if (dist > loop.innerR && dist < loop.outerR) {
         const angle = Math.atan2(dy, dx);
         for (const gate of loop.gates) {
@@ -786,21 +763,36 @@ function drawLoopObstacle() {
     ctx.lineWidth = 4 + loop.pulse * 2;
     ctx.lineCap = 'round';
 
-    // Left Crescent (C-shaped, facing right)
     ctx.beginPath();
     ctx.arc(loop.cx - loop.gap/2, loop.cy, loop.midR, Math.PI * 0.7 + loopTilt, Math.PI * 1.3 + loopTilt);
     ctx.stroke();
 
-    // Right Crescent (C-shaped, facing left)
     ctx.beginPath();
     ctx.arc(loop.cx + loop.gap/2, loop.cy, loop.midR, Math.PI * 1.7 + loopTilt, Math.PI * 2.3 + loopTilt);
     ctx.stroke();
     
-    // Core text
     ctx.textAlign = 'center';
     ctx.font = '900 12px Inter, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.fillText('SPLIT LOOP', loop.cx, loop.cy);
+    
+    const drawMarkers = (cx, startA, endA) => {
+        const steps = 5;
+        for (let i = 0; i <= steps; i++) {
+            const a = startA + (endA - startA) * (i / steps);
+            const mx = cx + Math.cos(a) * (loop.midR + 8);
+            const my = loop.cy + Math.sin(a) * (loop.midR + 8);
+            
+            ctx.fillStyle = COLORS.accent;
+            ctx.shadowBlur = 4;
+            ctx.beginPath();
+            ctx.arc(mx, my, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    };
+    
+    drawMarkers(loop.cx - loop.gap/2, Math.PI * 0.7, Math.PI * 1.3);
+    drawMarkers(loop.cx + loop.gap/2, Math.PI * 1.7, Math.PI * 2.3);
     
     ctx.restore();
 }
@@ -828,15 +820,26 @@ function drawPlayfieldArt() {
     ctx.save();
     ctx.textAlign = 'center';
     ctx.font = '900 38px Inter, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.04)';
-    ctx.fillText('SIGNAL', 200, 420);
-    ctx.fillText('SHARE', 200, 460);
+
+    // INNOVATION: Dynamic Multiplier Glow on central decal elements
+    const glowIntensity = Math.min(1.0, (state.multiplier - 1) / 7);
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.04 + glowIntensity * 0.1})`;
     
-    ctx.strokeStyle = 'rgba(59, 130, 246, 0.15)';
-    ctx.lineWidth = 2;
+    if (glowIntensity > 0) {
+        ctx.shadowColor = COLORS.accent;
+        ctx.shadowBlur = glowIntensity * 20;
+    }
+
+    ctx.fillText('SIGNAL', 195, 420);
+    ctx.fillText('SHARE', 195, 460);
+    
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = `rgba(59, 130, 246, ${0.15 + glowIntensity * 0.35})`;
+    ctx.lineWidth = 2 + glowIntensity * 3;
     ctx.beginPath();
-    ctx.arc(200, 360, 140, Math.PI, 0);
+    ctx.arc(195, 360, 140, Math.PI, 0);
     ctx.stroke();
+    
     ctx.restore();
 }
 
@@ -844,24 +847,41 @@ function drawWalls() {
     walls.forEach((w) => {
         ctx.save();
         const pulse = w.pulse || 0;
-        ctx.strokeStyle = w.color;
-        ctx.lineWidth = w.thick + pulse * 2;
-        ctx.lineCap = 'round';
         
-        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetY = 4;
+        if (w.isGate) {
+            // Visualize the plunger lock gate dynamically
+            ctx.lineCap = 'round';
+            if (ball.inShooter) {
+                ctx.strokeStyle = 'rgba(16, 185, 129, 0.3)'; // Green/open logic
+                ctx.setLineDash([6, 6]);
+                ctx.lineWidth = w.thick;
+            } else {
+                ctx.strokeStyle = COLORS.danger; // Red/Locked
+                ctx.shadowColor = COLORS.danger;
+                ctx.shadowBlur = 12;
+                ctx.lineWidth = w.thick + 2;
+            }
+        } else {
+            ctx.strokeStyle = w.color;
+            ctx.lineWidth = w.thick + pulse * 2;
+            ctx.lineCap = 'round';
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetY = 4;
+        }
         
         ctx.beginPath();
         ctx.moveTo(w.x1, w.y1);
         ctx.lineTo(w.x2, w.y2);
         ctx.stroke();
 
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetY = 0;
-        ctx.strokeStyle = pulse > 0 ? COLORS.white : 'rgba(255,255,255,0.3)';
-        ctx.lineWidth = w.thick * 0.4;
-        ctx.stroke();
+        if (!w.isGate) {
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetY = 0;
+            ctx.strokeStyle = pulse > 0 ? COLORS.white : 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = w.thick * 0.4;
+            ctx.stroke();
+        }
         ctx.restore();
     });
 }
@@ -931,11 +951,11 @@ function drawBumpers() {
 function drawShooterLane() {
     ctx.save();
     ctx.fillStyle = 'rgba(255,255,255,0.02)';
-    ctx.fillRect(370, 140, 30, 560);
+    ctx.fillRect(370, 200, 28, 500); // perfectly scaled inside wall boundaries
     
     if (state.launchReady && ball.inShooter) {
         ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
-        ctx.beginPath(); ctx.arc(385, 628, 16, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(384, 628, 16, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
 }
@@ -1007,13 +1027,13 @@ function drawBall() {
 function drawPlungerMeter() {
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.fillRect(380, 640, 10, 50);
+    ctx.fillRect(380, 640, 8, 50); // Slimmer to fit within optimized inner lane
     
     const h = 50 * state.launchCharge;
     ctx.fillStyle = COLORS.accent;
     ctx.shadowColor = COLORS.accent;
     ctx.shadowBlur = 8;
-    ctx.fillRect(380, 690 - h, 10, h);
+    ctx.fillRect(380, 690 - h, 8, h);
     ctx.restore();
 }
 
