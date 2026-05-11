@@ -42,9 +42,10 @@
             flipperKick: 10.5,
             flipperSnap: 0.38,
             tableTilt: 0.015,
-            collisionSlop: 0.2,
-            substepsMin: 2,
-            substepsMax: 8
+            collisionSlop: 0.15,
+            substepsMin: 4,
+            substepsMax: 12,
+            slingshotForce: 14.5
         };
 
         let savedHighScore = 0;
@@ -86,7 +87,8 @@
             spin: 0,
             inShooter: true,
             active: true,
-            flipperCooldown: 0
+            flipperCooldown: 0,
+            trail: []
         };
 
         const leftFlipper = {
@@ -146,13 +148,50 @@
             { x: 350, y: 264, w: 12, h: 34, color: COLORS.cyan, lit: false, points: 180 }
         ];
 
+        function createArc(cx, cy, r, startAngle, endAngle, segments, color, thick) {
+            const arcWalls = [];
+            const step = (endAngle - startAngle) / segments;
+            for (let i = 0; i < segments; i++) {
+                const a1 = startAngle + i * step;
+                const a2 = startAngle + (i + 1) * step;
+                arcWalls.push({
+                    x1: cx + Math.cos(a1) * r,
+                    y1: cy + Math.sin(a1) * r,
+                    x2: cx + Math.cos(a2) * r,
+                    y2: cy + Math.sin(a2) * r,
+                    color,
+                    thick
+                });
+            }
+            return arcWalls;
+        }
+
         const walls = [
-            { x1: 100, y1: 36, x2: 300, y2: 36, color: COLORS.cyan, thick: 5 },
-            { x1: 20, y1: 120, x2: 100, y2: 36, color: COLORS.cyan, thick: 5 },
-            { x1: 300, y1: 36, x2: 398, y2: 100, color: COLORS.cyan, thick: 5 },
-            { x1: 20, y1: 570, x2: 20, y2: 120, color: COLORS.cyan, thick: 5 },
-            { x1: 398, y1: 100, x2: 398, y2: 688, color: COLORS.cyan, thick: 5 },
-            { x1: 0, y1: 688, x2: 400, y2: 688, color: COLORS.magenta, thick: 6 }
+            // Outer boundaries
+            { x1: 20, y1: 688, x2: 20, y2: 120, color: COLORS.cyan, thick: 6 }, // Left wall
+            { x1: 398, y1: 688, x2: 398, y2: 100, color: COLORS.cyan, thick: 6 }, // Right outer wall
+            { x1: 0, y1: 688, x2: 400, y2: 688, color: COLORS.magenta, thick: 8 }, // Bottom drain
+
+            // Shooter Lane inner wall
+            { x1: 372, y1: 688, x2: 372, y2: 140, color: COLORS.cyan, thick: 5 },
+
+            // Top curves (replaces diagonal walls)
+            ...createArc(100, 120, 80, Math.PI, Math.PI * 1.5, 12, COLORS.cyan, 5), // Top-left curve
+            { x1: 100, y1: 40, x2: 300, y2: 40, color: COLORS.cyan, thick: 5 }, // Top flat
+            ...createArc(300, 140, 98, Math.PI * 1.5, Math.PI * 2, 12, COLORS.cyan, 5), // Top-right curve
+
+            // Slingshots (triangular bumpers above flippers)
+            { x1: 50, y1: 540, x2: 100, y2: 590, color: COLORS.green, thick: 6, slingshot: true },
+            { x1: 100, y1: 590, x2: 50, y2: 590, color: COLORS.green, thick: 4 },
+            { x1: 50, y1: 590, x2: 50, y2: 540, color: COLORS.green, thick: 4 },
+
+            { x1: 350, y1: 540, x2: 300, y2: 590, color: COLORS.green, thick: 6, slingshot: true },
+            { x1: 300, y1: 590, x2: 350, y2: 590, color: COLORS.green, thick: 4 },
+            { x1: 350, y1: 590, x2: 350, y2: 540, color: COLORS.green, thick: 4 },
+
+            // Flipper guide walls
+            { x1: 20, y1: 570, x2: 100, y2: 615, color: COLORS.blue, thick: 4 },
+            { x1: 380, y1: 570, x2: 300, y2: 615, color: COLORS.blue, thick: 4 }
         ];
 
         function setupCanvas() {
@@ -336,9 +375,9 @@
                 return;
             }
             const power = clamp(state.launchCharge, 0.25, 1);
-            ball.vx = -0.35 - power * 0.55;
-            ball.vy = -12.4 - power * 8.8;
-            ball.spin = -0.18;
+            ball.vx = -1.2 - power * 0.8;
+            ball.vy = -18.5 - power * 9.5;
+            ball.spin = -0.25;
             state.launchHolding = false;
             state.launchReady = false;
             state.launchCharge = 0;
@@ -424,7 +463,13 @@
             }
 
             bumpers.forEach((b) => { b.pulse = Math.max(0, b.pulse - 0.05 * dt); });
+            walls.forEach((w) => { if (w.pulse) w.pulse = Math.max(0, w.pulse - 0.08 * dt); });
             updateParticles(dt);
+            
+            // Update ball trail
+            ball.trail.push({ x: ball.x, y: ball.y });
+            if (ball.trail.length > 8) ball.trail.shift();
+
             state.screenShake = Math.max(0, state.screenShake - 0.45 * dt);
             if (state.messageTimer > 0) state.messageTimer -= dt;
             if (state.nudgeCooldown > 0) state.nudgeCooldown -= dt;
@@ -450,15 +495,17 @@
             ball.y += ball.vy * dt;
             ball.spin += (ball.vx * 0.018 + ball.vy * 0.004) * dt;
 
-            // Dynamic Shooter Mode: Always active when ball is in the lane
-            if (ball.x > 374 && ball.y > 100) {
+            // Improved Shooter Gate Logic
+            if (ball.x > 370 && ball.y > 600) {
                 if (!ball.inShooter) {
                     ball.inShooter = true;
                     state.launchReady = true;
                 }
-            } else {
-                if (ball.inShooter && ball.y < 108) {
+            } else if (ball.y < 120) {
+                if (ball.inShooter) {
                     ball.inShooter = false;
+                    // Give a slight horizontal boost when exiting to ensure it clears the lane
+                    if (ball.vy < 0) ball.vx -= 1.5;
                 }
             }
 
@@ -527,8 +574,24 @@
             if (vn < 0) {
                 ball.vx -= (1 + restitution) * vn * nx;
                 ball.vy -= (1 + restitution) * vn * ny;
-                ball.spin += vn * 0.025;
-                if (Math.abs(vn) > 3.8) explode(ball.x, ball.y, seg.color || COLORS.white, 5);
+                
+                // Add spin influence to bounce
+                ball.vx += ny * ball.spin * 15;
+                ball.vy -= nx * ball.spin * 15;
+                ball.spin *= 0.85; // Friction on spin
+                ball.spin += (vrt || 0) * 0.008;
+
+                // Slingshot logic
+                if (seg.slingshot && Math.abs(vn) > 1.2) {
+                    ball.vx += nx * CFG.slingshotForce;
+                    ball.vy += ny * CFG.slingshotForce;
+                    seg.pulse = 1;
+                    explode(ball.x, ball.y, seg.color, 12);
+                    state.screenShake = Math.max(state.screenShake, 6);
+                    addScore(50, ball.x, ball.y, seg.color, 'SLINGSHOT');
+                } else if (Math.abs(vn) > 3.8) {
+                    explode(ball.x, ball.y, seg.color || COLORS.white, 5);
+                }
             }
         }
 
@@ -651,6 +714,12 @@
                 ball.vx += j * nx;
                 ball.vy += j * ny;
 
+                // Horizontal boost for flipper tips
+                const tipFactor = t; // t is 0..1 from base to tip
+                if (isHitting) {
+                    ball.vx += dx * 0.12 * tipFactor;
+                }
+
                 const tx = -ny;
                 const ty = nx;
                 const vrt = vrx * tx + vry * ty;
@@ -659,10 +728,10 @@
                 ball.vy -= vrt * 0.18 * ty;
                 ball.spin += vrt * 0.12;
 
-                if (isHitting && ball.flipperCooldown <= 0 && j > 8) {
+                if (isHitting && ball.flipperCooldown <= 0 && j > 6) {
                     ball.flipperCooldown = 2;
-                    state.screenShake = Math.max(state.screenShake, clamp(j * 0.12, 0, 4));
-                    explode(cx, cy, f.color, Math.floor(clamp(j * 0.4, 5, 25)));
+                    state.screenShake = Math.max(state.screenShake, clamp(j * 0.15, 0, 5));
+                    explode(cx, cy, f.color, Math.floor(clamp(j * 0.5, 5, 30)));
                 }
             }
         }
@@ -777,7 +846,13 @@
         function drawWalls() {
             walls.forEach((w) => {
                 ctx.save();
-                glowStroke(w.color || COLORS.rail, w.thick || 3, 10);
+                const pulse = w.pulse || 0;
+                const color = w.color || COLORS.rail;
+                glowStroke(color, (w.thick || 3) + pulse * 4, 10 + pulse * 15);
+                if (pulse > 0) {
+                    ctx.shadowColor = '#ffffff';
+                    ctx.strokeStyle = '#ffffff';
+                }
                 ctx.lineCap = 'round';
                 ctx.beginPath();
                 ctx.moveTo(w.x1, w.y1);
@@ -785,7 +860,6 @@
                 ctx.stroke();
                 ctx.restore();
             });
-
         }
 
         function drawRollovers() {
@@ -854,16 +928,21 @@
 
         function drawShooterLane() {
             ctx.save();
-            ctx.strokeStyle = 'rgba(255,215,0,0.36)';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([7, 8]);
+            ctx.strokeStyle = 'rgba(255,215,0,0.22)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([6, 10]);
             ctx.beginPath();
-            ctx.moveTo(385, 118);
-            ctx.lineTo(385, 666);
+            ctx.moveTo(385, 140);
+            ctx.lineTo(385, 660);
             ctx.stroke();
             ctx.setLineDash([]);
-            ctx.fillStyle = 'rgba(255,215,0,0.08)';
-            roundRect(374, 132, 23, 516, 10, true, false);
+            
+            // Lane bottom glow
+            const grad = ctx.createLinearGradient(372, 600, 398, 688);
+            grad.addColorStop(0, 'rgba(255,215,0,0)');
+            grad.addColorStop(1, 'rgba(255,215,0,0.12)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(372, 140, 26, 548);
             ctx.restore();
         }
 
@@ -898,6 +977,22 @@
         }
 
         function drawBall() {
+            // Draw Trail
+            if (ball.trail.length > 1) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(ball.trail[0].x, ball.trail[0].y);
+                for (let i = 1; i < ball.trail.length; i++) {
+                    ctx.lineTo(ball.trail[i].x, ball.trail[i].y);
+                }
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.lineWidth = ball.r * 1.2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.stroke();
+                ctx.restore();
+            }
+
             ctx.save();
             ctx.translate(ball.x, ball.y);
             ctx.rotate(ball.spin);
