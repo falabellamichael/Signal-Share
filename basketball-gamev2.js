@@ -46,11 +46,11 @@ const hypot = (x, y) => Math.sqrt(x * x + y * y);
 
 // Pixel/second physics. This keeps the shot stable on every monitor refresh rate.
 const GRAVITY = 1500;
-const AIR_DRAG_PER_SECOND = 0.992;
+const AIR_DRAG_PER_SECOND = 0.993;
 const SPIN_DRAG_PER_SECOND = 0.985;
-const FLOOR_BOUNCE = 0.46;
-const RIM_RESTITUTION = 0.62;
-const BACKBOARD_RESTITUTION = 0.58;
+const FLOOR_BOUNCE = 0.52;
+const RIM_RESTITUTION = 0.68;
+const BACKBOARD_RESTITUTION = 0.62;
 
 const hoop = {
     x: 0,
@@ -85,8 +85,8 @@ const ball = {
 };
 
 const net = {
-    rows: 10,
-    cols: 16,
+    rows: 8,
+    cols: 12,
     points: [],
     lastPunchAt: 0,
 };
@@ -814,10 +814,10 @@ function releaseShot() {
     ball.isOnFire = false;
     ball.releaseQuality = clamp(speedQuality * 0.55 + straightQuality * 0.45, 0, 1);
 
-    // Time-of-flight is intentionally narrow: enough arc to look real, not floaty.
-    const flightTime = lerp(1.03, 1.34, power);
-    const targetX = hoop.x - dx * (physicsMode === 'arcade' ? 0.18 : 0.34);
-    const targetY = hoop.y - 5;
+    // Flight time and target bias tuned to feel like a real set shot/flick.
+    const flightTime = lerp(1.15, 1.65, power);
+    const targetX = hoop.x - dx * (physicsMode === 'arcade' ? 0.22 : 0.45);
+    const targetY = hoop.y - 8;
 
     // Small pro-mode release error. Arcade keeps it forgiving.
     const errorScale = physicsMode === 'arcade' ? 0.18 : 1;
