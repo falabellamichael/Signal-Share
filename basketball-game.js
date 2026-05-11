@@ -29,8 +29,8 @@ let dragStartX = 0;
 let dragStartY = 0;
 let dragStartTime = 0;
 
-// NEW DYNAMIC PHYSICS CONSTANTS
-const GRAVITY = 1.0; 
+// GRACEFUL PHYSICS CONSTANTS
+const GRAVITY = 1.2; 
 const HOOP_Z = 0.35;
 
 const hoop = {
@@ -140,33 +140,29 @@ function update() {
             });
         }
 
-        // KEEP BALL IN VIEW: Prevent it from flying too far horizontally
-        if (ball.x < -100 || ball.x > width + 100) {
-            resetBall();
-            resetStreak();
-        }
-
-        if (ball.y > height + 200) {
+        // Prevent flying too far off screen
+        if (ball.x < -200 || ball.x > width + 200 || ball.y > height + 400) {
             resetStreak();
             resetBall();
         }
 
-        // DEPTH COLLISION
+        // COLLISION LOGIC
         if (ball.state === 'shooting' && ball.z <= HOOP_Z) {
             let dx = ball.x - hoop.x;
             let dy = ball.y - hoop.y;
             let dist = Math.sqrt(dx * dx + dy * dy);
             
-            let swishRadius = physicsMode === 'arcade' ? hoop.radius * 1.5 : hoop.radius * 0.8;
+            // Tuned Swish Radius
+            let swishRadius = physicsMode === 'arcade' ? hoop.radius * 1.4 : hoop.radius * 0.9;
 
             if (dist < swishRadius) {
-                scoreShot(ball.isPerfect || dist < 12);
+                scoreShot(ball.isPerfect || dist < 15);
             } else {
-                // BOUNCE OFF RIM/BACKBOARD
+                // Bounce
                 ball.state = 'falling';
-                ball.vz = 0.04; // Bounce forward
-                ball.vy = -ball.vy * 0.4; // Bounce up
-                ball.vx = dx * 0.1 + (Math.random() - 0.5) * 4;
+                ball.vz = 0.05; 
+                ball.vy = -ball.vy * 0.45; 
+                ball.vx = dx * 0.15 + (Math.random() - 0.5) * 4;
                 resetStreak();
             }
         }
@@ -272,6 +268,7 @@ function drawBall(radius) {
     ctx.strokeStyle = '#331100'; ctx.lineWidth = Math.max(1, 4 * ball.z);
     ctx.beginPath(); 
     ctx.moveTo(0, -radius); ctx.lineTo(0, radius); 
+    ctx.moveTo(-radius, 0); ctx.lineTo(radius, 0);
     ctx.stroke(); ctx.restore();
 }
 
@@ -292,29 +289,31 @@ function handleEnd() {
         let dx = dragStartX - mouseX;
         let dy = dragStartY - mouseY;
         
+        // Capping inputs to prevent "flying off the screen"
+        dx = Math.max(-250, Math.min(250, dx));
+        dy = Math.max(40, Math.min(600, dy));
+        
         if (dy > 30) {
             ball.state = 'shooting';
             let duration = Math.max((Date.now() - dragStartTime) / 1000, 0.05);
             
-            // DYNAMIC PHYSICS ENGINE
+            // 1. GRACEFUL TIME (Slower, higher arc)
+            // Base time is significantly higher to prevent "FAST and RIGHT IN"
+            let flickSpeedFactor = dy / (duration * 1000);
+            let t = 1.8 / (flickSpeedFactor + 0.5); 
+            t = Math.max(1.4, Math.min(2.8, t)); // Forces a minimum of 1.4s flight time
             
-            // 1. DYNAMIC POWER (Distance)
-            // Based on how many pixels the mouse went
+            // 2. DYNAMIC POWER
             let powerFactor = dy / (height * 0.45);
-            
-            // 2. DYNAMIC SPEED (Time)
-            // Based on flick velocity
-            let flickSpeed = dy / duration; 
-            let t = 2.0 / (flickSpeed / 1000 + 0.4); 
-            t = Math.max(0.6, Math.min(2.8, t)); // Clamped between fast and slow shots
-            
-            // 3. DYNAMIC ACCURACY (Centering)
-            let targetX = hoop.x - (dx * 1.8);
-            let targetZ = 1.0 - (0.75 * powerFactor);
+            let targetZ = 1.0 - (0.8 * powerFactor);
+            targetZ = Math.max(0.05, Math.min(0.9, targetZ));
 
-            // Assist window (Tightened)
-            if (Math.abs(targetZ - HOOP_Z) < 0.12 && Math.abs(targetX - hoop.x) < 45) {
-                if (physicsMode === 'arcade') {
+            // 3. HORIZONTAL ACCURACY
+            let targetX = hoop.x - (dx * 1.4); // Sensitivity reduced
+
+            // Perfect Shot Assist (Arcade mode)
+            if (physicsMode === 'arcade') {
+                if (Math.abs(targetZ - HOOP_Z) < 0.15 && Math.abs(targetX - hoop.x) < 50) {
                     targetZ = HOOP_Z;
                     targetX = hoop.x;
                     ball.isPerfect = true;
@@ -322,7 +321,8 @@ function handleEnd() {
                 }
             }
 
-            // Projectile Equations based on DYNAMIC T
+            // CALCULATE VELOCITIES
+            // Vy is solved to reach the hoop height precisely over time T
             ball.vx = (targetX - ball.x) / t;
             ball.vz = (targetZ - 1.0) / t;
             ball.vy = (hoop.y - ball.y - 0.5 * GRAVITY * t * t) / t;
