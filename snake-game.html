@@ -65,18 +65,83 @@
         .stat-pill {
             background: var(--glass);
             border: 1px solid var(--border);
-            padding: 8px 16px;
-            border-radius: 12px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            backdrop-filter: blur(10px);
+            padding: 10px 20px;
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
             display: flex;
-            gap: 12px;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 0.6rem;
+            font-weight: 800;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 0.1em;
+            margin-bottom: 2px;
         }
 
         .stat-val {
+            font-size: 1.1rem;
+            font-weight: 700;
             color: var(--neon-green);
             text-shadow: 0 0 10px rgba(0, 255, 157, 0.3);
+            line-height: 1;
+        }
+
+        .stat-divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border);
+        }
+
+        .badge-container {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stats-bar {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 14px;
+            margin-top: 10px;
+        }
+
+        .bar-item {
+            display: flex;
+            gap: 8px;
+            align-items: baseline;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .bar-label {
+            opacity: 0.4;
+            font-size: 0.65rem;
+            letter-spacing: 1px;
         }
 
         #gameCanvas {
@@ -217,28 +282,47 @@
 <body>
     <div class="game-container">
         <div class="game-header">
-            <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; flex-direction: column;">
                 <h1 class="game-title">Neon Snake</h1>
-                <div id="setting-badges" style="display: flex; gap: 6px; opacity: 0.4; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
-                    <!-- Populated by JS -->
-                </div>
+                <div id="setting-badges" class="badge-container"></div>
             </div>
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
-                <div class="stat-pill">
-                    <span>Score <span class="stat-val" id="scoreVal">0</span></span>
-                    <span>Best <span class="stat-val" id="bestVal">0</span></span>
+            
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; opacity: 0.8;">
+                    <div style="font-size: 0.65rem; font-weight: 800; color: rgba(255,255,255,0.4);">SESSION LVL</div>
+                    <div id="statSpeed" style="font-size: 1.2rem; font-weight: 900; color: var(--neon-blue);">1</div>
                 </div>
-                <div style="display: flex; gap: 12px; opacity: 0.8; font-size: 0.75rem; font-weight: 700;">
-                    <span>FOOD <span id="statFood" class="stat-val">0</span></span>
-                    <span>LVL <span id="statSpeed" class="stat-val">1</span></span>
+                <div class="stat-pill">
+                    <div class="stat-item">
+                        <span class="stat-label">SCORE</span>
+                        <span class="stat-val" id="scoreVal">0</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-label">BEST</span>
+                        <span class="stat-val" id="bestVal">0</span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div style="width: 100%; display: flex; gap: 15px; opacity: 0.6; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 0 10px;">
-            <span>Time <span id="statTime">00:00</span></span>
-            <span>Moves <span id="statMoves">0</span></span>
-            <span>Streak <span id="statStreak">0</span></span>
+        <div class="stats-bar">
+            <div class="bar-item">
+                <span class="bar-label">TIME</span>
+                <span id="statTime">00:00</span>
+            </div>
+            <div class="bar-item">
+                <span class="bar-label">FOOD</span>
+                <span id="statFood">0</span>
+            </div>
+            <div class="bar-item">
+                <span class="bar-label">MOVES</span>
+                <span id="statMoves">0</span>
+            </div>
+            <div class="bar-item">
+                <span class="bar-label">STREAK</span>
+                <span id="statStreak">0</span>
+            </div>
         </div>
 
         <div style="position: relative; width: 100%;">
@@ -295,10 +379,8 @@
             
             const addBadge = (label, val) => {
                 const s = document.createElement('span');
+                s.className = 'badge';
                 s.textContent = `${label}: ${val}`;
-                s.style.border = '1px solid rgba(255,255,255,0.1)';
-                s.style.padding = '2px 6px';
-                s.style.borderRadius = '4px';
                 badges.appendChild(s);
             };
 
