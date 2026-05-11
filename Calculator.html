@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scientific Calculator | Signal Share</title>
+    <link rel="stylesheet" href="./questions-guide.css">
+    <style>
+        body {
+            background: #08080b;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .calc-container {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 400px;
+            margin-top: 40px;
+        }
+
+        .calc-display {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            font-size: 2rem;
+            text-align: right;
+            margin-bottom: 20px;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            word-break: break-all;
+        }
+
+        .calc-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .calc-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            font-size: 1.2rem;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .calc-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .calc-btn.operator {
+            background: rgba(70, 130, 180, 0.2);
+            color: #4682b4;
+            font-weight: bold;
+        }
+
+        .calc-btn.equals {
+            background: #4682b4;
+            color: white;
+            grid-column: span 2;
+        }
+
+        .calc-btn.clear {
+            background: rgba(255, 62, 62, 0.2);
+            color: #ff3e3e;
+        }
+
+        .calc-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .calc-header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="calc-container">
+        <div class="calc-header">
+            <h1>Scientific Calculator</h1>
+            <p style="font-size: 0.8rem; opacity: 0.5;">Signal Share Utility</p>
+        </div>
+        
+        <div id="display" class="calc-display">0</div>
+        
+        <div class="calc-grid">
+            <button class="calc-btn clear" onclick="clearDisplay()">C</button>
+            <button class="calc-btn operator" onclick="append('(')">(</button>
+            <button class="calc-btn operator" onclick="append(')')">)</button>
+            <button class="calc-btn operator" onclick="append('/')">/</button>
+            
+            <button class="calc-btn" onclick="append('7')">7</button>
+            <button class="calc-btn" onclick="append('8')">8</button>
+            <button class="calc-btn" onclick="append('9')">9</button>
+            <button class="calc-btn operator" onclick="append('*')">×</button>
+            
+            <button class="calc-btn" onclick="append('4')">4</button>
+            <button class="calc-btn" onclick="append('5')">5</button>
+            <button class="calc-btn" onclick="append('6')">6</button>
+            <button class="calc-btn operator" onclick="append('-')">-</button>
+            
+            <button class="calc-btn" onclick="append('1')">1</button>
+            <button class="calc-btn" onclick="append('2')">2</button>
+            <button class="calc-btn" onclick="append('3')">3</button>
+            <button class="calc-btn operator" onclick="append('+')">+</button>
+            
+            <button class="calc-btn" onclick="append('0')">0</button>
+            <button class="calc-btn" onclick="append('.')">.</button>
+            <button class="calc-btn equals" onclick="calculate()">=</button>
+        </div>
+    </div>
+
+    <div class="questions-guide-footer" style="margin-top: 60px; text-align: center;">
+        <div style="display: flex; justify-content: center; gap: 20px; margin-bottom: 20px;">
+            <a href="./index.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Back to Site</a>
+            <a href="./how-to-guide.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Back to How-To</a>
+            <a href="./hero-player-deepdive.html" style="text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);">Back to Dev Tools</a>
+        </div>
+        <span style="opacity: 0.8;">Signal Share Engineering Documentation</span><br>
+        <span style="opacity: 0.8;">&copy; 2026 Deep Dive Series</span>
+    </div>
+
+    <script>
+        let displayValue = '0';
+        const displayEl = document.getElementById('display');
+
+        function updateDisplay() {
+            displayEl.textContent = displayValue;
+        }
+
+        function append(char) {
+            if (displayValue === '0' && char !== '.') {
+                displayValue = char;
+            } else {
+                displayValue += char;
+            }
+            updateDisplay();
+        }
+
+        function clearDisplay() {
+            displayValue = '0';
+            updateDisplay();
+        }
+
+        function calculate() {
+            try {
+                // Basic sanitization
+                const sanitized = displayValue.replace(/[^-()\d/*+.]/g, '');
+                displayValue = eval(sanitized).toString();
+            } catch (e) {
+                displayValue = 'Error';
+            }
+            updateDisplay();
+        }
+    </script>
+</body>
+</html>
