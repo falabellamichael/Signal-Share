@@ -369,6 +369,8 @@
             ctx.shadowBlur = 0;
 
             // Correct 3D Depth Sorting
+            let currentRadius = Math.max(ball.radiusBase * 0.3, ball.radiusBase * (0.3 + 0.7 * ball.z));
+            
             if (ball.z < 0.3) {
                 // Ball is behind the rim (e.g. hitting backboard)
                 drawBall(currentRadius);
