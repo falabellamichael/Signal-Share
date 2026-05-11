@@ -1,9 +1,10 @@
 import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js';
 import { createAppUi } from './app-v3-ui.js';
-import { 
   getMessageAttachmentKind, isPlayablePost, formatTimestamp, 
   formatFileSize, formatKind, formatProviderName,
-  formatPostBadge, formatPostMeta
+  formatPostBadge, formatPostMeta,
+  clampNumber, parseTags, getMediaKind, compareByNewest,
+  getLatestPostedPostId
 } from './shared-utils.js';
 
 // Ban Helper Functions
@@ -1726,7 +1727,6 @@ function isPostModerationError(error) {
 }
 function getSiteSettingsPayload() { return { id: "global", shell_width: state.siteSettings.shellWidth, section_gap: state.siteSettings.sectionGap, surface_radius: state.siteSettings.surfaceRadius, media_fit: state.siteSettings.mediaFit, updated_at: new Date().toISOString() }; }
 function normalizeSiteSettings(row = {}) { return { shellWidth: clampNumber(row.shell_width, 960, 1440, DEFAULT_SITE_SETTINGS.shellWidth), sectionGap: clampNumber(row.section_gap, 16, 40, DEFAULT_SITE_SETTINGS.sectionGap), surfaceRadius: clampNumber(row.surface_radius, 22, 44, DEFAULT_SITE_SETTINGS.surfaceRadius), mediaFit: row.media_fit === "contain" ? "contain" : DEFAULT_SITE_SETTINGS.mediaFit }; }
-function clampNumber(value, min, max, fallback) { const numeric = Number(value); if (!Number.isFinite(numeric)) return fallback; return Math.min(max, Math.max(min, Math.round(numeric))); }
 
 function loadPlayerPosition() {
   try {
@@ -1827,16 +1827,12 @@ function cleanupObjectUrls() { state.generatedUrls.forEach((url) => URL.revokeOb
 function getLikeCount(post) { if (canUseLiveLikesForPost(post)) return post.likes; return post.likes + (state.likedPosts.includes(post.id) ? 1 : 0); }
 
 function getSignalLabel(post) { if (isFreshFeedPost(post)) return "Fresh in feed"; const likes = getLikeCount(post); if (likes >= 20) return "High signal"; if (likes >= 10) return "Building momentum"; return "Live on feed"; }
-function isFreshFeedPost(post) { if (!post) return false; return isPostFromToday(post) || post.id === getLatestPostedPostId(); }
+function isFreshFeedPost(post) { if (!post) return false; return isPostFromToday(post) || post.id === getLatestPostedPostId(getAllPosts()); }
 function isPostFromToday(post) { const postDate = new Date(post.createdAt); if (Number.isNaN(postDate.getTime())) return false; const today = new Date(); return postDate.getFullYear() === today.getFullYear() && postDate.getMonth() === today.getMonth() && postDate.getDate() === today.getDate(); }
-function getLatestPostedPostId() { const posts = getAllPosts(); if (!posts.length) return ""; let latestPost = posts[0], latestTime = new Date(latestPost.createdAt).getTime(); for (const candidate of posts.slice(1)) { const candidateTime = new Date(candidate.createdAt).getTime(); if (!Number.isNaN(candidateTime) && (Number.isNaN(latestTime) || candidateTime > latestTime)) { latestPost = candidate; latestTime = candidateTime; } } return latestPost?.id ?? ""; }
-function parseTags(raw) { return raw.split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean).slice(0, 6); }
-function getMediaKind(type) { if (type.startsWith("image/")) return "image"; if (type.startsWith("video/")) return "video"; return "audio"; }
 
 function resolveViewerSource(post) { if (post.src) return post.src; if (post.blob) { if (state.viewerUrl) URL.revokeObjectURL(state.viewerUrl); state.viewerUrl = URL.createObjectURL(post.blob); return state.viewerUrl; } return ""; }
 function resolveActivePlayerSource(post) { if (post.src) return post.src; if (post.blob) { if (state.activePlayerUrl) URL.revokeObjectURL(state.activePlayerUrl); state.activePlayerUrl = URL.createObjectURL(post.blob); return state.activePlayerUrl; } return ""; }
 
-function compareByNewest(l, r) { return new Date(r.createdAt).getTime() - new Date(l.createdAt).getTime(); }
 function getSpotlightPost(posts) { return [...posts].sort((l, r) => getLikeCount(r) - getLikeCount(l) || compareByNewest(l, r))[0]; }
 function getPostById(id) { return getAllPosts().find((p) => p.id === id) ?? null; }
 function isPostSaved(id) { return state.savedPosts.includes(id); }

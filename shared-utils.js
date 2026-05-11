@@ -11,6 +11,20 @@ export function toCleanString(value) {
 }
 
 /**
+ * Ensures a value is a trimmed string with normalized whitespace.
+ */
+export function cleanDisplayText(value = "") {
+  return toCleanString(value).replace(/\s+/g, " ");
+}
+
+/**
+ * Normalizes a string: trimmed and lowercased.
+ */
+export function normalizeText(value = "") {
+  return toCleanString(value).toLowerCase();
+}
+
+/**
  * Checks if a value is a Promise or thenable.
  */
 export function isThenable(value) {
@@ -31,14 +45,30 @@ export function safeCall(fn, fallback, ...args) {
 }
 
 /**
- * Determines the category of a message attachment based on its MIME type.
+ * Determines the category of a media/attachment based on its MIME type.
+ * @param {string} type MIME type
+ * @param {string} fallback Default category if not matched
  */
-export function getMessageAttachmentKind(type = "") {
+export function getMediaKind(type = "", fallback = "file") {
   const t = (type || "").toLowerCase();
   if (t.startsWith("image/")) return "image";
   if (t.startsWith("video/")) return "video";
   if (t.startsWith("audio/")) return "audio";
-  return "file";
+  return fallback;
+}
+
+/**
+ * Alias for backward compatibility in messenger logic.
+ */
+export function getMessageAttachmentKind(type = "") {
+  return getMediaKind(type, "file");
+}
+
+/**
+ * Clamps a number between min and max.
+ */
+export function clampNumber(num, min, max) {
+  return Math.min(Math.max(num, min), max);
 }
 
 /**
@@ -79,13 +109,22 @@ export function isPlayablePost(post) {
 }
 
 /**
+ * Checks if a post is an external URL provider (YouTube/Spotify).
+ */
+export function isExternalUrlPost(post) {
+  if (!post) return false;
+  return post.sourceKind === "youtube" || post.sourceKind === "spotify";
+}
+
+/**
  * Capitalizes the provider name (e.g. "youtube" -> "YouTube").
  */
 export function formatProviderName(p = "") {
-  if (!p) return "";
-  if (p.toLowerCase() === "youtube") return "YouTube";
-  if (p.toLowerCase() === "spotify") return "Spotify";
-  return p.charAt(0).toUpperCase() + p.slice(1);
+  const normalized = normalizeText(p);
+  if (!normalized) return "";
+  if (normalized === "youtube") return "YouTube";
+  if (normalized === "spotify") return "Spotify";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 /**
@@ -116,7 +155,45 @@ export function formatFileSize(size) {
  * Formats a media kind into a post label (e.g. "image" -> "Image post").
  */
 export function formatKind(kind = "media") {
-  return `${kind.charAt(0).toUpperCase()}${kind.slice(1)} post`;
+  const k = toCleanString(kind) || "media";
+  return `${k.charAt(0).toUpperCase()}${k.slice(1)} post`;
+}
+
+/**
+ * Parses a comma-separated tag string into a clean array.
+ */
+export function parseTags(raw = "") {
+  return toCleanString(raw)
+    .split(",")
+    .map((tag) => tag.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+/**
+ * Comparison helper for sorting posts by creation date (newest first).
+ */
+export function compareByNewest(l, r) {
+  const lTime = l?.createdAt ? new Date(l.createdAt).getTime() : 0;
+  const rTime = r?.createdAt ? new Date(r.createdAt).getTime() : 0;
+  return rTime - lTime;
+}
+
+/**
+ * Returns the ID of the latest post from a list.
+ */
+export function getLatestPostedPostId(posts = []) {
+  if (!posts.length) return "";
+  let latestPost = posts[0];
+  let latestTime = new Date(latestPost.createdAt).getTime();
+  for (const candidate of posts.slice(1)) {
+    const candidateTime = new Date(candidate.createdAt).getTime();
+    if (!Number.isNaN(candidateTime) && (Number.isNaN(latestTime) || candidateTime > latestTime)) {
+      latestPost = candidate;
+      latestTime = candidateTime;
+    }
+  }
+  return latestPost?.id ?? "";
 }
 
 /**

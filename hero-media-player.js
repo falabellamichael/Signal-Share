@@ -4,6 +4,7 @@ import {
   handlePlayPauseAction, handleNextAction, handlePreviousAction,
   handleVolumeAction, handleRefreshAction
 } from "./hero-media-player-actions.js";
+import { isThenable, normalizeText, toCleanString, cleanDisplayText, isExternalUrlPost, formatProviderName } from './shared-utils.js';
 
 
 
@@ -171,9 +172,6 @@ The companion bridge is designed with several security layers to keep your PC sa
   const externalHeaderMetadataCache = new Map();
   const externalHeaderMetadataInFlight = new Map();
 
-  function isThenable(value) {
-    return Boolean(value && typeof value.then === "function");
-  }
 
   function initializeSdkHooks() {
     // Spotify Web Playback SDK initialization
@@ -219,9 +217,6 @@ The companion bridge is designed with several security layers to keep your PC sa
     return "none";
   }
 
-  function normalizeText(value = "") {
-    return `${value || ""}`.trim().toLowerCase();
-  }
 
   function getPreferredHeroControlSource() {
     const value = normalizeText(state.heroControlSource || state.heroMediaSource || state.systemMediaSource || "");
@@ -329,19 +324,8 @@ The companion bridge is designed with several security layers to keep your PC sa
     syncHeroControlSourceChange(source);
   }
 
-  function cleanDisplayText(value = "") {
-    return `${value || ""}`.replace(/\s+/g, " ").trim();
-  }
 
-  function isExternalUrlPost(post = null) {
-    return post?.sourceKind === "youtube" || post?.sourceKind === "spotify";
-  }
 
-  function getExternalProviderName(post = null) {
-    if (post?.sourceKind === "youtube") return "YouTube";
-    if (post?.sourceKind === "spotify") return "Spotify";
-    return "App";
-  }
 
   function firstCleanValue(...values) {
     for (const value of values) {
@@ -475,7 +459,7 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function getExternalHeaderFallback(post) {
-    const providerName = getExternalProviderName(post);
+    const providerName = formatProviderName(post?.sourceKind || "App");
     const directTitle = firstCleanValue(
       post?.mediaTitle,
       post?.externalTitle,
