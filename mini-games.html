@@ -897,7 +897,6 @@
                 const history = JSON.parse(localStorage.getItem('launch-history') || '[]');
                 filtered = history.map(id => GAMES.find(g => g.id === id)).filter(Boolean);
             }
-  }
             
             if (filtered.length === 0 && currentCategory === 'recent') {
                 grid.innerHTML = '<div style="grid-column: 1/-1; padding: 40px; text-align: center; opacity: 0.4;">No recent activity recorded.</div>';
