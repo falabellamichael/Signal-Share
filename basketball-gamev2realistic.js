@@ -916,6 +916,10 @@ function setPhysics(mode) {
     if (proBtn) proBtn.style.opacity = physicsMode === 'pro' ? '1' : '0.5';
 }
 
+// Ensure functions are global for HTML button onclick handlers
+window.startGame = startGame;
+window.setPhysics = setPhysics;
+
 function startCountdown() {
     if (timerInterval) clearInterval(timerInterval);
     timerValEl.textContent = timeLeft;
@@ -949,11 +953,12 @@ function gameOver() {
     setTimeout(() => overlay.style.opacity = '1', 10);
 }
 
-resize();
-setPhysics(physicsMode);
-loop();
-
 document.addEventListener('DOMContentLoaded', () => {
+    console.info('[Neon Hoops] DOM ready, initializing...');
+    resize();
+    setPhysics(physicsMode);
+    loop();
+
     const params = new URLSearchParams(window.location.search);
     const mode = params.get('mode');
     const physics = params.get('physics');
