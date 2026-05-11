@@ -33,16 +33,16 @@
         };
 
         const CFG = {
-            gravity: 0.25,
-            friction: 0.992, // Increased friction (lower value = more resistance)
+            gravity: 0.22,
+            friction: 0.990, // Increased friction (lower value = more resistance)
             restitution: 0.62,
             ballRadius: 8.8,
-            maxSpeed: 32,
+            maxSpeed: 24,
             bumperKick: 11.0,
             flipperKick: 10.5,
             flipperSnap: 0.48,
             tableTilt: 0.012,
-            collisionSlop: 0.15,
+            collisionSlop: 0.20,
             substepsMin: 4,
             substepsMax: 14,
             slingshotForce: 11.5,
@@ -104,7 +104,7 @@
         const leftFlipper = {
             side: 'left',
             x: 125,
-            y: 626,
+            y: 640,
             length: 75,
             width: 16,
             rest: 0.35,
@@ -119,7 +119,7 @@
         const rightFlipper = {
             side: 'right',
             x: 275,
-            y: 626,
+            y: 640,
             length: 75,
             width: 16,
             rest: Math.PI - 0.35,
@@ -145,10 +145,10 @@
         ];
 
         const targets = [
-            { x: 38, y: 220, w: 12, h: 34, color: COLORS.magenta, lit: false, points: 180 },
-            { x: 38, y: 264, w: 12, h: 34, color: COLORS.magenta, lit: false, points: 180 },
-            { x: 350, y: 220, w: 12, h: 34, color: COLORS.cyan, lit: false, points: 180 },
-            { x: 350, y: 264, w: 12, h: 34, color: COLORS.cyan, lit: false, points: 180 }
+            { x: 50, y: 220, w: 12, h: 34, color: COLORS.magenta, lit: false, points: 180 },
+            { x: 50, y: 264, w: 12, h: 34, color: COLORS.magenta, lit: false, points: 180 },
+            { x: 306, y: 220, w: 12, h: 34, color: COLORS.cyan, lit: false, points: 180 },
+            { x: 306, y: 264, w: 12, h: 34, color: COLORS.cyan, lit: false, points: 180 }
         ];
 
         const loop = {
@@ -213,14 +213,14 @@
         ];
 
         const walls = [
-            // Cleaner outer cabinet: proportional, mostly vertical, and mirrored around the playfield.
-            ...createPolyline([[22, 688], [22, 144], [34, 103], [68, 64], [112, 42]], COLORS.cyan, 6),
-            { x1: 112, y1: 42, x2: 284, y2: 42, color: COLORS.cyan, thick: 6 },
-            ...createPolyline([[284, 42], [326, 64], [362, 105], [397, 130], [397, 688]], COLORS.cyan, 6),
-
-            // Shooter lane is straighter and evenly spaced so it no longer looks pinched.
-            { x1: 372, y1: 688, x2: 372, y2: 146, color: COLORS.cyan, thick: 5 },
-            ...createArc(345, 145, 27, -0.1, Math.PI * 0.78, 12, COLORS.cyan, 5),
+            // Cleaner outer cabinet: shifted outward to prevent ball squeeze near targets
+            ...createPolyline([[10, 688], [10, 144], [22, 103], [56, 64], [100, 42]], COLORS.cyan, 6),
+            { x1: 100, y1: 42, x2: 284, y2: 42, color: COLORS.cyan, thick: 6 },
+            ...createPolyline([[284, 42], [326, 64], [362, 105], [390, 130], [390, 688]], COLORS.cyan, 6),
+            
+            // Shooter lane adjusted for new cabinet width
+            { x1: 365, y1: 688, x2: 365, y2: 146, color: COLORS.cyan, thick: 5 },
+            ...createArc(338, 145, 27, -0.1, Math.PI * 0.78, 12, COLORS.cyan, 5),
 
             // Smooth ball-return guides.
             ...createPolyline([[36, 490], [50, 525], [86, 560], [120, 594]], COLORS.blue, 4),
@@ -235,9 +235,9 @@
             { x1: 288, y1: 578, x2: 332, y2: 602, color: COLORS.green, thick: 4 },
             { x1: 332, y1: 602, x2: 346, y2: 528, color: COLORS.green, thick: 4 },
 
-            // Lower guides feed the ball toward the flippers without the old stretched proportions.
-            { x1: 24, y1: 596, x2: 116, y2: 626, color: COLORS.blue, thick: 4 },
-            { x1: 376, y1: 596, x2: 284, y2: 626, color: COLORS.blue, thick: 4 },
+            // Lower guides feed the ball toward the flipper pivots exactly.
+            { x1: 10, y1: 610, x2: 125, y2: 640, color: COLORS.blue, thick: 4 },
+            { x1: 365, y1: 610, x2: 275, y2: 640, color: COLORS.blue, thick: 4 },
 
             ...loopWalls
         ];
@@ -276,7 +276,7 @@
         }
 
         function resetBall() {
-            ball.x = 385;
+            ball.x = 377.5;
             ball.y = 628;
             ball.vx = 0;
             ball.vy = 0;
@@ -606,7 +606,7 @@
             }
 
             if (ball.inShooter && ball.y > 150) {
-                ball.x = clamp(ball.x, 376, 396);
+                ball.x = clamp(ball.x, 370, 386);
             }
 
             capSpeed();
@@ -1015,7 +1015,7 @@
             ctx.save();
             ctx.globalAlpha = 0.82;
             glowStroke(COLORS.blue, 2, 12);
-            roundRect(42, 46, 316, 590, 26, false, true);
+            roundRect(62, 46, 276, 590, 26, false, true);
             ctx.restore();
 
             ctx.save();
@@ -1192,23 +1192,23 @@
             ctx.lineWidth = 1.5;
             ctx.setLineDash([6, 10]);
             ctx.beginPath();
-            ctx.moveTo(385, 140);
-            ctx.lineTo(385, 660);
+            ctx.moveTo(377.5, 140);
+            ctx.lineTo(377.5, 660);
             ctx.stroke();
             ctx.setLineDash([]);
             
             // Lane highlight
-            const grad = ctx.createLinearGradient(372, 600, 398, 688);
+            const grad = ctx.createLinearGradient(365, 600, 390, 688);
             grad.addColorStop(0, 'rgba(255,215,0,0)');
             grad.addColorStop(1, 'rgba(255,215,0,0.12)');
             ctx.fillStyle = grad;
-            ctx.fillRect(372, 140, 26, 548);
+            ctx.fillRect(365, 140, 25, 548);
 
             // Ready indicator
             if (state.launchReady && ball.inShooter) {
                 ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
                 ctx.beginPath();
-                ctx.arc(385, 628, 15, 0, Math.PI * 2);
+                ctx.arc(377.5, 628, 15, 0, Math.PI * 2);
                 ctx.fill();
             }
             ctx.restore();
