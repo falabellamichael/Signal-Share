@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Hoops | Signal Share</title>
+    <style>
+        :root {
+            --neon-orange: #ff7700;
+            --neon-blue: #00d2ff;
+            --glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #1b2838 0%, #000 100%);
+            color: #fff;
+            font-family: 'Inter', system-ui, sans-serif;
+            touch-action: none; /* Prevent scrolling on mobile */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+        #gameUI {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .score-box {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            padding: 10px 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            text-align: center;
+        }
+        .score-label {
+            font-size: 0.65rem;
+            letter-spacing: 2px;
+            opacity: 0.6;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+        .score-value {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--neon-orange);
+            text-shadow: 0 0 10px rgba(255, 119, 0, 0.5);
+            line-height: 1;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            backdrop-filter: blur(5px);
+            transition: opacity 0.3s;
+        }
+        .play-btn {
+            background: linear-gradient(to bottom, var(--neon-orange), #cc5500);
+            color: #fff;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            border-radius: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 0 20px rgba(255, 119, 0, 0.4);
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="gameUI">
+        <div class="score-box">
+            <div class="score-label">SCORE</div>
+            <div class="score-value" id="score">0</div>
+        </div>
+        <div class="score-box">
+            <div class="score-label">STREAK</div>
+            <div class="score-value" id="streak" style="color: var(--neon-blue); text-shadow: 0 0 10px rgba(0, 210, 255, 0.5);">0</div>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="overlay">
+        <h1 style="font-size: 4rem; margin: 0; color: var(--neon-orange); text-shadow: 0 0 20px rgba(255,119,0,0.6); letter-spacing: -2px; text-align: center;">NEON HOOPS</h1>
+        <p style="opacity: 0.7; font-size: 1.2rem; text-align: center; margin-top: 10px;">Drag down and release to shoot</p>
+        <button class="play-btn" id="startBtn">START GAME</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('startBtn');
+        const scoreEl = document.getElementById('score');
+        const streakEl = document.getElementById('streak');
+
+        let width, height;
+        let score = 0;
+        let streak = 0;
+        let isPlaying = false;
+        
+        let mouseX = 0;
+        let mouseY = 0;
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            hoop.x = width / 2;
+            hoop.y = height * 0.3;
+            if (ball.state === 'idle') {
+                resetBall();
+            }
+        }
+        window.addEventListener('resize', resize);
+
+        const hoop = {
+            x: 0,
+            y: 0,
+            radius: 45,
+            boardWidth: 160,
+            boardHeight: 100
+        };
+
+        const ball = {
+            x: 0,
+            y: 0,
+            z: 1, // 1 is close (bottom), 0 is far (top/hoop)
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            radiusBase: 70,
+            state: 'idle', // idle, shooting, falling
+            rotation: 0,
+            vRot: 0
+        };
+
+        const particles = [];
+
+        function resetBall() {
+            ball.x = width / 2;
+            ball.y = height * 0.85;
+            ball.z = 1;
+            ball.vx = 0;
+            ball.vy = 0;
+            ball.vz = 0;
+            ball.state = 'idle';
+            ball.rotation = 0;
+            ball.vRot = 0;
+        }
+
+        function createParticles(x, y, color) {
+            for(let i=0; i<30; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 12,
+                    vy: (Math.random() - 0.5) * 12,
+                    life: 1,
+                    color: color
+                });
+            }
+        }
+
+        function update() {
+            if (!isPlaying) return;
+
+            if (ball.state === 'shooting' || ball.state === 'falling') {
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+                ball.z += ball.vz;
+                
+                // Gravity
+                ball.vy += 0.5;
+                ball.rotation += ball.vRot;
+
+                // Stop if it goes out of bounds below screen
+                if (ball.y > height + ball.radiusBase * 2 && ball.vy > 0) {
+                    if (ball.state === 'shooting') streak = 0; // miss
+                    streakEl.textContent = streak;
+                    resetBall();
+                }
+
+                // Check collision / hoop crossing
+                if (ball.state === 'shooting' && ball.z <= 0.3) {
+                    ball.vz = 0; // stop going back
+                    // Evaluate shot
+                    let dx = ball.x - hoop.x;
+                    let dy = ball.y - hoop.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < hoop.radius) {
+                        // SWISH
+                        score += 1 + Math.floor(streak / 2);
+                        streak++;
+                        scoreEl.textContent = score;
+                        streakEl.textContent = streak;
+                        createParticles(hoop.x, hoop.y, '#00ff9d');
+                        ball.state = 'falling';
+                        ball.vx *= 0.5;
+                        ball.vy = 2; // slow drop down
+                    } else if (Math.abs(ball.y - (hoop.y - hoop.boardHeight/2)) < hoop.boardHeight && Math.abs(dx) < hoop.boardWidth/2) {
+                        // Hit backboard
+                        ball.state = 'falling';
+                        ball.vy = -ball.vy * 0.5; // bounce slightly up
+                        ball.vx = -ball.vx * 0.8 + (Math.random()-0.5)*3;
+                        ball.z = 0.3; // lock depth to backboard
+                        streak = 0;
+                        streakEl.textContent = streak;
+                    } else if (dist < hoop.radius * 1.5) {
+                        // Hit rim
+                        ball.state = 'falling';
+                        ball.vy = -ball.vy * 0.6;
+                        ball.vx = (Math.random() - 0.5) * 10;
+                        streak = 0;
+                        streakEl.textContent = streak;
+                    } else {
+                        // Airball
+                        ball.state = 'falling';
+                        streak = 0;
+                        streakEl.textContent = streak;
+                    }
+                }
+            }
+
+            // Update particles
+            for(let i=particles.length-1; i>=0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.03;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw grid background for perspective
+            ctx.strokeStyle = 'rgba(0, 210, 255, 0.05)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for(let i=0; i<width; i+=40) {
+                ctx.moveTo(i, 0);
+                ctx.lineTo(width/2 + (i-width/2)*2, height);
+            }
+            for(let i=0; i<height; i+=40) {
+                ctx.moveTo(0, i);
+                ctx.lineTo(width, i + (height-i)*0.2);
+            }
+            ctx.stroke();
+
+            // Draw hoop (Backboard)
+            ctx.fillStyle = 'rgba(255,255,255,0.05)';
+            ctx.strokeStyle = '#00d2ff';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = '#00d2ff';
+            ctx.shadowBlur = 10;
+            ctx.fillRect(hoop.x - hoop.boardWidth/2, hoop.y - hoop.boardHeight, hoop.boardWidth, hoop.boardHeight);
+            ctx.strokeRect(hoop.x - hoop.boardWidth/2, hoop.y - hoop.boardHeight, hoop.boardWidth, hoop.boardHeight);
+            
+            // Inner board square
+            ctx.strokeRect(hoop.x - 30, hoop.y - 45, 60, 45);
+            ctx.shadowBlur = 0;
+
+            // Draw ball (if far, draw behind rim front)
+            let currentRadius = Math.max(ball.radiusBase * 0.3, ball.radiusBase * (0.3 + 0.7 * ball.z));
+            
+            if (ball.z <= 0.3) drawHoopRimBack();
+            drawBall(currentRadius);
+            if (ball.z > 0.3) drawHoopRimBack();
+            
+            drawHoopRimFront();
+
+            // Draw particles
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4 * p.life, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            });
+
+            // Draw drag vector
+            if (isDragging && ball.state === 'idle') {
+                ctx.strokeStyle = 'rgba(255, 119, 0, 0.5)';
+                ctx.lineWidth = 4;
+                ctx.setLineDash([10, 10]);
+                ctx.beginPath();
+                ctx.moveTo(ball.x, ball.y);
+                
+                let dx = dragStartX - mouseX;
+                let dy = dragStartY - mouseY;
+                ctx.lineTo(ball.x - dx, ball.y - dy);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        function drawHoopRimBack() {
+            ctx.strokeStyle = 'rgba(255, 50, 0, 0.5)';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.ellipse(hoop.x, hoop.y, hoop.radius, hoop.radius/2.5, 0, Math.PI, Math.PI*2);
+            ctx.stroke();
+        }
+
+        function drawHoopRimFront() {
+            ctx.strokeStyle = '#ff3e3e';
+            ctx.lineWidth = 6;
+            ctx.shadowColor = '#ff3e3e';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.ellipse(hoop.x, hoop.y, hoop.radius, hoop.radius/2.5, 0, 0, Math.PI);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            
+            // Net
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(hoop.x - hoop.radius, hoop.y);
+            ctx.lineTo(hoop.x - hoop.radius/2, hoop.y + 45);
+            ctx.lineTo(hoop.x + hoop.radius/2, hoop.y + 45);
+            ctx.lineTo(hoop.x + hoop.radius, hoop.y);
+            
+            for(let i=-hoop.radius; i<=hoop.radius; i+=15) {
+                ctx.moveTo(hoop.x + i, hoop.y);
+                ctx.lineTo(hoop.x + i*0.5, hoop.y + 45);
+            }
+            ctx.stroke();
+        }
+
+        function drawBall(radius) {
+            ctx.save();
+            ctx.translate(ball.x, ball.y);
+            ctx.rotate(ball.rotation);
+
+            // Ball glow
+            ctx.shadowColor = '#ff7700';
+            ctx.shadowBlur = 20 * ball.z;
+            
+            // Base ball
+            let grad = ctx.createRadialGradient(-radius/3, -radius/3, radius/10, 0, 0, radius);
+            grad.addColorStop(0, '#ffaa00');
+            grad.addColorStop(1, '#cc4400');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+
+            // Lines
+            ctx.strokeStyle = '#331100';
+            ctx.lineWidth = Math.max(1, 4 * ball.z);
+            ctx.beginPath();
+            // Vertical
+            ctx.moveTo(0, -radius);
+            ctx.lineTo(0, radius);
+            // Horizontal
+            ctx.moveTo(-radius, 0);
+            ctx.lineTo(radius, 0);
+            // Curves
+            ctx.moveTo(-radius, 0);
+            ctx.quadraticCurveTo(-radius/2, -radius/2, 0, -radius);
+            ctx.moveTo(radius, 0);
+            ctx.quadraticCurveTo(radius/2, radius/2, 0, radius);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // Interaction
+        function handleStart(x, y) {
+            if (ball.state === 'idle') {
+                isDragging = true;
+                dragStartX = x;
+                dragStartY = y;
+                mouseX = x;
+                mouseY = y;
+            }
+        }
+
+        function handleMove(x, y) {
+            if (isDragging) {
+                mouseX = x;
+                mouseY = y;
+            }
+        }
+
+        function handleEnd() {
+            if (isDragging && ball.state === 'idle') {
+                isDragging = false;
+                let dx = dragStartX - mouseX;
+                let dy = dragStartY - mouseY;
+                
+                // Only shoot if dragged down (so vector is up) -> wait, drag down to shoot up? 
+                // Let's do Angry Birds style: drag down/back to shoot up/forward
+                if (dy > 20) {
+                    ball.state = 'shooting';
+                    // We pull back so the ball goes in the opposite direction of the pull
+                    ball.vx = -dx * 0.15;
+                    ball.vy = -dy * 0.18;
+                    ball.vz = -0.018; // move away
+                    ball.vRot = dx * 0.01;
+                }
+            }
+        }
+
+        // Mouse events
+        window.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
+        window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
+        window.addEventListener('mouseup', handleEnd);
+
+        // Touch events
+        window.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX, e.touches[0].clientY), {passive: false});
+        window.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // prevent scroll
+            handleMove(e.touches[0].clientX, e.touches[0].clientY);
+        }, {passive: false});
+        window.addEventListener('touchend', handleEnd);
+
+        startBtn.addEventListener('click', () => {
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                isPlaying = true;
+                resize();
+                resetBall();
+                score = 0;
+                streak = 0;
+                scoreEl.textContent = '0';
+                streakEl.textContent = '0';
+            }, 300);
+        });
+
+        // Initialize
+        resize();
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>

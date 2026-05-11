@@ -551,6 +551,32 @@
                         </div>
                     </div>
 
+                    <!-- Basketball Specific Content -->
+                    <div id="hub-basketball" style="display: none;">
+                        <div class="game-hub-header">
+                            <img src="basketball_game_poster.png" class="hub-poster">
+                            <div>
+                                <h1 style="font-size: 4rem; margin: 0 0 10px 0; letter-spacing: -3px; font-weight: 900;">Neon Hoops</h1>
+                                <div style="display: flex; gap: 10px; margin-bottom: 30px;">
+                                    <span class="badge">ARCADE</span>
+                                    <span class="badge">3D SIMULATION</span>
+                                    <span class="badge" style="color: var(--steam-light);">READY</span>
+                                </div>
+                                <p style="color: rgba(255,255,255,0.6); line-height: 1.8; font-size: 1.1rem; max-width: 600px;">
+                                    A vibrant 3D-perspective basketball arcade. Drag to shoot, experience gravity physics, and beat your high score.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="play-bar">
+                            <div>
+                                <span style="font-size: 0.7rem; font-weight: 900; color: #ff7700; letter-spacing: 2px;">STATUS: ONLINE</span>
+                                <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">Ready to Launch</div>
+                            </div>
+                            <button class="play-btn" style="background: linear-gradient(to bottom, #ff7700 5%, #cc5500 95%);" onclick="launchBasketball()">Play Now</button>
+                        </div>
+                    </div>
+
                     <!-- Calculator Specific Content -->
                     <div id="hub-calc" style="display: none;">
                         <div class="game-hub-header">
@@ -776,6 +802,7 @@
     <script>
         const GAMES = [
             { id: 'snake', title: 'Neon Snake', category: 'ARCADE', poster: 'snake_game_poster_1778466261855.png', tag: 'ARCADE • READY', type: 'game' },
+            { id: 'basketball', title: 'Neon Hoops', category: 'ARCADE', poster: 'basketball_game_poster.png', tag: 'ARCADE • 3D', type: 'game' },
             { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility' }
         ];
 
@@ -941,6 +968,7 @@
             if (g) hubBg.style.backgroundImage = `url(${g.poster})`;
 
             document.getElementById('hub-snake').style.display = (game === 'snake') ? 'block' : 'none';
+            document.getElementById('hub-basketball').style.display = (game === 'basketball') ? 'block' : 'none';
             document.getElementById('hub-calc').style.display = (game === 'calc') ? 'block' : 'none';
             
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -972,7 +1000,12 @@
             const wallwrap  = document.getElementById('snake-wallwrap').checked ? '1' : '0';
             
             const url = `./snake-game.html?speed=${speed}&grid=${grid}&neon=${neon}&obstacles=${obstacles}&obstCount=${obstCount}&wallwrap=${wallwrap}&autostart=1`;
-            openApp(url, 'Neon Snake', 'snake_game_poster_1778466261855.png');
+            openApp(url, 'Neon Snake', 'snake_game_poster_1778466261855.png', 'snake');
+        }
+
+        function launchBasketball() {
+            recordLaunch('basketball');
+            openApp('./basketball-game.html', 'Neon Hoops', 'basketball_game_poster.png', 'basketball');
         }
 
         function launchCalc() {
