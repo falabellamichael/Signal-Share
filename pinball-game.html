@@ -189,12 +189,12 @@
         const pCtx = pCanvas.getContext('2d');
 
         const CONFIG = {
-            gravity: 0.28,
-            friction: 0.992,
+            gravity: 0.32,
+            friction: 0.994,
             ballRadius: 10,
-            flipperLength: 75,
-            flipperWidth: 10,
-            flipperSpeed: 0.28,
+            flipperLength: 70,
+            flipperWidth: 14,
+            flipperSpeed: 0.32,
             flipperMaxAngle: Math.PI / 4,
             flipperMinAngle: -Math.PI / 8
         };
@@ -207,8 +207,14 @@
 
         const ball = { x: 375, y: 650, vx: 0, vy: 0, radius: CONFIG.ballRadius };
 
-        const leftFlipper = { x: 120, y: 640, angle: CONFIG.flipperMinAngle, targetAngle: CONFIG.flipperMinAngle, length: CONFIG.flipperLength, side: 'left' };
-        const rightFlipper = { x: 280, y: 640, angle: -CONFIG.flipperMinAngle, targetAngle: -CONFIG.flipperMinAngle, length: CONFIG.flipperLength, side: 'right' };
+        // Adjusted flipper positions to be closer together
+        const leftFlipper = { x: 145, y: 650, angle: CONFIG.flipperMinAngle, targetAngle: CONFIG.flipperMinAngle, length: CONFIG.flipperLength, side: 'left', color: var(--neon-cyan) };
+        const rightFlipper = { x: 255, y: 650, angle: -CONFIG.flipperMinAngle, targetAngle: -CONFIG.flipperMinAngle, length: CONFIG.flipperLength, side: 'right', color: var(--neon-magenta) };
+
+        // Helper to get color from CSS variable
+        function getVar(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
 
         const bumpers = [
             { x: 140, y: 150, r: 25, color: '#ff00ff', points: 100 },
@@ -218,20 +224,21 @@
             { x: 320, y: 350, r: 20, color: '#4d4dff', points: 50 }
         ];
 
+        // Adjusted walls to funnel toward the closer flippers
         const walls = [
             { x1: 0, y1: 0, x2: 400, y2: 0 },
             { x1: 0, y1: 0, x2: 0, y2: 700 },
             { x1: 400, y1: 0, x2: 400, y2: 700 },
             { x1: 350, y1: 150, x2: 350, y2: 700 },
-            { x1: 0, y1: 600, x2: 80, y2: 660 },
-            { x1: 400, y1: 600, x2: 320, y2: 660 }
+            { x1: 0, y1: 580, x2: 145, y2: 670 }, // Funnel left
+            { x1: 400, y1: 580, x2: 255, y2: 670 }  // Funnel right
         ];
 
         const keys = {};
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
             if (e.code === 'Space' && ball.y > 600 && ball.x > 350) {
-                ball.vy = -18 - Math.random() * 4;
+                ball.vy = -20 - Math.random() * 4;
             }
         });
         window.addEventListener('keyup', e => keys[e.code] = false);
@@ -286,7 +293,7 @@
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist < ball.radius + b.r) {
                     const angle = Math.atan2(dy, dx);
-                    ball.vx = Math.cos(angle) * 12; ball.vy = Math.sin(angle) * 12;
+                    ball.vx = Math.cos(angle) * 14; ball.vy = Math.sin(angle) * 14;
                     score += b.points; updateUI();
                     createImpactParticles(b.x, b.y, b.color);
                 }
@@ -323,27 +330,59 @@
             const closestX = f.x + (dot * dx), closestY = f.y + (dot * dy);
             if (dot >= 0 && dot <= 1) {
                 const dist = Math.sqrt(Math.pow(ball.x - closestX, 2) + Math.pow(ball.y - closestY, 2));
-                if (dist < ball.radius + 5) {
+                if (dist < ball.radius + 8) {
                     const angle = f.angle + (f.side === 'left' ? -Math.PI/2 : Math.PI/2);
-                    const speed = Math.abs(f.targetAngle - f.angle) * 50 + 10;
+                    const speed = Math.abs(f.targetAngle - f.angle) * 60 + 12;
                     ball.vx = Math.cos(angle) * speed; ball.vy = Math.sin(angle) * speed;
                 }
             }
         }
 
+        function drawFlipper(f) {
+            const tipX = f.x + Math.cos(f.angle) * f.length;
+            const tipY = f.y + Math.sin(f.angle) * f.length;
+            const color = f.side === 'left' ? getVar('--neon-cyan') : getVar('--neon-magenta');
+
+            ctx.save();
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = color;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = CONFIG.flipperWidth;
+            ctx.lineCap = 'round';
+            
+            // Draw main flipper body
+            ctx.beginPath();
+            ctx.moveTo(f.x, f.y);
+            ctx.lineTo(tipX, tipY);
+            ctx.stroke();
+
+            // Draw pivot point
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Walls
             ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 2;
             walls.forEach(w => { ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke(); });
+            
+            // Bumpers
             bumpers.forEach(b => {
                 ctx.shadowBlur = 15; ctx.shadowColor = b.color; ctx.fillStyle = b.color;
                 ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
             });
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; ctx.lineCap = 'round';
-            [leftFlipper, rightFlipper].forEach(f => {
-                ctx.beginPath(); ctx.moveTo(f.x, f.y);
-                ctx.lineTo(f.x + Math.cos(f.angle) * f.length, f.y + Math.sin(f.angle) * f.length); ctx.stroke();
-            });
+            
+            // Flippers
+            drawFlipper(leftFlipper);
+            drawFlipper(rightFlipper);
+            
+            // Ball
             ctx.shadowBlur = 10; ctx.shadowColor = '#fff'; ctx.fillStyle = '#fff';
             ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
         }
