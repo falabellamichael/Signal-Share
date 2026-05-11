@@ -429,16 +429,26 @@
                 let dy = dragStartY - mouseY;
                 
                 // Only shoot if dragged down (so vector is up) -> wait, drag down to shoot up? 
-                // Let's do Angry Birds style: drag down/back to shoot up/forward
                 if (dy > 20) {
                     ball.state = 'shooting';
-                    // Cap the drag distance to prevent shooting too high
-                    let cappedDx = Math.max(Math.min(-dx, 300), -300);
-                    let cappedDy = Math.min(dy, 350);
                     
-                    ball.vx = cappedDx * 0.1;
-                    ball.vy = -cappedDy * 0.16;
-                    ball.vz = -0.022; // move away slightly faster
+                    // Auto-aim assist for straight shots
+                    let assistDx = Math.abs(dx) < 30 ? 0 : (dx > 0 ? dx - 30 : dx + 30);
+                    let targetX = hoop.x - assistDx * 1.2;
+                    let targetY = hoop.y;
+                    
+                    // Arc height based on drag distance
+                    let cappedDy = Math.max(dy, 50);
+                    let peak_y = hoop.y - cappedDy * 0.8;
+                    
+                    // Calculate precise initial velocity to hit target exactly on the way down
+                    let initial_vy = -Math.sqrt(2 * 0.8 * (ball.y - peak_y));
+                    let discriminant = 1.6 * (targetY - peak_y);
+                    let t = (-initial_vy + Math.sqrt(discriminant)) / 0.8;
+                    
+                    ball.vx = (targetX - ball.x) / t;
+                    ball.vy = initial_vy;
+                    ball.vz = -0.7 / t;
                     ball.vRot = dx * 0.01;
                 }
             }
