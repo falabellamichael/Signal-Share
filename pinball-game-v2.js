@@ -138,11 +138,11 @@ const bumpers = [
 
 // Reconfigured to spell "SHARE" spaced perfectly along the radial trajectory of the top arc
 const rollovers = [
-    { x: 78, y: 115, r: 12, label: 'S', lit: false, points: 250 },
-    { x: 130, y: 71, r: 12, label: 'H', lit: false, points: 250 },
-    { x: 195, y: 55, r: 12, label: 'A', lit: false, points: 250 },
-    { x: 260, y: 71, r: 12, label: 'R', lit: false, points: 250 },
-    { x: 312, y: 115, r: 12, label: 'E', lit: false, points: 250 }
+    { x: 78, y: 115, r: 12, label: 'S', lit: false, points: 250, cooldown: 0 },
+    { x: 130, y: 71, r: 12, label: 'H', lit: false, points: 250, cooldown: 0 },
+    { x: 195, y: 55, r: 12, label: 'A', lit: false, points: 250, cooldown: 0 },
+    { x: 260, y: 71, r: 12, label: 'R', lit: false, points: 250, cooldown: 0 },
+    { x: 312, y: 115, r: 12, label: 'E', lit: false, points: 250, cooldown: 0 }
 ];
 
 const targets = [
@@ -515,6 +515,7 @@ function update(dt) {
     }
 
     bumpers.forEach((b) => { b.pulse = Math.max(0, b.pulse - 0.05 * dt); });
+    rollovers.forEach((r) => { r.cooldown = Math.max(0, r.cooldown - dt); });
     walls.forEach((w) => { if (w.pulse) w.pulse = Math.max(0, w.pulse - 0.1 * dt); });
     updateParticles(dt);
 
@@ -743,18 +744,29 @@ function checkBumperCollision(b) {
 }
 
 function checkRollover(r) {
+    if (r.cooldown > 0) return;
     if (length(ball.x - r.x, ball.y - r.y) > ball.r + r.r) return;
-    if (!r.lit) {
-        r.lit = true;
+
+    r.lit = !r.lit;
+    r.cooldown = 45; // Prevents rapid toggling while ball is over the sensor
+
+    if (r.lit) {
         addScore(r.points, r.x, r.y - 18, COLORS.accent, r.label);
         explode(r.x, r.y, COLORS.accent, 20);
+
         if (rollovers.every((item) => item.lit)) {
-            rollovers.forEach((item) => { item.lit = false; });
             state.multiplier = Math.min(99, state.multiplier + 10);
             updateUI();
-            spawnText('LANE BONUS', 195, 130, COLORS.success);
-            explode(195, 120, COLORS.success, 50);
+            spawnText('SHARE COMPLETE! 10x BOOST', 195, 130, COLORS.success);
+            explode(195, 120, COLORS.success, 60);
+            // Auto-reset after a short delay so the player can earn it again
+            setTimeout(() => {
+                rollovers.forEach((item) => { item.lit = false; });
+            }, 1200);
         }
+    } else {
+        // Visual feedback for turning OFF
+        explode(r.x, r.y, 'rgba(255,255,255,0.2)', 10);
     }
 }
 
