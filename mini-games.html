@@ -1190,7 +1190,7 @@
 
         function launchPinball() {
             recordLaunch('pinball');
-            openApp(`./Pinball-game.html`, 'Neon Pinball', 'pinball_poster_1778481948543.png', 'pinball');
+            openApp(`./pinball-game.html`, 'Neon Pinball', 'pinball_poster_1778481948543.png', 'pinball');
         }
 
         function launchCalc() {
@@ -1242,7 +1242,7 @@
                     const frame = document.getElementById('app-frame');
                     if (id === 'snake') frame.src = 'snake-game.html';
                     else if (id === 'basketball') frame.src = 'basketball-game.html';
-                    else if (id === 'pinball') frame.src = 'Pinball-game.html';
+                    else if (id === 'pinball') frame.src = 'pinball-game.html';
                     else if (id === 'calc') frame.src = 'Calculator.html';
                     openApp(s.url, s.title, s.icon, s.appId, true);
                 }
