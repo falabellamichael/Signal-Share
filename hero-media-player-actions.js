@@ -1,8 +1,6 @@
-/**
- * Hero Media Player Actions
- * Isolated handler for specialized media operations like "Open Media", "Open Phone",
  * and System Media control (Play/Pause, Next, Previous).
  */
+import { debounce, memoGet } from './shared-utils.js';
 
 /**
  * Throttles high-frequency actions to prevent hardware/bridge flooding.
@@ -21,32 +19,7 @@ export function debounceAction(state, actionName, cooldownLimit = 0) {
   return false;
 }
 
-const ActionCache = new Map();
 
-/**
- * Simple memoization helper for expensive lookups or repeated calls within an action.
- */
-export function memoGet(key, factory, ttl = 1000) {
-  const now = Date.now();
-  const entry = ActionCache.get(key);
-  if (entry && (now - entry.timestamp < ttl)) return entry.value;
-  const value = factory();
-  ActionCache.set(key, { value, timestamp: now });
-  return value;
-}
-
-/**
- * Shared debounce gate using ActionCache.
- * Returns true if the action should be throttled.
- */
-export function debounce(actionName, ttl = 0) {
-  const now = Date.now();
-  const key = `debounce_${actionName}`;
-  const entry = ActionCache.get(key);
-  if (entry && (now - entry.timestamp < ttl)) return true;
-  ActionCache.set(key, { value: true, timestamp: now });
-  return false;
-}
 
 export function handleOpenMediaAction(context) {
   const {

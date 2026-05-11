@@ -1,3 +1,5 @@
+import { getMessageAttachmentKind } from './shared-utils.js';
+
 let apiContext = {
   state: null,
   APP_CONFIG: null,
@@ -9,13 +11,6 @@ let apiContext = {
 
 export function setApiContext(context) {
   apiContext = { ...apiContext, ...context };
-}
-
-function getMessageAttachmentKind(type = "") { 
-  if (type.startsWith("image/")) return "image"; 
-  if (type.startsWith("video/")) return "video"; 
-  if (type.startsWith("audio/")) return "audio"; 
-  return "file"; 
 }
 
 export function createSupabaseClient() {

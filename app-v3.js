@@ -1,5 +1,9 @@
 import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js';
 import { createAppUi } from './app-v3-ui.js';
+import { 
+  getMessageAttachmentKind, isPlayablePost, formatTimestamp, 
+  formatFileSize, formatKind, formatProviderName 
+} from './shared-utils.js';
 
 // Ban Helper Functions
 
@@ -1115,11 +1119,23 @@ function getDefaultProfileName() {
   const accountName = state.profileRecord?.displayName?.trim() || state.currentUser?.user_metadata?.display_name?.trim() || state.currentUser?.user_metadata?.full_name?.trim() || state.currentUser?.user_metadata?.name?.trim();
   if (accountName) return accountName.slice(0, 40);
   const remembered = localStorage.getItem(CREATOR_NAME_KEY)?.trim(); if (remembered) return remembered.slice(0, 40);
-  const email = state.currentUser?.email ?? ""; const localPart = email.split("@")[0] ?? "Member"; const prettyName = localPart.replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
-  return prettyName ? prettyName.slice(0, 40) : "Member";
+  const prettyName = formatDisplayNameFromEmail(state.currentUser?.email || "");
+  return prettyName || "Member";
 }
-function formatDisplayNameFromEmail(email = "") { const localPart = String(email ?? "").trim().split("@")[0] ?? ""; const prettyName = localPart.replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "); return prettyName ? prettyName.slice(0, 40) : ""; }
-function resolveMemberDisplayName(profile, fallback = "Member") { if (!profile || typeof profile !== "object") return fallback; const displayName = String(profile.displayName ?? "").trim(); if (displayName && !normalizeEmailForMatch(displayName).includes("@")) return displayName.slice(0, 40); const prettyEmailName = formatDisplayNameFromEmail(profile.email); return prettyEmailName || (displayName ? displayName.slice(0, 40) : fallback); }
+
+function formatDisplayNameFromEmail(email = "") { 
+  const localPart = String(email ?? "").trim().split("@")[0] ?? ""; 
+  const prettyName = localPart.replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "); 
+  return prettyName ? prettyName.slice(0, 40) : ""; 
+}
+
+function resolveMemberDisplayName(profile, fallback = "Member") { 
+  if (!profile || typeof profile !== "object") return fallback; 
+  const displayName = String(profile.displayName ?? "").trim(); 
+  if (displayName && !normalizeEmailForMatch(displayName).includes("@")) return displayName.slice(0, 40); 
+  const prettyEmailName = formatDisplayNameFromEmail(profile.email); 
+  return prettyEmailName || (displayName ? displayName.slice(0, 40) : fallback); 
+}
 function normalizeProfile(row) {
   return {
     id: row.id,
@@ -1670,19 +1686,43 @@ async function refreshLikedPostsState() {
   state.likedPosts = loadLikedPosts();
 }
 
-function isAdminRestrictedUploadKind(mediaKind) { return mediaKind === "image" || mediaKind === "video" || mediaKind === "audio"; }
-function canCurrentUserUploadMediaKind(mediaKind) { if (state.backendMode !== "supabase") return true; if (!isAdminRestrictedUploadKind(mediaKind)) return true; return isCurrentUserAdmin(); }
-function getRestrictedUploadMessage(mediaKind) { if (mediaKind === "image") return "Only admin accounts can publish uploaded images to the live feed. YouTube and Spotify links stay open."; if (mediaKind === "video") return "Only admin accounts can publish uploaded videos to the live feed. YouTube links stay available to everyone."; if (mediaKind === "audio") return "Only admin accounts can publish uploaded audio to the live feed. Spotify and YouTube links stay open."; return "Only admin accounts can publish that upload type to the live feed."; }
+function canCurrentUserUploadMediaKind(mediaKind) { 
+  if (state.backendMode !== "supabase") return true; 
+  if (!["image", "video", "audio"].includes(mediaKind)) return true; 
+  return isCurrentUserAdmin(); 
+}
+
+function getRestrictedUploadMessage(mediaKind) { 
+  if (mediaKind === "image") return "Only admin accounts can publish uploaded images to the live feed. YouTube and Spotify links stay open."; 
+  if (mediaKind === "video") return "Only admin accounts can publish uploaded videos to the live feed. YouTube links stay available to everyone."; 
+  if (mediaKind === "audio") return "Only admin accounts can publish uploaded audio to the live feed. Spotify and YouTube links stay open."; 
+  return "Only admin accounts can publish that upload type to the live feed."; 
+}
 
 function canDeletePost(post) { if (!post) return false; if (post.isLocal) return true; if (state.backendMode !== "supabase" || !state.currentUser) return false; return isCurrentUserAdmin() || post.authorId === state.currentUser.id; }
 function getAuthRedirectUrl() { if (APP_CONFIG.authRedirectUrl) { try { return new URL(APP_CONFIG.authRedirectUrl).toString(); } catch (error) { console.warn("Configured auth redirect URL is invalid", error); } } if (/^https?:$/.test(window.location.protocol)) return new URL(window.location.pathname, window.location.origin).toString(); return DEFAULT_AUTH_REDIRECT_URL; }
 
-function normalizeModerationText(value) { return String(value ?? "").toLowerCase().normalize("NFKC").replace(/['\u2019]+/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim(); }
+function normalizeModerationText(value) { 
+  const curlyApostrophe = String.fromCharCode(8217);
+  return String(value ?? "").toLowerCase().normalize("NFKC").split("'").join("").split(curlyApostrophe).join("").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim(); 
+}
+
 function getActiveBlockedTerms() { return [...DEFAULT_BLOCKED_TERMS]; }
-function normalizePostModerationText(value) { return String(value ?? "").toLowerCase().normalize("NFKC").split("'").join("").split("’").join("").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim(); }
-function normalizePostModerationTextSafe(value) { const curlyApostrophe = String.fromCharCode(8217); return String(value ?? "").toLowerCase().normalize("NFKC").split("'").join("").split(curlyApostrophe).join("").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim(); }
-function findBlockedPostTerm({ creator = "", title = "", caption = "", tags = [] }) { const normalizedPostText = normalizePostModerationTextSafe([creator, title, caption, ...(Array.isArray(tags) ? tags : [])].join(" ")); if (!normalizedPostText) return ""; const haystack = ` ${normalizedPostText} `; return getActiveBlockedTerms().find((term) => { const normalizedTerm = normalizePostModerationTextSafe(term); return normalizedTerm && haystack.includes(` ${normalizedTerm} `); }) ?? ""; }
-function isPostModerationError(error) { const message = formatBackendError(error).toLowerCase(); return message.includes("blocked language"); }
+
+function findBlockedPostTerm({ creator = "", title = "", caption = "", tags = [] }) { 
+  const normalizedPostText = normalizeModerationText([creator, title, caption, ...(Array.isArray(tags) ? tags : [])].join(" ")); 
+  if (!normalizedPostText) return ""; 
+  const haystack = ` ${normalizedPostText} `; 
+  return getActiveBlockedTerms().find((term) => { 
+    const normalizedTerm = normalizeModerationText(term); 
+    return normalizedTerm && haystack.includes(` ${normalizedTerm} `); 
+  }) ?? ""; 
+}
+
+function isPostModerationError(error) { 
+  const message = formatBackendError(error).toLowerCase(); 
+  return message.includes("blocked language"); 
+}
 function getSiteSettingsPayload() { return { id: "global", shell_width: state.siteSettings.shellWidth, section_gap: state.siteSettings.sectionGap, surface_radius: state.siteSettings.surfaceRadius, media_fit: state.siteSettings.mediaFit, updated_at: new Date().toISOString() }; }
 function normalizeSiteSettings(row = {}) { return { shellWidth: clampNumber(row.shell_width, 960, 1440, DEFAULT_SITE_SETTINGS.shellWidth), sectionGap: clampNumber(row.section_gap, 16, 40, DEFAULT_SITE_SETTINGS.sectionGap), surfaceRadius: clampNumber(row.surface_radius, 22, 44, DEFAULT_SITE_SETTINGS.surfaceRadius), mediaFit: row.media_fit === "contain" ? "contain" : DEFAULT_SITE_SETTINGS.mediaFit }; }
 function clampNumber(value, min, max, fallback) { const numeric = Number(value); if (!Number.isFinite(numeric)) return fallback; return Math.min(max, Math.max(min, Math.round(numeric))); }
@@ -1756,7 +1796,7 @@ function getProfileBoardEntries(posts) {
 
 function sortPosts(posts) { return posts.sort((l, r) => { if (state.sort === "popular") return getLikeCount(r) - getLikeCount(l) || compareByNewest(l, r); const lTime = new Date(l.createdAt).getTime(); const rTime = new Date(r.createdAt).getTime(); return state.sort === "oldest" ? lTime - rTime : rTime - lTime; }); }
 
-function isPlayablePost(post) { if (!post) return false; return post.mediaKind === "video" || post.mediaKind === "audio" || post.sourceKind === "youtube" || post.sourceKind === "spotify"; }
+
 
 async function deletePost(postId) {
   const post = getPostById(postId); if (!post || !canDeletePost(post)) { showFeedback("You do not have permission to delete that post.", true); return; }
@@ -1784,15 +1824,14 @@ function loadSavedPosts() { try { return JSON.parse(localStorage.getItem(SAVED_P
 function resolvePostSource(post) { if (post.src) return post.src; if (post.blob) { const url = URL.createObjectURL(post.blob); state.generatedUrls.push(url); return url; } return ""; }
 function cleanupObjectUrls() { state.generatedUrls.forEach((url) => URL.revokeObjectURL(url)); state.generatedUrls = []; }
 function getLikeCount(post) { if (canUseLiveLikesForPost(post)) return post.likes; return post.likes + (state.likedPosts.includes(post.id) ? 1 : 0); }
-function formatKind(kind) { return `${kind.charAt(0).toUpperCase()}${kind.slice(1)} post`; }
+
 function getSignalLabel(post) { if (isFreshFeedPost(post)) return "Fresh in feed"; const likes = getLikeCount(post); if (likes >= 20) return "High signal"; if (likes >= 10) return "Building momentum"; return "Live on feed"; }
 function isFreshFeedPost(post) { if (!post) return false; return isPostFromToday(post) || post.id === getLatestPostedPostId(); }
 function isPostFromToday(post) { const postDate = new Date(post.createdAt); if (Number.isNaN(postDate.getTime())) return false; const today = new Date(); return postDate.getFullYear() === today.getFullYear() && postDate.getMonth() === today.getMonth() && postDate.getDate() === today.getDate(); }
 function getLatestPostedPostId() { const posts = getAllPosts(); if (!posts.length) return ""; let latestPost = posts[0], latestTime = new Date(latestPost.createdAt).getTime(); for (const candidate of posts.slice(1)) { const candidateTime = new Date(candidate.createdAt).getTime(); if (!Number.isNaN(candidateTime) && (Number.isNaN(latestTime) || candidateTime > latestTime)) { latestPost = candidate; latestTime = candidateTime; } } return latestPost?.id ?? ""; }
-function formatTimestamp(iso) { return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(iso)); }
-function formatFileSize(size) { if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`; return `${(size / (1024 * 1024)).toFixed(1)} MB`; }
 function parseTags(raw) { return raw.split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean).slice(0, 6); }
 function getMediaKind(type) { if (type.startsWith("image/")) return "image"; if (type.startsWith("video/")) return "video"; return "audio"; }
+
 function resolveViewerSource(post) { if (post.src) return post.src; if (post.blob) { if (state.viewerUrl) URL.revokeObjectURL(state.viewerUrl); state.viewerUrl = URL.createObjectURL(post.blob); return state.viewerUrl; } return ""; }
 function resolveActivePlayerSource(post) { if (post.src) return post.src; if (post.blob) { if (state.activePlayerUrl) URL.revokeObjectURL(state.activePlayerUrl); state.activePlayerUrl = URL.createObjectURL(post.blob); return state.activePlayerUrl; } return ""; }
 
@@ -1892,7 +1931,7 @@ function parseSpotifyUrl(raw) {
   };
 }
 
-function formatProviderName(p) { return p.charAt(0).toUpperCase() + p.slice(1); }
+
 function isHostedPostingEnabled() { return Boolean(APP_CONFIG.supabaseUrl && APP_CONFIG.supabaseAnonKey && window.supabase); }
 
 function updatePostLikeCount(id, delta) { state.userPosts = state.userPosts.map((p) => p.id === id ? { ...p, likes: Math.max(0, (p.likes ?? 0) + delta) } : p); }
@@ -1971,8 +2010,8 @@ export const {
   normalizeUserPreferences, saveUserPreferences, updateUserPreferences, isCurrentUserActivated, getCurrentUserEmail,
   normalizeEmailForMatch, getCurrentUserEmailCandidates, isCurrentUserAdmin, canRevealMemberEmails, canUseLiveLikesForPost,
   getPersonalStateScope, getScopedStorageKey, parseStoredPostIds, loadScopedPostIds, persistScopedPostIds,
-  refreshLikedPostsState, isAdminRestrictedUploadKind, canCurrentUserUploadMediaKind, getRestrictedUploadMessage, canDeletePost,
-  getAuthRedirectUrl, normalizeModerationText, getActiveBlockedTerms, normalizePostModerationText, normalizePostModerationTextSafe,
+  refreshLikedPostsState, canCurrentUserUploadMediaKind, getRestrictedUploadMessage, canDeletePost,
+  getAuthRedirectUrl, normalizeModerationText, getActiveBlockedTerms,
   findBlockedPostTerm, isPostModerationError, getSiteSettingsPayload, normalizeSiteSettings, clampNumber,
   loadPlayerPosition, normalizePlayerVolume, loadPlayerVolume, savePlayerVolume, savePlayerPosition,
   getPlayerViewportPadding, clampPlayerPosition, loadSiteSettingsFromSupabase, handleAdminSettingsSubmit, getAllPosts,
@@ -1982,6 +2021,7 @@ export const {
   toggleSave, loadLikedPosts, loadSavedPosts, resolvePostSource, cleanupObjectUrls,
   getLikeCount, formatKind, getSignalLabel, isFreshFeedPost, isPostFromToday,
   getLatestPostedPostId, formatTimestamp, formatFileSize, parseTags, getMediaKind,
+  getMessageAttachmentKind, formatPostBadge, formatPostMeta,
   resolveViewerSource, resolveActivePlayerSource, compareByNewest, getSpotlightPost, getPostById,
   isPostSaved, rememberCreatorInput, rememberCreator, buildUploadPost, buildExternalPost,
   parseExternalMediaUrl, healPosts, parseSpotifyUrl, formatProviderName, isHostedPostingEnabled,

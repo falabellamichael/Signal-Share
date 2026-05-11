@@ -89,7 +89,8 @@ const state = {
     message: '',
     messageTimer: 0,
     drainLock: false,
-    stuckFrames: 0
+    stuckFrames: 0,
+    triLevel: 0
 };
 
 const keys = Object.create(null);
@@ -143,6 +144,12 @@ const rollovers = [
     { x: 195, y: 55, r: 12, label: 'A', lit: false, points: 250, cooldown: 0 },
     { x: 260, y: 71, r: 12, label: 'R', lit: false, points: 250, cooldown: 0 },
     { x: 312, y: 115, r: 12, label: 'E', lit: false, points: 250, cooldown: 0 }
+];
+
+const triRollovers = [
+    { x: 195, y: 490, r: 10, lit: false, points: 400, cooldown: 0, color: COLORS.accent },
+    { x: 155, y: 540, r: 10, lit: false, points: 400, cooldown: 0, color: COLORS.accent },
+    { x: 235, y: 540, r: 10, lit: false, points: 400, cooldown: 0, color: COLORS.accent }
 ];
 
 const targets = [
@@ -296,7 +303,14 @@ function startGame() {
         b.color = BUMPER_LEVELS[0].color;
         b.points = b.basePoints;
     });
-    rollovers.forEach((r) => { r.lit = false; });
+    rollovers.forEach((r) => { r.lit = false; r.cooldown = 0; });
+    state.triLevel = 0;
+    triRollovers.forEach((t) => { 
+        t.lit = false; 
+        t.cooldown = 0; 
+        t.points = 400;
+        t.color = `hsl(210, 100%, 60%)`; // Reset to initial blue
+    });
     targets.forEach((t) => { t.lit = false; });
     loop.gates.forEach((g) => { g.lit = false; });
     loop.pulse = 0;
@@ -516,6 +530,7 @@ function update(dt) {
 
     bumpers.forEach((b) => { b.pulse = Math.max(0, b.pulse - 0.05 * dt); });
     rollovers.forEach((r) => { r.cooldown = Math.max(0, r.cooldown - dt); });
+    triRollovers.forEach((t) => { t.cooldown = Math.max(0, t.cooldown - dt); });
     walls.forEach((w) => { if (w.pulse) w.pulse = Math.max(0, w.pulse - 0.1 * dt); });
     updateParticles(dt);
 
@@ -571,6 +586,7 @@ function stepBall(dt) {
     for (const wall of walls) checkSegmentCollision(wall, CFG.restitution);
     for (const bumper of bumpers) checkBumperCollision(bumper);
     for (const rollover of rollovers) checkRollover(rollover);
+    for (const tri of triRollovers) checkTriRollover(tri);
     for (const target of targets) checkTargetCollision(target);
     checkFlipperCollision(leftFlipper, dt);
     checkFlipperCollision(rightFlipper, dt);
@@ -883,6 +899,7 @@ function draw() {
     drawLoopObstacle();
     drawWalls();
     drawRollovers();
+    drawTriRollovers();
     drawTargets();
     drawBumpers();
     drawShooterLane();
@@ -893,6 +910,43 @@ function draw() {
 
     ctx.restore();
     drawParticles(shakeX, shakeY);
+}
+
+function checkTriRollover(t) {
+    if (t.cooldown > 0) return;
+    if (length(ball.x - t.x, ball.y - t.y) > ball.r + t.r) return;
+
+    t.lit = !t.lit;
+    t.cooldown = 45;
+
+    if (t.lit) {
+        addScore(t.points, t.x, t.y - 12, t.color, `+${t.points}`);
+        explode(t.x, t.y, t.color, 15);
+
+        if (triRollovers.every((item) => item.lit)) {
+            state.triLevel = Math.min(100, state.triLevel + 1);
+            state.multiplier = Math.min(99, state.multiplier + 2);
+            updateUI();
+            
+            // Calculate new color and points for the next level
+            const newHue = (210 + state.triLevel * 15) % 360;
+            const newColor = `hsl(${newHue}, 100%, 60%)`;
+            const newPoints = 400 + state.triLevel * 200;
+
+            spawnText(`TRI-POWER LVL ${state.triLevel}`, 195, 520, COLORS.success);
+            explode(195, 520, COLORS.success, 50);
+
+            setTimeout(() => {
+                triRollovers.forEach((item) => { 
+                    item.lit = false; 
+                    item.color = newColor;
+                    item.points = newPoints;
+                });
+            }, 800);
+        }
+    } else {
+        explode(t.x, t.y, 'rgba(255,255,255,0.15)', 8);
+    }
 }
 
 function normalizeAngle(a) {
@@ -1081,6 +1135,27 @@ function drawRollovers() {
         ctx.font = '800 12px Inter, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(r.label, r.x, r.y + 1);
+        ctx.restore();
+    });
+}
+
+function drawTriRollovers() {
+    triRollovers.forEach((t) => {
+        ctx.save();
+        ctx.shadowBlur = t.lit ? 15 : 0;
+        ctx.shadowColor = t.color;
+        
+        ctx.strokeStyle = t.lit ? t.color : 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2); ctx.stroke();
+        
+        if (t.lit) {
+            ctx.fillStyle = t.color;
+            ctx.globalAlpha = 0.3;
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            ctx.beginPath(); ctx.arc(t.x, t.y, t.r * 0.4, 0, Math.PI * 2); ctx.fill();
+        }
         ctx.restore();
     });
 }

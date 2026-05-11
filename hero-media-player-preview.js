@@ -1,23 +1,7 @@
+import { toCleanString, isThenable, safeCall, formatPostBadge, formatPostMeta } from './shared-utils.js';
+
 const YOUTUBE_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
 const SPOTIFY_TYPES = new Set(["track", "album", "playlist", "artist", "episode", "show"]);
-
-function toCleanString(value) {
-  return typeof value === "string" ? value.trim() : value == null ? "" : `${value}`.trim();
-}
-
-function isThenable(value) {
-  return Boolean(value && typeof value.then === "function");
-}
-
-function safeCall(fn, fallback, ...args) {
-  if (typeof fn !== "function") return fallback;
-  try {
-    const result = fn(...args);
-    return result == null ? fallback : result;
-  } catch (_error) {
-    return fallback;
-  }
-}
 
 function getPostCandidateValues(post) {
   if (!post) return [];
@@ -504,15 +488,7 @@ function canUseFallbackMedia(fallbackMedia) {
   return typeof HTMLMediaElement !== "undefined" && fallbackMedia instanceof HTMLMediaElement;
 }
 
-function formatPostBadge(post, formatKind, getSignalLabel) {
-  const kind = safeCall(formatKind, post?.mediaKind ? `${post.mediaKind} post` : "Media post", post?.mediaKind || "media");
-  const signal = safeCall(getSignalLabel, "Live on feed", post);
-  return [kind, signal].filter(Boolean).join(" / ");
-}
 
-function formatPostMeta(post, creatorSummary) {
-  return creatorSummary?.displayName ?? post?.creator ?? "";
-}
 
 export function renderHeroStagePreview(options = {}) {
   const {

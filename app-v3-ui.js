@@ -47,6 +47,7 @@ export function createAppUi(context) {
     toggleSave, loadLikedPosts, loadSavedPosts, resolvePostSource, cleanupObjectUrls,
     getLikeCount, formatKind, getSignalLabel, isFreshFeedPost, isPostFromToday,
     getLatestPostedPostId, formatTimestamp, formatFileSize, parseTags, getMediaKind,
+    getMessageAttachmentKind, formatPostBadge, formatPostMeta,
     resolveViewerSource, resolveActivePlayerSource, compareByNewest, getSpotlightPost, getPostById,
     isPostSaved, rememberCreatorInput, rememberCreator, buildUploadPost, buildExternalPost,
     parseExternalMediaUrl, healPosts, parseSpotifyUrl, isHostedPostingEnabled,
@@ -1357,7 +1358,7 @@ export function createAppUi(context) {
     link.append(title, meta); return link;
   }
 
-  function getMessageAttachmentKind(type = "") { if (type.startsWith("image/")) return "image"; if (type.startsWith("video/")) return "video"; if (type.startsWith("audio/")) return "audio"; return "file"; }
+
 
   function formatAttachmentTypeLabel(type = "") { if (!type) return "File"; const [major, minor] = type.split("/"); if (!minor) return major.charAt(0).toUpperCase() + major.slice(1); return `${major.charAt(0).toUpperCase() + major.slice(1)} ${minor.toUpperCase()}`; }
 
@@ -2470,17 +2471,7 @@ export function createAppUi(context) {
     }
   }
 
-  function formatPostBadge(post, formatKind, getSignalLabel) {
-    const kind = typeof formatKind === "function" ? formatKind(post?.mediaKind || "media") : "Media post";
-    const signal = typeof getSignalLabel === "function" ? getSignalLabel("Live on feed", post) : "Live on feed";
-    return [kind, signal].filter(Boolean).join(" / ");
-  }
 
-  function formatPostMeta(post, creatorSummary, formatTimestamp) {
-    const creator = creatorSummary?.displayName ?? post?.creator ?? "Signal Share";
-    const timestamp = typeof formatTimestamp === "function" ? formatTimestamp(post?.createdAt) : "";
-    return [creator, timestamp].filter(Boolean).join(" · ");
-  }
 
   function formatExternalPreviewBadge(provider, creator = "") {
     const providerName = formatProviderName(provider);
