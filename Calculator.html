@@ -137,11 +137,6 @@
             <div id="nav-temp" class="nav-item" onclick="setMode('temp')">Thermal Units</div>
         </div>
 
-        <div style="margin-top: auto; padding: 15px;">
-            <a href="./mini-games.html" style="text-decoration: none; font-size: 0.8rem; font-weight: 800; color: var(--accent); display: flex; align-items: center; gap: 8px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                Return to Library
-            </a>
         </div>
     </aside>
 
@@ -539,6 +534,13 @@
             if (e.key === 'Escape') handleBtn('AC');
             if (currentMode === 'programmer' && /^[a-fA-F]$/.test(e.key)) handleBtn(e.key.toUpperCase());
         });
+
+        // Hide sidebar return if in iframe
+        if (window.self !== window.top) {
+            const sidebar = document.querySelector('.sidebar');
+            // We keep the sidebar but we could hide specific items if needed
+            // Actually, the previous chunk already removed the specific link
+        }
 
         setMode('standard');
         renderHistory();
