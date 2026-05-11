@@ -531,10 +531,10 @@ function updateHoop(dt) {
     }
 
     // Sync net anchors to moving hoop
-    const netCount = 6;
-    const spacing = (Math.PI * 2) / netCount;
-    for (let i = 0; i < netCount; i++) {
-        const node = netNodes[i];
+    const spacing = (Math.PI * 2) / net.cols;
+    for (let i = 0; i < net.cols; i++) {
+        const node = net.points[i];
+        if (!node) continue;
         const angle = i * spacing;
         node.x = hoop.x + Math.cos(angle) * hoop.radius;
         node.y = hoop.y + Math.sin(angle) * hoop.radius;
