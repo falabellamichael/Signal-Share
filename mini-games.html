@@ -691,6 +691,46 @@
                 </div>
             </div>
 
+                    <!-- Pinball Specific Content -->
+                    <div id="hub-pinball" style="display: none;">
+                        <div class="game-hub-header">
+                            <img src="pinball_poster_1778481948543.png" class="hub-poster">
+                            <div>
+                                <h1 style="font-size: 4rem; margin: 0 0 10px 0; letter-spacing: -3px; font-weight: 900;">Neon Pinball</h1>
+                                <div style="display: flex; gap: 10px; margin-bottom: 30px;">
+                                    <span class="badge">ARCADE</span>
+                                    <span class="badge">PHYSICS SIM</span>
+                                    <span class="badge" style="color: #ff00ff;">NEW</span>
+                                </div>
+                                <p style="color: rgba(255,255,255,0.6); line-height: 1.8; font-size: 1.1rem; max-width: 600px;">
+                                    A high-fidelity neon pinball experience with custom collision physics. Control the flippers, hit the bumpers, and master the plunger for a legendary high score.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="play-bar">
+                            <div>
+                                <span style="font-size: 0.7rem; font-weight: 900; color: #ff00ff; letter-spacing: 2px;">STATUS: ACTIVE</span>
+                                <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">Arcade Session Ready</div>
+                            </div>
+                            <button class="play-btn" style="background: linear-gradient(to bottom, #ff00ff 5%, #cc00cc 95%);" onclick="launchPinball()">Launch Pinball</button>
+                        </div>
+
+                        <h3 style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.3; margin-bottom: 20px; font-weight: 900;">PINBALL MECHANICS</h3>
+                        <div class="config-grid">
+                            <div style="color: rgba(255,255,255,0.8); font-size: 0.85rem; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 4px; height: 4px; background: #ff00ff; border-radius: 50%;"></div> High-G Glow Bumpers</div>
+                                <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 4px; height: 4px; background: #ff00ff; border-radius: 50%;"></div> Precision Input Flippers</div>
+                            </div>
+                            <div style="color: rgba(255,255,255,0.8); font-size: 0.85rem; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 4px; height: 4px; background: #ff00ff; border-radius: 50%;"></div> Particle Impact Engine</div>
+                                <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 4px; height: 4px; background: #ff00ff; border-radius: 50%;"></div> Career Score Persistence</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Store View -->
             <div id="store-view" style="display: none;">
                 <div id="store-locked-msg" class="store-locked">
@@ -811,6 +851,7 @@
         const GAMES = [
             { id: 'snake', title: 'Neon Snake', category: 'ARCADE', poster: 'snake_game_poster_1778466261855.png', tag: 'ARCADE • READY', type: 'game' },
             { id: 'basketball', title: 'Neon Hoops', category: 'ARCADE', poster: 'basketball_game_poster.png', tag: 'ARCADE • 3D', type: 'game' },
+            { id: 'pinball', title: 'Neon Pinball', category: 'ARCADE', poster: 'pinball_poster_1778481948543.png', tag: 'ARCADE • NEW', type: 'game' },
             { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility' }
         ];
 
@@ -997,15 +1038,7 @@
 
             const hoopsData = JSON.parse(localStorage.getItem('hoops-bests') || '{"classic":0,"timer":0,"playoff":0}');
             const snakeBest = parseInt(localStorage.getItem('snake-best') || '0');
-            const totalPoints = snakeBest + (hoopsData.classic || 0) + (hoopsData.timer || 0) + ((hoopsData.playoff || 0) * 1000);
             
-            const userRank = calculateRank(totalPoints);
-            const rankTitleEl = document.querySelector('#leader-user-meta div:nth-child(2)');
-            if (rankTitleEl) {
-                rankTitleEl.textContent = userRank.name;
-                rankTitleEl.style.color = userRank.color;
-            }
-
             const games = [
                 {
                     title: 'Neon Snake',
@@ -1024,8 +1057,26 @@
                         { label: 'PLAYOFF MAX', val: hoopsData.playoff || '1', unit: 'LVL' },
                         { label: 'TIMER RECORD', val: hoopsData.timer || '0', unit: 'PTS' }
                     ]
+                },
+                {
+                    title: 'Neon Pinball',
+                    poster: 'pinball_poster_1778481948543.png',
+                    stats: [
+                        { label: 'HIGH SCORE', val: localStorage.getItem('pinball-best') || '0', unit: 'PTS' },
+                        { label: 'AVG SCORE', val: '4,200', unit: 'PTS' },
+                        { label: 'GLOBAL RANK', val: 'LEGENDARY I', unit: '' }
+                    ]
                 }
             ];
+
+            const totalPoints = snakeBest + (hoopsData.classic || 0) + (hoopsData.timer || 0) + ((hoopsData.playoff || 0) * 1000) + parseInt(localStorage.getItem('pinball-best') || '0');
+            
+            const userRank = calculateRank(totalPoints);
+            const rankTitleEl = document.querySelector('#leader-user-meta div:nth-child(2)');
+            if (rankTitleEl) {
+                rankTitleEl.textContent = userRank.name;
+                rankTitleEl.style.color = userRank.color;
+            }
 
             games.forEach(game => {
                 const card = document.createElement('div');
@@ -1095,6 +1146,7 @@
 
             document.getElementById('hub-snake').style.display = (game === 'snake') ? 'block' : 'none';
             document.getElementById('hub-basketball').style.display = (game === 'basketball') ? 'block' : 'none';
+            document.getElementById('hub-pinball').style.display = (game === 'pinball') ? 'block' : 'none';
             document.getElementById('hub-calc').style.display = (game === 'calc') ? 'block' : 'none';
             
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1134,6 +1186,11 @@
             const mode = document.getElementById('hoops-mode').value;
             const physics = document.getElementById('hoops-physics').value;
             openApp(`./basketball-game.html?mode=${mode}&physics=${physics}`, 'Neon Hoops', 'basketball_game_poster.png', 'basketball');
+        }
+
+        function launchPinball() {
+            recordLaunch('pinball');
+            openApp(`./Pinball-game.html`, 'Neon Pinball', 'pinball_poster_1778481948543.png', 'pinball');
         }
 
         function launchCalc() {
@@ -1180,7 +1237,15 @@
                 const s = event.state;
                 if (s.type === 'category') setCategory(s.cat, true);
                 else if (s.type === 'detail') showGameDetails(s.game, true);
-                else if (s.type === 'app') openApp(s.url, s.title, s.icon, s.appId, true);
+                else if (s.type === 'app') {
+                    const id = s.appId;
+                    const frame = document.getElementById('app-frame');
+                    if (id === 'snake') frame.src = 'snake-game.html';
+                    else if (id === 'basketball') frame.src = 'basketball-game.html';
+                    else if (id === 'pinball') frame.src = 'Pinball-game.html';
+                    else if (id === 'calc') frame.src = 'Calculator.html';
+                    openApp(s.url, s.title, s.icon, s.appId, true);
+                }
             } else {
                 // Default initial state
                 setCategory('all', true);
