@@ -215,9 +215,77 @@
             .score-box { min-width: 62px; padding: 8px 10px; }
             #game-canvas-container { width: min(96vw, 430px); height: min(84vh, 752px); }
         }
+        /* Signal Share Menu Bar Styles */
+        .runner-header {
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(20px);
+            padding: 12px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .close-runner {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .close-runner:hover {
+            background: #ff3e3e;
+            border-color: transparent;
+        }
+
+        .runner-title-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .runner-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+
+        .runner-title {
+            font-weight: 900;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
+    <div class="runner-header">
+        <div class="runner-title-group">
+            <img src="neon_pinball_v2_poster.png" class="runner-icon">
+            <span class="runner-title">Neon Pinball</span>
+        </div>
+        <a href="mini-games.html" class="close-runner">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            EXIT SESSION
+        </a>
+    </div>
+
     <div id="gameUI">
         <div class="stat-group">
             <div class="score-box">
@@ -259,7 +327,7 @@
         <div class="controls-hint"><p><span class="key-cap">A</span> / <span class="key-cap">←</span> left &nbsp; <span class="key-cap">D</span> / <span class="key-cap">→</span> right &nbsp; <span class="key-cap">T</span> nudge</p><p>Hold <span class="key-cap">SPACE</span> to launch. Be careful—shaking the machine too much will cause a <strong>TILT</strong>!</p></div>
     </div>
 
-    <script src="pinball-game-v2.js?v=2.0"></script>
+    <script src="pinball-game-v2.js?v=2.3"></script>
 </body>
 </html>
 

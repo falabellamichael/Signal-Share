@@ -29,14 +29,14 @@ const ui = {
 };
 
 const COLORS = {
-    bgDark: '#0f172a',       
-    bgLight: '#1e293b',      
-    primary: '#3b82f6',      
-    secondary: '#8b5cf6',    
-    accent: '#f59e0b',       
-    danger: '#ef4444',       
-    success: '#10b981',      
-    wall: '#94a3b8',         
+    bgDark: '#0f172a',
+    bgLight: '#1e293b',
+    primary: '#3b82f6',
+    secondary: '#8b5cf6',
+    accent: '#f59e0b',
+    danger: '#ef4444',
+    success: '#10b981',
+    wall: '#94a3b8',
     wallGlow: 'rgba(59, 130, 246, 0.4)',
     white: '#f8fafc',
     metallic: '#cbd5e1'
@@ -111,17 +111,29 @@ const ball = {
 };
 
 // Restored missing boundary logic in object initialization for exact physics rest/up calculation
-const leftFlipper = { side: 'left', x: 128, y: 636, angle: 0.46, rest: 0.46, up: -0.58, length: 72, width: 14, color: COLORS.primary, pressed: false };
-const rightFlipper = { side: 'right', x: 262, y: 636, angle: Math.PI - 0.46, rest: Math.PI - 0.46, up: Math.PI + 0.58, length: 72, width: 14, color: COLORS.secondary, pressed: false };
+const leftFlipper = { side: 'left', x: 124, y: 630, angle: 0.46, rest: 0.46, up: -0.58, length: 66, width: 14, color: COLORS.primary, pressed: false };
+const rightFlipper = { side: 'right', x: 276, y: 630, angle: Math.PI - 0.46, rest: Math.PI - 0.46, up: Math.PI + 0.58, length: 66, width: 14, color: COLORS.secondary, pressed: false };
 
-// BUMPERS: Expanded array to include the new lower-side bumpers.
-// They are moved "North" to y:390 so they don't trap the ball behind the slingshots (y:515).
+const BUMPER_LEVELS = [
+    { color: '#3b82f6', pointsMult: 1.0 },  // 0: Blue
+    { color: '#8b5cf6', pointsMult: 1.5 },  // 1: Purple
+    { color: '#ec4899', pointsMult: 2.0 },  // 2: Pink
+    { color: '#ef4444', pointsMult: 3.0 },  // 3: Red
+    { color: '#f97316', pointsMult: 4.5 },  // 4: Orange
+    { color: '#f59e0b', pointsMult: 6.0 },  // 5: Gold
+    { color: '#10b981', pointsMult: 8.0 },  // 6: Green
+    { color: '#06b6d4', pointsMult: 11.0 }, // 7: Cyan
+    { color: '#f8fafc', pointsMult: 15.0 }, // 8: White
+    { color: '#fbbf24', pointsMult: 20.0 }  // 9: Super Nova
+];
+
 const bumpers = [
-    { x: 195, y: 190, r: 30, color: COLORS.secondary, points: 500, pulse: 0 },
-    { x: 100, y: 310, r: 28, color: COLORS.primary, points: 300, pulse: 0 },
-    { x: 290, y: 310, r: 28, color: COLORS.primary, points: 300, pulse: 0 },
-    { x: 65,  y: 390, r: 24, color: COLORS.accent, points: 400, pulse: 0 },   // New Low Left (Safely elevated)
-    { x: 325, y: 390, r: 24, color: COLORS.accent, points: 400, pulse: 0 }    // New Low Right (Safely elevated)
+    { x: 195, y: 260, r: 35, color: BUMPER_LEVELS[0].color, points: 500, pulse: 0, hits: 0, level: 0 },
+    { x: 195, y: 150, r: 30, color: BUMPER_LEVELS[0].color, points: 500, pulse: 0, hits: 0, level: 0 },
+    { x: 100, y: 310, r: 28, color: BUMPER_LEVELS[0].color, points: 300, pulse: 0, hits: 0, level: 0 },
+    { x: 290, y: 310, r: 28, color: BUMPER_LEVELS[0].color, points: 300, pulse: 0, hits: 0, level: 0 },
+    { x: 65, y: 390, r: 24, color: BUMPER_LEVELS[0].color, points: 400, pulse: 0, hits: 0, level: 0 },
+    { x: 325, y: 390, r: 24, color: BUMPER_LEVELS[0].color, points: 400, pulse: 0, hits: 0, level: 0 }
 ];
 
 // Reconfigured to spell "SHARE" spaced perfectly along the radial trajectory of the top arc
@@ -194,11 +206,13 @@ const walls = [
 
     // Open slingshots: no closed triangle pockets, no vertical back wall to trap the ball.
     { x1: 62, y1: 526, x2: 122, y2: 584, color: COLORS.success, thick: 7, slingshot: true },
-    { x1: 122, y1: 584, x2: 86, y2: 604, color: COLORS.wall, thick: 4, slingCap: true },
     { x1: 338, y1: 526, x2: 278, y2: 584, color: COLORS.success, thick: 7, slingshot: true },
-    { x1: 278, y1: 584, x2: 314, y2: 604, color: COLORS.wall, thick: 4, slingCap: true },
 
-    // Return guides and lower bars removed to open up flipper access
+    // Return guides now connected directly to flipper pivots for a seamless look.
+    { x1: 20, y1: 558, x2: 124, y2: 630, color: COLORS.wall, thick: 5 },
+    { x1: 370, y1: 558, x2: 276, y2: 630, color: COLORS.wall, thick: 5 },
+    { x1: 40, y1: 645, x2: 115, y2: 668, color: COLORS.wall, thick: 5 },
+    { x1: 350, y1: 645, x2: 275, y2: 668, color: COLORS.wall, thick: 5 },
 
     // Loop crescents.
     ...createArc(195 - 35 / 2, loop.cy, 62, Math.PI * 0.7, Math.PI * 1.3, 12, COLORS.accent, 4),
@@ -233,7 +247,7 @@ function updateUI() {
         state.highScore = state.score;
         try {
             localStorage.setItem('pinball-pro-best', String(state.highScore));
-        } catch (e) {}
+        } catch (e) { }
         ui.highScore.textContent = formatScore(state.highScore);
     }
 }
@@ -247,10 +261,10 @@ function resetBall() {
     ball.inShooter = true;
     ball.active = true;
     ball.flipperCooldown = 0;
-    
+
     leftFlipper.angle = leftFlipper.rest;
     rightFlipper.angle = rightFlipper.rest;
-    
+
     state.launchReady = true;
     state.launchCharge = 0;
     state.drainLock = false;
@@ -337,12 +351,12 @@ function nudge(direction = 0) {
     state.nudgeCooldown = 30;
     state.tiltWarnings++;
     state.screenShake = Math.max(state.screenShake, 10);
-    
+
     const forceX = direction === 0 ? (Math.random() - 0.5) * 5 : (direction * 4);
     const forceY = -2.0;
     ball.vx += forceX;
     ball.vy += forceY;
-    
+
     if (state.tiltWarnings > 4) {
         state.tilted = true;
         spawnText("TILT FAULT", 195, 350, COLORS.danger);
@@ -392,7 +406,7 @@ function releaseLaunchCharge() {
     const power = clamp(state.launchCharge, 0.3, 1.0);
     ball.vx = -0.5 - power * 0.5; // Restored the "perfect" lock trajectory
     ball.vy = -20.0 - power * 11.0;
-    ball.spin = -power * 0.2; 
+    ball.spin = -power * 0.2;
     state.launchHolding = false;
     state.launchReady = false;
     state.launchCharge = 0;
@@ -475,17 +489,22 @@ function update(dt) {
     if (state.launchHolding) state.launchCharge = clamp(state.launchCharge + 0.02 * dt, 0, 1);
 
     const speed = length(ball.vx, ball.vy);
-    const maxMovePerSubstep = ball.r * 0.3; 
+    const maxMovePerSubstep = ball.r * 0.3;
     const requiredSteps = Math.ceil((speed * dt) / maxMovePerSubstep);
     const steps = clamp(Math.max(requiredSteps, CFG.substepsMin), CFG.substepsMin, 30);
     const subDt = dt / steps;
 
-    for (let i = 0; i < steps; i += 1) stepBall(subDt);
+    for (let i = 0; i < steps; i += 1) {
+        const t = (i + 1) / steps;
+        leftFlipper.currentAngle = leftFlipper.prevAngle + (leftFlipper.angle - leftFlipper.prevAngle) * t;
+        rightFlipper.currentAngle = rightFlipper.prevAngle + (rightFlipper.angle - rightFlipper.prevAngle) * t;
+        stepBall(subDt);
+    }
 
     bumpers.forEach((b) => { b.pulse = Math.max(0, b.pulse - 0.05 * dt); });
     walls.forEach((w) => { if (w.pulse) w.pulse = Math.max(0, w.pulse - 0.1 * dt); });
     updateParticles(dt);
-    
+
     if (length(ball.vx, ball.vy) > 2) {
         ball.trail.push({ x: ball.x, y: ball.y });
         if (ball.trail.length > 10) ball.trail.shift();
@@ -504,7 +523,9 @@ function updateFlipper(f, pressed, dt) {
     f.target = pressed ? f.up : f.rest;
     f.prevAngle = f.angle;
     const diff = f.target - f.angle;
-    f.angle += diff * clamp(CFG.flipperSnap * dt, 0, 1);
+    const snap = clamp(CFG.flipperSnap * dt, 0, 1);
+    f.angle += diff * snap;
+    f.omega = (f.angle - f.prevAngle) / (dt || 0.016);
 }
 
 function stepBall(dt) {
@@ -513,13 +534,13 @@ function stepBall(dt) {
     ball.flipperCooldown = Math.max(0, ball.flipperCooldown - dt);
     ball.vy += CFG.gravity * dt;
     ball.vx += CFG.tableTilt * dt;
-    
+
     ball.vx *= Math.pow(CFG.friction, dt);
     ball.vy *= Math.pow(CFG.friction, dt);
-    
+
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
-    
+
     ball.spin *= Math.pow(0.95, dt);
 
     if (ball.x > CFG.shooterMinX && ball.y > 450) {
@@ -528,7 +549,7 @@ function stepBall(dt) {
     } else if (ball.inShooter && ball.y < 165) {
         // Exit shooter mode ONLY after clearing the one-way gate (y=170)
         ball.inShooter = false;
-        state.launchReady = false; 
+        state.launchReady = false;
     }
 
     if (checkDrain()) return;
@@ -592,22 +613,22 @@ function rescueBallIfStuck() {
 function checkSegmentCollision(seg, restitution) {
     if (seg.isDrain) return;
     // If it's the plunger lock gate, and the ball is still shooting, let it ghost through
-    if (seg.isGate && ball.inShooter) return; 
+    if (seg.isGate && ball.inShooter) return;
 
     const dx = seg.x2 - seg.x1;
     const dy = seg.y2 - seg.y1;
     const lenSq = dx * dx + dy * dy;
     if (lenSq === 0) return;
-    
+
     const t = clamp(((ball.x - seg.x1) * dx + (ball.y - seg.y1) * dy) / lenSq, 0, 1);
     const cx = seg.x1 + dx * t;
     const cy = seg.y1 + dy * t;
-    
+
     let nx = ball.x - cx;
     let ny = ball.y - cy;
     let dist = length(nx, ny);
     const radius = ball.r + (seg.thick || 2) * 0.5;
-    
+
     if (dist >= radius) return;
 
     if (dist < 0.0001) {
@@ -629,17 +650,17 @@ function checkSegmentCollision(seg, restitution) {
     const penetration = radius - dist + CFG.collisionSlop;
     ball.x += nx * penetration;
     ball.y += ny * penetration;
-    
+
     const vn = ball.vx * nx + ball.vy * ny;
     if (vn < 0) {
         ball.vx -= (1 + restitution) * vn * nx;
         ball.vy -= (1 + restitution) * vn * ny;
-        
+
         const tx = -ny, ty = nx;
         const vt = ball.vx * tx + ball.vy * ty;
         ball.vx -= vt * CFG.wallFriction * tx;
         ball.vy -= vt * CFG.wallFriction * ty;
-        
+
         ball.spin += (vt * CFG.wallFriction) / ball.r;
 
         if (seg.slingshot && Math.abs(vn) > 1.5) {
@@ -667,19 +688,19 @@ function checkBumperCollision(b) {
     let ny = ball.y - b.y;
     const dist = length(nx, ny);
     const radius = ball.r + b.r;
-    
+
     if (dist >= radius) return;
-    
-    if (dist < 0.001) { nx = 0; ny = -1; } 
+
+    if (dist < 0.001) { nx = 0; ny = -1; }
     else { nx /= dist; ny /= dist; }
-    
+
     // 1. Static Resolution (Snap out of overlap)
     ball.x = b.x + nx * radius;
     ball.y = b.y + ny * radius;
-    
+
     // 2. Kinetic Resolution (Dynamic Kick)
     const vNormal = ball.vx * nx + ball.vy * ny;
-    
+
     if (vNormal < 0) {
         // Full kinetic transfer if striking the bumper head-on
         ball.vx += nx * CFG.bumperKick;
@@ -689,10 +710,22 @@ function checkBumperCollision(b) {
         ball.vx += nx * (CFG.bumperKick * 0.4);
         ball.vy += ny * (CFG.bumperKick * 0.4);
     }
-    
+
     b.pulse = 1;
     state.screenShake = Math.max(state.screenShake, 8);
-    addScore(b.points, b.x, b.y - b.r - 10, b.color, 'BUMP');
+
+    // Bumper Leveling System: Advance level every 25 hits
+    b.hits += 1;
+    const nextLevel = Math.min(9, Math.floor(b.hits / 25));
+    if (nextLevel > b.level) {
+        b.level = nextLevel;
+        b.color = BUMPER_LEVELS[nextLevel].color;
+        spawnText('LEVEL UP!', b.x, b.y - 20, COLORS.success);
+        explode(b.x, b.y, b.color, 40);
+    }
+
+    const currentPoints = Math.round(b.points * BUMPER_LEVELS[b.level].pointsMult);
+    addScore(currentPoints, b.x, b.y - b.r - 10, b.color, 'BUMP');
     explode(b.x, b.y, b.color, 30);
 }
 
@@ -704,7 +737,7 @@ function checkRollover(r) {
         explode(r.x, r.y, COLORS.accent, 20);
         if (rollovers.every((item) => item.lit)) {
             rollovers.forEach((item) => { item.lit = false; });
-            state.multiplier = Math.min(8, state.multiplier + 1);
+            state.multiplier = Math.min(99, state.multiplier + 10);
             updateUI();
             spawnText('LANE BONUS', 195, 130, COLORS.success);
             explode(195, 120, COLORS.success, 50);
@@ -719,19 +752,24 @@ function checkTargetCollision(t) {
     let ny = ball.y - closestY;
     const dist = length(nx, ny);
     if (dist >= ball.r) return;
-    
-    if (dist < 0.001) { nx = ball.x < t.x + t.w / 2 ? -1 : 1; ny = 0; } 
+
+    if (dist < 0.001) { nx = ball.x < t.x + t.w / 2 ? -1 : 1; ny = 0; }
     else { nx /= dist; ny /= dist; }
-    
+
     ball.x += nx * (ball.r - dist + 0.1);
     ball.y += ny * (ball.r - dist + 0.1);
-    
+
     const vn = ball.vx * nx + ball.vy * ny;
     if (vn < 0) {
         ball.vx -= 1.6 * vn * nx;
         ball.vy -= 1.6 * vn * ny;
+        
+        // Active kicker effect to prevent the ball from settling on top of targets
+        const kick = 6.5;
+        ball.vx += nx * kick;
+        ball.vy += ny * kick;
     }
-    
+
     if (!t.lit) {
         t.lit = true;
         addScore(t.points, t.x + t.w / 2, t.y, t.color, 'HIT');
@@ -740,12 +778,13 @@ function checkTargetCollision(t) {
 }
 
 function checkFlipperCollision(f, dt) {
-    const tipX = f.x + Math.cos(f.angle) * f.length;
-    const tipY = f.y + Math.sin(f.angle) * f.length;
+    const ang = f.currentAngle || f.angle;
+    const tipX = f.x + Math.cos(ang) * f.length;
+    const tipY = f.y + Math.sin(ang) * f.length;
     const dx = tipX - f.x, dy = tipY - f.y;
     const lenSq = dx * dx + dy * dy;
     if (lenSq === 0) return;
-    
+
     const t = clamp(((ball.x - f.x) * dx + (ball.y - f.y) * dy) / lenSq, 0, 1);
     const cx = f.x + dx * t;
     const cy = f.y + dy * t;
@@ -754,20 +793,15 @@ function checkFlipperCollision(f, dt) {
     const contactRadius = ball.r + f.width * 0.5;
 
     if (dist >= contactRadius) return;
-    if (dist < 0.001) { nx = f.side === 'left' ? 0.35 : -0.35; ny = -0.94; dist = 1; } 
+    if (dist < 0.001) { nx = f.side === 'left' ? 0.35 : -0.35; ny = -0.94; dist = 1; }
     else { nx /= dist; ny /= dist; }
-
-    const crossProductSign = (ball.x - f.x) * dy - (ball.y - f.y) * dx;
-    if ((f.side === 'left' && crossProductSign > 0) || (f.side === 'right' && crossProductSign < 0)) {
-        nx = -nx; ny = -ny;
-    }
 
     ball.x += nx * (contactRadius - dist + CFG.collisionSlop);
     ball.y += ny * (contactRadius - dist + CFG.collisionSlop);
 
-    const omega = ((f.angle - f.prevAngle) / (dt || 1)) * 1.1;
+    const omega = f.omega * 1.1;
     const vfx = -omega * (cy - f.y), vfy = omega * (cx - f.x);
-    
+
     const vrx = ball.vx - vfx, vry = ball.vy - vfy;
     const vrn = vrx * nx + vry * ny;
 
@@ -783,7 +817,7 @@ function checkFlipperCollision(f, dt) {
         const vrt = vrx * tx + vry * ty;
         ball.vx -= vrt * CFG.flipperFriction * tx;
         ball.vy -= vrt * CFG.flipperFriction * ty;
-        
+
         ball.spin += (vrt * CFG.flipperFriction) / ball.r;
 
         if (isHitting && ball.flipperCooldown <= 0 && j > 5) {
@@ -850,7 +884,7 @@ function checkLoopScoring() {
     const dx = ball.x - loop.cx;
     const dy = ball.y - loop.cy;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    
+
     if (dist > loop.innerR && dist < loop.outerR) {
         const angle = Math.atan2(dy, dx);
         for (const gate of loop.gates) {
@@ -860,7 +894,7 @@ function checkLoopScoring() {
                 loop.pulse = 1.0;
                 addScore(gate.points, ball.x, ball.y, loop.color, `LOOP ${gate.label}`);
                 explode(ball.x, ball.y, loop.color, 15);
-                
+
                 if (loop.gates.every(g => g.lit)) {
                     loop.gates.forEach(g => g.lit = false);
                     state.multiplier = Math.min(5, state.multiplier + 1);
@@ -877,7 +911,7 @@ function drawLoopObstacle() {
     ctx.save();
     loop.pulse = Math.max(0, loop.pulse - 0.05);
     const glow = 5 + loop.pulse * 15;
-    
+
     ctx.shadowBlur = glow;
     ctx.shadowColor = loop.color;
     ctx.strokeStyle = loop.color;
@@ -885,25 +919,25 @@ function drawLoopObstacle() {
     ctx.lineCap = 'round';
 
     ctx.beginPath();
-    ctx.arc(loop.cx - loop.gap/2, loop.cy, loop.midR, Math.PI * 0.7 + loopTilt, Math.PI * 1.3 + loopTilt);
+    ctx.arc(loop.cx - loop.gap / 2, loop.cy, loop.midR, Math.PI * 0.7 + loopTilt, Math.PI * 1.3 + loopTilt);
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(loop.cx + loop.gap/2, loop.cy, loop.midR, Math.PI * 1.7 + loopTilt, Math.PI * 2.3 + loopTilt);
+    ctx.arc(loop.cx + loop.gap / 2, loop.cy, loop.midR, Math.PI * 1.7 + loopTilt, Math.PI * 2.3 + loopTilt);
     ctx.stroke();
-    
+
     ctx.textAlign = 'center';
     ctx.font = '900 12px Inter, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.fillText('SPLIT LOOP', loop.cx, loop.cy);
-    
+
     const drawMarkers = (cx, startA, endA) => {
         const steps = 5;
         for (let i = 0; i <= steps; i++) {
             const a = startA + (endA - startA) * (i / steps);
             const mx = cx + Math.cos(a) * (loop.midR + 8);
             const my = loop.cy + Math.sin(a) * (loop.midR + 8);
-            
+
             ctx.fillStyle = COLORS.accent;
             ctx.shadowBlur = 4;
             ctx.beginPath();
@@ -911,10 +945,10 @@ function drawLoopObstacle() {
             ctx.fill();
         }
     };
-    
-    drawMarkers(loop.cx - loop.gap/2, Math.PI * 0.7, Math.PI * 1.3);
-    drawMarkers(loop.cx + loop.gap/2, Math.PI * 1.7, Math.PI * 2.3);
-    
+
+    drawMarkers(loop.cx - loop.gap / 2, Math.PI * 0.7, Math.PI * 1.3);
+    drawMarkers(loop.cx + loop.gap / 2, Math.PI * 1.7, Math.PI * 2.3);
+
     ctx.restore();
 }
 
@@ -945,7 +979,7 @@ function drawPlayfieldArt() {
     // Dynamic Multiplier Glow on central decal elements
     const glowIntensity = Math.min(1.0, (state.multiplier - 1) / 7);
     ctx.fillStyle = `rgba(255, 255, 255, ${0.04 + glowIntensity * 0.1})`;
-    
+
     if (glowIntensity > 0) {
         ctx.shadowColor = COLORS.accent;
         ctx.shadowBlur = glowIntensity * 20;
@@ -953,14 +987,14 @@ function drawPlayfieldArt() {
 
     ctx.fillText('SIGNAL', 195, 430);
     ctx.fillText('SHARE', 195, 470);
-    
+
     ctx.shadowBlur = 0;
     ctx.strokeStyle = `rgba(59, 130, 246, ${0.15 + glowIntensity * 0.35})`;
     ctx.lineWidth = 2 + glowIntensity * 3;
     ctx.beginPath();
     ctx.arc(195, 360, 140, Math.PI, 0);
     ctx.stroke();
-    
+
     ctx.restore();
 }
 
@@ -968,7 +1002,7 @@ function drawWalls() {
     walls.forEach((w) => {
         ctx.save();
         const pulse = w.pulse || 0;
-        
+
         if (w.isGate) {
             // Visualize the plunger lock gate dynamically
             ctx.lineCap = 'round';
@@ -990,7 +1024,7 @@ function drawWalls() {
             ctx.shadowBlur = 8;
             ctx.shadowOffsetY = 4;
         }
-        
+
         ctx.beginPath();
         ctx.moveTo(w.x1, w.y1);
         ctx.lineTo(w.x2, w.y2);
@@ -1014,15 +1048,15 @@ function drawRollovers() {
         ctx.fillStyle = r.lit ? color : 'rgba(0,0,0,0.3)';
         ctx.strokeStyle = color;
         ctx.lineWidth = 2;
-        
+
         if (r.lit) {
             ctx.shadowColor = color;
             ctx.shadowBlur = 12;
         }
-        
+
         ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
         ctx.fill(); ctx.stroke();
-        
+
         ctx.fillStyle = r.lit ? '#000' : 'rgba(255,255,255,0.5)';
         ctx.font = '800 12px Inter, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1048,21 +1082,21 @@ function drawBumpers() {
     bumpers.forEach((b) => {
         const pulse = b.pulse;
         ctx.save();
-        
+
         ctx.shadowColor = 'rgba(0,0,0,0.8)';
         ctx.shadowBlur = 10;
         ctx.shadowOffsetY = 5;
-        
+
         ctx.fillStyle = COLORS.bgLight;
         ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
-        
+
         ctx.shadowColor = b.color;
         ctx.shadowBlur = 15 + pulse * 20;
         ctx.shadowOffsetY = 0;
         ctx.strokeStyle = b.color;
         ctx.lineWidth = 4 + pulse * 3;
         ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 4 + pulse * 2, 0, Math.PI * 2); ctx.stroke();
-        
+
         ctx.fillStyle = COLORS.white;
         ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.4, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
@@ -1073,7 +1107,7 @@ function drawShooterLane() {
     ctx.save();
     ctx.fillStyle = 'rgba(255,255,255,0.02)';
     ctx.fillRect(370, 200, 28, CFG.drainY - 188); // perfectly scaled inside wall boundaries
-    
+
     if (state.launchReady && ball.inShooter) {
         ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
         ctx.beginPath(); ctx.arc(384, 628, 16, 0, Math.PI * 2); ctx.fill();
@@ -1082,26 +1116,27 @@ function drawShooterLane() {
 }
 
 function drawFlipper(f) {
-    const tipX = f.x + Math.cos(f.angle) * f.length;
-    const tipY = f.y + Math.sin(f.angle) * f.length;
+    const ang = f.currentAngle || f.angle;
+    const tipX = f.x + Math.cos(ang) * f.length;
+    const tipY = f.y + Math.sin(ang) * f.length;
     ctx.save();
-    
+
     ctx.lineCap = 'round';
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 6;
     ctx.shadowOffsetY = 4;
-    
+
     ctx.strokeStyle = COLORS.bgLight;
     ctx.lineWidth = f.width + 2;
     ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(tipX, tipY); ctx.stroke();
-    
+
     ctx.shadowBlur = f.pressed ? 12 : 0;
     ctx.shadowColor = f.color;
     ctx.shadowOffsetY = 0;
     ctx.strokeStyle = f.color;
     ctx.lineWidth = f.width - 4;
     ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(tipX, tipY); ctx.stroke();
-    
+
     ctx.fillStyle = COLORS.white;
     ctx.beginPath(); ctx.arc(f.x, f.y, f.width * 0.6, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
@@ -1122,26 +1157,26 @@ function drawBall() {
     ctx.save();
     ctx.translate(ball.x, ball.y);
     ctx.rotate(ball.spin);
-    
+
     ctx.shadowColor = 'rgba(0,0,0,0.7)';
     ctx.shadowBlur = 8;
     ctx.shadowOffsetY = 4;
-    
-    const grad = ctx.createRadialGradient(-ball.r*0.3, -ball.r*0.3, ball.r*0.1, 0, 0, ball.r);
+
+    const grad = ctx.createRadialGradient(-ball.r * 0.3, -ball.r * 0.3, ball.r * 0.1, 0, 0, ball.r);
     grad.addColorStop(0, '#ffffff');
     grad.addColorStop(0.3, '#94a3b8');
     grad.addColorStop(0.8, '#334155');
     grad.addColorStop(1, '#0f172a');
-    
+
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(0, 0, ball.r, 0, Math.PI * 2); ctx.fill();
-    
+
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
     ctx.strokeStyle = 'rgba(255,255,255,0.6)';
     ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(0, 0, ball.r * 0.5, 0, Math.PI * 0.5); ctx.stroke();
-    
+
     ctx.restore();
 }
 
@@ -1149,7 +1184,7 @@ function drawPlungerMeter() {
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.fillRect(380, 640, 8, 50); // Slimmer to fit within optimized inner lane
-    
+
     const h = 50 * state.launchCharge;
     ctx.fillStyle = COLORS.accent;
     ctx.shadowColor = COLORS.accent;
@@ -1162,7 +1197,7 @@ function drawParticles(shakeX, shakeY) {
     pCtx.clearRect(0, 0, W, H);
     pCtx.save();
     pCtx.translate(shakeX, shakeY);
-    
+
     particles.forEach((p) => {
         pCtx.globalAlpha = clamp(p.life, 0, 1);
         pCtx.fillStyle = p.color;
@@ -1178,13 +1213,13 @@ function drawParticles(shakeX, shakeY) {
         pCtx.textAlign = 'center';
         pCtx.fillText(ft.text, ft.x, ft.y);
     });
-    
+
     pCtx.restore();
 }
 
 function frame(now) {
     const rawDt = state.lastTime ? (now - state.lastTime) / 16.6667 : 1;
-    const dt = clamp(rawDt, 0.1, 2.5); 
+    const dt = clamp(rawDt, 0.1, 2.5);
     state.lastTime = now;
     update(dt);
     draw();
