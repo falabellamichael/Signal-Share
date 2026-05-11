@@ -29,8 +29,8 @@ let dragStartX = 0;
 let dragStartY = 0;
 let dragStartTime = 0;
 
-// Re-implementing the "300px Sweet-Spot" and "Z-Axis Bounce" logic
-const GRAVITY = 0.8;
+// NEW DYNAMIC PHYSICS CONSTANTS
+const GRAVITY = 1.0; 
 const HOOP_Z = 0.35;
 
 const hoop = {
@@ -140,48 +140,34 @@ function update() {
             });
         }
 
+        // KEEP BALL IN VIEW: Prevent it from flying too far horizontally
+        if (ball.x < -100 || ball.x > width + 100) {
+            resetBall();
+            resetStreak();
+        }
+
         if (ball.y > height + 200) {
             resetStreak();
             resetBall();
         }
 
-        // Z-Axis Depth Collision (The "300px sweet-spot" companion logic)
+        // DEPTH COLLISION
         if (ball.state === 'shooting' && ball.z <= HOOP_Z) {
             let dx = ball.x - hoop.x;
             let dy = ball.y - hoop.y;
             let dist = Math.sqrt(dx * dx + dy * dy);
             
-            // Tuned swish/rim thresholds
             let swishRadius = physicsMode === 'arcade' ? hoop.radius * 1.5 : hoop.radius * 0.8;
-            let rimRadius = hoop.radius * 2.0;
 
             if (dist < swishRadius) {
-                scoreShot(ball.isPerfect || dist < 10);
-            } else if (dist < rimRadius) {
-                // Bounce Logic
+                scoreShot(ball.isPerfect || dist < 12);
+            } else {
+                // BOUNCE OFF RIM/BACKBOARD
                 ball.state = 'falling';
-                ball.vz = 0.05; // Bounce back
-                ball.vy = -ball.vy * 0.4;
+                ball.vz = 0.04; // Bounce forward
+                ball.vy = -ball.vy * 0.4; // Bounce up
                 ball.vx = dx * 0.1 + (Math.random() - 0.5) * 4;
                 resetStreak();
-            } else {
-                // Backboard Check
-                let boardLeft = hoop.x - hoop.boardWidth / 2;
-                let boardRight = hoop.x + hoop.boardWidth / 2;
-                let boardTop = hoop.y - hoop.boardHeight;
-                let boardBottom = hoop.y;
-
-                if (ball.x > boardLeft && ball.x < boardRight && ball.y > boardTop && ball.y < boardBottom) {
-                    ball.state = 'falling';
-                    ball.vz = 0.08; 
-                    ball.vx = -ball.vx * 0.5;
-                    ball.vy *= 0.5;
-                    resetStreak();
-                } else {
-                    // Passed the depth without hitting anything
-                    ball.state = 'falling';
-                    resetStreak();
-                }
             }
         }
     }
@@ -202,6 +188,7 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, width, height);
     
+    // Background Grid
     ctx.strokeStyle = 'rgba(0, 210, 255, 0.05)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -223,7 +210,7 @@ function draw() {
     ctx.strokeRect(hoop.x - 30, hoop.y - 45, 60, 45);
     ctx.shadowBlur = 0;
 
-    let ballScale = Math.max(0.2, ball.z);
+    let ballScale = Math.max(0.1, ball.z);
     let currentRadius = ball.radiusBase * ballScale;
 
     if (ball.z < HOOP_Z) {
@@ -285,7 +272,6 @@ function drawBall(radius) {
     ctx.strokeStyle = '#331100'; ctx.lineWidth = Math.max(1, 4 * ball.z);
     ctx.beginPath(); 
     ctx.moveTo(0, -radius); ctx.lineTo(0, radius); 
-    ctx.moveTo(-radius, 0); ctx.lineTo(radius, 0);
     ctx.stroke(); ctx.restore();
 }
 
@@ -306,27 +292,41 @@ function handleEnd() {
         let dx = dragStartX - mouseX;
         let dy = dragStartY - mouseY;
         
-        if (dy > 40) {
+        if (dy > 30) {
             ball.state = 'shooting';
+            let duration = Math.max((Date.now() - dragStartTime) / 1000, 0.05);
             
-            // THE 300PX SWEET-SPOT Logic
-            let power = dy / 300;
-            let t = 1.6; // Human flight time
-            let targetX = hoop.x - (dx * 1.3);
-            let targetZ = 1.0 - (0.65 * power);
+            // DYNAMIC PHYSICS ENGINE
+            
+            // 1. DYNAMIC POWER (Distance)
+            // Based on how many pixels the mouse went
+            let powerFactor = dy / (height * 0.45);
+            
+            // 2. DYNAMIC SPEED (Time)
+            // Based on flick velocity
+            let flickSpeed = dy / duration; 
+            let t = 2.0 / (flickSpeed / 1000 + 0.4); 
+            t = Math.max(0.6, Math.min(2.8, t)); // Clamped between fast and slow shots
+            
+            // 3. DYNAMIC ACCURACY (Centering)
+            let targetX = hoop.x - (dx * 1.8);
+            let targetZ = 1.0 - (0.75 * powerFactor);
 
-            // Assist
-            if (Math.abs(power - 1.0) < 0.15 && Math.abs(dx) < 40) {
-                targetZ = HOOP_Z;
-                targetX = hoop.x;
-                ball.isPerfect = true;
-                ball.isOnFire = true;
+            // Assist window (Tightened)
+            if (Math.abs(targetZ - HOOP_Z) < 0.12 && Math.abs(targetX - hoop.x) < 45) {
+                if (physicsMode === 'arcade') {
+                    targetZ = HOOP_Z;
+                    targetX = hoop.x;
+                    ball.isPerfect = true;
+                    ball.isOnFire = true;
+                }
             }
 
-            // Projectile Equations
+            // Projectile Equations based on DYNAMIC T
             ball.vx = (targetX - ball.x) / t;
             ball.vz = (targetZ - 1.0) / t;
             ball.vy = (hoop.y - ball.y - 0.5 * GRAVITY * t * t) / t;
+            
             ball.vRot = dx * 0.05;
         }
     }
