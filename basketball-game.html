@@ -282,12 +282,21 @@
                     resetBall();
                 }
 
+                if (ball.state === 'shooting' && ball.z <= 0.4 && ball.z >= 0.25) {
+                    // Magnetic Hoop Effect: Subtle pull towards center as it approaches
+                    let dx = ball.x - hoop.x;
+                    let pullStrength = (physicsMode === 'arcade' ? 0.15 : 0.08);
+                    ball.vx -= dx * pullStrength;
+                }
+
                 if (ball.state === 'shooting' && ball.z <= 0.35) {
                     ball.vz = 0;
                     let dx = ball.x - hoop.x;
                     let dy = ball.y - hoop.y;
                     let dist = Math.sqrt(dx * dx + dy * dy);
-                    let swishRadius = physicsMode === 'arcade' ? hoop.radius * 2.5 : hoop.radius * 1.8;
+                    
+                    // Increased swish radius for easier scoring
+                    let swishRadius = physicsMode === 'arcade' ? hoop.radius * 3.2 : hoop.radius * 2.2;
 
                     if (dist < swishRadius) {
                         let isPerfectShot = ball.isPerfect && dist < hoop.radius * 0.4;
@@ -321,11 +330,18 @@
                         ball.vx = -ball.vx * 0.6 + (Math.random() - 0.5) * 3;
                         ball.vz = 0.05; ball.z = 0.32;
                         streak = 0; streakEl.textContent = streak;
-                    } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 3.8 : hoop.radius * 2.8)) {
-                        ball.state = 'falling';
-                        ball.vy = -ball.vy * 0.5;
-                        ball.vx = (Math.random() - 0.5) * 8;
-                        ball.vz = 0.04;
+                    } else if (dist < (physicsMode === 'arcade' ? hoop.radius * 4.2 : hoop.radius * 3.2)) {
+                        // Forgiving Rim Logic: If it's a near miss, maybe it rolls in?
+                        if (physicsMode === 'arcade' && Math.random() > 0.6) {
+                            ball.vx = (hoop.x - ball.x) * 0.1;
+                            ball.vy = 2;
+                            ball.vz = -0.02;
+                        } else {
+                            ball.state = 'falling';
+                            ball.vy = -ball.vy * 0.45;
+                            ball.vx = (Math.random() - 0.5) * 6;
+                            ball.vz = 0.04;
+                        }
                         streak = 0; streakEl.textContent = streak;
                     } else {
                         ball.state = 'falling';
@@ -477,18 +493,17 @@
                     // A power of ~1.0 should hit the hoop
                     let power = distFactor * (speedFactor * 0.4 + 0.6);
                     
-                    // The "Perfect" Release Logic
-                    // Check if dy is close to perfectDy and duration is in 100-500ms range
-                    let isPerfectRelease = Math.abs(distFactor - 1.0) < 0.15 && 
-                                         dragDuration >= 0.1 && dragDuration <= 0.5 && 
-                                         Math.abs(dx) < 25;
+                    // The "Perfect" Release Logic: Widened for easier triggers
+                    let isPerfectRelease = Math.abs(distFactor - 1.0) < 0.22 && 
+                                         dragDuration >= 0.05 && dragDuration <= 0.65 && 
+                                         Math.abs(dx) < 35;
                     
                     if (isPerfectRelease) {
                         power = 1.0;
                         ball.isPerfect = true;
                         ball.isOnFire = true;
-                    } else if (power > 0.88 && power < 1.12) {
-                        // Soft snap for near-perfect shots
+                    } else if (power > 0.82 && power < 1.18) {
+                        // Widened soft snap for near-perfect shots
                         power = (power + 1.0) / 2;
                     }
 
@@ -501,7 +516,8 @@
                     let targetX;
                     if (physicsMode === 'arcade') {
                         let deviation = Math.abs(dx);
-                        let correction = ball.isPerfect ? 0 : (deviation < 50 ? 0.1 : 0.3);
+                        // Even stronger aim assist: reduces horizontal error impact by 95% for small misses
+                        let correction = ball.isPerfect ? 0 : (deviation < 120 ? 0.05 : 0.15);
                         targetX = hoop.x - (dx * correction);
                     } else {
                         targetX = hoop.x - dx * 2.5;
