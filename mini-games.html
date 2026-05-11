@@ -268,6 +268,25 @@
                                         <option value="10">Dense (40x40)</option>
                                     </select>
                                 </div>
+                                <div>
+                                    <label class="setting-label">Obstacle Mode</label>
+                                    <select id="snake-obstacles" class="steam-select" onchange="toggleObstCount(this.value)">
+                                        <option value="none" selected>None</option>
+                                        <option value="static">Static</option>
+                                        <option value="dynamic">Dynamic</option>
+                                    </select>
+                                </div>
+                                <div id="snake-obst-count-row" style="display: none;">
+                                    <label class="setting-label">Obstacle Count</label>
+                                    <div style="display: flex; align-items: center; gap: 20px;">
+                                        <input type="range" id="snake-obst-count" min="1" max="20" value="5">
+                                        <span id="obst-count-val" style="width: 30px; font-weight: 700;">5</span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 14px; padding-top: 22px;">
+                                    <input type="checkbox" id="snake-wallwrap" style="width: 18px; height: 18px; accent-color: #66c0f4; cursor: pointer;">
+                                    <label for="snake-wallwrap" class="setting-label" style="margin-bottom: 0; cursor: pointer;">Wall Wrap</label>
+                                </div>
                                 <div style="grid-column: 1 / -1;">
                                     <label class="setting-label">Neon Intensity</label>
                                     <div style="display: flex; align-items: center; gap: 20px;">
@@ -320,6 +339,14 @@
             document.getElementById('neon-val').textContent = e.target.value;
         });
 
+        document.getElementById('snake-obst-count').addEventListener('input', (e) => {
+            document.getElementById('obst-count-val').textContent = e.target.value;
+        });
+
+        function toggleObstCount(mode) {
+            document.getElementById('snake-obst-count-row').style.display = (mode === 'none') ? 'none' : 'block';
+        }
+
         function showGameDetails(game) {
             const overlay = document.getElementById('game-details-overlay');
             const snake = document.getElementById('details-snake');
@@ -333,11 +360,14 @@
         }
 
         function launchSnake() {
-            const speed = document.getElementById('snake-speed').value;
-            const grid = document.getElementById('snake-grid').value;
-            const neon = document.getElementById('snake-neon').value;
+            const speed     = document.getElementById('snake-speed').value;
+            const grid      = document.getElementById('snake-grid').value;
+            const neon      = document.getElementById('snake-neon').value;
+            const obstacles = document.getElementById('snake-obstacles').value;
+            const obstCount = document.getElementById('snake-obst-count').value;
+            const wallwrap  = document.getElementById('snake-wallwrap').checked ? '1' : '0';
             
-            const url = `./snake-game.html?speed=${speed}&grid=${grid}&neon=${neon}&autostart=1`;
+            const url = `./snake-game.html?speed=${speed}&grid=${grid}&neon=${neon}&obstacles=${obstacles}&obstCount=${obstCount}&wallwrap=${wallwrap}&autostart=1`;
             window.open(url, '_blank');
         }
     </script>
