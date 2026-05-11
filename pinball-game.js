@@ -33,15 +33,18 @@
         };
 
         const CFG = {
-            gravity: 0.245,
-            friction: 0.997,
-            restitution: 0.82,
+            gravity: 0.28,
+            friction: 0.995,
+            restitution: 0.85,
             ballRadius: 8.8,
-            maxSpeed: 22,
+            maxSpeed: 24,
             bumperKick: 12.8,
             flipperKick: 10.5,
             flipperSnap: 0.38,
-            tableTilt: 0.015
+            tableTilt: 0.015,
+            collisionSlop: 0.2,
+            substepsMin: 2,
+            substepsMax: 8
         };
 
         let savedHighScore = 0;
@@ -121,7 +124,12 @@
             { x: 266, y: 164, r: 25, color: COLORS.cyan, points: 150, pulse: 0 },
             { x: 200, y: 250, r: 30, color: COLORS.green, points: 300, pulse: 0 },
             { x: 90, y: 360, r: 19, color: COLORS.blue, points: 100, pulse: 0 },
-            { x: 310, y: 360, r: 19, color: COLORS.blue, points: 100, pulse: 0 }
+            { x: 310, y: 360, r: 19, color: COLORS.blue, points: 100, pulse: 0 },
+            { x: 140, y: 420, r: 22, color: COLORS.orange, points: 200, pulse: 0 },
+            { x: 260, y: 420, r: 22, color: COLORS.orange, points: 200, pulse: 0 },
+            { x: 200, y: 480, r: 20, color: COLORS.magenta, points: 150, pulse: 0 },
+            { x: 110, y: 540, r: 18, color: COLORS.cyan, points: 120, pulse: 0 },
+            { x: 290, y: 540, r: 18, color: COLORS.cyan, points: 120, pulse: 0 }
         ];
 
         const rollovers = [
@@ -409,7 +417,7 @@
             }
 
             const speed = length(ball.vx, ball.vy);
-            const steps = clamp(Math.ceil(speed / 7), 1, 5);
+            const steps = clamp(Math.ceil(speed / 6.5), CFG.substepsMin, CFG.substepsMax);
             const subDt = dt / steps;
             for (let i = 0; i < steps; i += 1) {
                 stepBall(subDt);
@@ -461,7 +469,18 @@
             checkFlipperCollision(leftFlipper, dt);
             checkFlipperCollision(rightFlipper, dt);
 
-            if (!ball.inShooter && ball.y > 716) {
+            // Explicit floor boundary constraint
+            const floorY = 688;
+            const floorCollideRadius = ball.r + 4;
+            if (ball.y + floorCollideRadius > floorY) {
+                ball.y = floorY - floorCollideRadius;
+                if (ball.vy > 0) {
+                    ball.vy *= -CFG.restitution;
+                    ball.vx *= 0.98;
+                }
+            }
+
+            if (!ball.inShooter && ball.y > 710) {
                 loseBall();
                 return;
             }
@@ -501,7 +520,7 @@
                 ny /= dist;
             }
 
-            const penetration = radius - dist;
+            const penetration = radius - dist + CFG.collisionSlop;
             ball.x += nx * penetration;
             ball.y += ny * penetration;
             const vn = ball.vx * nx + ball.vy * ny;
@@ -602,13 +621,6 @@
 
             if (dist >= contactRadius) return;
 
-            // Flipper Bias: If ball is falling fast, it might cross the center line.
-            // We force the normal to point "up" to prevent tunnelling through the bottom.
-            if (ny > 0 && ball.vy > 0) {
-                 ny = -ny;
-                 nx = -nx; // Flip the whole vector to point away from the top
-            }
-
             if (dist < 0.001) {
                 nx = f.side === 'left' ? 0.35 : -0.35;
                 ny = -0.94;
@@ -618,8 +630,9 @@
                 ny /= dist;
             }
 
-            ball.x += nx * (contactRadius - dist + 0.4);
-            ball.y += ny * (contactRadius - dist + 0.4);
+            const penetration = contactRadius - dist + CFG.collisionSlop;
+            ball.x += nx * penetration;
+            ball.y += ny * penetration;
 
             const omega = ((f.angle - f.prevAngle) / (dt || 1)) * 1.15;
             const vfx = -omega * (cy - f.y);
