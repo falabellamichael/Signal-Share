@@ -1,8 +1,8 @@
 /**
- * Professional Pinball Engine - Ultra-Realistic Physics Build v3
+ * Professional Pinball Engine - Ultra-Realistic Physics Build v4 (Newtonian Edition)
  * Developed by your Apprentice.
  */
-window.__NEON_PINBALL_BUILD = 'pro-physics-v3-refined';
+window.__NEON_PINBALL_BUILD = 'pro-physics-v4-newtonian';
 console.log('[Pro Pinball] Engine Initialized:', window.__NEON_PINBALL_BUILD);
 
 const canvas = document.getElementById('pinballCanvas');
@@ -38,19 +38,21 @@ const COLORS = {
     metallic: '#cbd5e1'
 };
 
+// Pure Newtonian Physics Settings
 const CFG = {
-    gravity: 0.32,
-    friction: 0.992,
-    restitution: 0.55,       // Greatly reduced for a heavier, realistic steel ball feel
+    gravity: 0.35,
+    friction: 0.994,         // Table rolling friction (air resistance)
+    restitution: 0.58,       // True bounce of steel on hard surfaces
     ballRadius: 9.2,         
-    maxSpeed: 26,            // Slightly capped to prevent chaotic ricochets
-    bumperKick: 11.5,        // Toned down bumper explosions
-    flipperKick: 12.0,
-    flipperSnap: 0.42,
-    tableTilt: 0.01,
-    collisionSlop: 0.05,     
+    maxSpeed: 28,            
+    bumperKick: 12.0,        
+    flipperSnap: 0.45,       // Flipper rotational speed
+    tableTilt: 0.015,
+    collisionSlop: 0.03,     // Very tight collision resolution   
     substepsMin: 8,          
-    slingshotForce: 13.0     // Smoother slingshot kicks
+    slingshotForce: 13.0,
+    wallFriction: 0.08,      // Steel sliding on plastic/wood
+    flipperFriction: 0.25    // Steel sliding on flipper rubber
 };
 
 let savedHighScore = 0;
@@ -100,7 +102,7 @@ const leftFlipper = {
     side: 'left',
     x: 135,
     y: 630,
-    length: 52,
+    length: 68,
     width: 14,
     rest: 0.40,
     up: -0.50,
@@ -115,7 +117,7 @@ const rightFlipper = {
     side: 'right',
     x: 265,
     y: 630,
-    length: 52,
+    length: 68,
     width: 14,
     rest: Math.PI - 0.40,
     up: Math.PI + 0.50,
@@ -175,7 +177,7 @@ const walls = [
     { x1: 100, y1: 40, x2: 300, y2: 40, color: COLORS.wall, thick: 6 }, 
     ...createArc(300, 140, 98, Math.PI * 1.5, Math.PI * 2, 16, COLORS.wall, 6), 
 
-    // Repositioned Slingshots (Moved UP and CLOSER TOGETHER)
+    // Slingshots (Moved up and closer per earlier physics adjustment)
     { x1: 70, y1: 515, x2: 120, y2: 575, color: COLORS.success, thick: 6, slingshot: true },
     { x1: 120, y1: 575, x2: 70, y2: 575, color: COLORS.wall, thick: 4 },
     { x1: 70, y1: 575, x2: 70, y2: 515, color: COLORS.wall, thick: 4 },
@@ -184,7 +186,7 @@ const walls = [
     { x1: 280, y1: 575, x2: 330, y2: 575, color: COLORS.wall, thick: 4 },
     { x1: 330, y1: 575, x2: 330, y2: 515, color: COLORS.wall, thick: 4 },
 
-    // Flipper guides - Adjusted to feed directly and perfectly to the flipper pivots
+    // Funnel guides
     { x1: 20, y1: 530, x2: 130, y2: 625, color: COLORS.wall, thick: 5 },
     { x1: 370, y1: 530, x2: 270, y2: 625, color: COLORS.wall, thick: 5 }
 ];
@@ -363,7 +365,7 @@ function releaseLaunchCharge() {
     const power = clamp(state.launchCharge, 0.3, 1.0);
     ball.vx = -1.5 - power * 1.2;
     ball.vy = -20.0 - power * 11.0;
-    ball.spin = -0.4;
+    ball.spin = -power * 0.2; // Visual cue
     state.launchHolding = false;
     state.launchReady = false;
     state.launchCharge = 0;
@@ -436,12 +438,15 @@ function stepBall(dt) {
     ball.vy += CFG.gravity * dt;
     ball.vx += CFG.tableTilt * dt;
     
+    // Pure table rolling friction (air resistance)
     ball.vx *= Math.pow(CFG.friction, dt);
     ball.vy *= Math.pow(CFG.friction, dt);
     
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
-    ball.spin += (ball.vx * 0.02 + ball.vy * 0.005) * dt;
+    
+    // Gradual visual spin bleed-off (simulating rolling friction)
+    ball.spin *= Math.pow(0.95, dt);
 
     if (ball.x > 365 && ball.y > 450) {
         if (!ball.inShooter) ball.inShooter = true;
@@ -509,21 +514,25 @@ function checkSegmentCollision(seg, restitution) {
         ny = -ny;
     }
 
+    // Resolving position rigidly
     const penetration = radius - dist + CFG.collisionSlop;
     ball.x += nx * penetration;
     ball.y += ny * penetration;
     
     const vn = ball.vx * nx + ball.vy * ny;
     if (vn < 0) {
+        // Normal Impulse (Bounce)
         ball.vx -= (1 + restitution) * vn * nx;
         ball.vy -= (1 + restitution) * vn * ny;
         
+        // Tangential Impulse (True sliding friction)
         const tx = -ny, ty = nx;
-        const vrt = ball.vx * tx + ball.vy * ty;
-        ball.vx += ny * ball.spin * 12;
-        ball.vy -= nx * ball.spin * 12;
-        ball.spin *= 0.8; 
-        ball.spin += vrt * 0.01;
+        const vt = ball.vx * tx + ball.vy * ty;
+        ball.vx -= vt * CFG.wallFriction * tx;
+        ball.vy -= vt * CFG.wallFriction * ty;
+        
+        // Visual spin mathematically derived from friction grip
+        ball.spin += (vt * CFG.wallFriction) / ball.r;
 
         if (seg.slingshot && Math.abs(vn) > 1.5) {
             ball.vx += nx * CFG.slingshotForce;
@@ -628,26 +637,32 @@ function checkFlipperCollision(f, dt) {
     ball.x += nx * (contactRadius - dist + CFG.collisionSlop);
     ball.y += ny * (contactRadius - dist + CFG.collisionSlop);
 
+    // Calculate flipper rotational velocity at contact point
     const omega = ((f.angle - f.prevAngle) / (dt || 1)) * 1.1;
     const vfx = -omega * (cy - f.y), vfy = omega * (cx - f.x);
+    
+    // Relative velocity of ball to flipper
     const vrx = ball.vx - vfx, vry = ball.vy - vfy;
     const vrn = vrx * nx + vry * ny;
 
     if (vrn < 0) {
+        // Pure Newtonian Impulse Response
         const isHitting = (f.side === 'left' && omega < -0.01) || (f.side === 'right' && omega > 0.01);
-        const e = isHitting ? 0.75 : 0.4;
+        const e = isHitting ? 0.65 : 0.4;
         const j = -(1 + e) * vrn;
 
+        // Apply normal force
         ball.vx += j * nx;
         ball.vy += j * ny;
 
-        if (isHitting) ball.vx += dx * 0.15 * t;
-
+        // Apply true tangential friction (rubber grip)
         const tx = -ny, ty = nx;
         const vrt = vrx * tx + vry * ty;
-        ball.vx -= vrt * 0.2 * tx;
-        ball.vy -= vrt * 0.2 * ty;
-        ball.spin += vrt * 0.15;
+        ball.vx -= vrt * CFG.flipperFriction * tx;
+        ball.vy -= vrt * CFG.flipperFriction * ty;
+        
+        // Spin is now derived solely from friction, not forcing movement
+        ball.spin += (vrt * CFG.flipperFriction) / ball.r;
 
         if (isHitting && ball.flipperCooldown <= 0 && j > 5) {
             ball.flipperCooldown = 2;
