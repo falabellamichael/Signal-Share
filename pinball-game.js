@@ -63,6 +63,9 @@
             launchCharge: 0,
             launchReady: true,
             screenShake: 0,
+            tiltWarnings: 0,
+            tilted: false,
+            nudgeCooldown: 0,
             message: '',
             messageTimer: 0
         };
@@ -141,8 +144,8 @@
             { x1: 300, y1: 36, x2: 382, y2: 100, color: COLORS.rail, thick: 4 },
             { x1: 20, y1: 570, x2: 20, y2: 120, color: COLORS.rail, thick: 4 },
             { x1: 382, y1: 100, x2: 382, y2: 688, color: COLORS.rail, thick: 4 },
-            { x1: 20, y1: 570, x2: 115, y2: 635, color: COLORS.cyan, thick: 5 },
-            { x1: 350, y1: 570, x2: 285, y2: 635, color: COLORS.magenta, thick: 5 },
+            { x1: 20, y1: 570, x2: 118, y2: 626, color: COLORS.cyan, thick: 5 },
+            { x1: 350, y1: 570, x2: 282, y2: 626, color: COLORS.magenta, thick: 5 },
             { x1: 78, y1: 472, x2: 78, y2: 574, color: COLORS.dim, thick: 3 },
             { x1: 322, y1: 472, x2: 322, y2: 574, color: COLORS.dim, thick: 3 },
             { x1: 350, y1: 118, x2: 350, y2: 666, color: 'rgba(255,215,0,0.72)', thick: 4 },
@@ -210,6 +213,9 @@
             state.combo = 0;
             state.message = '';
             state.messageTimer = 0;
+            state.tiltWarnings = 0;
+            state.tilted = false;
+            state.nudgeCooldown = 0;
             state.launchHolding = false;
             state.launchCharge = 0;
             particles.length = 0;
@@ -237,6 +243,8 @@
             state.balls -= 1;
             state.combo = 0;
             state.multiplier = 1;
+            state.tilted = false;
+            state.tiltWarnings = 0;
             updateUI();
             if (state.balls <= 0) {
                 setTimeout(gameOver, 350);
@@ -259,6 +267,29 @@
 
         function spawnText(text, x, y, color) {
             floatingText.push({ text, x, y, color, life: 1, vy: -0.85 });
+        }
+
+        function nudge(direction = 0) {
+            if (!state.running || state.tilted || state.nudgeCooldown > 0) return;
+            
+            state.nudgeCooldown = 30; // 30 frames
+            state.tiltWarnings++;
+            state.screenShake = Math.max(state.screenShake, 8);
+            
+            const forceX = direction === 0 ? (Math.random() - 0.5) * 4 : (direction * 3);
+            const forceY = -1.5;
+            
+            ball.vx += forceX;
+            ball.vy += forceY;
+            
+            if (state.tiltWarnings > 5) {
+                state.tilted = true;
+                state.message = "TILT!";
+                state.messageTimer = 180;
+                spawnText("TILT!", 200, 350, COLORS.magenta);
+            } else if (state.tiltWarnings > 3) {
+                spawnText("WARNING!", 200, 350, COLORS.orange);
+            }
         }
 
         function explode(x, y, color, count = 16) {
@@ -316,10 +347,14 @@
         }
 
         window.addEventListener('keydown', (event) => {
-            if (['Space', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
+            if (['Space', 'ArrowLeft', 'ArrowRight', 'KeyT', 'KeyX', 'ShiftLeft', 'ShiftRight'].includes(event.code)) event.preventDefault();
             if (event.repeat && event.code !== 'Space') return;
             keys[event.code] = true;
             if (event.code === 'Space') beginLaunchCharge();
+            if (event.code === 'KeyT' || event.code === 'KeyX' || event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+                const dir = (event.code === 'ShiftLeft' || event.code === 'KeyZ') ? -1 : (event.code === 'ShiftRight' || event.code === 'KeyX') ? 1 : 0;
+                nudge(dir);
+            }
             if (!state.running && event.code === 'Enter') startGame();
         }, { passive: false });
 
@@ -372,8 +407,8 @@
         function update(dt) {
             if (!state.running) return;
 
-            const leftPressed = Boolean(keys.KeyA || keys.ArrowLeft || keys.TouchLeft);
-            const rightPressed = Boolean(keys.KeyD || keys.ArrowRight || keys.TouchRight);
+            const leftPressed = state.tilted ? false : Boolean(keys.KeyA || keys.ArrowLeft || keys.TouchLeft);
+            const rightPressed = state.tilted ? false : Boolean(keys.KeyD || keys.ArrowRight || keys.TouchRight);
 
             updateFlipper(leftFlipper, leftPressed, dt);
             updateFlipper(rightFlipper, rightPressed, dt);
@@ -393,6 +428,7 @@
             updateParticles(dt);
             state.screenShake = Math.max(0, state.screenShake - 0.45 * dt);
             if (state.messageTimer > 0) state.messageTimer -= dt;
+            if (state.nudgeCooldown > 0) state.nudgeCooldown -= dt;
         }
 
         function updateFlipper(f, pressed, dt) {
@@ -417,6 +453,10 @@
 
             if (ball.inShooter && ball.y < 108) {
                 ball.inShooter = false;
+            }
+            if (!ball.inShooter && ball.x > 354 && ball.y > 115) {
+                ball.inShooter = true;
+                state.launchReady = true;
             }
 
             for (const wall of walls) checkSegmentCollision(wall, CFG.restitution);
