@@ -24,7 +24,6 @@
             font-family: 'Inter', system-ui, sans-serif;
             display: flex;
             height: 100vh;
-            overflow: hidden;
         }
 
         /* Sidebar & Navigation */
@@ -45,31 +44,31 @@
         .nav-item.active { border-left: 4px solid var(--accent); background: linear-gradient(to right, rgba(102, 192, 244, 0.1), transparent); box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
 
         /* Workspace & Core UI */
-        .workspace { flex: 1; display: flex; flex-direction: column; padding: 50px; background: radial-gradient(circle at top right, rgba(102, 192, 244, 0.05), transparent); }
-        .calc-wrapper { max-width: 1000px; width: 100%; margin: 0 auto; display: grid; grid-template-columns: 1fr 320px; gap: 50px; height: 100%; }
+        .workspace { flex: 1; display: flex; flex-direction: column; padding: 40px; background: radial-gradient(circle at top right, rgba(102, 192, 244, 0.05), transparent); overflow-y: auto; }
+        .calc-wrapper { max-width: 1000px; width: 100%; margin: 0 auto; display: grid; grid-template-columns: 1fr 320px; gap: 40px; min-height: 100%; }
 
         .display-container {
             background: rgba(0,0,0,0.6);
             border: 1px solid var(--border);
             border-radius: 24px;
-            padding: 40px;
-            margin-bottom: 30px;
+            padding: 30px;
+            margin-bottom: 20px;
             text-align: right;
             box-shadow: inset 0 10px 30px rgba(0,0,0,0.5);
             position: relative;
         }
 
         .mode-indicator { position: absolute; top: 20px; left: 30px; font-size: 0.6rem; font-weight: 900; color: var(--accent); opacity: 0.4; letter-spacing: 2px; text-transform: uppercase; }
-        .history-line { font-size: 1rem; color: rgba(255,255,255,0.25); min-height: 1.2em; margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; }
-        .main-line { font-size: 3.5rem; font-weight: 700; word-break: break-all; line-height: 1; letter-spacing: -1px; }
+        .history-line { font-size: 0.9rem; color: rgba(255,255,255,0.25); min-height: 1.2em; margin-bottom: 10px; font-family: 'JetBrains Mono', monospace; }
+        .main-line { font-size: 3rem; font-weight: 700; word-break: break-all; line-height: 1; letter-spacing: -1px; }
 
         .controls-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
         .btn {
             background: rgba(255,255,255,0.03);
             border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 16px;
-            padding: 22px;
-            font-size: 1.1rem;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 1rem;
             font-weight: 600;
             color: #fff;
             cursor: pointer;
@@ -79,8 +78,8 @@
             justify-content: center;
         }
         .btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
-        .btn.operator { color: var(--accent); font-weight: 800; font-size: 1.3rem; background: rgba(102, 192, 244, 0.05); }
-        .btn.function { color: var(--success); font-size: 0.9rem; }
+        .btn.operator { color: var(--accent); font-weight: 800; font-size: 1.2rem; background: rgba(102, 192, 244, 0.05); }
+        .btn.function { color: var(--success); font-size: 0.85rem; }
         .btn.clear { color: var(--danger); background: rgba(255, 62, 62, 0.05); }
         .btn.equals { background: var(--accent); color: #000; font-weight: 900; grid-column: span 2; font-size: 1.5rem; }
 
@@ -95,13 +94,13 @@
         .converter-panel { display: none; background: rgba(255,255,255,0.02); padding: 50px; border-radius: 24px; border: 1px solid var(--border); flex-direction: column; gap: 40px; }
         .conv-row { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: end; }
         .conv-input-box { display: flex; flex-direction: column; gap: 15px; }
-        .conv-input-box input { background: rgba(0,0,0,0.4); border: 1px solid var(--border); padding: 20px; border-radius: 12px; color: #fff; font-size: 1.8rem; font-weight: 800; outline: none; transition: border-color 0.2s; }
+        .conv-input-box input { background: rgba(0,0,0,0.4); border: 1px solid var(--border); padding: 15px; border-radius: 12px; color: #fff; font-size: 1.5rem; font-weight: 800; outline: none; transition: border-color 0.2s; }
         .conv-input-box input:focus { border-color: var(--accent); }
         .conv-input-box select { background: #1a2b3b; color: #fff; border: 1px solid var(--border); padding: 12px; border-radius: 8px; outline: none; font-weight: 600; cursor: pointer; }
 
         /* Programmer View */
-        .programmer-panel { display: none; flex-direction: column; gap: 12px; margin-top: 25px; border-top: 1px solid var(--border); padding-top: 25px; }
-        .prog-line { display: flex; justify-content: space-between; padding: 12px 18px; background: rgba(255,255,255,0.02); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+        .programmer-panel { display: none; flex-direction: column; gap: 8px; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px; }
+        .prog-line { display: flex; justify-content: space-between; padding: 10px 14px; background: rgba(255,255,255,0.02); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
         .prog-label { color: var(--accent); font-weight: 800; font-size: 0.65rem; letter-spacing: 1px; }
 
         /* Toggle Switches */
@@ -150,6 +149,7 @@
 
                     <div class="display-container">
                         <span id="mode-badge" class="mode-indicator">Standard</span>
+                        <span id="memory-badge" style="position: absolute; top: 20px; right: 30px; font-size: 0.6rem; font-weight: 900; color: var(--success); opacity: 0; transition: opacity 0.3s;">MEM</span>
                         <div id="history-line" class="history-line"></div>
                         <div id="main-line" class="main-line">0</div>
                         <div id="prog-info" class="programmer-panel">
@@ -193,6 +193,7 @@
     <script>
         let currentExpr = '';
         let lastResult = null;
+        let memory = 0;
         let trigMode = 'deg'; // or 'rad'
         let history = JSON.parse(localStorage.getItem('calc-history') || '[]');
         let currentMode = 'standard';
@@ -280,12 +281,33 @@
             if (btn === 'AC') clearAll();
             else if (btn === 'del') backspace();
             else if (btn === '=') calculate();
-            else if (['sin','cos','tan','asin','acos','atan','log','ln','sqrt','abs','fact','sqr','inv','exp'].includes(btn)) applyFunc(btn);
+            else if (['MC','MR','M+','M-'].includes(btn)) handleMemory(btn);
+            else if (['sin','cos','tan','asin','acos','atan','log','ln','sqrt','abs','fact','sqr','inv','exp'].includes(btn)) {
+                if (currentMode === 'scientific') append(btn + '(');
+                else applyFunc(btn);
+            }
             else if (btn === 'pi') append('Math.PI');
             else if (btn === 'e') append('Math.E');
             else if (btn === 'pow') append('**');
             else if (btn === 'neg') toggleNeg();
+            else if (btn === 'AND') append('&');
+            else if (btn === 'OR') append('|');
+            else if (btn === 'XOR') append('^');
+            else if (btn === '<<') append('<<');
+            else if (btn === '>>') append('>>');
             else append(btn);
+        }
+
+        function handleMemory(btn) {
+            calculate(); // Ensure current expression is evaluated
+            const val = parseFloat(lastResult || currentExpr || 0);
+            switch(btn) {
+                case 'MC': memory = 0; break;
+                case 'MR': append(memory.toString()); break;
+                case 'M+': memory += val; break;
+                case 'M-': memory -= val; break;
+            }
+            document.getElementById('memory-badge').style.opacity = memory !== 0 ? '0.8' : '0';
         }
 
         function append(val) {
@@ -299,21 +321,65 @@
 
         function updateDisplay() {
             let display = currentExpr || '0';
-            document.getElementById('main-line').textContent = display.replace(/\*\*/g, '^').replace(/Math\.PI/g, 'π').replace(/Math\.E/g, 'e');
+            const pretty = display
+                .replace(/\*\*/g, '^')
+                .replace(/Math\.PI/g, 'π')
+                .replace(/Math\.E/g, 'e')
+                .replace(/sin\(/g, 'sin(')
+                .replace(/cos\(/g, 'cos(')
+                .replace(/tan\(/g, 'tan(')
+                .replace(/log\(/g, 'log(')
+                .replace(/ln\(/g, 'ln(')
+                .replace(/sqrt\(/g, '√(');
+            
+            document.getElementById('main-line').textContent = pretty;
             if (currentMode === 'programmer') updateProgrammer();
         }
 
         function calculate() {
             try {
-                let expr = currentExpr.replace(/×/g,'*').replace(/÷/g,'/');
+                let expr = currentExpr
+                    .replace(/×/g,'*')
+                    .replace(/÷/g,'/')
+                    .replace(/sin\(/g, trigMode === 'deg' ? 'Math.sin((Math.PI/180)*' : 'Math.sin(')
+                    .replace(/cos\(/g, trigMode === 'deg' ? 'Math.cos((Math.PI/180)*' : 'Math.cos(')
+                    .replace(/tan\(/g, trigMode === 'deg' ? 'Math.tan((Math.PI/180)*' : 'Math.tan(')
+                    .replace(/asin\(/g, trigMode === 'deg' ? '(180/Math.PI)*Math.asin(' : 'Math.asin(')
+                    .replace(/acos\(/g, trigMode === 'deg' ? '(180/Math.PI)*Math.acos(' : 'Math.acos(')
+                    .replace(/atan\(/g, trigMode === 'deg' ? '(180/Math.PI)*Math.atan(' : 'Math.atan(')
+                    .replace(/log\(/g, 'Math.log10(')
+                    .replace(/ln\(/g, 'Math.log(')
+                    .replace(/sqrt\(/g, 'Math.sqrt(')
+                    .replace(/abs\(/g, 'Math.abs(')
+                    .replace(/exp\(/g, 'Math.exp(');
+
+                // Programmer mode: handle Hex/Bin literals if they don't have prefix
+                if (currentMode === 'programmer') {
+                    // This is a simple heuristic: if it contains A-F, treat as hex
+                    // A better way is to prefix all tokens that look like numbers
+                    expr = expr.replace(/\b([0-9A-F]+)\b/g, (match) => {
+                        if (/[A-F]/.test(match)) return '0x' + match;
+                        return match;
+                    });
+                }
+
                 const res = Function('"use strict";return (' + expr + ')')();
                 
                 // Academic Precision formatting
                 let formattedRes = res;
-                if (Math.abs(res) > 1e12 || (Math.abs(res) < 1e-6 && res !== 0)) {
-                    formattedRes = res.toExponential(6);
-                } else {
-                    formattedRes = Number(res.toPrecision(12));
+                if (typeof res === 'number') {
+                    if (isNaN(res)) throw new Error('NaN');
+                    if (!isFinite(res)) {
+                        document.getElementById('main-line').textContent = 'Math Error';
+                        setTimeout(() => { if (document.getElementById('main-line').textContent === 'Math Error') updateDisplay(); }, 1500);
+                        return;
+                    }
+                    
+                    if (Math.abs(res) > 1e12 || (Math.abs(res) < 1e-6 && res !== 0)) {
+                        formattedRes = res.toExponential(6);
+                    } else {
+                        formattedRes = Number(res.toPrecision(12));
+                    }
                 }
 
                 document.getElementById('history-line').textContent = document.getElementById('main-line').textContent + ' =';
@@ -322,42 +388,52 @@
                 lastResult = formattedRes;
                 updateDisplay();
             } catch(e) { 
+                console.error(e);
                 document.getElementById('main-line').textContent = 'Syntax Error';
-                setTimeout(clearAll, 1000);
+                setTimeout(() => { if (document.getElementById('main-line').textContent === 'Syntax Error') updateDisplay(); }, 1500);
             }
         }
 
         function applyFunc(func) {
-            let val = parseFloat(currentExpr || '0');
-            let res;
-            
-            // Handle Degree/Radian for Trig
-            let trigVal = trigMode === 'deg' ? val * (Math.PI / 180) : val;
+            try {
+                calculate(); // Evaluate expression first
+                let val = parseFloat(currentExpr || '0');
+                let res;
+                
+                // Handle Degree/Radian for Trig
+                let trigVal = trigMode === 'deg' ? val * (Math.PI / 180) : val;
 
-            switch(func) {
-                case 'sin': res = Math.sin(trigVal); break;
-                case 'cos': res = Math.cos(trigVal); break;
-                case 'tan': res = Math.tan(trigVal); break;
-                case 'asin': res = Math.asin(val) * (trigMode === 'deg' ? 180/Math.PI : 1); break;
-                case 'acos': res = Math.acos(val) * (trigMode === 'deg' ? 180/Math.PI : 1); break;
-                case 'atan': res = Math.atan(val) * (trigMode === 'deg' ? 180/Math.PI : 1); break;
-                case 'log': res = Math.log10(val); break;
-                case 'ln': res = Math.log(val); break;
-                case 'sqrt': res = Math.sqrt(val); break;
-                case 'sqr': res = val * val; break;
-                case 'inv': res = 1 / val; break;
-                case 'abs': res = Math.abs(val); break;
-                case 'exp': res = Math.exp(val); break;
-                case 'fact': res = factorial(val); break;
+                switch(func) {
+                    case 'sin': res = Math.sin(trigVal); break;
+                    case 'cos': res = Math.cos(trigVal); break;
+                    case 'tan': res = Math.tan(trigVal); break;
+                    case 'asin': res = Math.asin(val) * (trigMode === 'deg' ? 180/Math.PI : 1); break;
+                    case 'acos': res = Math.acos(val) * (trigMode === 'deg' ? 180/Math.PI : 1); break;
+                    case 'atan': res = Math.atan(val) * (trigMode === 'deg' ? 180/Math.PI : 1); break;
+                    case 'log': res = Math.log10(val); break;
+                    case 'ln': res = Math.log(val); break;
+                    case 'sqrt': res = Math.sqrt(val); break;
+                    case 'sqr': res = val * val; break;
+                    case 'inv': res = 1 / val; break;
+                    case 'abs': res = Math.abs(val); break;
+                    case 'exp': res = Math.exp(val); break;
+                    case 'fact': res = factorial(val); break;
+                }
+                
+                if (!isFinite(res)) throw new Error('Math Error');
+                
+                currentExpr = Number(res.toPrecision(12)).toString();
+                updateDisplay();
+            } catch(e) {
+                console.error(func, e);
             }
-            currentExpr = res.toString();
-            updateDisplay();
         }
 
         function factorial(n) {
-            if (n < 0) return NaN;
+            if (n < 0 || n > 170) return NaN;
+            if (n === 0) return 1;
             let res = 1;
-            for (let i = 2; i <= n; i++) res *= i;
+            for (let i = 2; i <= Math.floor(n); i++) res *= i;
             return res;
         }
 
@@ -377,10 +453,16 @@
         function backspace() { currentExpr = currentExpr.slice(0, -1); updateDisplay(); }
 
         function updateProgrammer() {
-            const val = parseInt(currentExpr) || 0;
-            document.getElementById('prog-hex').textContent = val.toString(16).toUpperCase();
-            document.getElementById('prog-dec').textContent = val.toString(10);
-            document.getElementById('prog-bin').textContent = val.toString(2).padStart(8, '0').match(/.{1,4}/g).join(' ');
+            let val;
+            if (/[A-F]/.test(currentExpr)) {
+                val = parseInt(currentExpr, 16);
+            } else {
+                val = parseInt(currentExpr) || 0;
+            }
+            
+            document.getElementById('prog-hex').textContent = isNaN(val) ? '0' : val.toString(16).toUpperCase();
+            document.getElementById('prog-dec').textContent = isNaN(val) ? '0' : val.toString(10);
+            document.getElementById('prog-bin').textContent = isNaN(val) ? '0' : val.toString(2).padStart(8, '0').match(/.{1,4}/g).join(' ');
         }
 
         function setupConverter(mode) {
@@ -448,6 +530,7 @@
             if (e.key === 'Enter') handleBtn('=');
             if (e.key === 'Backspace') handleBtn('del');
             if (e.key === 'Escape') handleBtn('AC');
+            if (currentMode === 'programmer' && /^[a-fA-F]$/.test(e.key)) handleBtn(e.key.toUpperCase());
         });
 
         setMode('standard');
