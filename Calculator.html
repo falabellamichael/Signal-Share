@@ -27,6 +27,38 @@
             overflow: hidden;
         }
 
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                overflow-y: auto;
+            }
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+                padding: 20px;
+                box-sizing: border-box;
+                height: auto;
+                min-height: auto;
+            }
+            .workspace {
+                padding: 20px;
+            }
+            .calc-wrapper {
+                grid-template-columns: 1fr;
+            }
+            .main-line {
+                font-size: 2rem;
+            }
+            .controls-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            .history-panel {
+                margin-top: 40px;
+                min-height: 300px;
+            }
+        }
+
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }

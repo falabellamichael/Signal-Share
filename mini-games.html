@@ -28,6 +28,52 @@
             min-height: 100vh;
         }
 
+        @media (max-width: 768px) {
+            .steam-shell {
+                grid-template-columns: 1fr;
+            }
+            .steam-sidebar {
+                display: none; /* Hide sidebar on mobile for now, or could use a drawer */
+            }
+            .steam-header {
+                padding: 15px 20px;
+            }
+            .steam-content {
+                padding: 20px;
+            }
+            .featured-hero {
+                height: auto;
+                min-height: 300px;
+                padding: 30px;
+                flex-direction: column;
+                align-items: flex-start;
+                justify-content: flex-end;
+            }
+            .hero-content h2 {
+                font-size: 2.2rem !important;
+            }
+            .game-hub-header {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            .hub-poster {
+                max-width: 200px;
+                margin: 0 auto;
+            }
+            .play-bar {
+                flex-direction: column;
+                gap: 20px;
+                padding: 20px;
+                text-align: center;
+            }
+            .play-btn {
+                width: 100%;
+            }
+            .hub-content {
+                padding: 20px;
+            }
+        }
+
         .steam-sidebar {
             background: rgba(0,0,0,0.3);
             border-right: 1px solid var(--border);
@@ -914,6 +960,33 @@
             });
         }
 
+        function calculateRank(totalPoints) {
+            const tiers = [
+                { name: 'UNRANKED', min: 0, color: '#888' },
+                { name: 'BRONZE', min: 100, color: '#cd7f32' },
+                { name: 'SILVER', min: 500, color: '#c0c0c0' },
+                { name: 'GOLD', min: 1500, color: '#ffd700' },
+                { name: 'PLATINUM', min: 4000, color: '#e5e4e2' },
+                { name: 'DIAMOND', min: 8000, color: '#b9f2ff' },
+                { name: 'ELITE', min: 15000, color: '#a4d007' },
+                { name: 'MYTHIC', min: 30000, color: '#ff00ff' }
+            ];
+
+            let currentTier = tiers[0];
+            for (const tier of tiers) {
+                if (totalPoints >= tier.min) currentTier = tier;
+                else break;
+            }
+
+            // Infinite scaling for Legendary ranks
+            if (totalPoints >= 50000) {
+                const legendaryLevel = Math.floor((totalPoints - 50000) / 10000) + 1;
+                return { name: `LEGENDARY ${legendaryLevel}`, color: '#ff7700', progress: 100 };
+            }
+
+            return currentTier;
+        }
+
         function renderLeaderboard() {
             const grid = document.getElementById('leader-grid');
             if (!grid) return;
@@ -923,15 +996,24 @@
             grid.style.gap = '25px';
 
             const hoopsData = JSON.parse(localStorage.getItem('hoops-bests') || '{"classic":0,"timer":0,"playoff":0}');
+            const snakeBest = parseInt(localStorage.getItem('snake-best') || '0');
+            const totalPoints = snakeBest + (hoopsData.classic || 0) + (hoopsData.timer || 0) + ((hoopsData.playoff || 0) * 1000);
             
+            const userRank = calculateRank(totalPoints);
+            const rankTitleEl = document.querySelector('#leader-user-meta div:nth-child(2)');
+            if (rankTitleEl) {
+                rankTitleEl.textContent = userRank.name;
+                rankTitleEl.style.color = userRank.color;
+            }
+
             const games = [
                 {
                     title: 'Neon Snake',
                     poster: 'snake_game_poster_1778466261855.png',
                     stats: [
-                        { label: 'HIGH SCORE', val: localStorage.getItem('snake-best') || '0', unit: 'PTS' },
+                        { label: 'HIGH SCORE', val: snakeBest, unit: 'PTS' },
                         { label: 'BEST STREAK', val: sessionStorage.getItem('snake-streak') || '0', unit: 'RUN' },
-                        { label: 'RANK PROGRESS', val: 'ELITE III', unit: '' }
+                        { label: 'RANK', val: calculateRank(snakeBest * 5).name, unit: '' }
                     ]
                 },
                 {
@@ -976,9 +1058,9 @@
                     </div>
                     <div style="padding: 25px;">
                         ${statsHtml}
-                        <div style="margin-top: 20px; display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(164, 208, 7, 0.05); border-radius: 8px;">
-                            <div style="width: 8px; height: 8px; background: #a4d007; border-radius: 50%; box-shadow: 0 0 10px #a4d007;"></div>
-                            <span style="font-size: 0.65rem; color: #a4d007; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Verified Community Rank</span>
+                        <div style="margin-top: 20px; display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+                            <div style="width: 8px; height: 8px; background: ${userRank.color}; border-radius: 50%; box-shadow: 0 0 10px ${userRank.color};"></div>
+                            <span style="font-size: 0.65rem; color: ${userRank.color}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">${userRank.name} STATUS</span>
                         </div>
                     </div>
                 `;

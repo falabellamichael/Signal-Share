@@ -513,21 +513,28 @@ function updateHoop(dt) {
 
     const time = performance.now() / 1000;
     
-    // Movement scales with level
-    if (level === 2) {
-        // Simple slow horizontal
-        hoop.x = hoop.baseX + Math.sin(time * 1.5) * 80;
-    } else if (level === 3) {
-        // Faster horizontal
-        hoop.x = hoop.baseX + Math.sin(time * 2.5) * 120;
-    } else if (level === 4) {
-        // Vertical + Horizontal (Circular)
-        hoop.x = hoop.baseX + Math.sin(time * 2.2) * 140;
-        hoop.y = hoop.baseY + Math.cos(time * 1.8) * 40;
-    } else if (level >= 5) {
-        // Complex figure-8 / fast movement
-        hoop.x = hoop.baseX + Math.sin(time * 2.8) * 160;
-        hoop.y = hoop.baseY + Math.sin(time * 5.6) * 60;
+    // Procedural movement that scales with level for "infinite" progression
+    const speedScale = 1 + (level * 0.25);
+    const ampScale   = 1 + (level * 0.15);
+
+    // Horizontal oscillation (Always present)
+    const horizFreq = 1.2 * speedScale;
+    const horizAmp  = Math.min(60 * ampScale, width * 0.4);
+    hoop.x = hoop.baseX + Math.sin(time * horizFreq) * horizAmp;
+
+    // Vertical oscillation (Starts at level 3, increases)
+    if (level >= 3) {
+        const vertFreq = 0.8 * (speedScale * 0.8);
+        const vertAmp  = Math.min(20 * (level - 2) * ampScale * 0.3, 120);
+        hoop.y = hoop.baseY + Math.cos(time * vertFreq) * vertAmp;
+    }
+
+    // High-frequency jitter/complex path (Starts at level 5)
+    if (level >= 5) {
+        const jitterFreq = 2.4 + (level * 0.1);
+        const jitterAmp  = Math.min(level * 2, 30);
+        hoop.x += Math.sin(time * jitterFreq) * jitterAmp;
+        hoop.y += Math.cos(time * jitterFreq * 1.5) * (jitterAmp * 0.5);
     }
 
     // Sync net anchors to moving hoop
