@@ -1,3 +1,6 @@
+/**
+ * Hero Media Player Actions
+ * Isolated handler for specialized media operations like "Open Media", "Open Phone",
  * and System Media control (Play/Pause, Next, Previous).
  */
 import { debounce, memoGet } from './shared-utils.js';
