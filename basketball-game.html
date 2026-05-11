@@ -215,7 +215,8 @@
             radiusBase: 70,
             state: 'idle', // idle, shooting, falling
             rotation: 0,
-            vRot: 0
+            vRot: 0,
+            isOnFire: false
         };
 
         const particles = [];
@@ -230,6 +231,7 @@
             ball.state = 'idle';
             ball.rotation = 0;
             ball.vRot = 0;
+            ball.isOnFire = false;
         }
 
         function createParticles(x, y, color) {
@@ -257,6 +259,18 @@
                 ball.vy += 1.2;
                 ball.rotation += ball.vRot;
 
+                // Add fire particles if on fire
+                if (ball.isOnFire && Math.random() > 0.3) {
+                    particles.push({
+                        x: ball.x + (Math.random()-0.5) * ball.radiusBase * 0.5,
+                        y: ball.y + (Math.random()-0.5) * ball.radiusBase * 0.5,
+                        vx: (Math.random() - 0.5) * 5,
+                        vy: -Math.random() * 5 - 2,
+                        life: 0.8,
+                        color: Math.random() > 0.5 ? '#ff4400' : '#ffaa00'
+                    });
+                }
+
                 // Stop if it goes out of bounds below screen
                 if (ball.y > height + ball.radiusBase * 2 && ball.vy > 0) {
                     if (ball.state === 'shooting') streak = 0; // miss
@@ -276,14 +290,16 @@
                     
                     if (dist < swishRadius) {
                         // SWISH
-                        score += 1 + Math.floor(streak / 2);
+                        let points = ball.isOnFire ? 3 : (1 + Math.floor(streak / 2));
+                        score += points;
                         streak++;
                         scoreEl.textContent = score;
                         streakEl.textContent = streak;
-                        createParticles(hoop.x, hoop.y, '#00ff9d');
+                        createParticles(hoop.x, hoop.y, ball.isOnFire ? '#ff4400' : '#00ff9d');
                         ball.state = 'falling';
                         ball.vx *= 0.5;
                         ball.vy = 2; // slow drop down
+                        ball.isOnFire = false; // consume fire
 
                         if (gameMode === 'playoff' && score >= targetScore) {
                             nextLevel();
@@ -427,13 +443,19 @@
             ctx.rotate(ball.rotation);
 
             // Ball glow
-            ctx.shadowColor = '#ff7700';
-            ctx.shadowBlur = 20 * ball.z;
+            ctx.shadowColor = ball.isOnFire ? '#ff4400' : '#ff7700';
+            ctx.shadowBlur = (ball.isOnFire ? 40 : 20) * ball.z;
             
             // Base ball
             let grad = ctx.createRadialGradient(-radius/3, -radius/3, radius/10, 0, 0, radius);
-            grad.addColorStop(0, '#ffaa00');
-            grad.addColorStop(1, '#cc4400');
+            if (ball.isOnFire) {
+                grad.addColorStop(0, '#fff');
+                grad.addColorStop(0.5, '#ffcc00');
+                grad.addColorStop(1, '#ff4400');
+            } else {
+                grad.addColorStop(0, '#ffaa00');
+                grad.addColorStop(1, '#cc4400');
+            }
             ctx.fillStyle = grad;
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI*2);
@@ -532,7 +554,12 @@
                     ball.vx = (targetX - ball.x) / t;
                     ball.vy = initial_vy;
                     ball.vz = (targetZ - 1.0) / t; // Reaches targetZ at targetY
-                    ball.vRot = dx * 0.01;
+                    ball.vRot = dx * 0.05; // Increased spin sensitivity
+
+                    // CATCH FIRE if spin is high enough
+                    if (Math.abs(dx) > 150) {
+                        ball.isOnFire = true;
+                    }
                 }
             }
         }
