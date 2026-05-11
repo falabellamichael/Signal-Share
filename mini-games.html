@@ -449,6 +449,52 @@
         .play-btn:hover {
             filter: brightness(1.1);
         }
+
+        /* Publish View Specifics */
+        .publish-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .form-section {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 35px;
+            margin-bottom: 30px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+        }
+
+        .form-row-full {
+            grid-column: 1 / -1;
+        }
+
+        .upload-dropzone {
+            background: rgba(255, 255, 255, 0.01);
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 50px 30px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-bottom: 40px;
+        }
+
+        .upload-dropzone:hover {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: var(--steam-light);
+        }
+
+        .upload-dropzone svg {
+            color: var(--steam-light);
+            margin-bottom: 20px;
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -776,28 +822,29 @@
                     <button class="play-btn" onclick="showAuth()" style="font-size: 1rem;">Sign In Now</button>
                 </div>
 
-                <div id="publish-content" style="display: none;">
-                    <h2 style="font-size: 2rem; letter-spacing: -1px; margin-bottom: 30px;">Publish Your Game</h2>
+                <div id="publish-content" style="display: none;" class="publish-container">
+                    <h2 style="font-size: 2.5rem; letter-spacing: -2px; margin-bottom: 40px; font-weight: 900;">Publish Your Game</h2>
                     
                     <!-- Upload Section -->
-                    <div style="background: rgba(255,255,255,0.02); border: 2px dashed rgba(255,255,255,0.15); border-radius: 16px; padding: 40px; margin-bottom: 40px; text-align: center;">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 15px; opacity: 0.5;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                        <h3 style="margin: 0 0 10px; font-size: 1.2rem; color: #fff;">Upload Game Files</h3>
-                        <p style="opacity: 0.5; margin-bottom: 20px; font-size: 0.9rem;">Drag & drop or click to select HTML or JS files</p>
+                    <div class="upload-dropzone" onclick="document.getElementById('game-file-input').click()">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        <h3 style="margin: 0 0 10px; font-size: 1.4rem; font-weight: 800; color: #fff;">Upload Game Source</h3>
+                        <p style="opacity: 0.5; margin-bottom: 20px; font-size: 0.95rem;">Drag & drop your .html or .js file here to begin</p>
                         <input type="file" id="game-file-input" accept=".html,.js" style="display: none;">
-                        <button class="play-btn" onclick="document.getElementById('game-file-input').click()" style="font-size: 0.9rem; padding: 12px 24px;">Choose File</button>
+                        <button class="play-btn" style="font-size: 0.9rem; padding: 12px 24px;">SELECT FILE</button>
                     </div>
 
                     <!-- Game Details Form -->
-                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 30px; margin-bottom: 40px;">
-                        <h3 style="margin: 0 0 20px; font-size: 1.1rem;">Game Details</h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                    <div class="form-section">
+                        <h3 style="margin: 0 0 30px; font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; opacity: 0.4; font-weight: 900;">GAME METADATA</h3>
+                        
+                        <div class="form-grid">
                             <div>
-                                <label class="setting-label">Game Title</label>
-                                <input type="text" id="game-title" placeholder="My Awesome Game" style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                                <label class="setting-label">Display Title</label>
+                                <input type="text" id="game-title" placeholder="e.g. Neon Pinball v2" style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 14px; border-radius: 6px; font-size: 0.9rem; outline: none;">
                             </div>
                             <div>
-                                <label class="setting-label">Category</label>
+                                <label class="setting-label">Primary Category</label>
                                 <select id="game-category" class="steam-select">
                                     <option value="GAME">Game</option>
                                     <option value="UTILITY">Utility</option>
@@ -805,32 +852,42 @@
                                     <option value="DEMO">Demo</option>
                                 </select>
                             </div>
-                        </div>
-                        <div>
-                            <label class="setting-label">Description</label>
-                            <textarea id="game-description" placeholder="Describe your game..." style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; font-size: 0.85rem; outline: none; resize: vertical; min-height: 80px;"></textarea>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                            
+                            <div class="form-row-full">
+                                <label class="setting-label">Short Description</label>
+                                <textarea id="game-description" placeholder="A brief overview of your game and its mechanics..." style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 14px; border-radius: 6px; font-size: 0.9rem; outline: none; resize: vertical; min-height: 100px; font-family: inherit;"></textarea>
+                            </div>
+
                             <div>
-                                <label class="setting-label">Thumbnail URL (optional)</label>
-                                <input type="text" id="game-thumbnail" placeholder="https://..." style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                                <label class="setting-label">Poster URL (1000x1500)</label>
+                                <input type="text" id="game-thumbnail" placeholder="https://source.unsplash.com/random/..." style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 14px; border-radius: 6px; font-size: 0.9rem; outline: none;">
                             </div>
                             <div>
-                                <label class="setting-label">Tags (comma-separated)</label>
-                                <input type="text" id="game-tags" placeholder="fun, arcade, casual" style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; font-size: 0.85rem; outline: none;">
+                                <label class="setting-label">Discovery Tags</label>
+                                <input type="text" id="game-tags" placeholder="arcade, physics, retro" style="width: 100%; background: #233c51; color: #fff; border: 1px solid rgba(255,255,255,0.05); padding: 14px; border-radius: 6px; font-size: 0.9rem; outline: none;">
                             </div>
+                        </div>
+
+                        <div style="margin-top: 40px; display: flex; justify-content: flex-end;">
+                            <button class="play-btn" onclick="publishCustomGame()" style="font-size: 1.1rem; padding: 18px 50px;">PUBLISH TO WORKSHOP</button>
                         </div>
                     </div>
 
-                    <button class="play-btn" onclick="publishCustomGame()" style="font-size: 1rem;">Publish Game</button>
-
                     <!-- Published Games List -->
-                    <div style="margin-top: 60px;">
-                        <h3 style="font-size: 1.1rem; margin-bottom: 20px;">Your Published Games</h3>
-                        <div id="published-games-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+                    <div style="margin-top: 80px; padding: 0 10px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
+                            <h3 style="font-size: 0.85rem; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; font-weight: 900; margin: 0;">WORKSHOP CONTRIBUTIONS</h3>
+                            <div id="workshop-count" style="font-size: 0.75rem; color: var(--steam-light); font-weight: 800; letter-spacing: 1px;">0 FILES</div>
+                        </div>
+                        
+                        <div id="published-games-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px;">
                             <!-- Populated dynamically -->
                         </div>
-                        <div id="no-published-msg" style="text-align: center; padding: 40px; opacity: 0.4;">No games published yet</div>
+                        <div id="no-published-msg" style="text-align: center; padding: 80px 40px; background: rgba(255,255,255,0.01); border-radius: 16px; border: 1px dashed rgba(255,255,255,0.05); margin-top: 20px;">
+                            <div style="font-size: 2rem; margin-bottom: 15px; opacity: 0.2;">📦</div>
+                            <p style="opacity: 0.4; margin: 0; font-size: 1rem; font-weight: 500; letter-spacing: 0.5px;">Your workshop is currently empty.</p>
+                            <p style="opacity: 0.2; margin-top: 10px; font-size: 0.8rem;">Upload a game source above to get started.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1021,33 +1078,35 @@
         function renderPublishedGames() {
             const grid = document.getElementById('published-games-grid');
             const noMsg = document.getElementById('no-published-msg');
+            const countEl = document.getElementById('workshop-count');
             
             if (!grid) return;
             
             const userGames = customGames.filter(g => g.author === currentUser?.name);
+            if (countEl) countEl.textContent = userGames.length + ' FILES PUBLISHED';
             
             grid.innerHTML = '';
             noMsg.style.display = userGames.length === 0 ? 'block' : 'none';
 
             userGames.forEach(game => {
                 const card = document.createElement('div');
-                card.style.cssText = 'background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: all 0.3s;';
+                card.style.cssText = 'background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: all 0.3s; position: relative;';
                 
-                const desc = (game.description || '').substring(0, 60);
-                const descSuffix = (game.description || '').length > 60 ? '...' : '';
+                const desc = (game.description || '').substring(0, 80);
+                const descSuffix = (game.description || '').length > 80 ? '...' : '';
 
                 card.innerHTML = 
-                    '<div style="height: 140px; background: url(\'' + game.poster + '\') center/cover; position: relative; overflow: hidden;">' +
-                        '<div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); display: flex; align-items: flex-end; padding: 15px;">' +
-                            '<span style="font-size: 0.65rem; background: rgba(164, 208, 7, 0.2); color: #a4d007; padding: 4px 8px; border-radius: 4px; font-weight: 800;">' + game.tag + '</span>' +
+                    '<div style="height: 160px; background: url(\'' + game.poster + '\') center/cover; position: relative; overflow: hidden;">' +
+                        '<div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(16, 24, 34, 0.9), transparent); display: flex; align-items: flex-end; padding: 15px;">' +
+                            '<span style="font-size: 0.6rem; background: rgba(102, 192, 244, 0.2); color: var(--steam-light); padding: 4px 8px; border-radius: 4px; font-weight: 800; letter-spacing: 1px;">' + game.tag + '</span>' +
                         '</div>' +
                     '</div>' +
-                    '<div style="padding: 15px;">' +
-                        '<h4 style="margin: 0 0 5px; font-size: 0.9rem; font-weight: 700;">' + game.title + '</h4>' +
-                        '<p style="margin: 0 0 10px; font-size: 0.75rem; opacity: 0.5;">' + desc + descSuffix + '</p>' +
-                        '<div style="display: flex; gap: 8px; margin-top: 10px;">' +
-                            '<button class="play-btn" onclick="launchCustomGame(\'' + game.id + '\')" style="flex: 1; font-size: 0.8rem; padding: 8px; margin: 0;">PLAY</button>' +
-                            '<button class="play-btn" onclick="deleteCustomGame(\'' + game.id + '\')" style="flex: 0 0 auto; font-size: 0.8rem; padding: 8px 12px; margin: 0; background: rgba(255, 100, 100, 0.3);">DEL</button>' +
+                    '<div style="padding: 20px;">' +
+                        '<h4 style="margin: 0 0 8px; font-size: 1rem; font-weight: 800; color: #fff;">' + game.title + '</h4>' +
+                        '<p style="margin: 0 0 20px; font-size: 0.8rem; opacity: 0.5; line-height: 1.5; min-height: 2.4em;">' + desc + descSuffix + '</p>' +
+                        '<div style="display: flex; gap: 10px;">' +
+                            '<button class="play-btn" onclick="launchCustomGame(\'' + game.id + '\')" style="flex: 1; font-size: 0.8rem; padding: 10px; margin: 0; letter-spacing: 1px;">LAUNCH</button>' +
+                            '<button class="play-btn" onclick="deleteCustomGame(\'' + game.id + '\')" style="flex: 0 0 auto; font-size: 0.8rem; padding: 10px 15px; margin: 0; background: rgba(255, 100, 100, 0.15); color: #ff6464; border: 1px solid rgba(255, 100, 100, 0.1);">REMOVE</button>' +
                         '</div>' +
                     '</div>';
                 grid.appendChild(card);
