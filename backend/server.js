@@ -1,6 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { sendSystemMediaKey, MEDIA_KEY_CODES } from "./bridge-logic.js";
@@ -17,6 +18,7 @@ const port = Number(process.env.PORT || 3000);
 const userId = process.env.SIGNAL_SHARE_USER_ID;
 const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
 const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true";
+const ALLOW_OPEN_URI = process.env.SIGNAL_SHARE_ALLOW_OPEN_URI === "true";
 
 // Security Config
 const CORS_WHITELIST = [
@@ -52,13 +54,9 @@ app.use((req, res, next) => {
 
   if (req.method === "OPTIONS") return res.status(204).end();
 
-  // Validate Bridge Secret for critical APIs
   if (BRIDGE_SECRET && (req.path.startsWith("/api/system-media") || req.path.startsWith("/api/activity"))) {
     const secret = req.headers["x-bridge-secret"];
-    if (secret !== BRIDGE_SECRET) {
-      console.warn(`[Security] Forbidden access attempt from ${req.ip}`);
-      return res.status(403).json({ error: "Unauthorized" });
-    }
+    if (secret !== BRIDGE_SECRET) return res.status(403).json({ error: "Unauthorized" });
   }
 
   next();
@@ -73,20 +71,31 @@ app.get("/api/system-media/current", (req, res) => {
 });
 
 app.post("/api/system-media/action", async (req, res) => {
-  const { action, appPackage, preferredSource } = req.body;
+  const action = `${req.body?.action || ""}`.trim().toLowerCase();
+  const appPackage = `${req.body?.appPackage || ""}`.trim();
+  const preferredSource = req.body?.preferredSource || req.query.source || "";
+
+  if (action === "open_uri") {
+    if (!ALLOW_OPEN_URI) return res.status(403).json({ error: "open_uri disabled" });
+    const uri = `${req.body?.uri || ""}`.trim();
+    if (!uri) return res.status(400).json({ error: "Missing URI" });
+    spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
+    return res.json({ ok: true });
+  }
+
   if (!MEDIA_KEY_CODES[action]) return res.status(400).json({ error: "Invalid action" });
 
   res.json({ ok: true, status: "queued" });
   
   await sendSystemMediaKey(action, appPackage, preferredSource);
-  if (enableRemoteMediaSync) await syncToSupabase();
+  if (enableRemoteMediaSync) {
+    setTimeout(() => syncToSupabase(buildSnapshot(preferredSource)), 200);
+  }
 });
 
-// NEW: Arcade Activity Integration
 app.post("/api/activity/report", async (req, res) => {
   const { activity } = req.body;
   if (!activity) return res.status(400).json({ error: "Missing activity data" });
-
   const success = await reportLocalActivity(activity);
   res.json({ ok: success });
 });
@@ -98,18 +107,24 @@ if (enableRemoteMediaSync && userId) {
   console.log(`[Bridge] Remote media sync active for ${userId}`);
   setInterval(() => syncToSupabase(), 5000);
 
-  // Subscribe to remote commands
   supabase.channel('media_actions').on('postgres_changes', {
     event: 'INSERT', schema: 'public', table: 'system_media_actions', filter: `user_id=eq.${userId}`
   }, async (payload) => {
-    const { action, app_package } = payload.new;
+    const { action, app_package, uri } = payload.new;
+    const pref = payload.new?.payload?.preferredSource || "";
     console.log(`[Bridge] Remote command: ${action}`);
-    await sendSystemMediaKey(action, app_package, payload.new?.payload?.preferredSource || "");
-    await syncToSupabase();
+
+    if (action === "open_uri") {
+      if (uri && ALLOW_OPEN_URI) {
+        spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
+      }
+    } else {
+      await sendSystemMediaKey(action, app_package, pref);
+    }
+    await syncToSupabase(buildSnapshot(pref));
   }).subscribe();
 }
 
 app.listen(port, "127.0.0.1", () => {
   console.log(`[Bridge] Server running on http://localhost:${port}`);
-  console.log(`[Bridge] Security: ${BRIDGE_SECRET ? "SECRET CONFIGURED" : "DISABLED"}`);
 });

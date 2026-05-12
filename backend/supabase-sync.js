@@ -11,20 +11,31 @@ export function initSupabaseSync(url, key, uid) {
 }
 
 function normalizeSource(val = "") {
-  const n = val.toLowerCase().trim();
+  const n = `${val || ""}`.trim().toLowerCase();
   return (n === "youtube" || n === "spotify") ? n : "";
+}
+
+function isBrowser(id = "") {
+  const n = id.toLowerCase();
+  return n.includes("chrome") || n.includes("edge") || n.includes("msedge") || n.includes("firefox") || n.includes("opera") || n.includes("browser");
 }
 
 function classifyProvider(session, preferred = "") {
   const id = (session.sourceAppUserModelId || session.sourceAppId || "").toLowerCase();
   const title = (session.media?.title || "").toLowerCase();
-  
-  if (id.includes("spotify") || title.includes("spotify")) return "spotify";
-  if (id.includes("youtube") || id.includes("ytmusic") || title.includes("youtube")) return "youtube";
-  
+  const artist = (session.media?.artist || "").toLowerCase();
   const pref = normalizeSource(preferred);
-  if (id.includes("chrome") || id.includes("edge") || id.includes("firefox")) {
-    return pref || "browser";
+
+  const isSpotify = id.includes("spotify") || title.includes("spotify") || artist.includes("spotify");
+  const isYouTube = id.includes("youtube") || id.includes("ytmusic") || title.includes("youtube") || title.includes("youtu.be");
+
+  if (isSpotify) return "spotify";
+  if (isYouTube) return "youtube";
+
+  if (isBrowser(id)) {
+    if (pref === "youtube") return "youtube";
+    if (pref === "spotify") return "spotify";
+    return "browser";
   }
   return "";
 }
@@ -32,38 +43,71 @@ function classifyProvider(session, preferred = "") {
 function scoreSession(session, preferred = "") {
   const pref = normalizeSource(preferred);
   const provider = classifyProvider(session, preferred);
-  let score = (session.playback?.playbackStatus === 4 ? 5000 : 1000);
+  const priority = (session.playback?.playbackStatus === 4 ? 5 : 1);
+  let score = priority * 1000;
 
   if (pref) {
-    if (provider === pref) score += 10000;
-    else return -1; // Reject non-matching if preference set
+    if (provider === pref) score += 50000;
+    else return -1000000; // Reject non-matching
   }
+  
+  if (provider === "spotify" || provider === "youtube") score += 500;
   return score;
+}
+
+function sanitizeMediaMeta(rawMeta = "", sourceAppId = "") {
+  let meta = `${rawMeta || ""}`.replace(/\s+/g, " ").trim();
+  if (!meta) return "";
+  const variants = [sourceAppId, sourceAppId.replace(/!.*$/, ""), sourceAppId.replace(/\.exe$/i, "")];
+  variants.forEach(v => {
+    if (!v) return;
+    const pattern = new RegExp(`^${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[-:|]?\\s*`, "gi");
+    meta = meta.replace(pattern, "").trim();
+  });
+  return meta;
 }
 
 export function buildSnapshot(preferredSource = "") {
   const sessions = safeGetMediaSessions();
+  const pref = normalizeSource(preferredSource);
+  
   const best = sessions.reduce((acc, s) => {
-    const score = scoreSession(s, preferredSource);
-    if (score > (acc ? acc.score : -1)) return { session: s, score };
+    const score = scoreSession(s, pref);
+    if (score > (acc ? acc.score : -1000000)) return { session: s, score };
     return acc;
   }, null);
 
-  if (!best) return { active: false, playbackState: "none", title: "", meta: "" };
+  if (!best || best.score < 0) return { active: false, playbackState: "none", title: "", meta: "" };
 
   const s = best.session;
-  const videoId = (classifyProvider(s) === "youtube") ? extractYoutubeId(s.media?.title || "") : "";
+  const title = (s.media?.title || "").trim();
+  const artist = (s.media?.artist || s.media?.albumArtist || "").trim();
+  const sourceAppId = s.sourceAppUserModelId || s.sourceAppId || "";
+  const provider = classifyProvider(s, pref);
   
+  const sanitizedMeta = sanitizeMediaMeta(artist, sourceAppId);
+  const videoId = (provider === "youtube") ? extractYoutubeId(`${title} ${s.media?.albumTitle || ""}`) : "";
+
   return {
     active: true,
     playbackState: mapPlaybackState(s.playback?.playbackStatus),
-    title: s.media?.title || "Unknown",
-    meta: s.media?.artist || s.sourceAppId || "",
-    appPackage: s.sourceAppUserModelId || s.sourceAppId,
+    title: title || "Now playing",
+    meta: sanitizedMeta || artist || resolveAppLabel(sourceAppId),
+    appPackage: sourceAppId,
     artworkUri: videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "",
     openUri: videoId ? `https://www.youtube.com/watch?v=${videoId}` : "",
-    sourceProvider: classifyProvider(s, preferredSource)
+    sourceProvider: provider,
+    preferredSource: pref
   };
+}
+
+function resolveAppLabel(id = "") {
+  const n = id.toLowerCase();
+  if (n.includes("spotify")) return "Spotify";
+  if (n.includes("youtube")) return "YouTube";
+  if (n.includes("chrome")) return "Chrome";
+  if (n.includes("msedge")) return "Edge";
+  return id;
 }
 
 function extractYoutubeId(text) {
@@ -77,7 +121,7 @@ export async function syncToSupabase(snapshot = null) {
   if (!supabase || !userId) return;
   const data = snapshot || buildSnapshot();
   
-  const syncKey = `${data.title}|${data.playbackState}|${data.meta}`;
+  const syncKey = `${data.title}|${data.playbackState}|${data.meta}|${data.artworkUri ? "art" : "no"}`;
   if (syncKey === lastSyncKey) return;
 
   const { error } = await supabase.from("system_media").upsert({
@@ -97,7 +141,6 @@ export async function syncToSupabase(snapshot = null) {
 
 export async function reportLocalActivity(activity) {
   if (!supabase || !userId) return;
-  // activity = { type: 'game', title: 'Neon Pinball', meta: 'Playing now' }
   const { error } = await supabase.from("system_media").upsert({
     user_id: userId,
     playback_state: "playing",

@@ -57,6 +57,10 @@ $ErrorActionPreference = "Stop"
 $winRtSuccess = $false
 $targetApp = [string]$env:SIGNAL_SHARE_TARGET_APP
 $preferred = [string]$env:SIGNAL_SHARE_PREFERRED_SOURCE
+if ($null -eq $targetApp) { $targetApp = "" }
+if ($null -eq $preferred) { $preferred = "" }
+$targetApp = $targetApp.Trim()
+$preferred = $preferred.Trim().ToLowerInvariant()
 
 function Normalize-AppId([string]$value) {
   if ([string]::IsNullOrWhiteSpace($value)) { return "" }
@@ -67,32 +71,62 @@ function Normalize-AppId([string]$value) {
   return $normalized
 }
 
+function Matches-AppId([string]$candidate, [string]$target) {
+  $candidateNorm = Normalize-AppId $candidate
+  $targetNorm = Normalize-AppId $target
+  if ([string]::IsNullOrWhiteSpace($candidateNorm) -or [string]::IsNullOrWhiteSpace($targetNorm)) { return $false }
+  return ($candidateNorm -eq $targetNorm) -or ($candidateNorm.StartsWith($targetNorm)) -or ($targetNorm.StartsWith($candidateNorm))
+}
+
+function Is-Browser-App([string]$id) {
+  $n = Normalize-AppId $id
+  return ($n -match "chrome|msedge|edge|firefox|opera|browser")
+}
+
+function Get-Session-Text($session) {
+  $parts = New-Object System.Collections.Generic.List[string]
+  try { if ($session.SourceAppUserModelId) { $parts.Add($session.SourceAppUserModelId) } } catch {}
+  try {
+    $mediaOp = $session.TryGetMediaPropertiesAsync()
+    $media = $mediaOp.GetResults()
+    if ($media.Title) { $parts.Add($media.Title) }
+    if ($media.Artist) { $parts.Add($media.Artist) }
+    if ($media.AlbumArtist) { $parts.Add($media.AlbumArtist) }
+    if ($media.AlbumTitle) { $parts.Add($media.AlbumTitle) }
+  } catch {}
+  return ([string]::Join(" ", $parts)).ToLowerInvariant()
+}
+
 function Is-Match-Source($session, [string]$source) {
   if ([string]::IsNullOrWhiteSpace($source) -or $source -eq "all") { return $true }
   $id = ""
   try { $id = Normalize-AppId $session.SourceAppUserModelId } catch {}
-  $text = ""
-  try {
-    $media = $session.TryGetMediaPropertiesAsync().GetResults()
-    $text = ([string]::Join(" ", @($media.Title, $media.Artist, $media.AlbumTitle))).ToLowerInvariant()
-  } catch {}
+  $text = Get-Session-Text $session
+  $isBrowser = Is-Browser-App $id
+
+  $isYouTube = ($id -match "youtube|ytmusic") -or ($text -match "youtube\\.com|youtube -|- youtube|youtu\\.be|music\\.youtube")
+  $isSpotify = ($id -match "spotify") -or ($text -match "spotify|open\\.spotify")
 
   if ($source -eq "spotify") {
-    return ($id -match "spotify") -or ($text -match "spotify|open\\.spotify")
+    if ($isYouTube) { return $false }
+    if ($isSpotify) { return $true }
+    return $isBrowser
   }
   if ($source -eq "youtube") {
-    return ($id -match "youtube|ytmusic") -or ($text -match "youtube\\.com|youtu\\.be|music\\.youtube")
+    if ($isSpotify) { return $false }
+    if ($isYouTube) { return $true }
+    return $isBrowser
   }
   return $true
 }
 
 try {
   Add-Type -AssemblyName System.Runtime.WindowsRuntime
+  $manager = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync().GetResults()
   $asTaskMethod = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
     $_.ToString() -match 'Task.*AsTask.*IAsyncOperation' -and $_.ToString() -notmatch 'WithProgress' -and $_.ToString() -match 'TResult.*TResult'
   } | Select-Object -First 1
 
-  $manager = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync().GetResults()
   if ($null -ne $manager) {
     $sessions = $manager.GetSessions()
     $session = $null
@@ -101,10 +135,18 @@ try {
     foreach ($candidate in $sessions) {
       if ($null -eq $candidate) { continue }
       $score = 0
-      $id = $candidate.SourceAppUserModelId
-      if ($id -eq $targetApp) { $score += 1000 }
-      if (Is-Match-Source $candidate $preferred) { $score += 5000 }
-      if ($candidate.PlaybackInfo.PlaybackStatus -eq 4) { $score += 2000 } # Playing
+      $id = ""
+      try { $id = $candidate.SourceAppUserModelId } catch {}
+
+      $isTarget = [string]::IsNullOrWhiteSpace($targetApp) -or (Matches-AppId $id $targetApp)
+      $isPreferred = [string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or (Is-Match-Source $candidate $preferred)
+      
+      if (![string]::IsNullOrWhiteSpace($preferred) -and $preferred -ne "all") {
+        if ($isPreferred) { $score += 10000 }
+        else { $score -= 20000 }
+      }
+      if ($isTarget) { $score += 1000 }
+      if ($candidate.PlaybackInfo.PlaybackStatus -eq 4) { $score += 5000 }
 
       if ($score -gt $bestScore) {
         $bestScore = $score
@@ -112,7 +154,7 @@ try {
       }
     }
 
-    if ($session -ne $null) {
+    if ($session -ne $null -and $bestScore -ge 0) {
       $actionMethod = $session.GetType().GetMethod('${winrtMethodName}', [Type[]]@())
       if ($actionMethod -ne $null) {
         $actionOp = $actionMethod.Invoke($session, @())
@@ -123,11 +165,13 @@ try {
 } catch { $winRtSuccess = $false }
 
 if ($winRtSuccess -eq $false -and ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all")) {
-  # Global Fallback
-  [void](Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);' -Name "MediaKeySender" -Namespace "WinAPI" -PassThru)
-  [WinAPI.MediaKeySender]::keybd_event(${vkCode}, 0, 0, [UIntPtr]::Zero)
-  Start-Sleep -Milliseconds 50
-  [WinAPI.MediaKeySender]::keybd_event(${vkCode}, 0, 2, [UIntPtr]::Zero)
+  # Global Fallback logic
+  try {
+    Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);' -Name "MediaKeySender" -Namespace "WinAPI" -PassThru | Out-Null
+  } catch {}
+  [WinAPI.MediaKeySender]::keybd_event(${vkCode}, 0, 1, [UIntPtr]::Zero)
+  Start-Sleep -Milliseconds 45
+  [WinAPI.MediaKeySender]::keybd_event(${vkCode}, 0, 3, [UIntPtr]::Zero)
   Write-Output "ok-global"
   exit 0
 }
