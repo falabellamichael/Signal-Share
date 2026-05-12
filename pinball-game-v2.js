@@ -471,6 +471,7 @@ function bindHoldButton(id, onDown, onUp) {
 bindHoldButton('leftTouch', () => { keys.TouchLeft = true; }, () => { keys.TouchLeft = false; });
 bindHoldButton('rightTouch', () => { keys.TouchRight = true; }, () => { keys.TouchRight = false; });
 bindHoldButton('plungerTouch', beginLaunchCharge, releaseLaunchCharge);
+bindHoldButton('nudgeTouch', () => nudge(0), () => {});
 
 const startButton = document.querySelector('.play-btn');
 if (startButton) startButton.addEventListener('click', (event) => {

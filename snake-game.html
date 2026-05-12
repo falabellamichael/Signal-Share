@@ -25,6 +25,7 @@
             align-items: center;
             justify-content: flex-start;
             min-height: 100vh;
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
             background: 
                 radial-gradient(circle at top left, rgba(0, 210, 255, 0.1), transparent 40%),
                 radial-gradient(circle at bottom right, rgba(0, 255, 157, 0.08), transparent 40%),
@@ -233,40 +234,47 @@
 
         /* Mobile Controls */
         .controls-pad {
-            display: grid;
+            display: none;
             grid-template-areas: 
                 ". up ."
                 "left . right"
                 ". down .";
-            gap: 12px;
-            margin-top: 20px;
+            gap: 16px;
+            margin: 24px auto 0;
+            padding: 10px;
+            width: fit-content;
         }
 
         .control-btn {
-            width: 64px;
-            height: 64px;
-            background: var(--glass);
-            border: 1px solid var(--border);
-            border-radius: 20px;
+            width: 72px;
+            height: 72px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 22px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
             -webkit-user-select: none;
             user-select: none;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
         .control-btn:active {
-            background: rgba(255, 255, 255, 0.1);
-            transform: scale(0.9);
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(0.92);
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
         }
 
         .control-btn svg {
-            width: 24px;
-            height: 24px;
+            width: 32px;
+            height: 32px;
             fill: #fff;
-            opacity: 0.8;
+            opacity: 0.9;
+            filter: drop-shadow(0 0 5px rgba(255,255,255,0.3));
         }
 
         .btn-up { grid-area: up; }
@@ -274,10 +282,16 @@
         .btn-left { grid-area: left; }
         .btn-right { grid-area: right; }
 
-        @media (min-width: 768px) {
+        @media (hover: none), (max-width: 768px) {
             .controls-pad {
-                display: none;
+                display: grid;
             }
+            .game-container {
+                width: 95vw;
+                padding: 15px;
+            }
+            .game-title { font-size: 1.5rem; }
+            .overlay-msg { font-size: 1.8rem; }
         }
 
         /* Signal Share Menu Bar Styles */

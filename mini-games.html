@@ -35,6 +35,10 @@
             overflow: hidden;
         }
 
+        .mobile-category-nav {
+            display: none;
+        }
+
         @media (max-width: 768px) {
             .steam-shell {
                 grid-template-columns: 1fr;
@@ -144,8 +148,9 @@
 
         .steam-header {
             background: linear-gradient(to right, var(--steam-dark), var(--steam-blue));
-            padding: 0 40px;
-            height: var(--header-height);
+            padding: 0 max(40px, env(safe-area-inset-right)) 0 max(40px, env(safe-area-inset-left));
+            padding-top: env(safe-area-inset-top);
+            height: calc(var(--header-height) + env(safe-area-inset-top));
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
@@ -293,6 +298,7 @@
             background: rgba(0,0,0,0.4);
             backdrop-filter: blur(20px);
             padding: 15px 30px;
+            padding-top: calc(15px + env(safe-area-inset-top));
             display: flex;
             align-items: center;
             justify-content: space-between;
