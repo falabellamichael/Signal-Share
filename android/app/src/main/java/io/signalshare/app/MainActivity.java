@@ -260,8 +260,20 @@ public class MainActivity extends BridgeActivity {
                     data.getQueryParameter("uri"),
                     data.getBooleanQueryParameter("explicit", false)
             );
+            return;
+        }
+
+        if ("messages".equals(host)) {
+            final String threadId = data.getLastPathSegment();
+            mainHandler.post(() -> {
+                if (getBridge() != null && getBridge().getWebView() != null) {
+                    String js = "if (window.openMessengerFromNotification) window.openMessengerFromNotification('" + (threadId != null ? threadId : "") + "');";
+                    getBridge().getWebView().evaluateJavascript(js, null);
+                }
+            });
         }
     }
+
 
     private void openNowPlayingAccessSettings() {
         for (Intent settingsIntent : PhoneNowPlayingHelper.buildNotificationAccessIntents(this)) {
