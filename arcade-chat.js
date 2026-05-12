@@ -241,7 +241,11 @@ window.sendChatMessage = async function() {
         try {
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'target-address-space': 'private' // Chrome PNA mitigation
+                },
+                targetAddressSpace: 'private', // Chrome PNA experimental flag
                 body: JSON.stringify({ 
                     message: fullMessage,
                     history: arcadeChatHistory,

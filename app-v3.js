@@ -1819,13 +1819,16 @@ async function callLocalAI(text, history = [], pageContext = "") {
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'target-address-space': 'private'
+        },
+        targetAddressSpace: 'private',
         body: JSON.stringify({ 
           message: text, 
           history,
           pageContext: pageContext || 'Signal Share'
-        }),
-        targetAddressSpace: 'loopback'
+        })
       });
       
       if (response.ok) {
