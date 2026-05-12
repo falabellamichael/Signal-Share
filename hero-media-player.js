@@ -1298,16 +1298,10 @@ The companion bridge is designed with several security layers to keep your PC sa
     const isMediaMode = state.heroControlMode === "media";
 
     if (!force && state.desktopBridgeSuspended) {
-      // If we've already failed enough to suspend, stop polling entirely 
-      // unless the user manually refreshes or we are in active Media mode.
-      if (!isMediaMode) {
-        return Promise.resolve(desktopSnapshot);
-      }
-      
-      // Even in Media mode, slow down significantly if it's still missing
-      if (now - lastDesktopPollTime < 30000) {
-        return Promise.resolve(desktopSnapshot);
-      }
+      // If suspended, we stop ALL automatic polling.
+      // We will only retry if the user manually refreshes (force=true)
+      // or if an external event (like window focus) triggers a refresh.
+      return Promise.resolve(desktopSnapshot);
     }
 
     let waitTime = DESKTOP_POLL_INTERVAL_MS;
@@ -1361,7 +1355,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         lastDesktopSnapshotSignature = "none";
         desktopPollFailureCount += 1;
 
-        if (desktopPollFailureCount >= 5) {
+        if (desktopPollFailureCount >= 1) {
           state.desktopBridgeSuspended = true;
         }
 
@@ -1389,17 +1383,29 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function startDesktopSnapshotPolling() {
-    if (desktopPollTimerId || !canUseDesktopBridge()) return;
-    refreshDesktopSnapshot({ renderAfter: false });
-    desktopPollTimerId = window.setInterval(() => {
-      if (document.hidden) return;
-      refreshDesktopSnapshot();
-    }, DESKTOP_POLL_INTERVAL_MS);
+    if (desktopPollTimerId) return;
+
+    const poll = async () => {
+      try {
+        await refreshDesktopSnapshot();
+      } finally {
+        const interval = state.heroControlMode === "media" ? 1000 : DESKTOP_POLL_INTERVAL_MS;
+        // If we are suspended, stop the loop entirely. 
+        // It will be restarted by external triggers (focus, refresh button).
+        if (!state.desktopBridgeSuspended) {
+          desktopPollTimerId = window.setTimeout(poll, interval);
+        } else {
+          desktopPollTimerId = 0;
+        }
+      }
+    };
+
+    desktopPollTimerId = window.setTimeout(poll, DESKTOP_POLL_INTERVAL_MS);
   }
 
   function stopDesktopSnapshotPolling() {
     if (!desktopPollTimerId) return;
-    window.clearInterval(desktopPollTimerId);
+    window.clearTimeout(desktopPollTimerId);
     desktopPollTimerId = 0;
   }
 
@@ -1946,6 +1952,15 @@ The companion bridge is designed with several security layers to keep your PC sa
     elements.heroPlayerRefreshButton?.addEventListener("click", (event) => {
       handleRefresh();
       if (event.currentTarget instanceof HTMLElement) event.currentTarget.blur();
+    });
+
+    // Auto-reconnect when window is focused
+    window.addEventListener("focus", () => {
+      if (state.desktopBridgeSuspended) {
+        console.log("[Hero] Window focused, attempting to reconnect to bridge...");
+        handleRefresh({ silent: true });
+        startDesktopSnapshotPolling();
+      }
     });
 
     // Android: Disable pull-to-refresh while interacting with the Hero Stage
