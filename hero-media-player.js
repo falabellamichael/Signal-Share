@@ -1355,7 +1355,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         lastDesktopSnapshotSignature = "none";
         desktopPollFailureCount += 1;
 
-        if (desktopPollFailureCount >= 1) {
+        if (desktopPollFailureCount >= 3) {
           state.desktopBridgeSuspended = true;
         }
 
