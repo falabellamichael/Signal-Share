@@ -62,6 +62,15 @@ body > .chat-resize-handle.collapsed {
     box-shadow: 0 8px 25px rgba(103, 193, 245, 0.4);
 }
 
+/* Hide floating toggle and messenger launcher in integrated mode (steam-shell) 
+   to prevent redundant UI and overlapping icons. */
+.steam-shell ~ .chat-toggle-btn,
+.steam-shell .chat-toggle-btn,
+.steam-shell ~ .messenger-launcher,
+.steam-shell .messenger-launcher {
+    display: none !important;
+}
+
 /* Move the button with the sidebar when NOT collapsed */
 body:not(.chat-collapsed) .chat-toggle-btn {
     right: 400px; /* sidebar width (380) + margin (20) */

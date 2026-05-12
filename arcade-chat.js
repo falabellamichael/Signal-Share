@@ -429,6 +429,16 @@ window.toggleChat = function() {
 };
 
 function setupToggle() {
+    // If we are in a grid-based layout (like mini-games), the chatbot is integrated.
+    // We don't need a floating toggle button there.
+    const isIntegrated = document.querySelector('.steam-shell') || 
+                        window.location.pathname.includes('mini-games.html');
+
+    if (isIntegrated) {
+        console.log('[Arcade Chat] Integrated mode detected. Skipping floating toggle.');
+        return;
+    }
+
     // Add toggle button to DOM if it doesn't exist
     if (!document.querySelector('.chat-toggle-btn')) {
         const btn = document.createElement('button');
@@ -454,7 +464,7 @@ function setupToggle() {
     
     // Restore collapsed state
     const wasCollapsed = localStorage.getItem('arcade-chat-collapsed') === 'true';
-    if (wasCollapsed) {
+    if (wasCollapsed && !document.querySelector('.steam-shell')) {
         const sidebar = document.querySelector('.steam-chat-sidebar');
         const handle = document.querySelector('.chat-resize-handle');
         if (sidebar) sidebar.classList.add('collapsed');
