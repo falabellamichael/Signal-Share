@@ -58,8 +58,23 @@ body > .chat-resize-handle.collapsed {
     display: grid !important;
     place-items: center !important;
     padding: 0;
-    transition: transform 0.2s ease, opacity 0.2s ease, top 0.3s ease;
+    transition: transform 0.2s ease, opacity 0.2s ease, top 0.3s ease, bottom 0.3s ease;
     opacity: 0.8;
+}
+
+/* Stacking AI Icon above Messenger on Android */
+html.platform-android .chat-toggle-btn {
+    top: auto !important;
+    bottom: calc(var(--viewport-offset-bottom, 0px) + 20px + 72px + 12px) !important;
+    right: 20px !important;
+    width: 72px !important;
+    height: 72px !important;
+    opacity: 1 !important;
+}
+
+html.platform-android .chat-toggle-btn svg {
+    width: 32px !important;
+    height: 32px !important;
 }
 
 body.messenger-expanded .chat-toggle-btn {
@@ -101,8 +116,9 @@ body:not(.chat-collapsed) .chat-toggle-btn {
     display: none !important;
 }
 
-/* Move the Direct Messenger launcher, OPENED window, and APP RUNNER with the sidebar when NOT collapsed */
+/* Move the Direct Messenger launcher, OPENED window, AI toggle, and APP RUNNER with the sidebar when NOT collapsed */
 body:not(.chat-collapsed) .messenger-launcher,
+body:not(.chat-collapsed) .chat-toggle-btn,
 body:not(.chat-collapsed) .messenger-section,
 body:not(.chat-collapsed) #app-runner {
     right: 380px !important; /* sidebar width (380) */
@@ -151,6 +167,13 @@ body:not(.chat-collapsed) .messenger-section {
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         border-left: none;
         box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    }
+
+    /* Android Safe Area Fix: Ensure companion starts below status bar */
+    html.platform-android .steam-chat-sidebar {
+        top: var(--safe-area-top, 0px) !important;
+        height: calc(100vh - var(--safe-area-top, 0px)) !important;
+        height: calc(100dvh - var(--safe-area-top, 0px)) !important;
     }
     
     .steam-chat-sidebar.collapsed {

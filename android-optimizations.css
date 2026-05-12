@@ -39,77 +39,62 @@ html.platform-android .play-btn {
 
 /* 5. Scroll & Background Fixes - CRITICAL FOR ANDROID */
 
-/* Force natural scrolling for Android - Nuclear reset */
+/* Re-enable natural scrolling for Android */
 html.platform-android {
     height: auto !important;
     min-height: 100% !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    background-color: var(--bg, #f6efe3) !important;
-    overscroll-behavior-y: auto !important;
-    scrollbar-gutter: auto !important;
+    /* Default light background for rubber-banding */
+    background-color: #f6efe3 !important;
 }
 
 html.platform-android body {
     height: auto !important;
-    min-height: 100dvh !important;
+    min-height: 100% !important;
     overflow-y: visible !important;
     overflow-x: hidden !important;
     position: relative !important;
     width: 100% !important;
     -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior-y: auto !important;
 
-    /* Ensure the background covers everything without shader errors */
-    /* Many Android WebViews fail on radial-gradients (Shader failures) */
-    background: var(--bg, #f6efe3) !important;
+    /* Theme-aware solid background to avoid Shader Compilation failures */
+    background-color: #f6efe3 !important;
     background-image: none !important;
-    background-attachment: scroll !important;
 }
 
-/* Kill all fixed-position background blobs that cause "messed up" rendering and lag */
+/* Theme color overrides for Android - Force correct colors on body and html */
+html.platform-android body[data-theme="midnight"] { background-color: #081017 !important; }
+html.platform-android body[data-theme="gallery"]  { background-color: #fffdf7 !important; }
+html.platform-android body[data-theme="aurora"]   { background-color: #f5fcfb !important; }
+html.platform-android body[data-theme="contrast"] { background-color: #000000 !important; }
+html.platform-android body[data-theme="ember"]    { background-color: #140302 !important; }
+
+/* Kill fixed-position blobs that cause "messed up background" (Shader failures) */
 html.platform-android body::before,
 html.platform-android body::after,
 html.platform-android #top::before,
 html.platform-android #top::after {
     display: none !important;
-    background: none !important;
-    background-image: none !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
 }
 
 /* Modal Lock - only lock when explicit modals are open */
-html.platform-android body.viewer-open,
-html.platform-android body.settings-open,
-html.platform-android body.modal-open {
+html.platform-android body.viewer-open {
     overflow: hidden !important;
-    position: fixed !important;
-    width: 100% !important;
 }
 
-/* Disable expensive filters that cause "messed up background" (Shader failures) on Android */
+/* Disable expensive filters that break on Android WebViews */
 html.platform-android * {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
 }
 
-/* Ensure the main container grows and allows scrolling */
+/* Ensure the main container grows and allows natural scrolling */
 html.platform-android .page-shell {
     min-height: 100dvh;
     display: block !important;
-    overflow: visible !important;
     padding-top: max(var(--container-padding), var(--safe-area-top)) !important;
     padding-bottom: max(var(--container-padding), var(--safe-area-bottom)) !important;
-}
-
-/* Prevent hidden sections from swallowing touch events (antigravity fix) */
-html.platform-android .viewer:not(.is-open),
-html.platform-android .profile-view:not(.is-open),
-html.platform-android .settings-panel:not(.is-open),
-html.platform-android .messenger-section:not(.is-open) {
-    display: none !important;
-    pointer-events: none !important;
 }
 
 /* 6. Safe Area Utility Classes */
