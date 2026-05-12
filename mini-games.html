@@ -1300,19 +1300,42 @@
             thinkingMsg.innerHTML = '<span style="opacity: 0.5;">Thinking...</span>';
             messagesContainer.appendChild(thinkingMsg);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            console.log('[Arcade Chat] v2.1: Initializing message sequence...');
 
-            try {
-                const response = await fetch('/api/llm/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
-                });
-                
-                const data = await response.json();
-                thinkingMsg.textContent = data.reply || "I'm having trouble connecting to my logic core right now.";
-            } catch (err) {
+            const candidates = [
+                '/api/llm/chat',
+                'http://localhost:3000/api/llm/chat',
+                'http://127.0.0.1:3000/api/llm/chat'
+            ];
+
+            let success = false;
+            for (const url of candidates) {
+                try {
+                    console.log(`[Arcade Chat] Attempting connection: ${url}`);
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: text }),
+                        targetAddressSpace: 'loopback' 
+                    });
+                    
+                    const contentType = response.headers.get('content-type');
+                    if (response.ok && contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        thinkingMsg.textContent = data.reply || "I'm having trouble connecting to my logic core right now.";
+                        success = true;
+                        break;
+                    } else {
+                        console.warn(`[Arcade Chat] Skip ${url}: Status ${response.status}, Content-Type ${contentType}`);
+                    }
+                } catch (err) {
+                    console.warn(`[Arcade Chat] Endpoint failed ${url}:`, err);
+                }
+            }
+
+            if (!success) {
                 thinkingMsg.textContent = "Offline. Please ensure the local bridge is running.";
-                console.error('[Arcade Chat] Error:', err);
             }
             
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
