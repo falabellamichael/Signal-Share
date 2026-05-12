@@ -1422,7 +1422,13 @@ export function createAppUi(context) {
   function showAuthFeedback(message, isError = false) { elements.authFeedback.textContent = message; elements.authFeedback.classList.toggle("is-error", isError); }
 
   function applyUserPreferences(preferences) {
-    document.body.dataset.theme = preferences.theme; document.body.dataset.density = preferences.density; document.body.dataset.motion = preferences.motion; document.documentElement.dataset.statusBarStrip = preferences.statusBarStrip ? "on" : "off"; document.documentElement.style.scrollBehavior = preferences.motion === "calm" ? "auto" : "smooth";
+    document.documentElement.dataset.theme = preferences.theme;
+    document.body.dataset.theme = preferences.theme;
+    document.documentElement.dataset.density = preferences.density;
+    document.body.dataset.density = preferences.density;
+    document.body.dataset.motion = preferences.motion;
+    document.documentElement.dataset.statusBarStrip = preferences.statusBarStrip ? "on" : "off";
+    document.documentElement.style.scrollBehavior = preferences.motion === "calm" ? "auto" : "smooth";
   }
 
   function openSettingsPanel() { state.settingsPanelOpen = true; state.settingsActivePage = "main"; setMobileHeaderHidden(false); renderSettingsPanel(); requestAnimationFrame(() => elements.settingsCloseButton?.focus?.()); }
@@ -1688,15 +1694,29 @@ export function createAppUi(context) {
 
   function handleWindowScroll() {
     if (!isMobileHeaderViewport()) return;
-    const currentScrollY = window.scrollY;
+    const currentScrollY = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
 
-    const isAtBottom = (window.innerHeight + currentScrollY) >= (document.documentElement.scrollHeight - 10);
+    const isAtBottom = (window.innerHeight + currentScrollY) >= (document.documentElement.scrollHeight - 20);
     document.documentElement.classList.toggle("is-at-bottom", isAtBottom);
 
-    if (state.settingsPanelOpen || currentScrollY <= 24) { setMobileHeaderHidden(false); state.lastScrollY = currentScrollY; return; }
+    const isModalOpen = Boolean(state.settingsPanelOpen || state.notificationsPanelOpen || state.keyboardShortcutsPanelOpen || state.adminBanPanelOpen || state.viewerPostId || state.activeProfileKey);
+    if (isModalOpen || currentScrollY <= 30) {
+      setMobileHeaderHidden(false);
+      state.lastScrollY = currentScrollY;
+      return;
+    }
+
     const delta = currentScrollY - state.lastScrollY;
-    if (Math.abs(delta) < 8) { state.lastScrollY = currentScrollY; return; }
-    if (delta > 0) setMobileHeaderHidden(true); else setMobileHeaderHidden(false);
+    if (Math.abs(delta) < 2) return;
+
+    if (delta > 0) {
+      // Scrolling down
+      if (!state.mobileHeaderHidden) setMobileHeaderHidden(true);
+    } else {
+      // Scrolling up
+      if (state.mobileHeaderHidden) setMobileHeaderHidden(false);
+    }
+
     state.lastScrollY = currentScrollY;
   }
 
@@ -1862,6 +1882,7 @@ export function createAppUi(context) {
     }
 
     if (modalOverlayOpen !== lastModalOverlayOpen) {
+      document.documentElement.classList.toggle("viewer-open", modalOverlayOpen);
       document.body.classList.toggle("viewer-open", modalOverlayOpen);
       lastModalOverlayOpen = modalOverlayOpen;
     }

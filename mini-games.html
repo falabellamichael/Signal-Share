@@ -13,6 +13,7 @@
             const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
             if (isNative || /Android/i.test(navigator.userAgent)) {
                 document.documentElement.classList.add('platform-android');
+                document.documentElement.classList.add('is-steam-shell');
             }
         })();
     </script>
@@ -1129,6 +1130,12 @@
         const isAndroid = /Android/i.test(navigator.userAgent);
         if (isAndroid || (window.Capacitor && window.Capacitor.getPlatform() === 'android')) {
             document.documentElement.classList.add('platform-android');
+
+            // Disable native pull-to-refresh for the mini-games shell to allow internal scrolling
+            const bridge = window.NativeBridge;
+            if (bridge && typeof bridge.setPullToRefreshEnabled === 'function') {
+                bridge.setPullToRefreshEnabled(false);
+            }
         }
 
         console.log('[Arcade Launcher] API Module Loading...', ArcadeAPI);

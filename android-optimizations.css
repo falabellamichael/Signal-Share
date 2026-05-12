@@ -26,7 +26,7 @@ html.platform-android select {
 
 /* 3. Hero Media Player Optimizations */
 html.platform-android .hero-player-stage {
-    min-height: 200px;
+    min-height: 180px;
     aspect-ratio: 16/9;
 }
 
@@ -40,13 +40,17 @@ html.platform-android .play-btn {
 
 /* 5. Scroll & Background Fixes - CRITICAL FOR ANDROID */
 
-/* Natural scrolling reset */
+/*
+   Natural scrolling reset - ONLY for the main application shell.
+   We avoid :has() for better compatibility with older WebViews.
+*/
 html.platform-android {
     height: auto !important;
     min-height: 100% !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
     background-color: var(--bg-android) !important;
+    overscroll-behavior-y: auto !important;
 }
 
 html.platform-android body {
@@ -57,18 +61,37 @@ html.platform-android body {
     position: relative !important;
     width: 100% !important;
     -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: auto !important;
+    touch-action: auto !important;
 
     /* Theme-aware solid background to avoid Shader Compilation failures */
     background: var(--bg-android) !important;
     background-image: none !important;
 }
 
+/* Revert scroll resets for Steam Shell and Games */
+html.platform-android.is-steam-shell,
+html.platform-android.is-steam-shell body,
+html.platform-android.is-game-page,
+html.platform-android.is-game-page body {
+    height: 100vh !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    overscroll-behavior-y: none !important;
+}
+
+/* Explicit background fix for Steam Shell */
+html.platform-android.is-steam-shell,
+html.platform-android.is-steam-shell body {
+    background: #1b2838 !important;
+}
+
 /* Theme color overrides for Android solid background */
-html.platform-android body[data-theme="midnight"] { --bg-android: #081017; }
-html.platform-android body[data-theme="gallery"]  { --bg-android: #fffdf7; }
-html.platform-android body[data-theme="aurora"]   { --bg-android: #f5fcfb; }
-html.platform-android body[data-theme="contrast"] { --bg-android: #000000; }
-html.platform-android body[data-theme="ember"]    { --bg-android: #140302; }
+html.platform-android[data-theme="midnight"], html.platform-android body[data-theme="midnight"] { --bg-android: #081017; }
+html.platform-android[data-theme="gallery"],  html.platform-android body[data-theme="gallery"]  { --bg-android: #fffdf7; }
+html.platform-android[data-theme="aurora"],   html.platform-android body[data-theme="aurora"]   { --bg-android: #f5fcfb; }
+html.platform-android[data-theme="contrast"], html.platform-android body[data-theme="contrast"] { --bg-android: #000000; }
+html.platform-android[data-theme="ember"],    html.platform-android body[data-theme="ember"]    { --bg-android: #140302; }
 
 /* Kill fixed-position blobs that cause "messed up background" (Shader failures) */
 html.platform-android body::before,
@@ -80,14 +103,9 @@ html.platform-android #top::after {
 }
 
 /* Modal Lock - only lock when explicit modals are open */
+html.platform-android.viewer-open,
 html.platform-android body.viewer-open {
     overflow: hidden !important;
-}
-
-/* Disable expensive filters that break on Android WebViews */
-html.platform-android * {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
 }
 
 /* Ensure the main container grows and allows natural scrolling */
@@ -136,12 +154,18 @@ html.platform-android .site-header {
     position: sticky !important;
     top: var(--safe-area-top, 0px) !important;
     margin-top: 10px !important;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease !important;
+    /* Low Z-index so it stays behind all global overlays */
+    z-index: 20 !important;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;
+    /* Ensure hardware acceleration for smooth sliding */
+    will-change: transform, opacity;
+    transform: translateY(0) translateZ(0) !important;
 }
 
 html.platform-android .site-header.is-hidden {
-    transform: translateY(calc(-100% - 20px)) !important;
+    transform: translateY(calc(-100% - 40px)) translateZ(0) !important;
     opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 /* 10. Floating Icons Slide-away at Bottom */
@@ -166,36 +190,70 @@ html.platform-android .admin-ban-launcher {
 }
 
 /* 11. Mini-Games & Tools Overrides (Steam Shell) */
-html.platform-android .steam-shell {
-    height: auto !important;
-    min-height: 100dvh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: visible !important;
+html.platform-android.is-steam-shell .steam-shell {
+    height: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto 1fr !important;
 }
 
-html.platform-android .steam-content {
-    height: auto !important;
-    overflow: visible !important;
-    padding-top: var(--safe-area-top) !important;
+html.platform-android.is-steam-shell .steam-sidebar,
+html.platform-android.is-steam-shell .chat-resize-handle {
+    display: none !important;
 }
 
-/* Simplified dark backgrounds for Games/Notes to avoid shader failures */
-html.platform-android body.questions-page,
-html.platform-android body.game-body,
-html.platform-android .steam-shell,
-html.platform-android .calculator-body {
-    background: #08080b !important;
+html.platform-android.is-steam-shell .steam-content {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 15px !important;
+    padding-bottom: calc(20px + var(--safe-area-bottom)) !important;
+    display: block !important;
+    height: 100% !important;
+}
+
+html.platform-android.is-steam-shell .game-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+    gap: 12px !important;
+}
+
+@media (max-height: 500px) {
+    html.platform-android.is-steam-shell {
+        --header-height: 50px !important;
+    }
+    html.platform-android.is-steam-shell .steam-header {
+        padding: 8px 15px !important;
+    }
+    html.platform-android.is-steam-shell .featured-hero {
+        min-height: 180px !important;
+        padding: 15px !important;
+        margin-bottom: 15px !important;
+    }
+    html.platform-android.is-steam-shell .hero-content h2 {
+        font-size: 1.8rem !important;
+        margin: 5px 0 !important;
+    }
+    html.platform-android.is-steam-shell .hero-content p {
+        display: none !important;
+    }
+}
+
+html.platform-android.is-game-page body.game-body {
+    background-color: #000 !important;
     background-image: none !important;
 }
 
-/* Specific for Mini-Games background which is steam-blue */
-html.platform-android body:has(.steam-shell) {
-    background: #1b2838 !important;
+/* 12. Stacking Order Fixes - FORCE OVERLAYS TO FRONT */
+html.platform-android .settings-panel,
+html.platform-android .viewer,
+html.platform-android .auth-overlay,
+html.platform-android .admin-ban-panel,
+html.platform-android .companion-prompt-overlay,
+html.platform-android .notification-panel {
+    z-index: 10000 !important;
 }
 
-/* Fix for Calculator specific body scroll */
-html.platform-android body:has(.calc-wrapper) {
-    overflow-y: auto !important;
-    height: auto !important;
+html.platform-android .steam-chat-sidebar,
+html.platform-android .messenger-section {
+    z-index: 9000 !important;
 }
