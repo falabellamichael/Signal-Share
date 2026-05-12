@@ -966,6 +966,19 @@ app.post("/api/activity/report", async (req, res) => {
     return res.status(500).json({ ok: false });
   }
 });
+// Local LLM chat endpoint
+app.post('/api/llm/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message) return res.status(400).json({ error: 'No message provided' });
+    // Placeholder implementation: echo the received message.
+    const reply = `🕹️ You said: "${message}"`;
+    res.json({ reply });
+  } catch (err) {
+    console.error('[Bridge] LLM chat error:', err);
+    res.status(500).json({ error: 'LLM processing failed' });
+  }
+});
 
 app.get("/security", (req, res) => res.sendFile(path.join(projectRoot, "security.html")));
 app.get("/", (req, res) => res.sendFile(path.join(projectRoot, "index.html")));
