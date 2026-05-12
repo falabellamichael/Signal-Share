@@ -376,7 +376,7 @@ function setupResizing() {
         if (newWidth < 280) newWidth = 280;
         
         if (!isFixed && shell.classList.contains('steam-shell')) {
-            shell.style.gridTemplateColumns = `240px auto 6px ${newWidth}px`;
+            shell.style.gridTemplateColumns = `240px 1fr 6px ${newWidth}px`;
         } else {
             sidebar.style.width = `${newWidth}px`;
             if (isFixed && handle) {

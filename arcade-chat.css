@@ -10,6 +10,11 @@
     transition: width 0.1s ease;
 }
 
+/* Ensure the sidebar fills the grid area in integrated mode */
+.steam-shell .steam-chat-sidebar {
+    width: 100%;
+}
+
 /* Fixed positioning for pages like index.html that don't use the steam-shell grid */
 body > .steam-chat-sidebar {
     position: fixed;
