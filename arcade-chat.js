@@ -371,66 +371,65 @@ let isSendingChatMessage = false;
 window.sendChatMessage = async function() {
     if (isSendingChatMessage) return;
     isSendingChatMessage = true;
+    
     const input = document.getElementById('arc-chat-input');
-    if (!input) return;
+    if (!input) {
+        isSendingChatMessage = false;
+        return;
+    }
     const text = input.value.trim();
-    if (!text) return;
-
-    addChatMessage('user', text);
-    input.value = '';
-    
-    const typingId = addTypingIndicator();
-    
-    let activeAiAbortController = null;
-
-    window.stopArcadeAi = function() {
-        if (activeAiAbortController) {
-            activeAiAbortController.abort();
-            activeAiAbortController = null;
-            removeTypingIndicator(typingId);
-            addChatMessage('assistant', '🕹️ [Arcade Protocol]: Intelligence process terminated by user.');
-        }
-    };
-
-    const candidates = [
-        'http://localhost:3000/api/llm/chat',
-        'http://127.0.0.1:3000/api/llm/chat',
-        window.location.origin + '/api/llm/chat',
-        '/api/llm/chat'
-    ];
-
-    let reply = null;
-    let lastError = null;
-
-    activeAiAbortController = new AbortController();
-    const { signal } = activeAiAbortController;
-
-    // Prepare context (what page we are on and what's on it)
-    const pageContext = document.title || 'Signal Share';
-    const pageText = document.body.innerText.substring(0, 1000); // Send a snippet of the current page
-    const fullMessage = text;
+    if (!text) {
+        isSendingChatMessage = false;
+        return;
+    }
 
     try {
-        const response = await bridgeFetch('/api/llm/chat', {
-            method: 'POST',
-            signal,
-            body: JSON.stringify({ 
-                message: text,
-                history: arcadeChatHistory,
-                pageContext: `${pageContext} (Visible text: ${pageText})`
-            })
-        });
+        addChatMessage('user', text);
+        input.value = '';
+        
+        const typingId = addTypingIndicator();
+        let activeAiAbortController = new AbortController();
+        const { signal } = activeAiAbortController;
 
-        if (response.ok) {
-            const data = await response.json();
-            reply = data.reply;
-        } else {
-            lastError = `Bridge returned ${response.status}`;
+        window.stopArcadeAi = function() {
+            if (activeAiAbortController) {
+                activeAiAbortController.abort();
+                activeAiAbortController = null;
+                removeTypingIndicator(typingId);
+                addChatMessage('assistant', '🕹️ [Arcade Protocol]: Intelligence process terminated by user.');
+            }
+        };
+
+        let reply = null;
+        let lastError = null;
+
+        // Prepare context
+        const pageContext = document.title || 'Signal Share';
+        const pageText = document.body.innerText.substring(0, 1000);
+
+        try {
+            const response = await bridgeFetch('/api/llm/chat', {
+                method: 'POST',
+                signal,
+                body: JSON.stringify({ 
+                    message: text,
+                    history: arcadeChatHistory,
+                    pageContext: `${pageContext} (Visible text: ${pageText})`
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                reply = data.reply;
+            } else {
+                lastError = `Bridge returned ${response.status}`;
+            }
+        } catch (err) {
+            lastError = err.message || "Connection refused or blocked by browser";
+            console.warn(`[Arcade Chat] Bridge request failed:`, err);
+        } finally {
+            removeTypingIndicator(typingId);
         }
-    } catch (err) {
-        lastError = err.message || "Connection refused or blocked by browser";
-        console.warn(`[Arcade Chat] Bridge request failed:`, err);
-    }
 
         if (reply !== null) {
             addChatMessage('ai', reply || "...");
@@ -439,12 +438,10 @@ window.sendChatMessage = async function() {
             saveCurrentChat();
             updateChatStatus('active');
         } else {
-            // AUTO-SWITCH TO OFFLINE CHATBOT
             console.warn(`[Arcade Chat] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
             const offlineReply = getArcadeProtocolOfflineResponse(text);
             addChatMessage('ai', offlineReply);
             
-            // Still save to history so the conversation flows
             arcadeChatHistory.push({ role: 'user', content: text });
             arcadeChatHistory.push({ role: 'assistant', content: offlineReply });
             saveCurrentChat();
@@ -453,7 +450,6 @@ window.sendChatMessage = async function() {
     } catch (e) {
         console.error("[Arcade Chat] Error in sendChatMessage:", e);
     } finally {
-        removeTypingIndicator(typingId);
         isSendingChatMessage = false;
     }
 }
