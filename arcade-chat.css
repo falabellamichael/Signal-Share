@@ -76,7 +76,8 @@ body > .chat-resize-handle.collapsed {
 
 body.chat-collapsed .chat-toggle-btn,
 body.chat-collapsed .messenger-launcher {
-    display: flex !important;
+    display: grid !important;
+    place-items: center !important;
 }
 
 /* Move the button with the sidebar when NOT collapsed */
