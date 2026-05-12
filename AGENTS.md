@@ -14,6 +14,7 @@ PROJECT PRIORITIES
 8. Add proper error handling around async work, browser APIs, Supabase calls, media controls, file uploads, network calls, and local storage.
 9. Always account for desktop, mobile, and responsive behavior.
 10. Keep accessibility in mind: buttons need labels, interactive elements need keyboard support, images need alt text, and form controls should be usable without a mouse.
+11. Create separate files for anything possible to keep them small and organized. Do not stuff too much info into one file. A good rule of thumb is not have a file with more than 1000-2000 lines.
 
 CODE STRUCTURE RULES
 

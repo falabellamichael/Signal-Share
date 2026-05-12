@@ -161,7 +161,10 @@ async function publishCustomGame() {
         let match;
         while ((match = statRegex.exec(allCode)) !== null) {
             const key = match[1];
-            if (key.includes('score') || key.includes('best') || key.includes('level') || key.includes('stats') || key.includes('rank')) {
+            const lowerKey = key.toLowerCase();
+            // Expanded scanner keywords from the sophisticated list
+            const keywords = ['score', 'best', 'level', 'stats', 'rank', 'xp', 'streak', 'win', 'lose', 'food', 'points', 'plays', 'time', 'likes', 'views', 'eng', 'rep', 'consecutive'];
+            if (keywords.some(k => lowerKey.includes(k))) {
                 if (!trackedStats.includes(key)) trackedStats.push(key);
             }
         }
@@ -488,8 +491,32 @@ function calculateRank(totalPoints) {
 function discoverStats(game) {
     let stats = [];
     const id = game.id;
+    const engine = typeof LEADERBOARD_ENGINE !== 'undefined' ? LEADERBOARD_ENGINE : null;
 
+    // Helper to add a stat if it's not already in the list
+    const tryAddStat = (key, labelOverride = null) => {
+        if (stats.length >= 3) return true;
+        const lowerKey = key.toLowerCase();
+        
+        // Don't duplicate by label or key
+        if (stats.find(s => s.key === key || (labelOverride && s.label === labelOverride))) return false;
+
+        const raw = localStorage.getItem(key);
+        if (!raw) return false;
+
+        const val = parseInt(raw);
+        if (!isNaN(val)) {
+            const label = labelOverride || (engine ? engine.formatLabel(key, id) : key.toUpperCase());
+            const unit = engine ? engine.getUnit(key) : '';
+            stats.push({ key, label, val, unit });
+            return true;
+        }
+        return false;
+    };
+
+    // 1. HIGH PRIORITY: Explicitly tracked keys from manifest
     (game.trackedStats || []).forEach(key => {
+        if (stats.length >= 3) return;
         const raw = localStorage.getItem(key) || sessionStorage.getItem(key);
         if (!raw) return;
 
@@ -497,42 +524,52 @@ function discoverStats(game) {
             try {
                 const data = JSON.parse(raw);
                 Object.entries(data).forEach(([k, v]) => {
+                    if (stats.length >= 3) return;
                     if (typeof v === 'number' || !isNaN(v)) {
-                        stats.push({ label: k.toUpperCase(), val: v, unit: '' });
+                        const label = engine ? engine.formatLabel(k, id) : k.toUpperCase();
+                        const unit = engine ? engine.getUnit(k) : '';
+                        stats.push({ key: k, label, val: v, unit });
                     }
                 });
             } catch(e) {}
         } else {
-            const val = parseInt(raw);
-            if (!isNaN(val)) {
-                let label = key.replace(`${id}-`, '').replace(/-/g, ' ').toUpperCase();
-                if (label.includes('BEST')) label = 'ALL-TIME BEST';
-                stats.push({ label: label || 'RECORD', val: val, unit: '' });
-            }
+            tryAddStat(key);
         }
     });
 
+    // 2. MEDIUM PRIORITY: Exhaustive Heuristic Discovery (Direct ID Matches)
     if (stats.length < 3) {
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key.includes(id) && !stats.find(s => key.includes(s.label.toLowerCase()))) {
-                const val = parseInt(localStorage.getItem(key));
-                if (!isNaN(val)) {
-                    stats.push({ label: key.split('-').pop().toUpperCase(), val: val, unit: '' });
-                }
+            if (key.includes(id)) {
+                tryAddStat(key);
             }
+            if (stats.length >= 3) break;
         }
     }
 
-    const defaults = [
-        { label: 'GLOBAL RANK', val: 'UNRANKED', unit: '' },
+    // 3. LOW PRIORITY: Contextual Global Metrics (from the sophisticated list)
+    if (stats.length < 3 && engine) {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            // Check if this global key matches a dictionary entry and is "meaningful"
+            if (engine.getMetric(key)) {
+                tryAddStat(key);
+            }
+            if (stats.length >= 3) break;
+        }
+    }
+
+    // 4. FALLBACKS: Only if we still have fewer than 3
+    const placeholders = [
+        { label: 'HIGH SCORE', val: '0', unit: 'PTS' },
         { label: 'PLAY TIME', val: '0', unit: 'MIN' },
-        { label: 'COMPLETION', val: '0', unit: '%' }
+        { label: 'GLOBAL RANK', val: 'UNRANKED', unit: '' }
     ];
 
     while (stats.length < 3) {
-        const def = defaults[stats.length] || { label: 'PENDING', val: '---', unit: '' };
-        stats.push(def);
+        const p = placeholders[stats.length] || { label: 'PENDING', val: '---', unit: '' };
+        stats.push(p);
     }
 
     return stats.slice(0, 3);
@@ -731,6 +768,15 @@ function openApp(url, title, icon, appId, skipPush = false) {
             history.pushState(stateData, '');
         }
     }
+
+    // Android Optimizations: Disable Pull-to-Refresh and enable Immersive Mode for games
+    if (window.NativeBridge) {
+        try {
+            NativeBridge.setPullToRefreshEnabled(false);
+            NativeBridge.setImmersiveMode(true);
+            NativeBridge.setStatusBarColor('#000000');
+        } catch (e) { console.warn("NativeBridge error:", e); }
+    }
 }
 
 function closeApp(skipPush = false) {
@@ -741,7 +787,17 @@ function closeApp(skipPush = false) {
 
     runner.style.display = 'none';
     frame.src = '';
-    document.body.style.overflow = 'auto';
+    document.body.style.overflow = '';
+
+    // Android Optimizations: Re-enable Pull-to-Refresh and exit Immersive Mode
+    if (window.NativeBridge) {
+        try {
+            NativeBridge.setPullToRefreshEnabled(true);
+            NativeBridge.setImmersiveMode(false);
+            // Revert status bar to default steam-dark color
+            NativeBridge.setStatusBarColor('#1b2838');
+        } catch (e) { console.warn("NativeBridge error:", e); }
+    }
 
     if (!skipPush && !isNavigatingHistory) {
         history.back();

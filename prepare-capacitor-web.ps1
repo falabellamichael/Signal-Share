@@ -47,6 +47,8 @@ $files = @(
   "llm-deepdive-2.html",
   "mini-games.html",
   "mini-games.js",
+  "leaderboard-metrics.js",
+  "android-optimizations.css",
   "snake-game.html",
   "gameLogic.js",
   "Calculator.html",

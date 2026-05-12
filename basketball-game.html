@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Neon Hoops | Signal Share</title>
+    <link rel="stylesheet" href="./android-optimizations.css?v=1.0">
     <style>
         :root {
             --neon-orange: #ff7700;
@@ -237,7 +238,11 @@
             const header = document.querySelector('.runner-header');
             const gameUI = document.getElementById('gameUI');
             if (header) header.style.display = 'none';
-            if (gameUI) gameUI.style.top = '20px';
+            if (gameUI) {
+                gameUI.style.top = 'max(20px, var(--safe-area-top, 20px))';
+                gameUI.style.paddingLeft = 'var(--safe-area-left, 0px)';
+                gameUI.style.paddingRight = 'var(--safe-area-right, 0px)';
+            }
         }
     </script>
 </body>
