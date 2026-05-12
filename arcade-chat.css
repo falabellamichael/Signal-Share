@@ -200,14 +200,17 @@ body.messenger-expanded .chat-toggle-btn {
     border: 1px solid var(--arc-border) !important;
     border-right: none !important;
     border-radius: 8px 0 0 8px !important;
-    display: flex !important;
+    display: flex !important; /* Force flex for the tab content */
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
     padding: 15px 0 !important;
     opacity: 1 !important;
+    z-index: 20000 !important; /* Ensure it's above EVERYTHING */
     box-shadow: -5px 0 15px var(--arc-shadow) !important;
     transition: transform 0.2s, background 0.3s, right 0.3s ease !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
 }
 
 .chat-toggle-btn.chat-tab-mode:hover {
@@ -219,11 +222,16 @@ body.messenger-expanded .chat-toggle-btn {
     white-space: nowrap;
 }
 
+/* Ensure the tab isn't hidden by the general toggle rule if it's in tab mode */
+body:not(.chat-collapsed) .chat-toggle-btn.chat-tab-mode {
+    display: none !important; /* Only hide if the sidebar is actually open */
+}
+
 /* Hide floating toggle and messenger launcher in integrated mode (steam-shell) 
-   to prevent redundant UI and overlapping icons, BUT show them if the sidebar is collapsed. 
-   On mobile, we ALWAYS show the floating toggle because the integrated one is pushed down. */
+    to prevent redundant UI and overlapping icons, BUT show them if the sidebar is collapsed. 
+    On mobile, we ALWAYS show the floating toggle because the integrated one is pushed down. */
 @media (min-width: 769px) {
-    .steam-shell .chat-toggle-btn,
+    .steam-shell .chat-toggle-btn:not(.chat-tab-mode),
     .steam-shell .messenger-launcher {
         display: none;
     }
