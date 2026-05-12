@@ -6,8 +6,8 @@
 
 const GAMES = [
     { id: 'snake', title: 'Neon Snake', category: 'ARCADE', poster: 'snake_game_poster_1778466261855.png', tag: 'ARCADE • READY', type: 'game', trackedStats: ['snake-best', 'snake-food-total', 'snake-games-played'] },
-    { id: 'basketball', title: 'Neon Hoops', category: 'ARCADE', poster: 'basketball_game_poster.png', tag: 'ARCADE • 3D', type: 'game', trackedStats: ['hoops-bests'] },
-    { id: 'pinball', title: 'Neon Pinball', category: 'ARCADE', poster: 'neon_pinball_v2_poster.png', tag: 'ARCADE • NEW', type: 'game', trackedStats: ['pinball-pro-best', 'pinball-avg-score', 'pinball-sessions'] },
+    { id: 'basketball', title: 'Neon Hoops', category: 'ARCADE', poster: 'basketball_game_poster.png', tag: 'ARCADE • 3D', type: 'game', trackedStats: ['hoops-bests', 'hoops-total-points', 'hoops-sessions'] },
+    { id: 'pinball', title: 'Neon Pinball', category: 'ARCADE', poster: 'neon_pinball_v2_poster.png', tag: 'ARCADE • NEW', type: 'game', trackedStats: ['pinball-pro-best', 'pinball-total-score', 'pinball-avg-score', 'pinball-sessions'] },
     { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility', trackedStats: [] }
 ];
 
@@ -61,7 +61,7 @@ function loadCustomGames() {
 function setupFileUpload() {
     const fileInput = document.getElementById('game-file-input');
     if (fileInput) {
-        fileInput.addEventListener('change', function(e) {
+        fileInput.addEventListener('change', function (e) {
             if (this.files.length > 0) {
                 Array.from(this.files).forEach(file => {
                     if (!uploadedFiles.find(f => f.name === file.name)) {
@@ -152,8 +152,8 @@ async function publishCustomGame() {
         const gameId = 'custom_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
 
         let entryFile = processedFiles.find(f => f.name.toLowerCase() === 'index.html') ||
-                        processedFiles.find(f => f.name.endsWith('.html')) ||
-                        processedFiles[0];
+            processedFiles.find(f => f.name.endsWith('.html')) ||
+            processedFiles[0];
 
         const allCode = processedFiles.map(f => f.content).join(' ');
         const trackedStats = [];
@@ -326,7 +326,7 @@ function hideAuth() {
 
 function performLogin() {
     const user = document.getElementById('login-user').value || 'Developer';
-    currentUser = { name: user, id: 'ID-' + Math.floor(Math.random()*1000) };
+    currentUser = { name: user, id: 'ID-' + Math.floor(Math.random() * 1000) };
     localStorage.setItem('ss-user', JSON.stringify(currentUser));
     updateAuthUI();
     hideAuth();
@@ -497,16 +497,18 @@ function discoverStats(game) {
     const tryAddStat = (key, labelOverride = null) => {
         if (stats.length >= 3) return true;
         const lowerKey = key.toLowerCase();
-        
-        // Don't duplicate by label or key
-        if (stats.find(s => s.key === key || (labelOverride && s.label === labelOverride))) return false;
 
+        // Don't duplicate by label or key
+        const label = labelOverride || (engine ? engine.formatLabel(key, id) : key.toUpperCase());
+        
+        // Don't duplicate by label OR key
+        if (stats.find(s => s.key === key || s.label === label)) return false;
+        
         const raw = localStorage.getItem(key);
         if (!raw) return false;
 
         const val = parseInt(raw);
         if (!isNaN(val)) {
-            const label = labelOverride || (engine ? engine.formatLabel(key, id) : key.toUpperCase());
             const unit = engine ? engine.getUnit(key) : '';
             stats.push({ key, label, val, unit });
             return true;
@@ -531,7 +533,7 @@ function discoverStats(game) {
                         stats.push({ key: k, label, val: v, unit });
                     }
                 });
-            } catch(e) {}
+            } catch (e) { }
         } else {
             tryAddStat(key);
         }
@@ -548,10 +550,15 @@ function discoverStats(game) {
         }
     }
 
-    // 3. LOW PRIORITY: Contextual Global Metrics (from the sophisticated list)
+    // 3. LOW PRIORITY: Contextual Global Metrics (Only if they aren't explicitly prefixed for another game)
     if (stats.length < 3 && engine) {
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
+            
+            // SECURITY: If the key clearly belongs to another game (contains their ID), skip it
+            const isOtherGameKey = GAMES.some(g => g.id !== id && key.toLowerCase().includes(g.id.toLowerCase()));
+            if (isOtherGameKey) continue;
+
             // Check if this global key matches a dictionary entry and is "meaningful"
             if (engine.getMetric(key)) {
                 tryAddStat(key);
@@ -711,12 +718,12 @@ function toggleObstCount(mode) {
 
 function launchSnake() {
     recordLaunch('snake');
-    const speed     = document.getElementById('snake-speed').value;
-    const grid      = document.getElementById('snake-grid').value;
-    const neon      = document.getElementById('snake-neon').value;
+    const speed = document.getElementById('snake-speed').value;
+    const grid = document.getElementById('snake-grid').value;
+    const neon = document.getElementById('snake-neon').value;
     const obstacles = document.getElementById('snake-obstacles').value;
     const obstCount = document.getElementById('snake-obst-count').value;
-    const wallwrap  = document.getElementById('snake-wallwrap').checked ? '1' : '0';
+    const wallwrap = document.getElementById('snake-wallwrap').checked ? '1' : '0';
 
     const url = `./snake-game.html?speed=${speed}&grid=${grid}&neon=${neon}&obstacles=${obstacles}&obstCount=${obstCount}&wallwrap=${wallwrap}&autostart=1`;
     openApp(url, 'Neon Snake', 'snake_game_poster_1778466261855.png', 'snake');
@@ -768,15 +775,6 @@ function openApp(url, title, icon, appId, skipPush = false) {
             history.pushState(stateData, '');
         }
     }
-
-    // Android Optimizations: Disable Pull-to-Refresh and enable Immersive Mode for games
-    if (window.NativeBridge) {
-        try {
-            NativeBridge.setPullToRefreshEnabled(false);
-            NativeBridge.setImmersiveMode(true);
-            NativeBridge.setStatusBarColor('#000000');
-        } catch (e) { console.warn("NativeBridge error:", e); }
-    }
 }
 
 function closeApp(skipPush = false) {
@@ -787,24 +785,14 @@ function closeApp(skipPush = false) {
 
     runner.style.display = 'none';
     frame.src = '';
-    document.body.style.overflow = '';
-
-    // Android Optimizations: Re-enable Pull-to-Refresh and exit Immersive Mode
-    if (window.NativeBridge) {
-        try {
-            NativeBridge.setPullToRefreshEnabled(true);
-            NativeBridge.setImmersiveMode(false);
-            // Revert status bar to default steam-dark color
-            NativeBridge.setStatusBarColor('#1b2838');
-        } catch (e) { console.warn("NativeBridge error:", e); }
-    }
+    document.body.style.overflow = 'auto';
 
     if (!skipPush && !isNavigatingHistory) {
         history.back();
     }
 }
 
-window.onpopstate = function(event) {
+window.onpopstate = function (event) {
     isNavigatingHistory = true;
 
     const runner = document.getElementById('app-runner');

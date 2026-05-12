@@ -89,32 +89,6 @@ public class MainActivity extends BridgeActivity {
         public void forceRefreshNowPlaying() {
             PhoneNowPlayingHelper.pushSnapshotToConnectedNodes(MainActivity.this);
         }
-
-        @android.webkit.JavascriptInterface
-        public void setImmersiveMode(boolean immersive) {
-            mainHandler.post(() -> {
-                androidx.core.view.WindowInsetsControllerCompat controller = 
-                    androidx.core.view.WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-                
-                if (immersive) {
-                    controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());
-                    controller.setSystemBarsBehavior(
-                        androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                    );
-                } else {
-                    controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars());
-                }
-            });
-        }
-
-        @android.webkit.JavascriptInterface
-        public void setStatusBarColor(String colorHex) {
-            mainHandler.post(() -> {
-                try {
-                    getWindow().setStatusBarColor(android.graphics.Color.parseColor(colorHex));
-                } catch (Exception ignored) {}
-            });
-        }
     };
 
     @Override

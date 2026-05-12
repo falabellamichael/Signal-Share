@@ -112,8 +112,8 @@ const ball = {
 };
 
 // Restored missing boundary logic in object initialization for exact physics rest/up calculation
-const leftFlipper = { side: 'left', x: 124, y: 640, angle: 0.46, rest: 0.46, up: -0.58, length: 66, width: 14, color: COLORS.primary, pressed: false };
-const rightFlipper = { side: 'right', x: 276, y: 640, angle: Math.PI - 0.46, rest: Math.PI - 0.46, up: Math.PI + 0.58, length: 66, width: 14, color: COLORS.secondary, pressed: false };
+const leftFlipper = { side: 'left', x: 119, y: 640, angle: 0.46, rest: 0.46, up: -0.58, length: 66, width: 14, color: COLORS.primary, pressed: false };
+const rightFlipper = { side: 'right', x: 271, y: 640, angle: Math.PI - 0.46, rest: Math.PI - 0.46, up: Math.PI + 0.58, length: 66, width: 14, color: COLORS.secondary, pressed: false };
 
 const BUMPER_LEVELS = [
     { color: '#3b82f6', pointsMult: 1.0 },  // 0: Blue
@@ -211,15 +211,15 @@ const walls = [
     // Slanted one-way plunger lock gate.
     { x1: 398, y1: 170, x2: 370, y2: 200, color: COLORS.accent, thick: 4, isGate: true },
 
-    // Open slingshots: no closed triangle pockets, no vertical back wall to trap the ball.
-    { x1: 62, y1: 526, x2: 122, y2: 584, color: COLORS.success, thick: 7, slingshot: true },
-    { x1: 338, y1: 526, x2: 278, y2: 584, color: COLORS.success, thick: 7, slingshot: true },
+    // Open slingshots: centered with the 195px playfield.
+    { x1: 57, y1: 526, x2: 117, y2: 584, color: COLORS.success, thick: 7, slingshot: true },
+    { x1: 333, y1: 526, x2: 273, y2: 584, color: COLORS.success, thick: 7, slingshot: true },
 
     // Return guides now connected directly to flipper pivots for a seamless look.
-    { x1: 20, y1: 558, x2: 124, y2: 640, color: COLORS.wall, thick: 5 },
-    { x1: 370, y1: 558, x2: 276, y2: 640, color: COLORS.wall, thick: 5 },
-    { x1: 40, y1: 655, x2: 115, y2: 678, color: COLORS.wall, thick: 5 },
-    { x1: 350, y1: 655, x2: 275, y2: 678, color: COLORS.wall, thick: 5 },
+    { x1: 20, y1: 558, x2: 119, y2: 640, color: COLORS.wall, thick: 5 },
+    { x1: 370, y1: 558, x2: 271, y2: 640, color: COLORS.wall, thick: 5 },
+    { x1: 40, y1: 655, x2: 110, y2: 678, color: COLORS.wall, thick: 5 },
+    { x1: 350, y1: 655, x2: 280, y2: 678, color: COLORS.wall, thick: 5 },
 
     // Loop crescents.
     ...createArc(195 - 35 / 2, loop.cy, 62, Math.PI * 0.7, Math.PI * 1.3, 12, COLORS.accent, 4),
@@ -296,18 +296,18 @@ function startGame() {
     state.launchCharge = 0;
     particles.length = 0;
     floatingText.length = 0;
-    bumpers.forEach((b) => { 
-        b.pulse = 0; 
-        b.hits = 0; 
-        b.level = 0; 
+    bumpers.forEach((b) => {
+        b.pulse = 0;
+        b.hits = 0;
+        b.level = 0;
         b.color = BUMPER_LEVELS[0].color;
         b.points = b.basePoints;
     });
     rollovers.forEach((r) => { r.lit = false; r.cooldown = 0; });
     state.triLevel = 0;
-    triRollovers.forEach((t) => { 
-        t.lit = false; 
-        t.cooldown = 0; 
+    triRollovers.forEach((t) => {
+        t.lit = false;
+        t.cooldown = 0;
         t.points = 400;
         t.color = `hsl(210, 100%, 60%)`; // Reset to initial blue
     });
@@ -329,7 +329,7 @@ function gameOver() {
         const sessions = parseInt(localStorage.getItem('pinball-sessions') || '0') + 1;
         const totalScore = parseInt(localStorage.getItem('pinball-total-score') || '0') + state.score;
         const avgScore = Math.round(totalScore / sessions);
-        
+
         localStorage.setItem('pinball-sessions', sessions);
         localStorage.setItem('pinball-total-score', totalScore);
         localStorage.setItem('pinball-avg-score', avgScore);
@@ -449,16 +449,16 @@ window.addEventListener('keydown', (event) => {
     if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', 'KeyA', 'KeyD', 'KeyS', 'KeyW', 'KeyT', 'ShiftLeft', 'ShiftRight'].includes(event.code)) event.preventDefault();
     if (event.repeat && !['Space', 'ArrowDown', 'KeyS'].includes(event.code)) return;
     keys[event.code] = true;
-    
+
     if (event.code === 'Space' || event.code === 'ArrowDown' || event.code === 'KeyS') {
         beginLaunchCharge();
     }
-    
+
     if (event.code === 'KeyT' || event.code === 'ArrowUp' || event.code === 'KeyW' || event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
         const dir = event.code === 'ShiftLeft' ? -1 : event.code === 'ShiftRight' ? 1 : 0;
         nudge(dir);
     }
-    
+
     if (!state.running && event.code === 'Enter') startGame();
 }, { passive: false });
 
@@ -483,7 +483,7 @@ function bindHoldButton(id, onDown, onUp) {
 bindHoldButton('leftTouch', () => { keys.TouchLeft = true; }, () => { keys.TouchLeft = false; });
 bindHoldButton('rightTouch', () => { keys.TouchRight = true; }, () => { keys.TouchRight = false; });
 bindHoldButton('plungerTouch', beginLaunchCharge, releaseLaunchCharge);
-bindHoldButton('nudgeTouch', () => nudge(0), () => {});
+bindHoldButton('nudgeTouch', () => nudge(0), () => { });
 
 const startButton = document.querySelector('.play-btn');
 if (startButton) startButton.addEventListener('click', (event) => {
@@ -817,7 +817,7 @@ function checkTargetCollision(t) {
     if (vn < 0) {
         ball.vx -= 1.6 * vn * nx;
         ball.vy -= 1.6 * vn * ny;
-        
+
         // Active kicker effect to prevent the ball from settling on top of targets
         const kick = 6.5;
         ball.vx += nx * kick;
@@ -852,6 +852,18 @@ function checkFlipperCollision(f, dt) {
 
     ball.x += nx * (contactRadius - dist + CFG.collisionSlop);
     ball.y += ny * (contactRadius - dist + CFG.collisionSlop);
+
+    // Active anti-trap "Pivot Kick": Prevents the ball from settling on the flipper joint
+    if (t < 0.22) {
+        const kick = 3.8;
+        const pushX = f.side === 'left' ? 1 : -1;
+        ball.vx += pushX * kick;
+        ball.vy = Math.min(ball.vy, -2.5); // Ensure upward momentum
+        if (Math.abs(ball.vx) < 6) {
+            explode(cx, cy, f.color, 12);
+            spawnText('BOUNCE', cx, cy - 15, f.color);
+        }
+    }
 
     const omega = f.omega * 1.1;
     const vfx = -omega * (cy - f.y), vfy = omega * (cx - f.x);
@@ -940,7 +952,7 @@ function checkTriRollover(t) {
             state.triLevel = Math.min(100, state.triLevel + 1);
             state.multiplier = Math.min(99, state.multiplier + 2);
             updateUI();
-            
+
             // Calculate new color and points for the next level
             const newHue = (210 + state.triLevel * 15) % 360;
             const newColor = `hsl(${newHue}, 100%, 60%)`;
@@ -950,8 +962,8 @@ function checkTriRollover(t) {
             explode(195, 520, COLORS.success, 50);
 
             setTimeout(() => {
-                triRollovers.forEach((item) => { 
-                    item.lit = false; 
+                triRollovers.forEach((item) => {
+                    item.lit = false;
                     item.color = newColor;
                     item.points = newPoints;
                 });
@@ -1049,7 +1061,8 @@ function drawBackground() {
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,0.03)';
     ctx.lineWidth = 1;
-    for (let i = 0; i < W; i += 40) {
+    // Offset by 35px so that a vertical line lands exactly at 195px (the playfield center)
+    for (let i = 35; i < W; i += 40) {
         ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, H); ctx.stroke();
     }
     for (let i = 0; i < H; i += 40) {
@@ -1157,11 +1170,11 @@ function drawTriRollovers() {
         ctx.save();
         ctx.shadowBlur = t.lit ? 15 : 0;
         ctx.shadowColor = t.color;
-        
+
         ctx.strokeStyle = t.lit ? t.color : 'rgba(255,255,255,0.1)';
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2); ctx.stroke();
-        
+
         if (t.lit) {
             ctx.fillStyle = t.color;
             ctx.globalAlpha = 0.3;
