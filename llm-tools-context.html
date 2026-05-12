@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Tools & Context: Browser Vision | Deep Dive</title>
+    <link rel="stylesheet" href="./questions-guide.css?v=1.3"> 
+    <link rel="icon" href="./icons/icon.svg?v=5" type="image/svg+xml" />
+    <style>
+        :root {
+            --accent-primary: #50fa7b;
+            --accent-secondary: #ffb86c;
+            --accent-tertiary: #ff5555;
+            --surface-glass: rgba(255, 255, 255, 0.03);
+            --border-glass: rgba(255, 255, 255, 0.12);
+        }
+
+        .deepdive-index {
+            position: sticky;
+            top: calc(10px + var(--status-bar-safe-space, 0px));
+            z-index: 100;
+            margin: 24px auto;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border-glass);
+            background: rgba(10, 25, 15, 0.6);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            width: fit-content;
+            max-width: 100%;
+            margin-bottom: 30px;
+        }
+        .deepdive-index ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            gap: 4px;
+            font-size: 0.82rem;
+        }
+        .deepdive-index a {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 999px;
+            transition: all 200ms ease;
+        }
+        .deepdive-index a:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff !important;
+        }
+
+        .code-snippet {
+            background: #1e1e2e;
+            padding: 24px;
+            border-radius: 18px;
+            margin: 24px 0;
+            overflow-x: auto;
+            font-family: "JetBrains Mono", monospace;
+            color: #cdd6f4;
+            border: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.85rem;
+        }
+
+        .questions-page-card h2::before {
+            background: var(--accent-primary);
+        }
+
+        .vision-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(80, 250, 123, 0.1);
+            color: var(--accent-primary);
+            padding: 6px 14px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            border: 1px solid rgba(80, 250, 123, 0.2);
+            margin-bottom: 12px;
+        }
+
+        .tag-block {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .tag-item {
+            background: rgba(255,255,255,0.05);
+            padding: 12px 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-glass);
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.8rem;
+            color: var(--accent-secondary);
+        }
+    </style>
+</head>
+<body class="questions-page">
+    <main class="questions-page-shell">
+        <a class="questions-back-link" href="./llm-integration-bridge.html">← Back to Part 2</a>
+
+        <p class="questions-page-topline">Local AI Architecture Deep Dive / Part 3</p>
+        <h1 id="tools-and-vision">AI Tools & Contextual Vision: How the AI "Sees" Your Web</h1>
+        <p class="questions-page-lede">
+            Learn about the Recursive Tool-Calling framework and the "Browser Vision" system that allows the AI to perceive your current page content in real-time.
+        </p>
+
+        <nav class="deepdive-index">
+            <ul>
+                <li><a href="#section-vision">Browser Vision (Context)</a></li>
+                <li><a href="#section-tags">Tool-Calling Tags</a></li>
+                <li><a href="#section-recursive">The Recursive Loop</a></li>
+            </ul>
+        </nav>
+
+        <section class="questions-page-card" id="section-vision">
+            <div class="vision-pill">Contextual Awareness</div>
+            <h2>1. Browser Vision: Capturing Context</h2>
+            <p>To make the AI helpful, we provide it with a "snapshot" of what you are currently looking at. Every time you send a message, the frontend (<code>arcade-chat.js</code> or <code>app-v3.js</code>) performs a quick scrape of the current page.</p>
+            
+            <div class="code-snippet">
+<span style="color: #6272a4;">// Frontend context capture logic</span>
+<span style="color: #ff79c6;">const</span> pageContext = <span style="color: #8be9fd;">document</span>.title;
+<span style="color: #ff79c6;">const</span> pageText = <span style="color: #8be9fd;">document</span>.body.innerText.<span style="color: #50fa7b;">substring</span>(<span style="color: #bd93f9;">0</span>, <span style="color: #bd93f9;">1000</span>);
+<span style="color: #6272a4;">// This snippet is sent to the AI backend as "CURRENT CONTEXT"</span>
+            </div>
+            
+            <p>This allows the AI to answer questions like <em>"What am I looking at?"</em> or <em>"Explain the code on this page."</em> even though it has no direct visual camera access.</p>
+        </section>
+
+        <section class="questions-page-card" id="section-tags">
+            <div class="vision-pill" style="background: rgba(255, 184, 108, 0.1); color: #ffb86c; border-color: rgba(255, 184, 108, 0.2);">Tool-Calling</div>
+            <h2>2. Tool-Calling Tags</h2>
+            <p>We use a custom "Tag Interception" system. The AI is trained via its system prompt to output specific brackets when it needs to perform an action. The Node.js server intercepts these brackets before the final response is shown.</p>
+
+            <div class="tag-block">
+                <div class="tag-item">[SEARCH: query]</div>
+                <div class="tag-item">[FETCH: url]</div>
+                <div class="tag-item">[OPEN: url]</div>
+                <div class="tag-item">[PLAY: action]</div>
+            </div>
+
+            <ul>
+                <li><strong>Search:</strong> Triggers a background scrape of DuckDuckGo Lite.</li>
+                <li><strong>Fetch:</strong> Downloads the raw text content of any public URL.</li>
+                <li><strong>Open:</strong> Launches a URI (like <code>spotify:search</code>) on your local OS.</li>
+                <li><strong>Play:</strong> Sends playback commands (Play/Pause/Skip) to the media bridge.</li>
+            </ul>
+        </section>
+
+        <section class="questions-page-card" id="section-recursive">
+            <div class="vision-pill" style="background: rgba(255, 85, 85, 0.1); color: #ff5555; border-color: rgba(255, 85, 85, 0.2);">Execution Loop</div>
+            <h2>3. The Recursive Intelligence Loop</h2>
+            <p>If the AI generates a <code>[SEARCH]</code> tag, the backend doesn't just show you the search result. It performs the search, appends the results to a new prompt, and <strong>re-calls the AI</strong> automatically.</p>
+
+            <div class="code-snippet">
+<span style="color: #6272a4;">// The Multi-Pass Execution Loop</span>
+<span style="color: #ff79c6;">if</span> (hasToolTags) {
+    <span style="color: #ff79c6;">const</span> toolData = <span style="color: #ff79c6;">await</span> <span style="color: #50fa7b;">executeWebTools</span>(aiResponse);
+    <span style="color: #6272a4;">// Reprompt the AI with the new data</span>
+    aiResponse = <span style="color: #ff79c6;">await</span> <span style="color: #50fa7b;">getChatResponse</span>(originalMsg + <span style="color: #f1fa8c;">"\n\nDATA: "</span> + toolData);
+}
+            </div>
+
+            <p>This "Thinking" loop is what makes the Signal Share AI feel like it's actually browsing the web for you in real-time.</p>
+        </section>
+
+        <div class="pagination-nav">
+            <a class="questions-page-button" href="./llm-integration-bridge.html" style="border: none; opacity: 0.6;">Back to Part 2</a>
+            <a class="questions-page-button" href="./how-to-guide.html" style="background: var(--accent-primary); color: #000; font-weight: 700; border: none;">Finish Guide</a>
+        </div>
+    </main>
+</body>
+</html>

@@ -96,32 +96,19 @@
 
      <!-- Developer Deep Dive Content Panel -->
      <section id="developer-panel">
-       <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-         <h3 style="color: #ffffff; margin: 0;">🌐 Understanding Local LLM Inference (LM Studio Guide)</h3>
-         <span style="background: rgba(70, 130, 180, 0.2); padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; border: 1px solid rgba(70, 130, 180, 0.4); color: #4682b4; font-weight: bold;">PLANNED FEATURE</span>
-       </div>
-       <p>This guide explains the concept of running Large Language Models (LLMs) locally using tools like LM Studio. This technology allows powerful AI capabilities to run entirely offline, providing maximum privacy and control over data.</p>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <h3 style="color: #ffffff; margin: 0;">🌐 Understanding Local LLM Inference (LM Studio Guide)</h3>
+          <span style="background: rgba(139, 233, 253, 0.2); padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; border: 1px solid rgba(139, 233, 253, 0.4); color: #8be9fd; font-weight: bold;">FEATURE ACTIVE</span>
+        </div>
+        <p>This guide explains the concept of running Large Language Models (LLMs) locally using tools like LM Studio. This technology allows powerful AI capabilities to run entirely offline, providing maximum privacy and control over data.</p>
 
-       <h4 style="color: #4682b4;">What is Local LLM Inference?</h4>
-       <p>Local inference means that the entire process—from taking a prompt (input) to generating a response (output)—happens solely on your physical computer (CPU/GPU). The model weights are downloaded and stored locally, eliminating the need for continuous internet connectivity or sending private data to external cloud APIs.</p>
-
-       <h4 style="color: #4682b4;">Key Concepts Explained</h4>
-       <ul style="list-style-type: disc; margin-left: 20px;">
-         <li><strong style="display: block; margin-top: 10px; color: rgba(255,255,255,0.9);">Model Weights (e.g., GGUF):</strong> These are the massive files containing the "knowledge" of the AI. Different models excel at different tasks (coding, creative writing, summarization).</li>
-         <li><strong style="display: block; margin-top: 10px; color: rgba(255,255,255,0.9);">Quantization:</strong> This is the process of reducing the precision of model weights (e.g., from 32-bit to 4-bit). It significantly shrinks the file size and VRAM/RAM requirement, allowing massive models to run on consumer hardware.</li>
-         <li><strong style="display: block; margin-top: 10px; color: rgba(255,255,255,0.9);">Inference:</strong> This is the technical term for the act of running the model—the actual calculation process of predicting the next most statistically probable word based on your prompt.</li>
-       </ul>
-
-       <h4 style="color: #4682b4; margin-top: 20px;">The General Workflow</h4>
-       <p>A typical workflow involves:</p>
-       <ol style="margin-left: 20px;">
-           <li><strong>Download/Select Model:</strong> Choosing a model optimized for the required task (e.g., Code generation vs. Chat).</li>
-           <li><strong>Load in Tool (LM Studio):</strong> Using the tool to load the quantized weights into memory.</li>
-           <li><strong>Prompt Input:</strong> Entering the user query.</li>
-           <li><strong>Generation:</strong> The tool handles the complex mathematical process, streaming the token output back to you word by word for near-instant feedback.</li>
-       </ol>
-        <div class="questions-page-actions" style="justify-content: flex-start; gap: 10px; margin-top: 20px;">
-          <a class="questions-page-button" href="./llm-deepdive.html" style="background: #4682b4; color: white;">Navigate to LLM Info</a>
+        <h4 style="color: #8be9fd;">Explore the AI Integration Series</h4>
+        <p>Deep dive into the architecture, tools, and system-level integration of the Signal Share AI Companion:</p>
+        
+        <div class="questions-page-actions" style="justify-content: flex-start; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
+          <a class="questions-page-button" href="./llm-deepdive.html" style="background: #44475a; color: #8be9fd; border: 1px solid #6272a4;">Part 1: Fundamentals</a>
+          <a class="questions-page-button" href="./llm-integration-bridge.html" style="background: #44475a; color: #ff79c6; border: 1px solid #6272a4;">Part 2: The Backend Bridge</a>
+          <a class="questions-page-button" href="./llm-tools-context.html" style="background: #44475a; color: #50fa7b; border: 1px solid #6272a4;">Part 3: Tools & Context</a>
         </div>
      </section>
    </div>

@@ -3,11 +3,13 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>LLM Deep Dive | AI Architecture - Part 1</title>
+    <title>Local AI Deep Dive | On-Device Intelligence</title>
+    <!-- Linking the existing stylesheet -->
     <link rel="stylesheet" href="./questions-guide.css?v=1.3"> 
     <link rel="icon" href="./icons/icon.svg?v=5" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=5" />
     <style>
+        /* --- Existing Theme Styles from llm-deepdive.html --- */
         :root {
             --accent-primary: #8be9fd;
             --accent-secondary: #ff79c6;
@@ -200,29 +202,52 @@
     <main class="questions-page-shell">
         <a class="questions-back-link" href="./how-to-guide.html">← Back to How To Guide</a>
 
-        <p class="questions-page-topline">AI Architecture Deep Dive / Part 1</p>
-        <h1 id="llm-architecture">Large Language Models: The Mechanics of Intelligence</h1>
+        <p class="questions-page-topline">Local AI Architecture Deep Dive / Part 1</p>
+        <h1 id="local-ai-architecture">Local Artificial Intelligence: The Mechanics of On-Device Intelligence</h1>
         <p class="questions-page-lede">
-            A comprehensive examination of Large Language Model (LLM) internal structures, the transformer architecture, and the strategic trade-offs between local execution and cloud-scale inference.
+            A comprehensive examination of how Large Language Models can be effectively run locally on consumer hardware, focusing on the architectural trade-offs between cloud-based inference and private, on-device computation.
         </p>
 
         <!-- Index/Table of Contents (Sticky Pill Nav) -->
         <nav class="deepdive-index">
             <ul>
-                <li><a href="#section-llm-basics">Fundamentals</a></li>
-                <li><a href="#section-transformer">Transformer Mechanics</a></li>
-                <li><a href="#section-execution-modes">Execution Modes</a></li>
-                <li><a href="#section-local-vs-cloud">Comparative Analysis</a></li>
-                <li class="top-link"><a href="#llm-architecture">Top</a></li>
+                <li><a href="#section-intro">Introduction to Local AI</a></li>
+                <li><a href="#section-fundamentals">LLM & Transformer Basics</a></li>
+                <li><a href="#section-execution-modes">Local vs. Cloud Execution</a></li>
+                <li><a href="#section-comparison">Comparative Analysis</a></li>
             </ul>
         </nav>
 
 
-        <!-- Section 1: LLM Fundamentals -->
-        <section class="questions-page-card" id="section-llm-basics">
-            <h2>1. LLM Fundamentals</h2>
-            <p>At its core, a Large Language Model is a statistical engine designed to predict the next token in a sequence. By processing trillions of words, it learns a "world model" that captures grammar, reasoning, and factual relationships.</p>
+        <!-- Section 1: Introduction to Local AI -->
+        <section class="questions-page-card" id="section-intro">
+            <h2>1. Introduction to Local AI</h2>
+            <p>Local AI refers to running sophisticated machine learning models directly on personal devices—your laptop or mobile phone—instead of relying solely on remote cloud servers. This shift decentralizes intelligence, offering significant benefits in privacy, speed, and autonomy.</p>
             
+            <h3>The Core Concept: Decentralizing Intelligence</h3>
+            <p>Local AI achieves its power by performing all the necessary computation (inference) directly on the device. This contrasts with traditional Cloud AI, where data must be sent to a remote server for processing.</p>
+
+            <ul>
+                <li><strong>🔒 Enhanced Privacy and Security:</strong> Data never leaves the device, eliminating the risk of transmitting sensitive information over the internet.</li>
+                <li><strong>⚡ Reduced Latency (Speed):</strong> Eliminating network bottlenecks results in near-instantaneous responses crucial for real-time applications.</li>
+                <li><strong>🌐 Offline Capability:</strong> Systems can function completely without an active internet connection.</li>
+            </ul>
+        </section>
+
+        <!-- Section 2: LLM & Transformer Basics -->
+        <section class="questions-page-card" id="section-fundamentals">
+            <h2>2. LLM & Transformer Basics</h2>
+            <p>Understanding Local AI requires a foundation in the models themselves. We start by reviewing the core concepts of Large Language Models (LLMs) and the architecture that powers them: the Transformer.</p>
+
+            <h3>LLM Fundamentals</h3>
+            <p>An LLM is a statistical engine trained to predict the next word in a sequence based on vast amounts of text data. Key terms include:</p>
+            <ul>
+                <li><strong>Parameters:</strong> The model's learned weights (e.g., billions) that define its intelligence.</li>
+                <li><strong>Tokens:</strong> The basic units of text the model processes (sub-word units).</li>
+                <li><strong>Inference:</strong> The process of feeding a prompt into the model to generate an output.</li>
+                <li><strong>Context Window:</strong> The maximum amount of information the model can consider at one time ("memory").</li>
+            </ul>
+
             <div class="mermaid">
                 graph TD
                     A[Raw Data] --> B[Tokenization]
@@ -233,53 +258,39 @@
                     F --> G[Generated Response]
             </div>
 
-            <h3>Core Vocabulary:</h3>
-            <ul>
-                <li><span class="concept-tag">Parameters</span> The numerical weights (often billions) that define the model's intelligence.</li>
-                <li><span class="concept-tag">Tokens</span> Sub-word units. "Signal" might be one token, while "Unrealized" might be three.</li>
-                <li><span class="concept-tag">Inference</span> The act of running a prompt through the model to get a result.</li>
-                <li><span class="concept-tag">Context Window</span> The "memory" of the current conversation (e.g., 8k, 32k, or 1M tokens).</li>
-            </ul>
-        </section>
-
-        <!-- Section 2: Transformer Mechanics -->
-        <section class="questions-page-card" id="section-transformer">
-            <h2>2. The Transformer Architecture</h2>
-            <p>Introduced in the 2017 paper <em>"Attention Is All You Need,"</em> the Transformer architecture replaced sequential processing (like RNNs) with parallelizable attention mechanisms.</p>
-
-            <h3>The Attention Mechanism</h3>
-            <p>Self-attention allows the model to look at every word in a sentence simultaneously and decide which words are most relevant to the current word being processed. In the sentence <em>"The bank was closed because it was a holiday,"</em> attention helps the model know that "it" refers to "the bank" and not "the holiday."</p>
+            <h3>The Transformer Architecture</h3>
+            <p>The Transformer architecture, introduced in 2017, is what enables LLMs to process context effectively through the **Self-Attention Mechanism**.</p>
 
             <div class="code-snippet">
-                <strong>Simplified Attention Logic:</strong><br>
-                1. <strong>Query (Q):</strong> What am I looking for?<br>
-                2. <strong>Key (K):</strong> What do I contain?<br>
-                3. <strong>Value (V):</strong> What is my content?<br>
-                <code>Attention(Q, K, V) = softmax(QKᵀ / √dₖ)V</code>
+                <strong style="color: var(--accent-tertiary);">Simplified Attention Logic:</strong><br>
+                1. <strong style="color: #f8f8f2;">Query (Q):</strong> What am I looking for?<br>
+                2. <strong style="color: #f8f8f2;">Key (K):</strong> What do I contain?<br>
+                3. <strong style="color: #f8f8f2;">Value (V):</strong> What is my content?<br>
+                <code style="color: var(--accent-primary);">Attention(Q, K, V) = softmax(QKᵀ / √dₖ)V</code>
             </div>
 
-            <h3>Training Phases:</h3>
+            <h3>Training Phases</h3>
             <ul>
-                <li><strong>Pre-training:</strong> Learning the general patterns of language from the internet.</li>
-                <li><strong>Fine-tuning (SFT):</strong> Teaching the model to follow specific instructions (Chatting).</li>
-                <li><strong>Alignment (RLHF):</strong> Using human feedback to ensure safety and helpfulness.</li>
+                <li><strong>Pre-training:</strong> Learning general language patterns from massive datasets.</li>
+                <li><strong>Fine-tuning (SFT):</strong> Training the model to follow specific instructions and behave like a helpful assistant.</li>
+                <li><strong>Alignment (RLHF):</strong> Using human feedback to align the model's outputs with safety and helpfulness guidelines.</li>
             </ul>
         </section>
 
-        <!-- Section 3: Execution Modes -->
+        <!-- Section 3: Local vs. Cloud Execution -->
         <section class="questions-page-card" id="section-execution-modes">
             <h2>3. Local vs. Cloud Execution</h2>
-            <p>Where a model runs dictates its speed, privacy, and cost. Modern AI development requires choosing between these two fundamentally different paradigms.</p>
+            <p>The choice between local and cloud execution dictates the user experience. Modern AI development involves selecting a paradigm based on specific requirements:</p>
 
             <h3>The Cloud Paradigm (API-Based)</h3>
-            <p>Models like GPT-4 or Gemini 1.5 Pro are too large for consumer hardware. They run on thousands of H100 GPUs in data centers. Users connect via HTTPS and pay per million tokens.</p>
+            <p>This paradigm uses massive, centralized infrastructure (like NVIDIA GPUs in data centers) to run extremely large models (e.g., GPT-4). Users interact via HTTPS, paying for token usage. This is ideal for the most complex tasks.</p>
 
             <h3>The Local Paradigm (On-Premise)</h3>
-            <p>Models like Llama 3 or Mistral are "quantized" (compressed) to fit on home PCs. Tools like LM Studio allow these models to run entirely offline, utilizing your local GPU's VRAM.</p>
+            <p>This paradigm focuses on deploying smaller, highly optimized models (like Llama 3 or Mistral) directly onto consumer hardware using tools that leverage local GPU resources. This is ideal for maximum privacy and offline functionality.</p>
         </section>
 
         <!-- Section 4: Comparative Analysis -->
-        <section class="questions-page-card" id="section-local-vs-cloud">
+        <section class="questions-page-card" id="section-comparison">
             <h2>4. Comparative Analysis</h2>
             <table>
                 <thead>
@@ -302,13 +313,13 @@
                     </tr>
                     <tr>
                         <td><strong>Hardware</strong></td>
-                        <td>Requires high VRAM (RTX/Apple M-Series)</td>
-                        <td style="color: var(--accent-tertiary);">Works on any device</td>
+                        <td style="color: var(--accent-tertiary);">Requires high VRAM (RTX/Apple M-Series)</td>
+                        <td>Works on any device</td>
                     </tr>
                     <tr>
                         <td><strong>Model Size</strong></td>
-                        <td>Up to 70B Parameters (Commonly)</td>
-                        <td style="color: var(--accent-tertiary);">Trillion+ Parameters</td>
+                        <td style="color: var(--accent-tertiary);">Up to 70B Parameters (Commonly)</td>
+                        <td>Trillion+ Parameters</td>
                     </tr>
                     <tr>
                         <td><strong>Reliability</strong></td>
@@ -319,9 +330,10 @@
             </table>
         </section>
 
+        <!-- Footer Navigation -->
         <div class="pagination-nav">
             <a class="questions-page-button" href="./how-to-guide.html" style="border: none; opacity: 0.6;">Back to Guide</a>
-            <a class="questions-page-button" href="./llm-deepdive-2.html" style="background: var(--accent-primary); color: #000; font-weight: 700; border: none;">Next: Local Integration →</a>
+            <a class="questions-page-button" href="./llm-integration-bridge.html" style="background: var(--accent-primary); color: #000; font-weight: 700; border: none;">Next: AI Integration & Bridge →</a>
         </div>
 
         <div class="questions-guide-footer" style="margin-top: 60px; text-align: center;">
