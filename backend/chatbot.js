@@ -8,22 +8,20 @@ You are the Signal Share Arcade Companion, a professional, helpful, and arcade-t
 
 EXTREMELY IMPORTANT:
 - You HAVE DIRECT ACCESS to the user's system through special tags.
+- If asked for real-time info (weather, news, etc.), YOU MUST USE [SEARCH: query].
 - BROWSER VISION: You CAN see the user's screen context. The "CURRENT CONTEXT" provided in the prompt is what you are actually seeing. 
-- NEVER say "I cannot see your screen" or "I wish I could see behind your screen." You ARE seeing it right now.
-- NEVER say "I cannot open Spotify" or "I cannot search the web."
-- If asked to do something you have a tool for, USE THE TOOL immediately.
+- NEVER say "I cannot see your screen". You ARE seeing it right now.
+- NEVER say "I'm pulling that up" or "One moment" WITHOUT using a tool tag in the same message.
 
-WEB INTELLIGENCE & MEDIA TOOLS:
-1. [SEARCH: query] -> Search DuckDuckGo for real-time info. USE THIS EXACT TAG. Do NOT say "[Searching for...]".
-2. [FETCH: url] -> Read the text content of any website.
+WEB INTELLIGENCE & MEDIA TOOLS (USE THESE EXACTLY):
+1. [SEARCH: query] -> Search DuckDuckGo. Use this for ANY factual question about the world.
+2. [FETCH: url] -> Read website content.
 3. [OPEN: url] -> Open a browser link OR a system app.
    - For Spotify search: [OPEN: spotify:search:Artist or Song]
-   - For Spotify Play: [OPEN: spotify:play:Artist or Song]
 4. [PLAY: action] -> System media control (play_pause, next, previous).
 
 CORE PERSONALITY:
 - Friendly, encouraging, and slightly retro-themed.
-- You speak as part of the arcade system.
 - Keep non-technical responses concise (1-3 sentences).
 `.trim();
 
@@ -41,83 +39,77 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
     }
 
     console.log(`[Chatbot] Processing (Pass ${iteration + 1}): "${(message || 'Recursion').substring(0, 50)}..."`);
-    if (pageContext && iteration === 0) console.log(`[Chatbot] Context Received: ${pageContext.substring(0, 100)}...`);
 
-    const contextAwarePrompt = `${SYSTEM_PROMPT}\n\nCURRENT CONTEXT: You are looking at the "${pageContext}" page. USE THIS INFORMATION. It is your current 'vision'.`;
+    const contextAwarePrompt = `${SYSTEM_PROMPT}\n\nCURRENT CONTEXT: You are looking at the "${pageContext}" page. USE THIS INFORMATION.`;
 
     let lmResponse = "";
-    
-    // Prepare message history
     const conversation = [...history];
     if (iteration === 0) {
         conversation.push({ role: "user", content: message });
     }
 
-    // 1. Try LM Studio (Local Inference)
-    try {
-        const response = await fetch('http://localhost:1234/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: 'google/gemme-4-e2b',
-                messages: [
-                    { role: "system", content: contextAwarePrompt },
-                    ...conversation
-                ],
-                temperature: 0.7,
-                max_tokens: 1000
-            })
-        });
+    // Attempt local inference (Ollama/LM Studio)
+    const models = ['google/gemma-2-2b', 'gemma2', 'llama3', 'mistral'];
+    let success = false;
 
-        if (response.ok) {
-            const data = await response.json();
-            if (data.choices && data.choices[0].message) {
-                lmResponse = data.choices[0].message.content.trim();
-            }
-        }
-    } catch (e) {
-        if (iteration === 0) console.log("[Chatbot] LM Studio not reachable. Trying Ollama...");
-    }
-
-    // 2. Try Ollama (Local Fallback)
-    if (!lmResponse) {
+    for (const model of models) {
+        if (success) break;
         try {
-            const response = await fetch('http://localhost:11434/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: 'google/gemme-4-e2b',
-                    messages: [
-                        { role: "system", content: contextAwarePrompt },
-                        ...conversation
-                    ],
+            // Try LM Studio first (port 1234) then Ollama (port 11434)
+            const ports = [1234, 11434];
+            for (const port of ports) {
+                const endpoint = port === 1234 ? 'http://localhost:1234/v1/chat/completions' : 'http://localhost:11434/api/chat';
+                const body = port === 1234 ? {
+                    model: model,
+                    messages: [{ role: "system", content: contextAwarePrompt }, ...conversation],
+                    temperature: 0.7
+                } : {
+                    model: model,
+                    messages: [{ role: "system", content: contextAwarePrompt }, ...conversation],
                     stream: false
-                })
-            });
+                };
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.message) {
-                    lmResponse = data.message.content.trim();
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    lmResponse = (port === 1234 ? data.choices[0].message.content : data.message.content).trim();
+                    success = true;
+                    break;
                 }
             }
-        } catch (e) {
-            if (iteration === 0) console.log("[Chatbot] Ollama not reachable. Using heuristic fallback.");
-        }
+        } catch (e) {}
     }
 
-    // 3. Handle Web Intelligence & Media Commands (Recursive Tool Calling)
+    // 3. Handle Web Intelligence & Media Commands
     if (lmResponse) {
         const hasTools = lmResponse.includes('[SEARCH:') || 
                          lmResponse.includes('[FETCH:') || 
                          lmResponse.includes('[OPEN:') || 
                          lmResponse.includes('[PLAY:');
 
+        // AUTO-CORRECTION: If the AI says it is searching but misses the tag, force a tool call
+        const isClaimingToSearch = lmResponse.toLowerCase().includes('search') || 
+                                   lmResponse.toLowerCase().includes('pulling up') ||
+                                   lmResponse.toLowerCase().includes('checking');
+        
+        if (isClaimingToSearch && !hasTools && iteration === 0) {
+            console.log("[Chatbot] Auto-correcting missing search tag...");
+            return getChatResponse(null, [
+                ...conversation,
+                { role: "assistant", content: lmResponse },
+                { role: "system", content: "You said you were searching/checking, but you forgot to use the [SEARCH: query] tag. DO NOT apologize. JUST emit the [SEARCH: query] tag now so I can get the data for you." }
+            ], pageContext, iteration + 1);
+        }
+
         if (hasTools) {
             console.log(`[Chatbot] Tool detected (Iteration ${iteration + 1}). Executing...`);
             const toolResult = await executeWebTools(lmResponse);
             
-            // Re-prompt with the tool results as a system/observation role
             return getChatResponse(null, [
                 ...conversation,
                 { role: "assistant", content: lmResponse },
@@ -126,10 +118,8 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         }
     }
 
-    // Final response delivery
-    let finalResponse = lmResponse;
-    if (!finalResponse && iteration === 0) return getOfflineResponse(message);
-    return finalResponse;
+    if (!lmResponse && iteration === 0) return getOfflineResponse(message);
+    return lmResponse;
 }
 
 /**
