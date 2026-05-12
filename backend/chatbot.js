@@ -57,12 +57,17 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
     // Process attachments
     let imageBase64 = null;
     let fileContentBlock = "";
+    let attachmentNote = "";
 
     if (attachment && attachment.data) {
         if (attachment.type === 'image') {
             imageBase64 = attachment.data.split(',')[1] || attachment.data;
+            attachmentNote = "\n\n[SYSTEM: An image was attached to this message. If you cannot see it, please inform the user.]";
+        } else if (attachment.type === 'video') {
+            // For now, we just inform the AI about the video attachment
+            attachmentNote = `\n\n[SYSTEM: A video file named "${attachment.name}" was attached to this message. You cannot "watch" it directly yet, but you should acknowledge its presence.]`;
         } else {
-            // It's a non-image file (js, html, txt, etc.)
+            // It's a non-image/non-video file (js, html, txt, etc.)
             try {
                 const base64Data = attachment.data.split(',')[1] || attachment.data;
                 const decoded = Buffer.from(base64Data, 'base64').toString('utf-8');
@@ -76,7 +81,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
 
     // Attempt local inference (Ollama/LM Studio)
     // Vision models list for Ollama
-    const visionModels = ['llava', 'moondream', 'bakllava'];
+    const visionModels = ['llava', 'llava:7b', 'moondream', 'bakllava', 'minicpm-v'];
     const standardModels = ['google/gemma-2-2b', 'gemma2', 'llama3', 'mistral'];
     
     // If we have an image, prioritize vision models
@@ -85,7 +90,9 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
 
     const conversation = [...history];
     if (iteration === 0) {
-        conversation.push({ role: "user", content: message + fileContentBlock });
+        // Combine message with file content and the system note about multimedia
+        const combinedContent = (message || "") + fileContentBlock + attachmentNote;
+        conversation.push({ role: "user", content: combinedContent.trim() || "[No text message provided]" });
     }
 
     for (const model of models) {
@@ -105,16 +112,13 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                         messages: messages,
                         temperature: 0.7
                     };
-                    // LM Studio doesn't strictly follow Ollama's vision format yet, 
-                    // but some versions might support it in messages. 
-                    // For now we focus vision on Ollama.
                 } else {
                     body = {
                         model: model,
                         messages: messages,
                         stream: false
                     };
-                    // Attach image to the LAST message if it's the first pass and we have one
+                    // Attach image to Ollama request if using a vision model or if we have one
                     if (imageBase64 && iteration === 0) {
                         body.images = [imageBase64];
                     }
