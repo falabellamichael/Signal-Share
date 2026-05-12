@@ -864,7 +864,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       return {
         ...init,
         headers,
-        targetAddressSpace: addressSpace
+        targetAddressSpace: (addressSpace === "loopback" || addressSpace === "local" || addressSpace === "private") ? "private" : addressSpace
       };
     } catch {
       return init;
@@ -900,7 +900,6 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     window.fetch(endpoint, withLocalNetworkFetchOptions(endpoint, {
       method: "GET",
-      mode: "no-cors",
       cache: "no-store",
       credentials: "omit",
     }))

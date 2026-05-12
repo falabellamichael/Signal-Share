@@ -297,8 +297,8 @@ window.sendChatMessage = async function() {
                     headers: { 
                         'Content-Type': 'application/json'
                     },
-                    // Chrome PNA requirement: must match the actual destination type
-                    targetAddressSpace: isLoopback ? 'loopback' : 'private',
+                    // Use 'private' to mark local network requests as per Chrome PNA requirements
+                    targetAddressSpace: 'private',
                     signal,
                     body: JSON.stringify({ 
                         message: fullMessage,
