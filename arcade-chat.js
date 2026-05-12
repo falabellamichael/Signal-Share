@@ -154,6 +154,43 @@ function updateEngineStatus(online) {
 
 let arcadeChatHistory = [];
 let currentChatId = null;
+let currentChatAttachment = null;
+
+/**
+ * Handles image selection for the chat.
+ */
+window.handleChatFileSelect = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file.');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        currentChatAttachment = e.target.result;
+        const preview = document.getElementById('chat-attachment-preview');
+        const previewImg = document.getElementById('chat-preview-img');
+        if (preview && previewImg) {
+            previewImg.src = currentChatAttachment;
+            preview.hidden = false;
+        }
+    };
+    reader.readAsDataURL(file);
+};
+
+/**
+ * Clears the current chat attachment.
+ */
+window.clearChatAttachment = function() {
+    currentChatAttachment = null;
+    const preview = document.getElementById('chat-attachment-preview');
+    const fileInput = document.getElementById('chat-file-input');
+    if (preview) preview.hidden = true;
+    if (fileInput) fileInput.value = '';
+};
 
 function updateChatStatus(status) {
     const dot = document.getElementById('chat-status-dot');
@@ -363,6 +400,21 @@ function addChatMessage(role, content) {
         msgDiv.textContent = content;
     }
 
+    // Handle image attachments if present in history or currently being sent
+    const msgObj = arcadeChatHistory.find(m => m.content === content && m.role === (role === 'ai' ? 'assistant' : 'user') && m.imageUrl);
+    if (msgObj && msgObj.imageUrl) {
+        const img = document.createElement('img');
+        img.src = msgObj.imageUrl;
+        img.className = 'chat-message-image';
+        msgDiv.appendChild(img);
+    } else if (role === 'user' && currentChatAttachment) {
+        // This is for the message being currently added
+        const img = document.createElement('img');
+        img.src = currentChatAttachment;
+        img.className = 'chat-message-image';
+        msgDiv.appendChild(img);
+    }
+
     // Process [ARCADE: action] tags
     const arcadeMatch = content.match(/\[ARCADE:\s*([^\]]+)\]/);
     if (arcadeMatch) {
@@ -458,8 +510,18 @@ window.sendChatMessage = async function() {
     }
 
     try {
+        const attachmentToSend = currentChatAttachment;
         addChatMessage('user', text);
+        
+        // Add to history with image if present
+        arcadeChatHistory.push({ 
+            role: 'user', 
+            content: text,
+            imageUrl: attachmentToSend 
+        });
+        
         input.value = '';
+        clearChatAttachment();
         
         // Refresh bridge context on demand so AI has latest info
         if (typeof pollDesktopBridge === 'function') {
@@ -492,7 +554,8 @@ window.sendChatMessage = async function() {
                 signal,
                 body: JSON.stringify({ 
                     message: text,
-                    history: arcadeChatHistory,
+                    image: attachmentToSend, // Send image to AI bridge
+                    history: arcadeChatHistory.map(m => ({ role: m.role, content: m.content })),
                     pageContext: `${pageContext} (Visible text: ${pageText})`
                 })
             });
@@ -512,7 +575,6 @@ window.sendChatMessage = async function() {
 
         if (reply !== null) {
             addChatMessage('ai', reply || "...");
-            arcadeChatHistory.push({ role: 'user', content: text });
             arcadeChatHistory.push({ role: 'assistant', content: reply });
             saveCurrentChat();
             updateChatStatus('active');
@@ -521,7 +583,6 @@ window.sendChatMessage = async function() {
             const offlineReply = getArcadeProtocolOfflineResponse(text);
             addChatMessage('ai', offlineReply);
             
-            arcadeChatHistory.push({ role: 'user', content: text });
             arcadeChatHistory.push({ role: 'assistant', content: offlineReply });
             saveCurrentChat();
             updateChatStatus('offline');
