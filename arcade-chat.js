@@ -6,6 +6,33 @@
 let arcadeChatHistory = [];
 let currentChatId = null;
 
+function updateChatStatus(status) {
+    const dot = document.getElementById('chat-status-dot');
+    const title = document.getElementById('chat-mode-title');
+    if (!dot || !title) return;
+
+    switch (status) {
+        case 'active': // Green: Local LLM Active
+            dot.style.background = '#2ecc71';
+            dot.style.boxShadow = '0 0 10px #2ecc71';
+            title.style.color = '#2ecc71';
+            title.textContent = 'A.I. Active';
+            break;
+        case 'idle': // Blue: Chatbot Only
+            dot.style.background = '#67c1f5';
+            dot.style.boxShadow = '0 0 8px #67c1f5';
+            title.style.color = '#67c1f5';
+            title.textContent = 'Companion';
+            break;
+        case 'error': // Red: Connection Error
+            dot.style.background = '#e74c3c';
+            dot.style.boxShadow = '0 0 12px #e74c3c';
+            title.style.color = '#e74c3c';
+            title.textContent = 'Bridge Error';
+            break;
+    }
+}
+
 
 function cleanupOldChats() {
     const chats = JSON.parse(localStorage.getItem('arcade-chats') || '[]');
@@ -34,8 +61,7 @@ function startNewChat() {
             </div>
         `;
     }
-    const title = document.getElementById('chat-mode-title');
-    if (title) title.textContent = 'Companion';
+    updateChatStatus('idle');
     showChatView();
     saveCurrentChat();
 }
@@ -83,8 +109,7 @@ function loadChat(id) {
             container.scrollTop = container.scrollHeight;
         }
         
-        const title = document.getElementById('chat-mode-title');
-        if (title) title.textContent = 'Companion';
+        updateChatStatus('idle');
         showChatView();
         
         chat.lastUsed = Date.now();
@@ -127,7 +152,7 @@ function showChatView() {
         inputArea.style.opacity = '1';
         inputArea.style.pointerEvents = 'all';
     }
-    if (title) title.textContent = 'Companion';
+    updateChatStatus('idle');
 }
 
 function renderHistoryList() {
@@ -287,8 +312,10 @@ window.sendChatMessage = async function() {
         arcadeChatHistory.push({ role: 'user', content: text });
         arcadeChatHistory.push({ role: 'assistant', content: reply });
         saveCurrentChat();
+        updateChatStatus('active');
     } else {
         addChatMessage('ai', `⚠️ [Connection Error] I couldn't reach my logic core. (Error: ${lastError})`);
+        updateChatStatus('error');
     }
 }
 
@@ -402,6 +429,7 @@ function setupToggle() {
     }
     setupResizing();
     setupToggle();
+    updateChatStatus('idle');
     
     // Restore collapsed state
     const wasCollapsed = localStorage.getItem('arcade-chat-collapsed') === 'true';
