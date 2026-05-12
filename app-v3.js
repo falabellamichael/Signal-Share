@@ -1689,7 +1689,11 @@ async function handleMessageSubmit(event) {
       renderMessenger();
 
       // Call LLM
-      const aiResponse = await callLocalAI(body, history);
+      const pageContext = document.title || 'Signal Share';
+      const pageText = document.body.innerText.substring(0, 1000);
+      const fullContext = `${pageContext} (Visible text: ${pageText})`;
+
+      const aiResponse = await callLocalAI(body, history, fullContext);
       
       // Remove thinking indicator
       state.activeMessages = state.activeMessages.filter(m => m.id !== thinkingId);
@@ -1804,7 +1808,7 @@ async function handleMessageSubmit(event) {
   }
 }
 
-async function callLocalAI(text, history = []) {
+async function callLocalAI(text, history = [], pageContext = "") {
   const candidates = [
     '/api/llm/chat',
     'http://localhost:3000/api/llm/chat',
@@ -1816,7 +1820,11 @@ async function callLocalAI(text, history = []) {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history }),
+        body: JSON.stringify({ 
+          message: text, 
+          history,
+          pageContext: pageContext || 'Signal Share'
+        }),
         targetAddressSpace: 'loopback'
       });
       
