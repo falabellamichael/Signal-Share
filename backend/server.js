@@ -991,26 +991,53 @@ app.post('/api/llm/chat', async (req, res) => {
       reply = `🎮 Interesting! I'm still learning about "${message}", but I'm here to help you dominate the leaderboards.`;
     }
 
-    // 2. Local LLM (Ollama) Integration
-    // This will attempt to use your local Ollama instance if it's running.
+    // 2. Local LLM Integration (LM Studio / OpenAI-Compatible)
+    // LM Studio typically runs on port 1234
     try {
-      const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
+      const lmStudioResponse = await fetch('http://localhost:1234/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           model: 'google/gemme-4-e2b', 
-          prompt: `Context: You are the Signal Share Arcade Companion, a helpful AI built into a retro-neon arcade suite. Keep your responses concise (1-2 sentences), friendly, and arcade-themed. 
-          User Message: ${message}`, 
-          stream: false 
+          messages: [
+            { role: "system", content: "You are the Signal Share Arcade Companion, a helpful AI built into a retro-neon arcade suite. Keep your responses concise (1-2 sentences), friendly, and arcade-themed." },
+            { role: "user", content: message }
+          ],
+          temperature: 0.7
         })
       });
 
-      if (ollamaResponse.ok) {
-        const data = await ollamaResponse.json();
-        if (data.response) reply = data.response.trim();
+      if (lmStudioResponse.ok) {
+        const data = await lmStudioResponse.json();
+        if (data.choices && data.choices[0].message) {
+          reply = data.choices[0].message.content.trim();
+        }
+      } else {
+        // If LM Studio is up but returns an error (e.g. model not loaded), try Ollama fallback
+        throw new Error("LM Studio returned non-ok status");
       }
     } catch (e) {
-      console.log("[Bridge] Ollama instance not detected at localhost:11434. Falling back to system tips.");
+      console.log("[Bridge] LM Studio not detected or model not loaded at :1234. Trying Ollama fallback...");
+      
+      try {
+        const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            model: 'google/gemme-4-e2b', 
+            prompt: `Context: You are the Signal Share Arcade Companion, a helpful AI built into a retro-neon arcade suite. Keep your responses concise (1-2 sentences), friendly, and arcade-themed. 
+            User Message: ${message}`, 
+            stream: false 
+          })
+        });
+
+        if (ollamaResponse.ok) {
+          const data = await ollamaResponse.json();
+          if (data.response) reply = data.response.trim();
+        }
+      } catch (e2) {
+        console.log("[Bridge] No local LLM detected (LM Studio or Ollama). Using system tips.");
+      }
     }
 
     res.json({ reply });
