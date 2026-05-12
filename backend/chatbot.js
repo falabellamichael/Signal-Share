@@ -110,16 +110,24 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
             console.log(`[Chatbot] Tool detected (Iteration ${iteration + 1}). Executing...`);
             const toolResult = await executeWebTools(lmResponse);
             
+            // Use 'user' role for tool results to be compatible with picky local LLMs 
+            // that don't support 'system' messages in the middle of a chat.
             return getChatResponse(null, [
                 ...conversation,
                 { role: "assistant", content: lmResponse },
-                { role: "system", content: `OBSERVATION/TOOL RESULT: ${toolResult}\n\nINSTRUCTION: Now use this information to give the final answer to the user.` }
+                { role: "user", content: `[SYSTEM OBSERVATION]: ${toolResult}\n\nPlease analyze this result and give your final answer to the user now.` }
             ], pageContext, iteration + 1);
         }
     }
 
     if (!lmResponse && iteration === 0) return getOfflineResponse(message);
-    return lmResponse;
+    
+    // Fallback if the model returned nothing during a tool-call iteration
+    if (!lmResponse && iteration > 0) {
+        return "I've processed your request but my logic core returned an empty result. Please try again or rephrase!";
+    }
+
+    return lmResponse || "I'm sorry, I encountered a hiccup while processing that. Could you try again?";
 }
 
 /**

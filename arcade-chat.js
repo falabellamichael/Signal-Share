@@ -322,8 +322,8 @@ window.sendChatMessage = async function() {
             }
         }
 
-        if (reply) {
-            addChatMessage('ai', reply);
+        if (reply !== null) {
+            addChatMessage('ai', reply || "...");
             arcadeChatHistory.push({ role: 'user', content: text });
             arcadeChatHistory.push({ role: 'assistant', content: reply });
             saveCurrentChat();
