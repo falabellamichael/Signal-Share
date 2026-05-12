@@ -1815,8 +1815,17 @@ async function callLocalAI(text, history = [], pageContext = "") {
     'http://127.0.0.1:3000/api/llm/chat'
   ];
 
+  let abortController = null;
+  window.stopMessengerAi = () => {
+    if (abortController) {
+      abortController.abort();
+      abortController = null;
+    }
+  };
+
   for (const url of candidates) {
     try {
+      abortController = new AbortController();
       const response = await fetch(url, {
         method: 'POST',
         headers: { 
@@ -1824,6 +1833,7 @@ async function callLocalAI(text, history = [], pageContext = "") {
           'target-address-space': 'private'
         },
         targetAddressSpace: 'private',
+        signal: abortController.signal,
         body: JSON.stringify({ 
           message: text, 
           history,

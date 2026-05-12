@@ -34,11 +34,18 @@ CORE PERSONALITY:
  * @param {string} pageContext - The current page the user is on.
  * @returns {Promise<string>} - The AI's response.
  */
-export async function getChatResponse(message, history = [], pageContext = 'Signal Share') {
+export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0) {
     if (!message) return "I didn't receive a message to process.";
+    
+    // Safety check for infinite recursion
+    const MAX_ITERATIONS = 2;
+    if (iteration >= MAX_ITERATIONS) {
+        console.warn("[Chatbot] Maximum tool-calling iterations reached. Stopping loop.");
+        return "I've hit a limit while trying to execute tools for you. Please try rephrasing your request!";
+    }
 
-    console.log(`[Chatbot] Processing: "${message.substring(0, 50)}..."`);
-    if (pageContext) console.log(`[Chatbot] Context Received: ${pageContext.substring(0, 100)}...`);
+    console.log(`[Chatbot] Processing (Pass ${iteration + 1}): "${message.substring(0, 50)}..."`);
+    if (pageContext && iteration === 0) console.log(`[Chatbot] Context Received: ${pageContext.substring(0, 100)}...`);
 
     const contextAwarePrompt = `${SYSTEM_PROMPT}\n\nCURRENT CONTEXT: You are looking at the "${pageContext}" page. USE THIS INFORMATION. It is your current 'vision'.`;
 
@@ -100,7 +107,6 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
     }
 
     // 3. Handle Web Intelligence & Media Commands (Recursive Tool Calling)
-    // If the response contains tools, we execute and re-prompt once.
     if (lmResponse) {
         const hasTools = lmResponse.includes('[SEARCH:') || 
                          lmResponse.includes('[FETCH:') || 
@@ -108,17 +114,18 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                          lmResponse.includes('[PLAY:');
 
         if (hasTools) {
-            console.log("[Chatbot] Tool detected in AI response. Executing...");
+            console.log(`[Chatbot] Tool detected (Iteration ${iteration + 1}). Executing...`);
             const toolResult = await executeWebTools(lmResponse);
             
-            // Re-prompt with the tool results so the AI knows they executed
+            // Re-prompt with the tool results
             return getChatResponse(message, [
                 ...history,
                 { role: "assistant", content: lmResponse },
                 { role: "system", content: `TOOL EXECUTION SUCCESSFUL. RESULTS:\n${toolResult}` }
-            ], pageContext);
+            ], pageContext, iteration + 1);
         }
     }
+
     // Final response delivery
     let finalResponse = lmResponse;
     if (!finalResponse) return getOfflineResponse(message);

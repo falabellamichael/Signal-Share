@@ -222,6 +222,17 @@ window.sendChatMessage = async function() {
     
     const typingId = addTypingIndicator();
     
+    let activeAiAbortController = null;
+
+    window.stopArcadeAi = function() {
+        if (activeAiAbortController) {
+            activeAiAbortController.abort();
+            activeAiAbortController = null;
+            removeTypingIndicator(typingId);
+            addChatMessage('assistant', '🕹️ [Arcade Protocol]: Intelligence process terminated by user.');
+        }
+    };
+
     const candidates = [
         'http://localhost:3000/api/llm/chat',
         'http://127.0.0.1:3000/api/llm/chat',
@@ -231,6 +242,9 @@ window.sendChatMessage = async function() {
 
     let reply = null;
     let lastError = null;
+
+    activeAiAbortController = new AbortController();
+    const { signal } = activeAiAbortController;
 
     // Prepare context (what page we are on and what's on it)
     const pageContext = document.title || 'Signal Share';
@@ -246,6 +260,7 @@ window.sendChatMessage = async function() {
                     'target-address-space': 'private' // Chrome PNA mitigation
                 },
                 targetAddressSpace: 'private', // Chrome PNA experimental flag
+                signal, // Support for stopping the request
                 body: JSON.stringify({ 
                     message: fullMessage,
                     history: arcadeChatHistory,
