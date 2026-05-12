@@ -594,7 +594,7 @@ function discoverStats(game) {
     return stats.slice(0, 3);
 }
 
-function renderLeaderboard() {
+async function renderLeaderboard() {
     const grid = document.getElementById('leader-grid');
     if (!grid) return;
     grid.innerHTML = '';
@@ -606,11 +606,33 @@ function renderLeaderboard() {
         let totalAccumulatedScore = 0;
         const appsToRender = GAMES.filter(g => g.type === 'game' || (g.trackedStats && g.trackedStats.length > 0));
 
-        appsToRender.forEach(game => {
+        for (const game of appsToRender) {
             const stats = discoverStats(game);
-            if (stats.length === 0 && game.type !== 'game') return;
+            
+            // Integrate Supabase Telemetry: Fetch persistent personal best
+            if (game.type === 'game' && typeof window.getPersonalBest === 'function') {
+                try {
+                    const pb = await window.getPersonalBest(game.id);
+                    if (pb && pb.score) {
+                        // Check if we already have a 'HIGH SCORE' or similar from local discovery
+                        const existingHigh = stats.find(s => s.label.includes('SCORE'));
+                        if (existingHigh) {
+                            if (Number(pb.score) > Number(existingHigh.val)) {
+                                existingHigh.val = pb.score;
+                                existingHigh.unit = 'PTS (SYNCED)';
+                            }
+                        } else {
+                            stats.unshift({ label: 'HIGH SCORE', val: pb.score, unit: 'PTS (SYNCED)' });
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`[Arcade Launcher] Could not sync ${game.id} telemetry:`, e);
+                }
+            }
 
-            const highest = Math.max(0, ...stats.map(s => typeof s.val === 'number' ? s.val : 0));
+            if (stats.length === 0 && game.type !== 'game') continue;
+
+            const highest = Math.max(0, ...stats.map(s => typeof s.val === 'number' ? s.val : (parseInt(s.val) || 0)));
             totalAccumulatedScore += highest;
 
             const card = document.createElement('div');
@@ -647,7 +669,7 @@ function renderLeaderboard() {
                     ${statsHtml}
                 </div>`;
             grid.appendChild(card);
-        });
+        }
 
         const userRank = calculateRank(totalAccumulatedScore);
         const rankTitleEl = document.querySelector('#leader-user-meta div:nth-child(2)');

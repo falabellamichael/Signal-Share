@@ -128,3 +128,4 @@ export async function getPersonalBest(gameId = null) {
 
     return data;
 }
+window.getPersonalBest = getPersonalBest;
