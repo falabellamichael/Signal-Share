@@ -970,10 +970,39 @@ app.post("/api/activity/report", async (req, res) => {
 app.post('/api/llm/chat', async (req, res) => {
   try {
     const { message } = req.body;
-    console.log(`[Chat] Received: "${message}"`);
     if (!message) return res.status(400).json({ error: 'No message provided' });
-    // Placeholder implementation: echo the received message.
-    const reply = `🕹️ You said: "${message}"`;
+
+    console.log(`[Chat] Query: "${message}"`);
+    const input = message.toLowerCase();
+
+    // 1. Arcade Personality & Tips (Smart Placeholder)
+    let reply = "";
+    if (input.includes("pinball")) {
+      reply = "🕹️ [SYSTEM TIP]: In Neon Pinball, gravity increases every 5,000 points. Keep those flippers moving!";
+    } else if (input.includes("basketball") || input.includes("hoops")) {
+      reply = "🏀 [PRO TIP]: For Neon Hoops, consistency is key. The 'Perfect' zone is exactly 12px wide at the peak of the rim.";
+    } else if (input.includes("snake")) {
+      reply = "🐍 [SYSTEM ALERT]: Neon Snake speeds up significantly after eating 10 energy pellets. Plan your path ahead!";
+    } else if (input.includes("who are you") || input.includes("model")) {
+      reply = "👾 I'm the Signal Share Arcade Companion, a local intelligence layer running on your bridge.";
+    } else if (input.includes("how are you")) {
+      reply = "✨ System diagnostics green. Logic core at 100%. Ready for the next game!";
+    } else {
+      reply = `🎮 Interesting! I'm still learning about "${message}", but I'm here to help you dominate the leaderboards.`;
+    }
+
+    /* 
+    // OPTIONAL: Uncomment to connect to a real local LLM (e.g. Ollama)
+    try {
+      const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
+        method: 'POST',
+        body: JSON.stringify({ model: 'llama3', prompt: message, stream: false })
+      });
+      const data = await ollamaResponse.json();
+      reply = data.response;
+    } catch (e) { console.warn("Local LLM not found, falling back to personality."); }
+    */
+
     res.json({ reply });
   } catch (err) {
     console.error('[Bridge] LLM chat error:', err);
