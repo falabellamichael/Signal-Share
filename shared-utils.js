@@ -224,3 +224,11 @@ export function debounce(actionName, ttl = 0) {
   UtilityCache.set(key, { value: true, timestamp: now });
   return false;
 }
+
+/**
+ * Checks if the app is running in a native Capacitor environment.
+ */
+export function isNative() {
+  if (typeof window === "undefined") return false;
+  return Boolean(window.Capacitor && window.Capacitor.isNativePlatform?.());
+}
