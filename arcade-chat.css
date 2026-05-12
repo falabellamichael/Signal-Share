@@ -45,8 +45,8 @@ body > .chat-resize-handle.collapsed {
 
 .chat-toggle-btn {
     position: fixed;
-    bottom: 30px;
-    right: 115px; /* Offset to sit to the left of the Messenger icon */
+    top: calc(var(--status-bar-safe-space) + 20px);
+    right: 20px;
     width: 72px;
     height: 72px;
     background: rgba(15, 15, 15, 0.7);
@@ -94,7 +94,7 @@ body:not(.chat-collapsed) .messenger-section {
 /* When collapsed, we have TWO floating buttons. Offset messenger to the left of the chat toggle. */
 /* When collapsed, Messenger takes the primary corner, Sidebar toggle moves left */
 body.chat-collapsed .chat-toggle-btn {
-    right: 115px !important; /* Positioned right next to the Messenger icon */
+    right: 20px !important;
 }
 
 body.chat-collapsed .messenger-section {
