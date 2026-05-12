@@ -124,6 +124,12 @@ class SnakeGame {
         }
         sessionStorage.setItem('snake-streak', this.sessionStreak);
 
+        // Smart Stats: Accumulate lifetime data
+        const totalFood = parseInt(localStorage.getItem('snake-food-total') || '0') + this.foodEaten;
+        const gamesPlayed = parseInt(localStorage.getItem('snake-games-played') || '0') + 1;
+        localStorage.setItem('snake-food-total', totalFood);
+        localStorage.setItem('snake-games-played', gamesPlayed);
+
         const time = this.formatTime(this.elapsedSec);
         this.messageEl.textContent   = 'Game Over';
         this.submessageEl.textContent = `Score ${this.score} · ${this.foodEaten} food · ${time}`;

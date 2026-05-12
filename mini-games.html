@@ -1060,9 +1060,9 @@
 
     <script>
         const GAMES = [
-            { id: 'snake', title: 'Neon Snake', category: 'ARCADE', poster: 'snake_game_poster_1778466261855.png', tag: 'ARCADE • READY', type: 'game', trackedStats: ['snake-best', 'snake-streak'] },
+            { id: 'snake', title: 'Neon Snake', category: 'ARCADE', poster: 'snake_game_poster_1778466261855.png', tag: 'ARCADE • READY', type: 'game', trackedStats: ['snake-best', 'snake-food-total', 'snake-games-played'] },
             { id: 'basketball', title: 'Neon Hoops', category: 'ARCADE', poster: 'basketball_game_poster.png', tag: 'ARCADE • 3D', type: 'game', trackedStats: ['hoops-bests'] },
-            { id: 'pinball', title: 'Neon Pinball', category: 'ARCADE', poster: 'neon_pinball_v2_poster.png', tag: 'ARCADE • NEW', type: 'game', trackedStats: ['pinball-pro-best', 'pinball-best'] },
+            { id: 'pinball', title: 'Neon Pinball', category: 'ARCADE', poster: 'neon_pinball_v2_poster.png', tag: 'ARCADE • NEW', type: 'game', trackedStats: ['pinball-pro-best', 'pinball-avg-score', 'pinball-sessions'] },
             { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility', trackedStats: [] }
         ];
 
@@ -1545,7 +1545,6 @@
                 const raw = localStorage.getItem(key) || sessionStorage.getItem(key);
                 if (!raw) return;
 
-                // Handle JSON objects (like hoops-bests)
                 if (raw.startsWith('{')) {
                     try {
                         const data = JSON.parse(raw);
@@ -1558,17 +1557,18 @@
                 } else {
                     const val = parseInt(raw);
                     if (!isNaN(val)) {
-                        const label = key.replace(`${id}-`, '').replace(/-/g, ' ').toUpperCase();
+                        let label = key.replace(`${id}-`, '').replace(/-/g, ' ').toUpperCase();
+                        if (label.includes('BEST')) label = 'ALL-TIME BEST';
                         stats.push({ label: label || 'RECORD', val: val, unit: '' });
                     }
                 }
             });
 
-            // 2. Fallback: Generic pattern matching if manifest is light
-            if (stats.length === 0) {
+            // 2. Heuristic Discovery: Look for any related keys
+            if (stats.length < 3) {
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
-                    if (key.includes(id) && (key.includes('best') || key.includes('score'))) {
+                    if (key.includes(id) && !stats.find(s => key.includes(s.label.toLowerCase()))) {
                         const val = parseInt(localStorage.getItem(key));
                         if (!isNaN(val)) {
                             stats.push({ label: key.split('-').pop().toUpperCase(), val: val, unit: '' });
@@ -1577,7 +1577,19 @@
                 }
             }
 
-            return stats;
+            // 3. Sophisticated Fallback: Ensure 3 stats with context-aware placeholders
+            const defaults = [
+                { label: 'GLOBAL RANK', val: 'UNRANKED', unit: '' },
+                { label: 'PLAY TIME', val: '0', unit: 'MIN' },
+                { label: 'COMPLETION', val: '0', unit: '%' }
+            ];
+
+            while (stats.length < 3) {
+                const def = defaults[stats.length] || { label: 'PENDING', val: '---', unit: '' };
+                stats.push(def);
+            }
+
+            return stats.slice(0, 3);
         }
 
         function renderLeaderboard() {
@@ -1664,11 +1676,16 @@
             renderLibrary();
         }
 
-        function showGameDetails(game) {
+        function showGameDetails(game, skipPush = false) {
             const library = document.getElementById('library-view');
             const detail = document.getElementById('detail-view');
+            const runner = document.getElementById('app-runner');
             const hubBg = document.getElementById('hub-bg');
             
+            // Close runner if open
+            runner.style.display = 'none';
+            document.body.style.overflow = 'auto';
+
             library.style.display = 'none';
             detail.style.display = 'block';
             setTimeout(() => detail.style.opacity = '1', 10);
@@ -1682,6 +1699,10 @@
             document.getElementById('hub-calc').style.display = (game === 'calc') ? 'block' : 'none';
             
             window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            if (!skipPush && !isNavigatingHistory) {
+                history.pushState({ type: 'detail', game: game }, '');
+            }
         }
 
         function showLibrary() {
@@ -1748,43 +1769,55 @@
             document.body.style.overflow = 'hidden';
 
             if (!skipPush && !isNavigatingHistory) {
-                history.pushState({ type: 'app', url, title, icon, appId }, '');
+                const state = { type: 'app', url, title, icon, appId };
+                const current = history.state;
+                
+                // If we are already in an app, replace the state instead of pushing 
+                // to prevent "game to game" back button loops.
+                if (current && current.type === 'app') {
+                    history.replaceState(state, '');
+                } else {
+                    history.pushState(state, '');
+                }
             }
         }
 
         function closeApp(skipPush = false) {
             const runner = document.getElementById('app-runner');
             const frame = document.getElementById('app-frame');
+            
+            if (runner.style.display === 'none') return;
+
             runner.style.display = 'none';
             frame.src = '';
             document.body.style.overflow = 'auto';
 
             if (!skipPush && !isNavigatingHistory) {
-                // If closing app, we probably want to go back to detail view of that app
-                // But for now, just let history handle it if they press back
-                // If they click EXIT, we should probably go back one in history?
-                // Actually, if they click EXIT, we just go back to where they were.
+                // Return to the previous state (Library or Details)
                 history.back();
-            } else {
-                renderLibrary();
             }
         }
 
         window.onpopstate = function(event) {
             isNavigatingHistory = true;
+            
+            // Sync Runner Visibility
+            const runner = document.getElementById('app-runner');
+            if (runner) {
+                if (event.state && event.state.type === 'app') {
+                    // Re-opening app from history
+                    const s = event.state;
+                    openApp(s.url, s.title, s.icon, s.appId, true);
+                } else {
+                    // Moving to a non-app state, ensure runner is closed
+                    closeApp(true);
+                }
+            }
+
             if (event.state) {
                 const s = event.state;
                 if (s.type === 'category') setCategory(s.cat, true);
                 else if (s.type === 'detail') showGameDetails(s.game, true);
-                else if (s.type === 'app') {
-                    const id = s.appId;
-                    const frame = document.getElementById('app-frame');
-                    if (id === 'snake') frame.src = 'snake-game.html';
-                    else if (id === 'basketball') frame.src = 'basketball-game.html';
-                    else if (id === 'pinball') frame.src = 'pinball-game.html';
-                    else if (id === 'calc') frame.src = 'Calculator.html';
-                    openApp(s.url, s.title, s.icon, s.appId, true);
-                }
             } else {
                 // Default initial state
                 setCategory('all', true);

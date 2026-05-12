@@ -323,6 +323,18 @@ window.startGame = startGame;
 
 function gameOver() {
     state.running = false;
+
+    // Smart Stats: Accumulate lifetime data
+    try {
+        const sessions = parseInt(localStorage.getItem('pinball-sessions') || '0') + 1;
+        const totalScore = parseInt(localStorage.getItem('pinball-total-score') || '0') + state.score;
+        const avgScore = Math.round(totalScore / sessions);
+        
+        localStorage.setItem('pinball-sessions', sessions);
+        localStorage.setItem('pinball-total-score', totalScore);
+        localStorage.setItem('pinball-avg-score', avgScore);
+    } catch (e) { console.warn("Failed to save lifetime stats:", e); }
+
     ui.overlay.classList.remove('hidden');
     ui.overlayTitle.innerHTML = `SESSION COMPLETE`;
     ui.overlayTitle.style.fontSize = '2.5rem';

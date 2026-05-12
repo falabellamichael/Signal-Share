@@ -472,7 +472,9 @@ final class PhoneNowPlayingHelper {
                 MediaMetadata.METADATA_KEY_TITLE,
                 MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE,
                 MediaMetadata.METADATA_KEY_ARTIST,
-                MediaMetadata.METADATA_KEY_ALBUM
+                MediaMetadata.METADATA_KEY_ALBUM,
+                MediaMetadata.METADATA_KEY_AUTHOR,
+                MediaMetadata.METADATA_KEY_COMPOSER
         };
 
         for (String key : keys) {
@@ -498,7 +500,9 @@ final class PhoneNowPlayingHelper {
                 MediaMetadata.METADATA_KEY_AUTHOR,
                 MediaMetadata.METADATA_KEY_WRITER,
                 MediaMetadata.METADATA_KEY_COMPOSER,
-                MediaMetadata.METADATA_KEY_ALBUM
+                MediaMetadata.METADATA_KEY_ALBUM,
+                MediaMetadata.METADATA_KEY_GENRE,
+                MediaMetadata.METADATA_KEY_COMPILATION
         };
 
         for (String key : keys) {
