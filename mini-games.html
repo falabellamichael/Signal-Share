@@ -38,7 +38,7 @@
 
         .steam-shell {
             display: grid;
-            grid-template-columns: 240px auto 1fr; /* Middle is auto-sized, Companion takes 1fr */
+            grid-template-columns: 240px auto 6px 1fr; /* 4 columns: Sidebar, Content, Handle, Chat */
             grid-template-rows: var(--header-height) 1fr;
             height: 100dvh;
             overflow: hidden;
@@ -1394,7 +1394,7 @@
                 if (newWidth > initialMax) newWidth = initialMax;
                 if (newWidth < 280) newWidth = 280; // Hard minimum to keep chat usable
                 
-                shell.style.gridTemplateColumns = `240px auto ${newWidth}px`;
+                shell.style.gridTemplateColumns = `240px auto 6px ${newWidth}px`;
             });
 
             document.addEventListener('mouseup', () => {
