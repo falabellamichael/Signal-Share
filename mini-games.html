@@ -38,7 +38,7 @@
 
         .steam-shell {
             display: grid;
-            grid-template-columns: 240px 1fr 300px; /* Added 300px right panel */
+            grid-template-columns: 240px auto 1fr; /* Middle is auto-sized, Companion takes 1fr */
             grid-template-rows: var(--header-height) 1fr;
             height: 100dvh;
             overflow: hidden;
@@ -277,8 +277,8 @@
 
         .steam-content {
             padding: 40px;
-            max-width: 1400px; /* Slightly wider for modern monitors */
-            width: 100%;
+            width: auto;
+            max-width: 1200px; /* Constrain tiles to keep them organized */
             height: 100%;
             overflow-y: auto;
             transition: opacity 0.3s;
