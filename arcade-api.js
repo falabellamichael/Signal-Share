@@ -45,17 +45,20 @@ export async function saveGameScore(gameId, score, rank = "", metadata = {}) {
 
     const { data, error } = await supabase
         .from('game_stats')
-        .upsert(payload, { onConflict: 'user_id,game_id' })
-        .select()
-        .single();
+        .upsert(payload, { 
+            onConflict: 'user_id,game_id',
+            ignoreDuplicates: false 
+        })
+        .select();
 
     if (error) {
-        console.error('[Arcade API] Error saving score:', error);
+        console.error('[Arcade API] Error saving score:', error.message || error);
         throw error;
     }
 
-    console.log('[Arcade API] Score/Rank saved successfully:', data);
-    return data;
+    const savedRecord = data && data.length > 0 ? data[0] : null;
+    console.log('[Arcade API] Score/Rank saved successfully:', savedRecord);
+    return savedRecord;
 }
 window.saveGameScore = saveGameScore;
 
@@ -121,7 +124,7 @@ export async function getPersonalBest(gameId = null) {
         query = query.eq('game_id', gameId);
     }
 
-    const { data, error } = await query.limit(1).single();
+    const { data, error } = await query.maybeSingle();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
         console.error('[Arcade API] Error fetching personal best:', error);
