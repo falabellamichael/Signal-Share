@@ -1918,7 +1918,7 @@ h1 {
 .hero-player-options {
   display: flex;
   gap: 12px;
-  align-items: stretch;
+  align-items: center;
   margin-bottom: 16px;
 }
 
