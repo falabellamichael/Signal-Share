@@ -991,17 +991,27 @@ app.post('/api/llm/chat', async (req, res) => {
       reply = `🎮 Interesting! I'm still learning about "${message}", but I'm here to help you dominate the leaderboards.`;
     }
 
-    /* 
-    // OPTIONAL: Uncomment to connect to a real local LLM (e.g. Ollama)
+    // 2. Local LLM (Ollama) Integration
+    // This will attempt to use your local Ollama instance if it's running.
     try {
       const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
         method: 'POST',
-        body: JSON.stringify({ model: 'llama3', prompt: message, stream: false })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          model: 'llama3', // You can change this to 'mistral' or any model you have pulled
+          prompt: `Context: You are the Signal Share Arcade Companion, a helpful AI built into a retro-neon arcade suite. Keep your responses concise, friendly, and arcade-themed. 
+          User Message: ${message}`, 
+          stream: false 
+        })
       });
-      const data = await ollamaResponse.json();
-      reply = data.response;
-    } catch (e) { console.warn("Local LLM not found, falling back to personality."); }
-    */
+
+      if (ollamaResponse.ok) {
+        const data = await ollamaResponse.json();
+        if (data.response) reply = data.response.trim();
+      }
+    } catch (e) {
+      console.log("[Bridge] Ollama instance not detected at localhost:11434. Falling back to system tips.");
+    }
 
     res.json({ reply });
   } catch (err) {
