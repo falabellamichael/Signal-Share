@@ -80,19 +80,9 @@ body.chat-collapsed .messenger-launcher {
     place-items: center !important;
 }
 
-/* Move the button with the sidebar when NOT collapsed */
+/* Hide the floating toggle when the sidebar is open */
 body:not(.chat-collapsed) .chat-toggle-btn {
-    right: 400px; /* sidebar width (380) + margin (20) */
-    opacity: 0.8;
-}
-
-body:not(.chat-collapsed) .chat-toggle-btn:hover {
-    opacity: 1;
-}
-
-/* Rotate icon when open */
-body:not(.chat-collapsed) .chat-toggle-btn svg {
-    transform: rotate(180deg);
+    display: none !important;
 }
 
 /* Move the Direct Messenger launcher and OPENED window with the sidebar when NOT collapsed */
