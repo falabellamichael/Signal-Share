@@ -79,7 +79,7 @@ export async function getLeaderboard(gameId, limit = 10) {
             created_at,
             metadata,
             user_id,
-            profiles (
+            profiles!game_stats_user_id_profiles_fkey (
                 display_name,
                 id
             )
@@ -93,14 +93,18 @@ export async function getLeaderboard(gameId, limit = 10) {
         return [];
     }
 
-    return data.map(row => ({
-        id: row.id,
-        score: row.score,
-        createdAt: row.created_at,
-        metadata: row.metadata,
-        displayName: row.profiles?.display_name || 'Anonymous Player',
-        userId: row.user_id
-    }));
+    return data.map(row => {
+        // Disambiguate profile data which might come as an object or array depending on relationship hints
+        const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+        return {
+            id: row.id,
+            score: row.score,
+            createdAt: row.created_at,
+            metadata: row.metadata,
+            displayName: profile?.display_name || 'Anonymous Player',
+            userId: row.user_id
+        };
+    });
 }
 window.getLeaderboard = getLeaderboard;
 
