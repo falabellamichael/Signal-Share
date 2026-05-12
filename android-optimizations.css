@@ -42,7 +42,6 @@ html.platform-android .play-btn {
 
 /*
    Natural scrolling reset - ONLY for the main application shell.
-   We avoid :has() for better compatibility with older WebViews.
 */
 html.platform-android {
     height: auto !important;
@@ -61,7 +60,6 @@ html.platform-android body {
     position: relative !important;
     width: 100% !important;
     -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior-y: auto !important;
     touch-action: auto !important;
 
     /* Theme-aware solid background to avoid Shader Compilation failures */
@@ -69,11 +67,11 @@ html.platform-android body {
     background-image: none !important;
 }
 
-/* Revert scroll resets for Steam Shell and Games */
+/* Revert scroll resets for Steam Shell and Apps */
 html.platform-android.is-steam-shell,
 html.platform-android.is-steam-shell body,
-html.platform-android.is-game-page,
-html.platform-android.is-game-page body {
+html.platform-android.is-signal-app,
+html.platform-android.is-signal-app body {
     height: 100vh !important;
     height: 100dvh !important;
     overflow: hidden !important;
@@ -189,12 +187,11 @@ html.platform-android .admin-ban-launcher {
     transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;
 }
 
-/* 11. Mini-Games & Tools Overrides (Steam Shell) */
+/* 11. Mini-Games Dashboard (Steam Shell) */
 html.platform-android.is-steam-shell .steam-shell {
     height: 100% !important;
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    grid-template-rows: auto 1fr !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 html.platform-android.is-steam-shell .steam-sidebar,
@@ -203,12 +200,12 @@ html.platform-android.is-steam-shell .chat-resize-handle {
 }
 
 html.platform-android.is-steam-shell .steam-content {
+    flex: 1 !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
     padding: 15px !important;
     padding-bottom: calc(20px + var(--safe-area-bottom)) !important;
     display: block !important;
-    height: 100% !important;
 }
 
 html.platform-android.is-steam-shell .game-grid {
@@ -219,28 +216,12 @@ html.platform-android.is-steam-shell .game-grid {
 
 @media (max-height: 500px) {
     html.platform-android.is-steam-shell {
-        --header-height: 50px !important;
-    }
-    html.platform-android.is-steam-shell .steam-header {
-        padding: 8px 15px !important;
+        --header-height: 44px !important;
     }
     html.platform-android.is-steam-shell .featured-hero {
-        min-height: 180px !important;
-        padding: 15px !important;
-        margin-bottom: 15px !important;
+        min-height: 100px !important;
+        margin-bottom: 10px !important;
     }
-    html.platform-android.is-steam-shell .hero-content h2 {
-        font-size: 1.8rem !important;
-        margin: 5px 0 !important;
-    }
-    html.platform-android.is-steam-shell .hero-content p {
-        display: none !important;
-    }
-}
-
-html.platform-android.is-game-page body.game-body {
-    background-color: #000 !important;
-    background-image: none !important;
 }
 
 /* 12. Stacking Order Fixes - FORCE OVERLAYS TO FRONT */
@@ -256,4 +237,115 @@ html.platform-android .notification-panel {
 html.platform-android .steam-chat-sidebar,
 html.platform-android .messenger-section {
     z-index: 9000 !important;
+}
+
+/* 13. SET METHOD: Robust Fitting for Signal Share Applications */
+
+/* Global App Shell */
+html.platform-android.is-signal-app,
+html.platform-android.is-signal-app body {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    background-color: #000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/*
+   Generic Application Stage Scaling.
+   Targeting common container patterns used in mini-games.
+*/
+html.platform-android.is-signal-app .game-container,
+html.platform-android.is-signal-app .calc-wrapper,
+html.platform-android.is-signal-app main,
+html.platform-android.is-signal-app .app-stage {
+    flex: 1 !important;
+    width: 100% !important;
+    max-width: 500px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    padding: 10px !important;
+    padding-top: max(10px, var(--safe-area-top)) !important;
+    box-sizing: border-box !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Auto-scale Canvas/Central Stage to fill available area */
+html.platform-android.is-signal-app #game-canvas-container,
+html.platform-android.is-signal-app .canvas-stage,
+html.platform-android.is-signal-app .app-content {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 5px 0 !important;
+}
+
+html.platform-android.is-signal-app canvas,
+html.platform-android.is-signal-app .fit-content {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
+    border-radius: 12px !important;
+}
+
+/* Control Area Preservation */
+html.platform-android.is-signal-app .controls-pad,
+html.platform-android.is-signal-app #touchControls,
+html.platform-android.is-signal-app .calc-controls,
+html.platform-android.is-signal-app footer,
+html.platform-android.is-signal-app .app-controls {
+    flex-shrink: 0 !important;
+    margin-top: auto !important;
+    padding-bottom: max(20px, var(--safe-area-bottom)) !important;
+}
+
+/* Responsive UI scaling for tighter screens */
+@media (max-height: 700px) {
+    html.platform-android.is-signal-app .game-header,
+    html.platform-android.is-signal-app header {
+        transform: scale(0.85) !important;
+        transform-origin: top !important;
+        margin-bottom: -15px !important;
+    }
+    html.platform-android.is-signal-app .controls-pad,
+    html.platform-android.is-signal-app #touchControls {
+        transform: scale(0.8) !important;
+        transform-origin: bottom !important;
+        margin-top: -10px !important;
+    }
+}
+
+/* Landscape Mode: Horizontal Split */
+@media (orientation: landscape) and (max-height: 500px) {
+    html.platform-android.is-signal-app .game-container,
+    html.platform-android.is-signal-app .app-stage {
+        flex-direction: row !important;
+        max-width: none !important;
+        justify-content: center !important;
+        gap: 20px !important;
+        padding-top: 5px !important;
+    }
+
+    html.platform-android.is-signal-app .game-header,
+    html.platform-android.is-signal-app .stats-bar,
+    html.platform-android.is-signal-app header {
+        display: none !important;
+    }
+
+    html.platform-android.is-signal-app .controls-pad,
+    html.platform-android.is-signal-app #touchControls,
+    html.platform-android.is-signal-app .app-controls {
+        transform: scale(0.65) !important;
+        margin: 0 !important;
+        padding-bottom: 5px !important;
+    }
 }

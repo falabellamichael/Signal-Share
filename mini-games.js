@@ -783,7 +783,6 @@ function launchCalc() {
 function openApp(url, title, icon, appId, skipPush = false) {
     vibrate(15);
     const runner = document.getElementById('app-runner');
-
     const frame = document.getElementById('app-frame');
     const titleEl = document.getElementById('runner-title');
     const iconEl = document.getElementById('runner-icon');
@@ -791,12 +790,28 @@ function openApp(url, title, icon, appId, skipPush = false) {
     if (titleEl) titleEl.textContent = title;
     if (iconEl) iconEl.src = icon;
 
+    // Detect if we are on Android
+    const isAndroid = /Android/i.test(navigator.userAgent) || (window.Capacitor && window.Capacitor.getPlatform() === 'android');
+
     if (url.startsWith('data:') || url.startsWith('<!DOCTYPE') || url.startsWith('<html')) {
         const blob = new Blob([url], { type: 'text/html' });
         frame.src = URL.createObjectURL(blob);
     } else {
         frame.src = url;
     }
+
+    // Signal Share Fitting Suite: Ensure all applications fit the screen on Android
+    frame.onload = () => {
+        try {
+            const doc = frame.contentDocument || frame.contentWindow.document;
+            if (isAndroid) {
+                doc.documentElement.classList.add('platform-android');
+                doc.documentElement.classList.add('is-signal-app');
+            }
+        } catch (e) {
+            console.warn('[App Runner] Could not inject fitting classes (Cross-origin or early load)', e);
+        }
+    };
 
     if (runner) runner.style.display = 'flex';
     document.body.style.overflow = 'hidden';

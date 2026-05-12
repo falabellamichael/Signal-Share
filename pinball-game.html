@@ -353,6 +353,7 @@
             const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
             if (isNative || /Android/i.test(navigator.userAgent)) {
                 document.documentElement.classList.add('platform-android');
+                document.documentElement.classList.add('is-signal-app');
             }
         })();
 
