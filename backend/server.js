@@ -56,7 +56,10 @@ app.use((req, res, next) => {
 
   if (BRIDGE_SECRET && (req.path.startsWith("/api/system-media") || req.path.startsWith("/api/activity"))) {
     const secret = req.headers["x-bridge-secret"];
-    if (secret !== BRIDGE_SECRET) return res.status(403).json({ error: "Unauthorized" });
+    if (secret !== BRIDGE_SECRET) {
+      console.warn(`[Security] Forbidden access attempt: ${secret ? 'Wrong Secret' : 'No Secret'}`);
+      return res.status(403).json({ error: "Unauthorized" });
+    }
   }
 
   next();
@@ -79,6 +82,7 @@ app.post("/api/system-media/action", async (req, res) => {
     if (!ALLOW_OPEN_URI) return res.status(403).json({ error: "open_uri disabled" });
     const uri = `${req.body?.uri || ""}`.trim();
     if (!uri) return res.status(400).json({ error: "Missing URI" });
+    console.log(`[Bridge] Local Action: Open URI -> ${uri}`);
     spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
     return res.json({ ok: true });
   }
@@ -87,9 +91,9 @@ app.post("/api/system-media/action", async (req, res) => {
 
   res.json({ ok: true, status: "queued" });
   
-  await sendSystemMediaKey(action, appPackage, preferredSource);
+  const success = await sendSystemMediaKey(action, appPackage, preferredSource);
   if (enableRemoteMediaSync) {
-    setTimeout(() => syncToSupabase(buildSnapshot(preferredSource)), 200);
+    setTimeout(() => syncToSupabase(buildSnapshot(preferredSource)), success ? 200 : 500);
   }
 });
 
@@ -104,27 +108,42 @@ app.get("/", (req, res) => res.sendFile(path.join(projectRoot, "index.html")));
 
 // Initialize Sync
 if (enableRemoteMediaSync && userId) {
-  console.log(`[Bridge] Remote media sync active for ${userId}`);
+  console.log(`[Bridge] Remote media sync active for user: ${userId}`);
   setInterval(() => syncToSupabase(), 5000);
 
-  supabase.channel('media_actions').on('postgres_changes', {
+  const channel = supabase.channel('media_actions').on('postgres_changes', {
     event: 'INSERT', schema: 'public', table: 'system_media_actions', filter: `user_id=eq.${userId}`
   }, async (payload) => {
     const { action, app_package, uri } = payload.new;
-    const pref = payload.new?.payload?.preferredSource || "";
-    console.log(`[Bridge] Remote command: ${action}`);
+    let extra = payload.new.payload;
+    if (typeof extra === 'string') {
+      try { extra = JSON.parse(extra); } catch { extra = {}; }
+    }
+    const pref = extra?.preferredSource || "";
+    
+    console.log(`[Bridge] Remote Command Received: ${action} (Pref: ${pref || "None"})`);
 
     if (action === "open_uri") {
       if (uri && ALLOW_OPEN_URI) {
+        console.log(`[Bridge] Remote Action: Open URI -> ${uri}`);
         spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
       }
     } else {
-      await sendSystemMediaKey(action, app_package, pref);
+      const success = await sendSystemMediaKey(action, app_package, pref);
+      console.log(`[Bridge] Remote Action ${action} ${success ? 'Succeeded' : 'Failed'}`);
     }
     await syncToSupabase(buildSnapshot(pref));
-  }).subscribe();
+  });
+
+  channel.subscribe((status) => {
+    console.log(`[Bridge] Realtime subscription status: ${status}`);
+    if (status === 'CHANNEL_ERROR') {
+      console.error("[Bridge] FAILED TO CONNECT TO REALTIME. Check Supabase config/permissions.");
+    }
+  });
 }
 
 app.listen(port, "127.0.0.1", () => {
   console.log(`[Bridge] Server running on http://localhost:${port}`);
+  console.log(`[Bridge] Security Mode: ${BRIDGE_SECRET ? "SECRET CONFIGURED" : "DISABLED"}`);
 });

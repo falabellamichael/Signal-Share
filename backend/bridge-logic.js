@@ -17,14 +17,6 @@ export const WINRT_ACTION_METHODS = {
   previous: "TrySkipPreviousAsync",
 };
 
-const APP_COMMAND_CODES = {
-  play_pause: 14,
-  play: 46,
-  pause: 47,
-  next: 11,
-  previous: 12,
-};
-
 export function mapPlaybackState(playbackStatus) {
   switch (playbackStatus) {
     case PlaybackStatus.PLAYING: return "playing";
@@ -39,7 +31,8 @@ export function safeGetMediaSessions() {
   if (process.platform !== "win32") return [];
   try {
     const allSessions = SMTCMonitor.getMediaSessions();
-    return Array.isArray(allSessions) ? allSessions.filter(Boolean) : [];
+    if (!allSessions || !Array.isArray(allSessions)) return [];
+    return allSessions.filter(s => s && (s.sourceAppUserModelId || s.sourceAppId));
   } catch (error) {
     console.warn("[Bridge] SMTC session fetch failed:", error.message);
     return [];
@@ -49,9 +42,13 @@ export function safeGetMediaSessions() {
 export function sendSystemMediaKey(action, targetAppPackage = "", preferredSource = "") {
   const vkCode = MEDIA_KEY_CODES[action];
   const winrtMethodName = WINRT_ACTION_METHODS[action];
-  if (!vkCode || !winrtMethodName) return Promise.resolve(false);
+  if (!vkCode || !winrtMethodName) {
+    console.error(`[Bridge] Invalid media action requested: ${action}`);
+    return Promise.resolve(false);
+  }
 
-  // PowerShell script for targeted media control
+  console.log(`[Bridge] Executing action: ${action} (Target: ${targetAppPackage || "All"}, Pref: ${preferredSource || "None"})`);
+
   const script = `
 $ErrorActionPreference = "Stop"
 $winRtSuccess = $false
@@ -172,6 +169,7 @@ try {
 } catch { $winRtSuccess = $false }
 
 if ($winRtSuccess -eq $false -and ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all")) {
+  # Global Fallback logic
   try {
     Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);' -Name "MediaKeySender" -Namespace "WinAPI" -PassThru | Out-Null
   } catch {}
@@ -195,9 +193,15 @@ if ($winRtSuccess) { Write-Output "ok-winrt" } else { Write-Output "fail" }
       },
     });
     let stdout = "";
+    let stderr = "";
     child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
+    child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
     child.on("close", (code) => {
-      resolve(code === 0 && stdout.toLowerCase().includes("ok"));
+      const out = stdout.trim();
+      const err = stderr.trim();
+      if (err) console.error(`[Bridge] Action PowerShell Error: ${err}`);
+      if (out) console.log(`[Bridge] Action Result: ${out}`);
+      resolve(code === 0 && out.toLowerCase().includes("ok"));
     });
   });
 }
