@@ -1079,6 +1079,13 @@ select {
   gap: 18px;
 }
 
+.nav-user-stack {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 .site-nav a {
   color: inherit;
   text-decoration: none;

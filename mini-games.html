@@ -59,6 +59,30 @@
             .hero-content h2 {
                 font-size: 2.2rem !important;
             }
+            .mobile-category-nav {
+                display: flex !important;
+                overflow-x: auto;
+                gap: 10px;
+                padding: 10px 20px;
+                margin: 0 -20px 20px;
+                scrollbar-width: none;
+            }
+            .mobile-category-nav::-webkit-scrollbar { display: none; }
+            .mobile-nav-item {
+                flex: 0 0 auto;
+                padding: 8px 16px;
+                background: rgba(255,255,255,0.05);
+                border-radius: 20px;
+                font-size: 0.75rem;
+                font-weight: 700;
+                color: rgba(255,255,255,0.6);
+                border: 1px solid transparent;
+            }
+            .mobile-nav-item.active {
+                background: var(--steam-light);
+                color: #000;
+                border-color: var(--steam-light);
+            }
             .game-hub-header {
                 grid-template-columns: 1fr;
                 gap: 20px;
@@ -536,13 +560,16 @@
 <body>
     <div class="steam-shell">
         <header class="steam-header">
-            <h1 style="margin: 0; color: #fff; font-size: 1.1rem; letter-spacing: 1px; font-weight: 900; text-transform: uppercase; opacity: 0.8;">Signal Share <span style="font-weight: 300; opacity: 0.5;">Launcher</span></h1>
-            <div style="display: flex; align-items: center; gap: 20px; font-size: 0.8rem; font-weight: 600;">
-                <span class="nav-link" onclick="setCategory('all')" style="color: var(--steam-light); cursor: pointer;">LIBRARY</span>
-                <span class="nav-link" style="opacity: 0.4; cursor: not-allowed;">COLLECTIONS</span>
-                <div id="user-pill" onclick="toggleAuth()" style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); padding: 6px 14px; border-radius: 20px; cursor: pointer; border: 1px solid rgba(255,255,255,0.05);">
-                    <div id="user-avatar" style="width: 20px; height: 20px; background: #66c0f4; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #000;">?</div>
-                    <span id="user-name">Sign In</span>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <a href="./index.html" class="close-runner" style="padding: 8px; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                </a>
+                <h1 style="margin: 0; color: #fff; font-size: 1rem; letter-spacing: 1px; font-weight: 900; text-transform: uppercase; opacity: 0.8;">Library</h1>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; font-size: 0.8rem; font-weight: 600;">
+                <div id="user-pill" onclick="toggleAuth()" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); padding: 5px 12px; border-radius: 20px; cursor: pointer; border: 1px solid rgba(255,255,255,0.05);">
+                    <div id="user-avatar" style="width: 18px; height: 18px; background: #66c0f4; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; color: #000; font-weight: 900;">?</div>
+                    <span id="user-name" style="font-size: 0.7rem;">Sign In</span>
                 </div>
             </div>
         </header>
@@ -589,6 +616,16 @@
         </aside>
 
         <main class="steam-content">
+            <!-- Mobile Navigation -->
+            <div class="mobile-category-nav">
+                <div class="mobile-nav-item active" id="mob-nav-all" onclick="setCategory('all')">Library</div>
+                <div class="mobile-nav-item" id="mob-nav-games" onclick="setCategory('games')">Games</div>
+                <div class="mobile-nav-item" id="mob-nav-utilities" onclick="setCategory('utilities')">Utilities</div>
+                <div class="mobile-nav-item" id="mob-nav-recent" onclick="setCategory('recent')">Recent</div>
+                <div class="mobile-nav-item" id="mob-nav-leaderboard" onclick="setCategory('leaderboard')">Ranks</div>
+                <div class="mobile-nav-item" id="mob-nav-publish" onclick="setCategory('publish')">Workshop</div>
+            </div>
+
             <!-- Library View -->
             <div id="library-view">
                 <div class="featured-hero" onclick="showGameDetails('snake')">
@@ -1356,7 +1393,12 @@
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             const navEl = document.getElementById(`nav-${cat}`);
             if (navEl) navEl.classList.add('active');
-            
+
+            // Mobile UI Updates
+            document.querySelectorAll('.mobile-nav-item').forEach(el => el.classList.remove('active'));
+            const mobNavEl = document.getElementById(`mob-nav-${cat}`);
+            if (mobNavEl) mobNavEl.classList.add('active');
+
             const hero = document.querySelector('.featured-hero');
             const library = document.getElementById('library-view');
             const store = document.getElementById('store-view');

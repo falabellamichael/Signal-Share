@@ -716,9 +716,22 @@
       white-space: nowrap;
     }
 
-    .site-nav .notification-bell,
-    .site-nav #profileNavLink {
-      flex: 0 0 auto;
+    #profileNavLink, #profileNavLink * {
+      text-decoration: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+      border: none !important;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    @media (orientation: portrait) {
+      #profileNavLink {
+        position: absolute !important;
+        top: 18px;
+        right: 18px;
+        margin: 0 !important;
+        z-index: 10;
+      }
     }
 
     .header-tools {
@@ -943,7 +956,7 @@
       padding-bottom: 6px;
     }
 
-    .messenger-section.is-expanded .messenger-toolbar {
+    .messenger-toolbar {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       align-items: center;

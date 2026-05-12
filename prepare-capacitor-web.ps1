@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 $dist = Join-Path $root "dist"
 
+# List of specific files to copy to dist
 $files = @(
   "index.html",
   "terms.html",
@@ -16,6 +17,7 @@ $files = @(
   "api-v3.js",
   "app-v3.js",
   "app-v3-ui.js",
+  "shared-utils.js",
   "hero-media-player.js",
   "hero-media-player-preview.js",
   "notifications.js",
@@ -47,8 +49,15 @@ $files = @(
   "snake-game.html",
   "gameLogic.js",
   "Calculator.html",
+  "basketball-game.html",
+  "basketball-gamev2realistic.js",
+  "pinball-game.html",
+  "pinball-game-v2.js",
   "snake_game_poster_1778466261855.png",
   "calculator_tool_poster_1778466276736.png",
+  "basketball_game_poster.png",
+  "neon_pinball_v2_poster.png",
+  "pinball_poster_1778481948543.png",
   "apple-touch-icon-180.png",
   "icon-192.png",
   "icon-512.png",
@@ -63,13 +72,13 @@ $directories = @(
   "icons"
 )
 
+# Clean and recreate dist
 if (Test-Path -LiteralPath $dist) {
   Remove-Item -LiteralPath $dist -Recurse -Force
 }
-
 New-Item -ItemType Directory -Path $dist | Out-Null
 
-Write-Host "--- Copying Files ---"
+Write-Host "--- Copying Files ---" -ForegroundColor Cyan
 foreach ($file in $files) {
   $src = Join-Path $root $file
   $dest = Join-Path $dist $file
@@ -81,12 +90,10 @@ foreach ($file in $files) {
   }
 }
 
-Write-Host "`n--- Copying Directories ---"
+Write-Host "`n--- Copying Directories ---" -ForegroundColor Cyan
 foreach ($directory in $directories) {
   $src = Join-Path $root $directory
-  $dest = Join-Path $dist $directory
   if (Test-Path -LiteralPath $src) {
-    # Ensure the destination parent exists
     Copy-Item -Path $src -Destination $dist -Recurse -Force
     Write-Host "[Dir]  $directory"
   } else {
@@ -94,4 +101,8 @@ foreach ($directory in $directories) {
   }
 }
 
-Write-Host "`nReady for Capacitor Sync."
+Write-Host "`n--- Syncing with Capacitor ---" -ForegroundColor Green
+Set-Location -Path $root
+npx cap copy android
+
+Write-Host "`nSync Complete! Ready to build in Android Studio." -ForegroundColor White
