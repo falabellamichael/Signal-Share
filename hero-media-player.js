@@ -848,7 +848,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     try {
       const resolved = new URL(url, window.location.href);
       const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
-      if (addressSpace !== "local" && addressSpace !== "private" && addressSpace !== "loopback") return init;
+      if (!["local", "private", "loopback"].includes(addressSpace)) return init;
 
       const secret = localStorage.getItem("ss_bridge_secret");
       const headers = { ...init.headers };
@@ -864,7 +864,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       return {
         ...init,
         headers,
-        targetAddressSpace: addressSpace
+        ...(addressSpace !== "loopback" ? { targetAddressSpace: addressSpace } : {})
       };
     } catch {
       return init;
@@ -1252,15 +1252,18 @@ The companion bridge is designed with several security layers to keep your PC sa
     for (const endpoint of endpoints) {
       try {
         const isLoopback = getEndpointAddressSpace(endpoint) === "loopback";
-        const response = await window.fetch(endpoint, withLocalNetworkFetchOptions(endpoint, {
-          method: "GET",
-          cache: "no-store",
-          credentials: "omit",
-          targetAddressSpace: isLoopback ? "loopback" : "private",
-          headers: {
-            Accept: "application/json",
-          },
-        }));
+        const response = await window.fetch(endpoint, {
+          ...withLocalNetworkFetchOptions(endpoint, {
+            method: "GET",
+            cache: "no-store",
+            credentials: "omit",
+            headers: {
+              Accept: "application/json",
+            },
+          }),
+          // Standardize on W3C PNA spec: omit for loopback, 'private' for LAN
+          ...(isLoopback ? {} : { targetAddressSpace: 'private' }),
+        });
         if (!response.ok) throw new Error(`Desktop media endpoint returned ${response.status}.`);
         const payload = await response.json();
         desktopSnapshotEndpoint = endpoint;

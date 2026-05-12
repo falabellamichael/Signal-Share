@@ -26,7 +26,6 @@ async function bridgeFetch(path, options = {}) {
             mode: "cors",
             cache: "no-store",
             credentials: "omit",
-            targetAddressSpace: "local",
             ...options,
             headers,
             signal: options.signal || controller.signal,

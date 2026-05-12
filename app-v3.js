@@ -1851,9 +1851,8 @@ async function callLocalAI(text, history = [], pageContext = "") {
       const response = await fetch(url, {
         method: 'POST',
         headers: headers,
-        // Standardize on W3C PNA spec: loopback for localhost, private for LAN
-        // This MUST match the actual address space or the browser blocks it.
-        targetAddressSpace: isLoopback ? 'loopback' : 'private',
+        // Standardize on W3C PNA spec: omit for loopback (handled as secure origin), 'private' for LAN
+        ...(isLoopback ? {} : { targetAddressSpace: 'private' }),
         signal: abortController.signal,
         cache: 'no-store',
         credentials: 'omit',
