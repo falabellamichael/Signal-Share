@@ -14,6 +14,19 @@
 }
 
 /* Theme Overrides - Only applied on the main page (identified by .main-page class) */
+body.main-page[data-theme="sunset"] {
+    --arc-bg: #f6efe3;
+    --arc-header-bg: rgba(238, 108, 77, 0.1);
+    --arc-input-area-bg: rgba(0, 0, 0, 0.03);
+    --arc-input-wrapper-bg: #ffffff;
+    --arc-msg-ai-bg: #e9e2d5;
+    --arc-msg-ai-text: #13212b;
+    --arc-msg-user-bg: #ee6c4d;
+    --arc-msg-user-text: #ffffff;
+    --arc-accent: #ee6c4d;
+    --arc-border: rgba(19, 33, 43, 0.1);
+}
+
 body.main-page[data-theme="midnight"] {
     --arc-bg: #0c151d;
     --arc-header-bg: rgba(0, 0, 0, 0.4);
