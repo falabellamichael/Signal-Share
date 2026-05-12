@@ -1172,7 +1172,7 @@
             </div>
             <div class="chat-input-area">
                 <div class="chat-input-wrapper">
-                    <input type="text" id="chat-input" class="chat-input" placeholder="Type a message..." onkeydown="if(event.key === 'Enter') sendChatMessage()" autocomplete="off" spellcheck="false">
+                    <input type="text" id="arc-chat-input" name="arc-chat-input-v3" class="chat-input" placeholder="Type a message..." onkeydown="if(event.key === 'Enter') sendChatMessage()" autocomplete="new-password" spellcheck="false">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="cursor: pointer; opacity: 0.6;" onclick="sendChatMessage()"><line x1="22" y1="2" x2="11" y2="13"></line><polyline points="22 2 15 22 11 13 2 9 22 2"></polyline></svg>
                 </div>
             </div>
@@ -1186,8 +1186,8 @@
                 </div>
                 
                 <div style="display: flex; flex-direction: column; gap: 15px;">
-                    <input type="text" id="login-user" class="auth-input" placeholder="Account Name / ID">
-                    <input type="password" id="login-pass" class="auth-input" placeholder="Access Key">
+                    <input type="text" id="login-user" class="auth-input" placeholder="Account Name / ID" autocomplete="username">
+                    <input type="password" id="login-pass" class="auth-input" placeholder="Access Key" autocomplete="current-password">
                     <button class="play-btn" onclick="performLogin()" style="width: 100%; font-size: 1rem;">SIGN IN</button>
                     <button onclick="hideAuth()" style="background: none; border: none; color: rgba(255,255,255,0.4); font-size: 0.7rem; cursor: pointer;">CANCEL</button>
                 </div>
@@ -1296,7 +1296,7 @@
     <script src="mini-games.js?v=1.3"></script>
     <script>
         async function sendChatMessage() {
-            const input = document.getElementById('chat-input');
+            const input = document.getElementById('arc-chat-input');
             const messagesContainer = document.getElementById('chat-messages');
             const text = input.value.trim();
             
