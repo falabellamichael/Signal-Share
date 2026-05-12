@@ -81,10 +81,24 @@ app.use(express.json({ limit: "1mb" }));
 
 // Security & CORS Middleware
 app.use((req, res, next) => {
+  // 1. Basic Security Headers
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Content-Security-Policy", "default-src 'self'");
+
   const origin = req.headers.origin;
   const isWhitelisted = origin && CORS_WHITELIST.some((allowed) => origin.startsWith(allowed));
-  const isLocalhost = !origin || origin.includes("localhost") || origin.includes("127.0.0.1");
+  const isLocalhost = !origin || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("::1");
 
+  // 2. Local-Only Mode Enforcement
+  if (process.env.SIGNAL_SHARE_LOCAL_ONLY === "true" && !isLocalhost) {
+    console.warn(`[Security] Blocked non-local request from ${req.ip} while in LOCAL_ONLY mode.`);
+    return res.status(403).json({ error: "Access Denied: Local-only mode is active." });
+  }
+
+  // 3. CORS Logic
   if (isWhitelisted || isLocalhost) {
     res.setHeader("Access-Control-Allow-Origin", origin || "*");
   } else {
@@ -98,30 +112,32 @@ app.use((req, res, next) => {
   res.setHeader("Access-Control-Max-Age", "86400");
   res.setHeader("Vary", "Origin, Access-Control-Request-Headers");
 
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
+  if (req.method === "OPTIONS") return res.status(204).end();
+
+  // 4. Content-Type Enforcement for POST
+  if (req.method === "POST" && !req.is("application/json") && req.path.startsWith("/api/")) {
+    return res.status(415).json({ error: "Unsupported Media Type: Must be application/json" });
   }
 
+  // 5. Bridge Secret Check
   if (BRIDGE_SECRET && req.path.startsWith("/api/system-media")) {
     const providedSecret = `${req.headers["x-bridge-secret"] || ""}`.trim();
     if (providedSecret !== BRIDGE_SECRET.trim()) {
-      console.warn(`[Security] Unauthorized media bridge request from ${req.ip}. Path: ${req.path}, ProvidedSecret: ${providedSecret ? "PRESENT" : "MISSING"}`);
+      console.warn(`[Security] Unauthorized media bridge request from ${req.ip}. Path: ${req.path}`);
       return res.status(403).json({ error: "Unauthorized: Invalid Bridge Secret" });
     }
   }
 
+  // 6. Rate Limiting
   if (req.method === "POST" && req.path.endsWith("/action")) {
     const now = Date.now();
     const state = actionCounts.get(req.ip) || { count: 0, resetAt: now + 60000 };
-
     if (now > state.resetAt) {
       state.count = 0;
       state.resetAt = now + 60000;
     }
-
     state.count++;
     actionCounts.set(req.ip, state);
-
     if (state.count > MAX_ACTIONS_PER_MINUTE) {
       return res.status(429).json({ error: "Too many actions. Please slow down." });
     }
@@ -858,6 +874,14 @@ app.post("/api/system-media/action", (req, res) => {
     }
     const uri = `${req.body?.uri || ""}`.trim();
     if (!uri) return res.status(400).json({ ok: false });
+
+    // Protocol Whitelist
+    const allowedProtocols = ["http:", "https:", "spotify:", "ms-phone:", "yourphone:", "mobilephonelink:"];
+    const hasAllowedProtocol = allowedProtocols.some(p => uri.toLowerCase().startsWith(p));
+    if (!hasAllowedProtocol) {
+      console.warn(`[Security] Blocked unauthorized protocol in open_uri: ${uri}`);
+      return res.status(403).json({ ok: false, error: "Unauthorized protocol. Only web links and specific app deep links are allowed." });
+    }
 
     const psCommand = `
       $uri = "${uri.replace(/"/g, '`"')}"
