@@ -1060,10 +1060,10 @@
 
     <script>
         const GAMES = [
-            { id: 'snake', title: 'Neon Snake', category: 'ARCADE', poster: 'snake_game_poster_1778466261855.png', tag: 'ARCADE • READY', type: 'game' },
-            { id: 'basketball', title: 'Neon Hoops', category: 'ARCADE', poster: 'basketball_game_poster.png', tag: 'ARCADE • 3D', type: 'game' },
-            { id: 'pinball', title: 'Neon Pinball', category: 'ARCADE', poster: 'neon_pinball_v2_poster.png', tag: 'ARCADE • NEW', type: 'game' },
-            { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility' }
+            { id: 'snake', title: 'Neon Snake', category: 'ARCADE', poster: 'snake_game_poster_1778466261855.png', tag: 'ARCADE • READY', type: 'game', trackedStats: ['snake-best', 'snake-streak'] },
+            { id: 'basketball', title: 'Neon Hoops', category: 'ARCADE', poster: 'basketball_game_poster.png', tag: 'ARCADE • 3D', type: 'game', trackedStats: ['hoops-bests'] },
+            { id: 'pinball', title: 'Neon Pinball', category: 'ARCADE', poster: 'neon_pinball_v2_poster.png', tag: 'ARCADE • NEW', type: 'game', trackedStats: ['pinball-pro-best', 'pinball-best'] },
+            { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility', trackedStats: [] }
         ];
 
         let currentCategory = 'all';
@@ -1182,19 +1182,32 @@
                                 processedFiles.find(f => f.name.endsWith('.html')) ||
                                 processedFiles[0];
 
+                // Smart Stat Discovery: Scan code for localStorage keys
+                const allCode = processedFiles.map(f => f.content).join(' ');
+                const trackedStats = [];
+                const statRegex = /localStorage\.(?:get|set)Item\(['"]([^'"]+)['"]\)/g;
+                let match;
+                while ((match = statRegex.exec(allCode)) !== null) {
+                    const key = match[1];
+                    if (key.includes('score') || key.includes('best') || key.includes('level') || key.includes('stats') || key.includes('rank')) {
+                        if (!trackedStats.includes(key)) trackedStats.push(key);
+                    }
+                }
+
                 const newGame = {
                     id: gameId,
                     title: title,
                     category: category,
                     poster: thumbnail,
                     tag: `${category} • CUSTOM`,
-                    type: 'game',
+                    type: category.toLowerCase() === 'utility' ? 'utility' : 'game',
                     description: description,
                     tags: tags,
                     author: currentUser.name,
                     files: processedFiles,
                     entryFile: entryFile.name,
-                    publishedAt: new Date().toISOString()
+                    publishedAt: new Date().toISOString(),
+                    trackedStats: trackedStats
                 };
 
                 // Add to custom games
@@ -1523,6 +1536,50 @@
             return currentTier;
         }
 
+        function discoverStats(game) {
+            let stats = [];
+            const id = game.id;
+            
+            // 1. Process explicit tracked keys from manifest
+            (game.trackedStats || []).forEach(key => {
+                const raw = localStorage.getItem(key) || sessionStorage.getItem(key);
+                if (!raw) return;
+
+                // Handle JSON objects (like hoops-bests)
+                if (raw.startsWith('{')) {
+                    try {
+                        const data = JSON.parse(raw);
+                        Object.entries(data).forEach(([k, v]) => {
+                            if (typeof v === 'number' || !isNaN(v)) {
+                                stats.push({ label: k.toUpperCase(), val: v, unit: '' });
+                            }
+                        });
+                    } catch(e) {}
+                } else {
+                    const val = parseInt(raw);
+                    if (!isNaN(val)) {
+                        const label = key.replace(`${id}-`, '').replace(/-/g, ' ').toUpperCase();
+                        stats.push({ label: label || 'RECORD', val: val, unit: '' });
+                    }
+                }
+            });
+
+            // 2. Fallback: Generic pattern matching if manifest is light
+            if (stats.length === 0) {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.includes(id) && (key.includes('best') || key.includes('score'))) {
+                        const val = parseInt(localStorage.getItem(key));
+                        if (!isNaN(val)) {
+                            stats.push({ label: key.split('-').pop().toUpperCase(), val: val, unit: '' });
+                        }
+                    }
+                }
+            }
+
+            return stats;
+        }
+
         function renderLeaderboard() {
             const grid = document.getElementById('leader-grid');
             if (!grid) return;
@@ -1531,87 +1588,67 @@
             grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(320px, 1fr))';
             grid.style.gap = '25px';
 
-            const hoopsData = JSON.parse(localStorage.getItem('hoops-bests') || '{"classic":0,"timer":0,"playoff":0}');
-            const snakeBest = parseInt(localStorage.getItem('snake-best') || '0');
-            
-            const games = [
-                {
-                    title: 'Neon Snake',
-                    poster: 'snake_game_poster_1778466261855.png',
-                    stats: [
-                        { label: 'HIGH SCORE', val: snakeBest, unit: 'PTS' },
-                        { label: 'BEST STREAK', val: sessionStorage.getItem('snake-streak') || '0', unit: 'RUN' },
-                        { label: 'RANK', val: calculateRank(snakeBest * 5).name, unit: '' }
-                    ]
-                },
-                {
-                    title: 'Neon Hoops',
-                    poster: 'basketball_game_poster.png',
-                    stats: [
-                        { label: 'CLASSIC BEST', val: hoopsData.classic || '0', unit: 'PTS' },
-                        { label: 'PLAYOFF MAX', val: hoopsData.playoff || '1', unit: 'LVL' },
-                        { label: 'TIMER RECORD', val: hoopsData.timer || '0', unit: 'PTS' }
-                    ]
-                },
-                {
-                    title: 'Neon Pinball',
-                    poster: 'neon_pinball_v2_poster.png',
-                    stats: [
-                        { label: 'HIGH SCORE', val: localStorage.getItem('pinball-best') || '0', unit: 'PTS' },
-                        { label: 'AVG SCORE', val: '4,200', unit: 'PTS' },
-                        { label: 'RANK', val: calculateRank(parseInt(localStorage.getItem('pinball-best') || '0')).name, unit: '' }
-                    ]
+            try {
+                let totalAccumulatedScore = 0;
+
+                const appsToRender = GAMES.filter(g => g.type === 'game' || (g.trackedStats && g.trackedStats.length > 0));
+
+                appsToRender.forEach(game => {
+                    const stats = discoverStats(game);
+                    if (stats.length === 0 && game.type !== 'game') return; // Skip utilities with no stats
+
+                    // Sum scores for total rank (only highest stat per game for simplicity)
+                    const highest = Math.max(0, ...stats.map(s => typeof s.val === 'number' ? s.val : 0));
+                    totalAccumulatedScore += highest;
+
+                    const card = document.createElement('div');
+                    card.style.cssText = `
+                        background: rgba(255,255,255,0.02);
+                        border: 1px solid rgba(255,255,255,0.08);
+                        border-radius: 16px;
+                        overflow: hidden;
+                        display: flex;
+                        flex-direction: column;
+                        transition: transform 0.3s, border-color 0.3s;
+                    `;
+
+                    let statsHtml = stats.length > 0 ? stats.map(s => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+                            <span style="font-size: 0.7rem; font-weight: 800; opacity: 0.4; letter-spacing: 1.5px; text-transform: uppercase;">${s.label}</span>
+                            <div style="text-align: right;">
+                                <span style="font-weight: 900; font-size: 1.2rem; color: #fff;">${s.val}</span>
+                                <span style="font-size: 0.6rem; opacity: 0.3; margin-left: 3px; font-weight: 800;">${s.unit}</span>
+                            </div>
+                        </div>
+                    `).join('') : '<div style="padding: 20px 0; opacity: 0.3; font-size: 0.8rem; text-align: center;">No local data recorded yet</div>';
+
+                    const posterUrl = (game.poster && !game.poster.includes('${')) ? game.poster : 'icon-512.png';
+                    
+                    card.innerHTML = `
+                        <div style="height: 140px; position: relative; overflow: hidden;">
+                            <img src="${posterUrl}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.5; filter: grayscale(0.5) brightness(0.6);">
+                            <div style="position: absolute; inset: 0; background: linear-gradient(to top, #101822 10%, transparent 90%); padding: 25px; display: flex; align-items: flex-end;">
+                                <h3 style="margin: 0; font-size: 1.6rem; letter-spacing: -1.5px; font-weight: 900; text-transform: uppercase;">${game.title}</h3>
+                            </div>
+                        </div>
+                        <div style="padding: 25px;">
+                            ${statsHtml}
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+
+                // Update User Global Rank
+                const userRank = calculateRank(totalAccumulatedScore);
+                const rankTitleEl = document.querySelector('#leader-user-meta div:nth-child(2)');
+                if (rankTitleEl) {
+                    rankTitleEl.textContent = userRank.name;
+                    rankTitleEl.style.color = userRank.color;
                 }
-            ];
-
-            const totalPoints = snakeBest + (hoopsData.classic || 0) + (hoopsData.timer || 0) + ((hoopsData.playoff || 0) * 1000) + parseInt(localStorage.getItem('pinball-best') || '0');
-            
-            const userRank = calculateRank(totalPoints);
-            const rankTitleEl = document.querySelector('#leader-user-meta div:nth-child(2)');
-            if (rankTitleEl) {
-                rankTitleEl.textContent = userRank.name;
-                rankTitleEl.style.color = userRank.color;
+            } catch (err) {
+                console.error('Leaderboard render error:', err);
+                grid.innerHTML = `<div style="grid-column: 1/-1; padding: 40px; text-align: center; color: #ff3e3e;">Failed to generate smart rankings: ${err.message}</div>`;
             }
-
-            games.forEach(game => {
-                const card = document.createElement('div');
-                card.style.cssText = `
-                    background: rgba(255,255,255,0.02);
-                    border: 1px solid rgba(255,255,255,0.08);
-                    border-radius: 16px;
-                    overflow: hidden;
-                    display: flex;
-                    flex-direction: column;
-                    transition: transform 0.3s, border-color 0.3s;
-                `;
-
-                let statsHtml = game.stats.map(s => `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
-                        <span style="font-size: 0.7rem; font-weight: 800; opacity: 0.4; letter-spacing: 1.5px; text-transform: uppercase;">${s.label}</span>
-                        <div style="text-align: right;">
-                            <span style="font-weight: 900; font-size: 1.2rem; color: #fff;">${s.val}</span>
-                            <span style="font-size: 0.6rem; opacity: 0.3; margin-left: 3px; font-weight: 800;">${s.unit}</span>
-                        </div>
-                    </div>
-                `).join('');
-
-                card.innerHTML = `
-                    <div style="height: 140px; position: relative; overflow: hidden;">
-                        <img src="${game.poster}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.5; filter: grayscale(0.5) brightness(0.6);">
-                        <div style="position: absolute; inset: 0; background: linear-gradient(to top, #101822 10%, transparent 90%); padding: 25px; display: flex; align-items: flex-end;">
-                            <h3 style="margin: 0; font-size: 1.6rem; letter-spacing: -1.5px; font-weight: 900; text-transform: uppercase;">${game.title}</h3>
-                        </div>
-                    </div>
-                    <div style="padding: 25px;">
-                        ${statsHtml}
-                        <div style="margin-top: 20px; display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
-                            <div style="width: 8px; height: 8px; background: ${userRank.color}; border-radius: 50%; box-shadow: 0 0 10px ${userRank.color};"></div>
-                            <span style="font-size: 0.65rem; color: ${userRank.color}; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">${userRank.name} STATUS</span>
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
         }
 
         function recordLaunch(id) {
