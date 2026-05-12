@@ -88,7 +88,9 @@ function Get-Session-Text($session) {
   try { if ($session.SourceAppUserModelId) { $parts.Add($session.SourceAppUserModelId) } } catch {}
   try {
     $mediaOp = $session.TryGetMediaPropertiesAsync()
-    $media = $mediaOp.GetResults()
+    $asTaskMethod = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.ToString() -match 'Task.*AsTask.*IAsyncOperation' -and $_.ToString() -notmatch 'WithProgress' } | Select-Object -First 1
+    $mediaTask = $asTaskMethod.MakeGenericMethod(@([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])).Invoke($null, @($mediaOp))
+    $media = $mediaTask.Result
     if ($media.Title) { $parts.Add($media.Title) }
     if ($media.Artist) { $parts.Add($media.Artist) }
     if ($media.AlbumArtist) { $parts.Add($media.AlbumArtist) }
@@ -122,50 +124,54 @@ function Is-Match-Source($session, [string]$source) {
 
 try {
   Add-Type -AssemblyName System.Runtime.WindowsRuntime
-  $manager = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync().GetResults()
   $asTaskMethod = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
     $_.ToString() -match 'Task.*AsTask.*IAsyncOperation' -and $_.ToString() -notmatch 'WithProgress' -and $_.ToString() -match 'TResult.*TResult'
   } | Select-Object -First 1
 
-  if ($null -ne $manager) {
-    $sessions = $manager.GetSessions()
-    $session = $null
-    $bestScore = -1
+  if ($asTaskMethod -ne $null) {
+    $managerOp = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
+    $managerTask = $asTaskMethod.MakeGenericMethod(@([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])).Invoke($null, @($managerOp))
+    $manager = $managerTask.Result
 
-    foreach ($candidate in $sessions) {
-      if ($null -eq $candidate) { continue }
-      $score = 0
-      $id = ""
-      try { $id = $candidate.SourceAppUserModelId } catch {}
+    if ($null -ne $manager) {
+      $sessions = $manager.GetSessions()
+      $session = $null
+      $bestScore = -1
 
-      $isTarget = [string]::IsNullOrWhiteSpace($targetApp) -or (Matches-AppId $id $targetApp)
-      $isPreferred = [string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or (Is-Match-Source $candidate $preferred)
-      
-      if (![string]::IsNullOrWhiteSpace($preferred) -and $preferred -ne "all") {
-        if ($isPreferred) { $score += 10000 }
-        else { $score -= 20000 }
+      foreach ($candidate in $sessions) {
+        if ($null -eq $candidate) { continue }
+        $score = 0
+        $id = ""
+        try { $id = $candidate.SourceAppUserModelId } catch {}
+
+        $isTarget = [string]::IsNullOrWhiteSpace($targetApp) -or (Matches-AppId $id $targetApp)
+        $isPreferred = [string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or (Is-Match-Source $candidate $preferred)
+        
+        if (![string]::IsNullOrWhiteSpace($preferred) -and $preferred -ne "all") {
+          if ($isPreferred) { $score += 10000 }
+          else { $score -= 20000 }
+        }
+        if ($isTarget) { $score += 1000 }
+        if ($candidate.PlaybackInfo.PlaybackStatus -eq [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus]::Playing) { $score += 5000 }
+
+        if ($score -gt $bestScore) {
+          $bestScore = $score
+          $session = $candidate
+        }
       }
-      if ($isTarget) { $score += 1000 }
-      if ($candidate.PlaybackInfo.PlaybackStatus -eq 4) { $score += 5000 }
 
-      if ($score -gt $bestScore) {
-        $bestScore = $score
-        $session = $candidate
-      }
-    }
-
-    if ($session -ne $null -and $bestScore -ge 0) {
-      $actionMethod = $session.GetType().GetMethod('${winrtMethodName}', [Type[]]@())
-      if ($actionMethod -ne $null) {
-        $actionOp = $actionMethod.Invoke($session, @())
-        $winRtSuccess = [bool]($asTaskMethod.MakeGenericMethod(@([bool])).Invoke($null, @($actionOp))).Result
+      if ($session -ne $null -and $bestScore -ge 0) {
+        $actionMethod = $session.GetType().GetMethod('${winrtMethodName}', [Type[]]@())
+        if ($actionMethod -ne $null) {
+          $actionOp = $actionMethod.Invoke($session, @())
+          $winRtSuccess = [bool]($asTaskMethod.MakeGenericMethod(@([bool])).Invoke($null, @($actionOp))).Result
+        }
       }
     }
   }
 } catch { $winRtSuccess = $false }
 
 if ($winRtSuccess -eq $false -and ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all")) {
-  # Global Fallback logic
   try {
     Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);' -Name "MediaKeySender" -Namespace "WinAPI" -PassThru | Out-Null
   } catch {}
