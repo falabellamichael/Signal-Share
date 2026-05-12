@@ -552,10 +552,10 @@ export function createAppUi(context) {
     window.visualViewport?.addEventListener("resize", handleViewportResize);
     window.visualViewport?.addEventListener("scroll", handleViewportResize);
     window.addEventListener("signal:nativeBridgeReady", syncOverlayBodyState);
-    document.addEventListener("touchstart", handleOverlayTouchStart, { passive: true, capture: true });
-    document.addEventListener("touchmove", handleOverlayTouchMove, { passive: false, capture: true });
-    document.addEventListener("touchend", clearOverlayTouchState, { passive: true, capture: true });
-    document.addEventListener("touchcancel", clearOverlayTouchState, { passive: true, capture: true });
+    // document.addEventListener("touchstart", handleOverlayTouchStart, { passive: true, capture: true });
+    // document.addEventListener("touchmove", handleOverlayTouchMove, { passive: false, capture: true });
+    // document.addEventListener("touchend", clearOverlayTouchState, { passive: true, capture: true });
+    // document.addEventListener("touchcancel", clearOverlayTouchState, { passive: true, capture: true });
     document.addEventListener("keydown", (event) => {
       if (state.themePickerOpen && event.key === "Escape") { closeThemePicker(); return; }
       if (state.settingsPanelOpen && event.key === "Escape") { closeSettingsPanel(); return; }
@@ -1679,8 +1679,8 @@ export function createAppUi(context) {
     const deltaY = touch.clientY - activeOverlayTouchY;
     activeOverlayTouchY = touch.clientY;
     const maxScrollTop = Math.max(0, activeOverlayScrollContainer.scrollHeight - activeOverlayScrollContainer.clientHeight);
-    const atTop = activeOverlayScrollContainer.scrollTop <= 0.5;
-    const atBottom = activeOverlayScrollContainer.scrollTop >= maxScrollTop - 0.5;
+    const atTop = activeOverlayScrollContainer.scrollTop <= 0;
+    const atBottom = activeOverlayScrollContainer.scrollTop >= maxScrollTop - 1;
     if (maxScrollTop <= 0 || (deltaY > 0 && atTop) || (deltaY < 0 && atBottom)) event.preventDefault();
   }
 

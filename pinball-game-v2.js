@@ -49,17 +49,17 @@ const COLORS = {
 
 // Pure Newtonian Physics Settings
 const CFG = {
-    gravity: 0.35,
+    gravity: 0.42, // Increased from 0.35 for more 'weight'
     friction: 0.994,
     restitution: 0.58,
     ballRadius: 9.2,
-    maxSpeed: 30,
-    bumperKick: 14.0,
-    flipperSnap: 0.45,
-    tableTilt: 0.015,
+    maxSpeed: 32, // Slightly increased cap for higher gravity momentum
+    bumperKick: 14.5, // Compensate for gravity
+    flipperSnap: 0.48, // Snappier flippers for the heavier ball
+    tableTilt: 0.018, // Slightly more pronounced tilt
     collisionSlop: 0.04,
-    substepsMin: 12,
-    slingshotForce: 13.0,
+    substepsMin: 14, // Increased substeps for better stability at higher gravity
+    slingshotForce: 13.5,
     wallFriction: 0.08,
     flipperFriction: 0.25,
     drainY: 688,
@@ -441,9 +441,9 @@ function releaseLaunchCharge() {
         return;
     }
     const power = clamp(state.launchCharge, 0.3, 1.0);
-    ball.vx = -0.5 - power * 0.5; // Restored the "perfect" lock trajectory
-    ball.vy = -20.0 - power * 11.0;
-    ball.spin = -power * 0.2;
+    ball.vx = -0.6 - power * 0.6; // Slightly adjusted for heavier ball
+    ball.vy = -21.0 - power * 12.0; // Increased from -20/-11
+    ball.spin = -power * 0.22;
     state.launchHolding = false;
     state.launchReady = false;
     state.launchCharge = 0;
