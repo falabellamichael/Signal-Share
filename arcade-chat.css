@@ -47,24 +47,30 @@ body > .chat-resize-handle.collapsed {
     position: fixed;
     top: calc(var(--status-bar-safe-space) + 20px);
     right: 20px;
-    width: 72px;
-    height: 72px;
-    background: rgba(15, 15, 15, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 22px;
+    width: 48px;
+    height: 48px;
+    background: transparent;
+    border: none;
     cursor: pointer;
     z-index: 10001;
     display: grid !important;
     place-items: center !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    padding: 0;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    opacity: 0.8;
 }
 
 .chat-toggle-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-4px) scale(1.05);
+    transform: scale(1.1);
+    opacity: 1;
+}
+
+.chat-toggle-btn svg {
+    width: 28px;
+    height: 28px;
+    color: #67c1f5; /* Arcade Blue */
+    filter: drop-shadow(0 0 8px rgba(103, 193, 245, 0.5));
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Hide floating toggle and messenger launcher in integrated mode (steam-shell) 
@@ -101,13 +107,6 @@ body.chat-collapsed .messenger-section {
     right: 20px !important;
 }
 
-/* SVG within the toggle */
-.chat-toggle-btn svg {
-    width: 32px;
-    height: 32px;
-    color: #4facfe;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
 
 body:not(.chat-collapsed) .messenger-launcher {
     transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
