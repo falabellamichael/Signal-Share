@@ -1088,8 +1088,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="leaderboard-metrics.js"></script>
     <script type="module">
-        import { initArcadeApi, saveGameScore, getLeaderboard } from './arcade-api.js';
+        import * as ArcadeAPI from './arcade-api.js';
         
+        console.log('[Arcade Launcher] API Module Loading...', ArcadeAPI);
+
         // Initialize Supabase and Arcade API
         const config = window.SIGNAL_SHARE_CONFIG || {
             supabaseUrl: "https://gswptxeikjmihdjxoiar.supabase.co",
@@ -1097,10 +1099,11 @@
         };
         
         const supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
-        initArcadeApi({ supabase });
+        ArcadeAPI.initArcadeApi({ supabase });
 
         // Global exposing for use in other functions
         window.renderGlobalLeaderboards = async () => {
+            console.log('[Arcade Launcher] Rendering global leaderboards...');
             const games = ['pinball', 'basketball', 'snake'];
             const container = document.getElementById('global-leaderboard-grid');
             if (!container) return;
@@ -1109,7 +1112,10 @@
             
             for (const gameId of games) {
                 try {
-                    const stats = await getLeaderboard(gameId, 5);
+                    if (typeof ArcadeAPI.getLeaderboard !== 'function') {
+                        throw new Error('ArcadeAPI.getLeaderboard is not a function');
+                    }
+                    const stats = await ArcadeAPI.getLeaderboard(gameId, 5);
                     const gameInfo = (window.GAMES || []).find(g => g.id === gameId) || { title: gameId.toUpperCase() };
                     
                     const group = document.createElement('div');
@@ -1143,7 +1149,7 @@
                 console.log(`[Arcade Launcher] Received score for ${gameId}: ${score}`, metadata);
                 
                 try {
-                    await saveGameScore(gameId, score, metadata);
+                    await ArcadeAPI.saveGameScore(gameId, score, metadata);
                     // Notify the game that the score was saved if needed
                     event.source.postMessage({ type: 'SCORE_SAVED', success: true }, '*');
                     
