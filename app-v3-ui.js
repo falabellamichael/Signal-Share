@@ -1037,12 +1037,12 @@ export function createAppUi(context) {
     lastPeopleRenderKey = currentKey;
     elements.peopleList.innerHTML = ""; const visibleProfiles = getFilteredPeopleProfiles();
     if (!isReady) { elements.peopleEmpty.hidden = false; elements.peopleEmpty.textContent = "Sign in with an activated account to see other members."; return; }
-    if (state.availableProfiles.length === 0) { elements.peopleEmpty.hidden = false; elements.peopleEmpty.textContent = "No other members are visible yet. Another signed-in user needs to join first."; return; }
+    // Removed early return for empty availableProfiles to allow AI Companion to show
     if (visibleProfiles.length === 0) { elements.peopleEmpty.hidden = false; elements.peopleEmpty.textContent = "No people match this search."; return; }
     elements.peopleEmpty.hidden = true;
     visibleProfiles.forEach((profile) => {
       const displayName = resolveMemberDisplayName(profile); const blocked = isUserBlocked(state, profile.id); const banned = isUserBanned(state, profile.id); const item = document.createElement("div"); item.className = "person-item"; const row = document.createElement("div"); row.className = "person-row"; const button = document.createElement("button"); button.type = "button"; button.className = "person-button"; if (blocked || banned) button.classList.add("is-blocked"); button.disabled = blocked || banned || state.messengerBusy;
-      const name = document.createElement("strong"); name.textContent = displayName; const meta = document.createElement("span"); meta.textContent = resolveVisibleMemberEmail(profile.email) || "Member"; const action = document.createElement("span"); action.className = "person-action"; action.textContent = banned ? "Banned" : (blocked ? "Blocked" : "Message");
+      const name = document.createElement("strong"); name.textContent = displayName; if (profile.isAi) { const b = document.createElement("span"); b.className = "ai-badge"; b.textContent = "AI"; name.appendChild(b); } const meta = document.createElement("span"); meta.textContent = resolveVisibleMemberEmail(profile.email) || "Member"; const action = document.createElement("span"); action.className = "person-action"; action.textContent = banned ? "Banned" : (blocked ? "Blocked" : "Message");
       button.append(name, meta, action); button.addEventListener("click", () => { state.pendingBlockUserId = ""; void openOrCreateThread(profile.id); });
       const blockButton = document.createElement("button"); blockButton.type = "button"; blockButton.className = "person-block-button"; if (blocked) blockButton.classList.add("is-blocked"); blockButton.setAttribute("aria-label", `${blocked ? "Unblock" : "Block"} ${displayName}`); blockButton.title = state.blockingAvailable ? `${blocked ? "Unblock" : "Block"} ${displayName}` : "Blocking needs the latest Supabase messenger schema."; blockButton.disabled = state.messengerBusy || !state.blockingAvailable || banned; blockButton.innerHTML = '<svg viewBox="0 0 24 24" role="presentation" focusable="false" aria-hidden="true"><circle cx="12" cy="12" r="7.25" fill="none" stroke="currentColor" stroke-width="1.75"></circle><path d="M8.5 15.5 15.5 8.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75"></path></svg>'; blockButton.addEventListener("click", (event) => { event.stopPropagation(); state.pendingDeleteThreadId = ""; state.pendingBlockUserId = state.pendingBlockUserId === profile.id ? "" : profile.id; renderMessenger(); });
       row.append(button, blockButton); item.appendChild(row);
@@ -1070,7 +1070,7 @@ export function createAppUi(context) {
     elements.conversationEmpty.hidden = true;
     visibleThreads.forEach((thread) => {
       const partner = getThreadPartnerProfile(thread); const item = document.createElement("div"); item.className = "conversation-item"; const row = document.createElement("div"); row.className = "conversation-row"; const button = document.createElement("button"); button.type = "button"; button.className = "conversation-button"; if (thread.id === state.activeThreadId) button.classList.add("is-active");
-      const name = document.createElement("strong"); name.textContent = resolveMemberDisplayName(partner, "Unknown member"); const meta = document.createElement("span"); meta.textContent = `Updated ${formatMessageTimestamp(thread.updatedAt)}`;
+      const name = document.createElement("strong"); name.textContent = resolveMemberDisplayName(partner, "Unknown member"); if (partner?.isAi) { const b = document.createElement("span"); b.className = "ai-badge"; b.textContent = "AI"; name.appendChild(b); } const meta = document.createElement("span"); meta.textContent = `Updated ${formatMessageTimestamp(thread.updatedAt)}`;
       button.append(name, meta); button.addEventListener("click", () => { state.pendingBlockUserId = ""; state.pendingDeleteThreadId = ""; void openExistingThread(thread.id); });
       const deleteButton = document.createElement("button"); deleteButton.type = "button"; deleteButton.className = "conversation-delete-button"; deleteButton.textContent = "x"; deleteButton.setAttribute("aria-label", `Delete conversation with ${resolveMemberDisplayName(partner, "member")}`); deleteButton.disabled = state.messengerBusy; deleteButton.addEventListener("click", (event) => { event.stopPropagation(); state.pendingBlockUserId = ""; state.pendingDeleteThreadId = state.pendingDeleteThreadId === thread.id ? "" : thread.id; renderMessenger(); });
       row.append(button, deleteButton); item.appendChild(row);
@@ -1141,13 +1141,14 @@ export function createAppUi(context) {
 
       const bubble = document.createElement("div");
       bubble.className = "message-bubble";
+      if (message.isThinking) bubble.style.opacity = "0.5";
       const senderLabel = getMessageSenderLabel(message, partner);
 
       if (message.attachmentUrl) bubble.appendChild(createMessageAttachmentNode(message, senderLabel));
 
-      const body = document.createElement("p");
-      body.textContent = message.body ?? "";
-      body.hidden = !message.body;
+      const body = document.createElement("div");
+      body.className = "message-body";
+      renderMessageBody(body, message.body);
 
       const meta = document.createElement("span");
       meta.textContent = `${senderLabel} / ${formatMessageTimestamp(message.createdAt)}`;
@@ -1318,6 +1319,41 @@ export function createAppUi(context) {
   function clearMessageAttachmentSelection(options = {}) { const { preserveFeedback = false } = options; if (state.messageAttachmentPreviewUrl) { URL.revokeObjectURL(state.messageAttachmentPreviewUrl); state.messageAttachmentPreviewUrl = ""; } state.messageAttachmentFile = null; elements.messageAttachmentInput.value = ""; elements.messageAttachmentPreview.hidden = true; elements.messageAttachmentPreview.replaceChildren(); elements.messageAttachmentClearButton.hidden = true; if (!preserveFeedback && elements.messengerFeedback.textContent.includes("ready to send")) showMessengerFeedback(""); }
 
   function renderMessageAttachmentPreview() { elements.messageAttachmentPreview.replaceChildren(); const file = state.messageAttachmentFile; const hasAttachment = Boolean(file); elements.messageAttachmentPreview.hidden = !hasAttachment; elements.messageAttachmentClearButton.hidden = !hasAttachment; if (!file) return; const card = document.createElement("div"); card.className = "message-attachment-card is-preview"; card.appendChild(createMessageAttachmentPreviewNode(file)); elements.messageAttachmentPreview.appendChild(card); }
+
+  function renderMessageBody(container, text) {
+    if (!text) { container.hidden = true; container.innerHTML = ""; return; }
+    container.hidden = false;
+    
+    // Simple Markdown-lite parser for code blocks
+    const parts = text.split(/```/g);
+    container.innerHTML = "";
+    
+    parts.forEach((part, index) => {
+      if (index % 2 === 0) {
+        if (!part.trim() && parts.length > 1) return; // Skip empty text between code blocks
+        const span = document.createElement("span");
+        span.textContent = part;
+        span.style.whiteSpace = "pre-wrap";
+        container.appendChild(span);
+      } else {
+        const pre = document.createElement("pre");
+        pre.className = "message-code-block";
+        const code = document.createElement("code");
+        
+        const lines = part.split("\n");
+        if (lines[0].trim() && lines.length > 1 && !lines[0].includes(" ")) {
+          // It's likely a language tag
+          code.dataset.lang = lines[0].trim();
+          code.textContent = lines.slice(1).join("\n").trim();
+        } else {
+          code.textContent = part.trim();
+        }
+        
+        pre.appendChild(code);
+        container.appendChild(pre);
+      }
+    });
+  }
 
   function getMessageSenderLabel(message, partner) { if (message.senderId === state.currentUser?.id) return "You"; return resolveMemberDisplayName(partner, "Member"); }
 

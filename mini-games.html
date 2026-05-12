@@ -1162,8 +1162,11 @@
 
         <aside class="steam-chat-sidebar">
             <div class="chat-header">
-                <div style="width: 10px; height: 10px; background: #75b022; border-radius: 50%; box-shadow: 0 0 8px #75b022;"></div>
-                <span style="font-size: 0.75rem; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Companion</span>
+                <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                    <div style="width: 10px; height: 10px; background: #75b022; border-radius: 50%; box-shadow: 0 0 8px #75b022;"></div>
+                    <span style="font-size: 0.75rem; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Companion</span>
+                </div>
+                <button onclick="resetArcadeChat()" style="background: none; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); font-size: 0.6rem; font-weight: 900; padding: 4px 8px; border-radius: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">New Chat</button>
             </div>
             <div id="chat-messages" class="chat-messages">
                 <div class="chat-message message-ai">
@@ -1295,6 +1298,19 @@
     </script>
     <script src="mini-games.js?v=1.3"></script>
     <script>
+        let arcadeChatHistory = [];
+
+        function resetArcadeChat() {
+            arcadeChatHistory = [];
+            const container = document.getElementById('chat-messages');
+            container.innerHTML = `
+                <div class="chat-message message-ai">
+                    Hello! I'm your local arcade assistant. How can I help you optimize your gameplay today?
+                </div>
+            `;
+            console.log('[Arcade Chat] Context cleared.');
+        }
+
         async function sendChatMessage() {
             const input = document.getElementById('arc-chat-input');
             const messagesContainer = document.getElementById('chat-messages');
@@ -1302,7 +1318,7 @@
             
             if (!text) return;
             
-            // Add user message
+            // Add user message to UI
             const userMsg = document.createElement('div');
             userMsg.className = 'chat-message message-user';
             userMsg.textContent = text;
@@ -1318,7 +1334,7 @@
             messagesContainer.appendChild(thinkingMsg);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             
-            console.log('[Arcade Chat] v2.1: Initializing message sequence...');
+            console.log('[Arcade Chat] Initializing LLM call...');
 
             const candidates = [
                 '/api/llm/chat',
@@ -1329,22 +1345,29 @@
             let success = false;
             for (const url of candidates) {
                 try {
-                    console.log(`[Arcade Chat] Attempting connection: ${url}`);
                     const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: text }),
+                        body: JSON.stringify({ 
+                            message: text,
+                            history: arcadeChatHistory 
+                        }),
                         targetAddressSpace: 'loopback' 
                     });
                     
-                    const contentType = response.headers.get('content-type');
-                    if (response.ok && contentType && contentType.includes('application/json')) {
+                    if (response.ok) {
                         const data = await response.json();
-                        thinkingMsg.textContent = data.reply || "I'm having trouble connecting to my logic core right now.";
+                        const reply = data.reply || "I'm having trouble connecting to my logic core right now.";
+                        
+                        // Update UI with real reply
+                        thinkingMsg.textContent = reply;
+                        
+                        // Update local history
+                        arcadeChatHistory.push({ role: 'user', content: text });
+                        arcadeChatHistory.push({ role: 'assistant', content: reply });
+                        
                         success = true;
                         break;
-                    } else {
-                        console.warn(`[Arcade Chat] Skip ${url}: Status ${response.status}, Content-Type ${contentType}`);
                     }
                 } catch (err) {
                     console.warn(`[Arcade Chat] Endpoint failed ${url}:`, err);

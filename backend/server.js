@@ -969,30 +969,15 @@ app.post("/api/activity/report", async (req, res) => {
 // Local LLM chat endpoint
 app.post('/api/llm/chat', async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, history } = req.body;
     if (!message) return res.status(400).json({ error: 'No message provided' });
 
-    console.log(`[Chat] Query: "${message}"`);
-    const input = message.toLowerCase();
-
-    // 1. Arcade Personality & Tips (Smart Placeholder)
+    console.log(`[Chat] Query: "${message}" (History: ${history?.length || 0} rounds)`);
+    
     let reply = "";
-    if (input.includes("pinball")) {
-      reply = "🕹️ [SYSTEM TIP]: In Neon Pinball, gravity increases every 5,000 points. Keep those flippers moving!";
-    } else if (input.includes("basketball") || input.includes("hoops")) {
-      reply = "🏀 [PRO TIP]: For Neon Hoops, consistency is key. The 'Perfect' zone is exactly 12px wide at the peak of the rim.";
-    } else if (input.includes("snake")) {
-      reply = "🐍 [SYSTEM ALERT]: Neon Snake speeds up significantly after eating 10 energy pellets. Plan your path ahead!";
-    } else if (input.includes("who are you") || input.includes("model")) {
-      reply = "👾 I'm the Signal Share Arcade Companion, a local intelligence layer running on your bridge.";
-    } else if (input.includes("how are you")) {
-      reply = "✨ System diagnostics green. Logic core at 100%. Ready for the next game!";
-    } else {
-      reply = `🎮 Interesting! I'm still learning about "${message}", but I'm here to help you dominate the leaderboards.`;
-    }
+    const systemPrompt = "You are the Signal Share Arcade Companion, a helpful AI built into a retro-neon arcade suite. Be friendly and arcade-themed. If the user asks for code or technical help, provide detailed explanations and code blocks (using ```). Otherwise, keep your responses concise (1-3 sentences).";
 
     // 2. Local LLM Integration (LM Studio / OpenAI-Compatible)
-    // LM Studio typically runs on port 1234
     try {
       const lmStudioResponse = await fetch('http://localhost:1234/v1/chat/completions', {
         method: 'POST',
@@ -1000,7 +985,8 @@ app.post('/api/llm/chat', async (req, res) => {
         body: JSON.stringify({ 
           model: 'google/gemme-4-e2b', 
           messages: [
-            { role: "system", content: "You are the Signal Share Arcade Companion, a helpful AI built into a retro-neon arcade suite. Keep your responses concise (1-2 sentences), friendly, and arcade-themed." },
+            { role: "system", content: systemPrompt },
+            ...(history || []),
             { role: "user", content: message }
           ],
           temperature: 0.7
@@ -1013,30 +999,41 @@ app.post('/api/llm/chat', async (req, res) => {
           reply = data.choices[0].message.content.trim();
         }
       } else {
-        // If LM Studio is up but returns an error (e.g. model not loaded), try Ollama fallback
         throw new Error("LM Studio returned non-ok status");
       }
     } catch (e) {
       console.log("[Bridge] LM Studio not detected or model not loaded at :1234. Trying Ollama fallback...");
       
       try {
-        const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
+        const ollamaResponse = await fetch('http://localhost:11434/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             model: 'google/gemme-4-e2b', 
-            prompt: `Context: You are the Signal Share Arcade Companion, a helpful AI built into a retro-neon arcade suite. Keep your responses concise (1-2 sentences), friendly, and arcade-themed. 
-            User Message: ${message}`, 
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...(history || []),
+              { role: "user", content: message }
+            ],
             stream: false 
           })
         });
 
         if (ollamaResponse.ok) {
           const data = await ollamaResponse.json();
-          if (data.response) reply = data.response.trim();
+          if (data.message) reply = data.message.content.trim();
         }
       } catch (e2) {
         console.log("[Bridge] No local LLM detected (LM Studio or Ollama). Using system tips.");
+        // Fallback to basic heuristics if completely offline
+        const input = message.toLowerCase();
+        if (input.includes("pinball")) {
+          reply = "🕹️ [SYSTEM TIP]: In Neon Pinball, gravity increases every 5,000 points. Keep those flippers moving!";
+        } else if (input.includes("basketball") || input.includes("hoops")) {
+          reply = "🏀 [PRO TIP]: For Neon Hoops, consistency is key. The 'Perfect' zone is exactly 12px wide at the peak of the rim.";
+        } else {
+          reply = "🎮 I'm currently in lightweight offline mode. Connect my logic core (LM Studio/Ollama) for a full tactical breakdown!";
+        }
       }
     }
 

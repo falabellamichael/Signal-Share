@@ -10,6 +10,15 @@ import {
 
 // Ban Helper Functions
 
+const AI_COMPANION_ID = "ai-companion";
+const AI_COMPANION_PROFILE = Object.freeze({
+  id: AI_COMPANION_ID,
+  email: "ai@signal.share",
+  displayName: "AI Companion",
+  isAi: true,
+  createdAt: new Date("2026-05-01").toISOString()
+});
+
 /**
  * Check if current user is banned
  * @param {object} state - The application state
@@ -1171,9 +1180,21 @@ function normalizeUserBan(row) { return { bannedId: row.banned_id, bannedBy: row
 function normalizeDirectThread(row) { return { id: row.id, userOneId: row.user_one_id, userTwoId: row.user_two_id, createdAt: row.created_at, updatedAt: row.updated_at }; }
 function normalizeMessage(row) { return { id: row.id, threadId: row.thread_id, senderId: row.sender_id, body: row.body ?? "", attachmentUrl: row.attachment_url ?? "", attachmentFilePath: row.attachment_file_path ?? "", attachmentName: row.attachment_name ?? "", attachmentType: row.attachment_type ?? "", attachmentSize: Number(row.attachment_size ?? 0), attachmentKind: row.attachment_kind ?? "", createdAt: row.created_at }; }
 function getThreadPartnerId(thread) { if (!thread || !state.currentUser) return ""; return thread.userOneId === state.currentUser.id ? thread.userTwoId : thread.userOneId; }
-function getThreadPartnerProfile(thread) { const partnerId = getThreadPartnerId(thread); return state.availableProfiles.find((profile) => profile.id === partnerId) ?? null; }
+function getThreadPartnerProfile(thread) { 
+  const partnerId = getThreadPartnerId(thread); 
+  if (partnerId === AI_COMPANION_ID) return AI_COMPANION_PROFILE;
+  return state.availableProfiles.find((profile) => profile.id === partnerId) ?? null; 
+}
 function normalizeMessengerListSearch(value) { return String(value ?? "").trim().toLowerCase(); }
-function getFilteredPeopleProfiles() { const query = state.peopleSearch; if (!query) return state.availableProfiles; return state.availableProfiles.filter((profile) => { const haystack = [resolveMemberDisplayName(profile, ""), profile.displayName, profile.email, formatDisplayNameFromEmail(profile.email)].map((v) => String(v ?? "").toLowerCase()).join(" "); return haystack.includes(query); }); }
+function getFilteredPeopleProfiles() { 
+  const query = state.peopleSearch; 
+  let profiles = [AI_COMPANION_PROFILE, ...state.availableProfiles];
+  if (!query) return profiles; 
+  return profiles.filter((profile) => { 
+    const haystack = [resolveMemberDisplayName(profile, ""), profile.displayName, profile.email, formatDisplayNameFromEmail(profile.email)].map((v) => String(v ?? "").toLowerCase()).join(" "); 
+    return haystack.includes(query); 
+  }); 
+}
 function getFilteredConversationThreads() { const query = state.conversationSearch; if (!query) return state.directThreads; return state.directThreads.filter((thread) => { const partner = getThreadPartnerProfile(thread); const haystack = [resolveMemberDisplayName(partner, ""), partner?.displayName, partner?.email, formatDisplayNameFromEmail(partner?.email)].map((v) => String(v ?? "").toLowerCase()).join(" "); return haystack.includes(query); }); }
 
 function isThreadBlocked(thread) { if (!thread) return false; const partnerId = getThreadPartnerId(thread); return isUserBlocked(state, partnerId) || isUserBanned(state, partnerId); }
@@ -1268,7 +1289,25 @@ async function refreshMessengerState(options = {}) {
     if (profilesResult.status !== "fulfilled") throw profilesResult.reason; if (threadsResult.status !== "fulfilled") throw threadsResult.reason;
     let blocks = [], blockingAvailable = true; if (blocksResult.status === "fulfilled") blocks = blocksResult.value; else if (isBlockingBackendUnavailable(blocksResult.reason)) blockingAvailable = false; else throw blocksResult.reason;
     let bans = [], banningAvailable = true; if (bansResult.status === "fulfilled") bans = bansResult.value; else if (isBanningBackendUnavailable(bansResult.reason)) banningAvailable = false; else throw bansResult.reason;
-    state.profileRecord = ownProfile; state.blockingAvailable = blockingAvailable; state.banningAvailable = banningAvailable; state.blockedUserIds = blocks.map((b) => b.blockedId); state.bannedUserIds = bans.map((b) => b.bannedId); state.availableProfiles = profilesResult.value.filter((p) => p.id !== state.currentUser.id); state.directThreads = sortThreads(threadsResult.value.filter((t) => !isThreadBlocked(t)));
+    state.profileRecord = ownProfile; state.blockingAvailable = blockingAvailable; state.banningAvailable = banningAvailable; state.blockedUserIds = blocks.map((b) => b.blockedId); state.bannedUserIds = bans.map((b) => b.bannedId); state.availableProfiles = profilesResult.value.filter((p) => p.id !== state.currentUser.id); 
+    
+    // Inject AI thread if it has history
+    const aiHistory = localStorage.getItem(`ai-messages-${state.currentUser.id}`);
+    let threads = threadsResult.value.filter((t) => !isThreadBlocked(t));
+    if (aiHistory && JSON.parse(aiHistory).length > 0) {
+      const lastMsg = JSON.parse(aiHistory).slice(-1)[0];
+      threads.push({
+        id: "thread-ai-companion",
+        userOneId: state.currentUser.id,
+        userTwoId: AI_COMPANION_ID,
+        createdAt: new Date("2026-05-01").toISOString(),
+        updatedAt: lastMsg.createdAt || new Date().toISOString(),
+        isAi: true,
+        lastMessageBody: lastMsg.body
+      });
+    }
+    state.directThreads = sortThreads(threads);
+    
     if (!preserveActiveThread || !state.directThreads.some((t) => t.id === state.activeThreadId)) state.activeThreadId = state.directThreads[0]?.id ?? null;
     if (state.activeThreadId) state.activeMessages = await loadMessagesFromSupabase(state.activeThreadId); else state.activeMessages = [];
     subscribeMessagingChannels(); state.messengerError = "";
@@ -1402,6 +1441,14 @@ async function openExistingThread(threadId) {
     window.notifications.markThreadAsRead(threadId);
   }
 
+  if (threadId === "thread-ai-companion") {
+    const savedMessages = localStorage.getItem(`ai-messages-${state.currentUser.id}`);
+    state.activeMessages = savedMessages ? JSON.parse(savedMessages) : [];
+    clearMessageAttachmentSelection({ preserveFeedback: true });
+    renderMessenger();
+    return;
+  }
+
   if (!isMessagingEnabled(state)) {
     renderMessenger();
     return;
@@ -1427,6 +1474,18 @@ async function deleteConversation(threadId) {
   try {
     state.messengerBusy++;
     renderMessenger();
+
+    if (threadId === "thread-ai-companion") {
+      localStorage.removeItem(`ai-messages-${state.currentUser.id}`);
+      state.pendingDeleteThreadId = "";
+      if (deletedWasActive) {
+        state.activeThreadId = null;
+        state.activeMessages = [];
+      }
+      await refreshMessengerState({ preserveActiveThread: !deletedWasActive });
+      return;
+    }
+
     const attachmentPaths = await loadThreadAttachmentPaths(threadId);
     if (attachmentPaths.length > 0) {
       const { error: storageError } = await state.supabase.storage.from(APP_CONFIG.storageBucket).remove(attachmentPaths);
@@ -1460,6 +1519,41 @@ async function openOrCreateThread(partnerId) {
     if (!state.messengerBusy) showMessengerFeedback("Sign in with an activated account before starting a conversation.", true);
     return;
   }
+
+  // AI Companion Interception
+  if (partnerId === AI_COMPANION_ID) {
+    state.messengerBusy++;
+    renderMessenger();
+    try {
+      const aiThread = {
+        id: "thread-ai-companion",
+        userOneId: state.currentUser.id,
+        userTwoId: AI_COMPANION_ID,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isAi: true
+      };
+      
+      // Check if we already have it in state
+      if (!state.directThreads.some(t => t.id === aiThread.id)) {
+        state.directThreads = sortThreads([aiThread, ...state.directThreads]);
+      }
+      
+      state.activeThreadId = aiThread.id;
+      
+      // Load from localStorage for persistence
+      const savedMessages = localStorage.getItem(`ai-messages-${state.currentUser.id}`);
+      state.activeMessages = savedMessages ? JSON.parse(savedMessages) : [];
+      
+      clearMessageAttachmentSelection({ preserveFeedback: true });
+      showMessengerFeedback("");
+    } finally {
+      state.messengerBusy = Math.max(0, state.messengerBusy - 1);
+      renderMessenger();
+    }
+    return;
+  }
+
   if (isUserBlocked(state, partnerId)) { showMessengerFeedback("Unblock this member before starting a conversation.", true); return; }
   if (isUserBanned(state, partnerId)) { showMessengerFeedback("This member is banned from Direct Messenger.", true); return; }
   try {
@@ -1548,6 +1642,75 @@ async function handleMessageSubmit(event) {
     return;
   }
 
+  // AI Interception
+  const activeThread = getActiveThread();
+  if (activeThread?.isAi) {
+    try {
+      const userMessage = {
+        id: crypto.randomUUID(),
+        threadId: state.activeThreadId,
+        senderId: state.currentUser.id,
+        body,
+        createdAt: new Date().toISOString()
+      };
+
+      // Prepare history for LLM (excluding current message)
+      const history = state.activeMessages
+        .filter(m => !m.isThinking)
+        .map(m => ({
+          role: m.senderId === AI_COMPANION_ID ? "assistant" : "user",
+          content: m.body
+        }));
+
+      mergeActiveMessage(userMessage);
+      saveAiMessagesLocally();
+      renderMessenger();
+
+      // Add thinking indicator
+      const thinkingId = `thinking-${crypto.randomUUID()}`;
+      const thinkingMsg = {
+        id: thinkingId,
+        threadId: state.activeThreadId,
+        senderId: AI_COMPANION_ID,
+        body: "Thinking...",
+        isThinking: true,
+        createdAt: new Date().toISOString()
+      };
+      state.activeMessages.push(thinkingMsg);
+      renderMessenger();
+
+      // Call LLM
+      const aiResponse = await callLocalAI(body, history);
+      
+      // Remove thinking indicator
+      state.activeMessages = state.activeMessages.filter(m => m.id !== thinkingId);
+      
+      const aiMessage = {
+        id: crypto.randomUUID(),
+        threadId: state.activeThreadId,
+        senderId: AI_COMPANION_ID,
+        body: aiResponse,
+        createdAt: new Date().toISOString()
+      };
+      mergeActiveMessage(aiMessage);
+      saveAiMessagesLocally();
+      renderMessenger();
+      playIncomingMessageSound();
+      
+      showMessengerFeedback("");
+    } catch (error) {
+      console.error("AI response failed", error);
+      showMessengerFeedback("AI Companion is currently offline.", true);
+    } finally {
+      window.__SIGNAL_MESSENGER_SUBMITTING__ = false;
+      state.messengerBusy = Math.max(0, state.messengerBusy - 1);
+      elements.messageInput.disabled = false;
+      elements.sendMessageButton.disabled = false;
+      renderMessenger();
+    }
+    return;
+  }
+
   try {
     const messageId = crypto.randomUUID();
 
@@ -1630,6 +1793,38 @@ async function handleMessageSubmit(event) {
     state.messengerBusy = Math.max(0, state.messengerBusy - 1);
     renderMessenger();
   }
+}
+
+async function callLocalAI(text, history = []) {
+  const candidates = [
+    '/api/llm/chat',
+    'http://localhost:3000/api/llm/chat',
+    'http://127.0.0.1:3000/api/llm/chat'
+  ];
+
+  for (const url of candidates) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, history }),
+        targetAddressSpace: 'loopback'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.reply || "I'm having trouble thinking right now.";
+      }
+    } catch (err) {
+      console.warn(`[AI Messenger] Endpoint failed ${url}:`, err);
+    }
+  }
+  throw new Error("All AI endpoints failed");
+}
+
+function saveAiMessagesLocally() {
+  if (!state.currentUser?.id) return;
+  localStorage.setItem(`ai-messages-${state.currentUser.id}`, JSON.stringify(state.activeMessages));
 }
 
 function formatMessageTimestamp(isoString) { return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(isoString)); }
