@@ -34,6 +34,8 @@ body > .chat-resize-handle {
 
 body > .chat-resize-handle.collapsed {
     transform: translateX(100%);
+    visibility: hidden;
+    pointer-events: none;
 }
 
 .chat-toggle-btn {
@@ -310,6 +312,11 @@ body:not(.chat-collapsed) .messenger-section {
     z-index: 100;
     position: relative;
     margin-left: -3px;
+}
+
+.chat-resize-handle.collapsed {
+    visibility: hidden;
+    pointer-events: none;
 }
 
 .chat-resize-handle:hover, .chat-resize-handle.active {
