@@ -38,10 +38,10 @@ body > .chat-resize-handle.collapsed {
 
 .chat-toggle-btn {
     position: fixed;
-    bottom: 20px;
+    top: 20px;
     right: 20px;
-    width: 50px;
-    height: 50px;
+    width: 44px;
+    height: 44px;
     background: #67c1f5;
     border-radius: 50%;
     display: none;
@@ -50,7 +50,7 @@ body > .chat-resize-handle.collapsed {
     color: #171a21;
     cursor: pointer;
     box-shadow: 0 5px 15px rgba(0,0,0,0.4);
-    z-index: 1000;
+    z-index: 2001; /* Above header (1000) and sidebar handle */
     border: none;
     transition: all 0.2s;
 }
