@@ -236,7 +236,11 @@ function removeTypingIndicator(id) {
     if (el) el.remove();
 }
 
+let isSendingChatMessage = false;
+
 window.sendChatMessage = async function() {
+    if (isSendingChatMessage) return;
+    isSendingChatMessage = true;
     const input = document.getElementById('arc-chat-input');
     if (!input) return;
     const text = input.value.trim();
@@ -276,46 +280,51 @@ window.sendChatMessage = async function() {
     const pageText = document.body.innerText.substring(0, 1000); // Send a snippet of the current page
     const fullMessage = text;
 
-    for (const url of candidates) {
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'target-address-space': 'private' // Chrome PNA mitigation
-                },
-                targetAddressSpace: 'private', // Chrome PNA experimental flag
-                signal, // Support for stopping the request
-                body: JSON.stringify({ 
-                    message: fullMessage,
-                    history: arcadeChatHistory,
-                    pageContext: `${pageContext} (Visible text: ${pageText})`
-                })
-            });
+    try {
+        for (const url of candidates) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'target-address-space': 'private'
+                    },
+                    targetAddressSpace: 'private',
+                    signal,
+                    body: JSON.stringify({ 
+                        message: fullMessage,
+                        history: arcadeChatHistory,
+                        pageContext: `${pageContext} (Visible text: ${pageText})`
+                    })
+                });
 
-            if (response.ok) {
-                const data = await response.json();
-                reply = data.reply;
-                break;
-            } else {
-                lastError = `Status ${response.status}`;
+                if (response.ok) {
+                    const data = await response.json();
+                    reply = data.reply;
+                    break;
+                } else {
+                    lastError = `Status ${response.status}`;
+                }
+            } catch (err) {
+                lastError = err.message;
             }
-        } catch (err) {
-            lastError = err.message;
         }
-    }
 
-    removeTypingIndicator(typingId);
-
-    if (reply) {
-        addChatMessage('ai', reply);
-        arcadeChatHistory.push({ role: 'user', content: text });
-        arcadeChatHistory.push({ role: 'assistant', content: reply });
-        saveCurrentChat();
-        updateChatStatus('active');
-    } else {
-        addChatMessage('ai', `⚠️ [Connection Error] I couldn't reach my logic core. (Error: ${lastError})`);
-        updateChatStatus('error');
+        if (reply) {
+            addChatMessage('ai', reply);
+            arcadeChatHistory.push({ role: 'user', content: text });
+            arcadeChatHistory.push({ role: 'assistant', content: reply });
+            saveCurrentChat();
+            updateChatStatus('active');
+        } else {
+            addChatMessage('ai', `⚠️ [Connection Error] I couldn't reach my logic core. (Error: ${lastError})`);
+            updateChatStatus('error');
+        }
+    } catch (e) {
+        console.error("[Arcade Chat] Error in sendChatMessage:", e);
+    } finally {
+        removeTypingIndicator(typingId);
+        isSendingChatMessage = false;
     }
 }
 

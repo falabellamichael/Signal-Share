@@ -1298,8 +1298,15 @@ The companion bridge is designed with several security layers to keep your PC sa
     const now = Date.now();
     const isMediaMode = state.heroControlMode === "media";
 
-    if (!force && state.desktopBridgeSuspended && !isMediaMode) {
-      if (now - lastDesktopPollTime < 60000) {
+    if (!force && state.desktopBridgeSuspended) {
+      // If we've already failed enough to suspend, stop polling entirely 
+      // unless the user manually refreshes or we are in active Media mode.
+      if (!isMediaMode) {
+        return Promise.resolve(desktopSnapshot);
+      }
+      
+      // Even in Media mode, slow down significantly if it's still missing
+      if (now - lastDesktopPollTime < 30000) {
         return Promise.resolve(desktopSnapshot);
       }
     }
@@ -1361,7 +1368,7 @@ The companion bridge is designed with several security layers to keep your PC sa
 
         const shouldWarn = !state.desktopBridgeSuspended
           && !isNativeCapacitorApp()
-          && (desktopPollFailureCount % 30 === 1);
+          && (desktopPollFailureCount === 1);
 
         if (shouldWarn) {
           console.warn("[Hero] Desktop media bridge not detected. Run the Signal-Share desktop bridge on your PC with: node server.js");
