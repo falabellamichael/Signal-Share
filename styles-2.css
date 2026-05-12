@@ -650,7 +650,15 @@
       padding: 12px 14px;
     }
 
-    .people-list,
+    .people-list {
+      display: grid;
+      gap: 12px;
+      max-height: 250px;
+      overflow-y: auto;
+      padding-right: 4px;
+      scrollbar-width: thin;
+    }
+
     .conversation-list {
       display: grid;
       gap: 12px;
