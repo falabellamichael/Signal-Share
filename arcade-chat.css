@@ -86,7 +86,7 @@ body:not(.chat-collapsed) .chat-toggle-btn {
 }
 
 /* Move the Direct Messenger launcher and OPENED window with the sidebar when NOT collapsed */
-/* Messenger launcher stays in the corner; sidebar elements move to accommodate it */
+body:not(.chat-collapsed) .messenger-launcher,
 body:not(.chat-collapsed) .messenger-section {
     right: 400px !important; /* sidebar width (380) + margin (20) */
 }
