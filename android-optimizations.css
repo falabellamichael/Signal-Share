@@ -1,9 +1,9 @@
-/**
- * Signal Share Android Optimization Suite
- * High-performance overrides for Capacitor/WebView environments.
- */
+/*
+    Signal Share Suite - Android Layout Optimizations
+    Targeting Capacitor/WebView environments.
+    Focuses on safe areas and performance without overriding core layout.
+*/
 
-/* 1. Viewport & System UI */
 :root {
     --safe-area-top: env(safe-area-inset-top, 0px);
     --safe-area-bottom: env(safe-area-inset-bottom, 0px);
@@ -11,114 +11,55 @@
     --safe-area-right: env(safe-area-inset-right, 0px);
 }
 
-/* 2. Global Performance & Interaction */
-html.platform-android * {
-    /* Disable long-press context menu on images/links for app-like feel */
-    -webkit-touch-callout: none;
-    /* Prevent blue highlight on tap */
-    -webkit-tap-highlight-color: transparent;
-    /* Optimize font rendering */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+/* 1. Global Reset & Performance */
+* {
+    -webkit-tap-highlight-color: transparent !important;
 }
 
-html.platform-android, 
-html.platform-android body {
-    /* Prevent bounce/rubber-band effects that break fixed layouts */
-    overscroll-behavior: none;
+/* 2. Form & Input Tweaks */
+html.platform-android input,
+html.platform-android textarea,
+html.platform-android select {
+    font-size: 16px !important; /* Prevent auto-zoom */
+    user-select: text !important;
 }
 
-/* 3. Fluid Scrolling */
-.scroll-container, 
-[style*="overflow-y: auto"], 
-[style*="overflow-y: scroll"],
-.steam-content,
-#feed-container {
-    -webkit-overflow-scrolling: touch !important; /* Enable 60fps momentum scroll */
-    scroll-behavior: smooth;
+/* 3. Hero Media Player Optimizations */
+html.platform-android .hero-player-stage {
+    min-height: 200px;
+    aspect-ratio: 16/9;
 }
 
-/* 4. Touch Targets & Interaction */
-button, 
-.card, 
-.nav-item, 
-[role="button"] {
-    /* Ensure touch targets are large enough (min 44px) */
-    min-height: 44px;
-    /* Improve responsiveness to touch */
+/* 4. Touch Improvements */
+html.platform-android .button,
+html.platform-android .nav-item,
+html.platform-android .steam-card,
+html.platform-android .play-btn {
     touch-action: manipulation;
 }
 
-/* Active state for better feedback on Android */
-button:active, 
-.interactive:active {
-    opacity: 0.7;
-    transform: scale(0.98);
-    transition: transform 0.1s;
+/* 5. Scroll Container Fixes - Prevent Locking */
+html.platform-android .scroll-container,
+html.platform-android .feed-container,
+html.platform-android .message-list,
+html.platform-android .steam-content {
+    -webkit-overflow-scrolling: touch !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: auto !important;
 }
 
-/* 5. Hardware Accelerated Components */
-.modal, 
-.overlay, 
-.hero-media-player, 
-.floating-action-button {
-    will-change: transform, opacity;
-    backface-visibility: hidden;
-    perspective: 1000px;
-}
+/* 6. Safe Area Utility Classes */
+.safe-p-top { padding-top: var(--safe-area-top); }
+.safe-p-bottom { padding-bottom: var(--safe-area-bottom); }
+.safe-m-top { margin-top: var(--safe-area-top); }
 
-/* 6. Image Optimization */
-img {
-    /* Prevent image dragging */
-    -webkit-user-drag: none;
-    /* High quality scaling */
-    image-rendering: -webkit-optimize-contrast;
-}
-
-/* 7. Input Fixes */
-input, textarea {
-    /* Prevent auto-zoom on focus in WebView */
-    font-size: 16px !important;
-}
-
-/* 8. Utility Classes */
-.android-safe-padding-top { padding-top: var(--safe-area-top); }
-.android-safe-padding-bottom { padding-bottom: var(--safe-area-bottom); }
-.android-safe-padding-left { padding-left: var(--safe-area-left); }
-.android-safe-padding-right { padding-right: var(--safe-area-right); }
-
-.android-hardware-accelerated { transform: translate3d(0,0,0); }
-
-/* 9. Game Fitting Overrides */
-.game-viewport-fit {
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: #000;
-}
-
-.game-ui-floating {
-    position: fixed;
-    top: max(15px, var(--safe-area-top));
-    left: max(15px, var(--safe-area-left));
-    right: max(15px, var(--safe-area-right));
-    z-index: 100;
-}
-
-.game-canvas-fit {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: contain;
-}
-
-/* 10. Fix for IFrame context in Capacitor */
-.iframe-wrapper {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
+/* 7. Game Specific High-Fidelity Overrides */
+html.platform-android .game-container,
+html.platform-android #game-canvas-container {
+    box-shadow: 0 0 40px rgba(0,0,0,0.8);
+    transform: translateZ(0);
+    max-width: 98vw !important;
+    margin: auto !important;
 }
 
 /* Ensure no bounce on scrollable game areas */
@@ -127,101 +68,35 @@ canvas, .game-container {
     -webkit-user-select: none;
     touch-action: none;
 }
-/* 11. Game Specific High-Fidelity Overrides */
-html.platform-android .game-container,
-html.platform-android #game-canvas-container {
-    box-shadow: 0 0 40px rgba(0,0,0,0.8);
-    transform: translateZ(0); /* Force GPU */
-    max-width: 98vw !important;
-    max-height: calc(100vh - 120px) !important;
-    margin: auto !important;
-}
 
-
-/* Ensure canvas takes priority and is centered */
 html.platform-android canvas {
-    image-rendering: pixelated; /* Sharpness on mobile */
+    image-rendering: pixelated;
     touch-action: none;
     -webkit-user-select: none;
 }
 
-/* 12. App Runner Immersive Experience */
+/* 8. App Runner Immersive Experience */
 html.platform-android #app-runner {
-    padding-top: var(--safe-area-top);
-    padding-bottom: var(--safe-area-bottom);
-    padding-left: var(--safe-area-left);
-    padding-right: var(--safe-area-right);
     background: #000;
 }
 
 html.platform-android .runner-header {
-    height: 60px;
-    padding-top: 0; /* Handled by runner container */
+    height: calc(var(--header-height, 72px) + var(--safe-area-top)) !important;
+    padding-top: var(--safe-area-top) !important;
 }
 
-/* 13. System Feedback */
-.vibrate-on-touch:active {
-    outline: none;
-}
+/* 9. Library Layout Overrides */
+@media (max-width: 768px) {
+    html.platform-android .steam-shell {
+        grid-template-columns: 1fr !important;
+    }
 
-/* 14. Library & Layout Overrides */
-html.platform-android .steam-shell {
-    grid-template-columns: 1fr !important;
-}
+    html.platform-android .steam-sidebar {
+        display: none !important;
+    }
 
-html.platform-android .steam-sidebar {
-    display: none !important;
-}
-
-html.platform-android .steam-content {
-    padding: 15px !important;
-    padding-top: max(15px, var(--safe-area-top)) !important;
-    padding-bottom: max(15px, var(--safe-area-bottom)) !important;
-}
-
-html.platform-android .featured-hero {
-    padding: 20px !important;
-    min-height: 240px !important;
-}
-
-html.platform-android .mobile-category-nav {
-    display: flex !important;
-    margin-bottom: 20px !important;
-}
-
-
-/* 14. Calculator Mobile Overrides */
-html.platform-android .calc-wrapper {
-    grid-template-columns: 1fr !important;
-    gap: 20px !important;
-}
-
-html.platform-android .sidebar {
-    width: 100% !important;
-    height: auto !important;
-    padding: 20px !important;
-    border-right: none !important;
-    border-bottom: 1px solid var(--border) !important;
-}
-
-html.platform-android .workspace {
-    padding: 15px !important;
-}
-
-html.platform-android .display-container {
-    padding: 20px !important;
-}
-
-html.platform-android .main-line {
-    font-size: 2.2rem !important;
-}
-
-html.platform-android .btn {
-    padding: 12px !important;
-    font-size: 0.95rem !important;
-}
-
-html.platform-android .history-panel {
-    min-height: 200px !important;
-    margin-top: 20px !important;
+    html.platform-android .steam-content {
+        padding-top: max(15px, var(--safe-area-top)) !important;
+        padding-bottom: max(20px, var(--safe-area-bottom)) !important;
+    }
 }

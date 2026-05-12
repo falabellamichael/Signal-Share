@@ -1679,8 +1679,8 @@ export function createAppUi(context) {
     const deltaY = touch.clientY - activeOverlayTouchY;
     activeOverlayTouchY = touch.clientY;
     const maxScrollTop = Math.max(0, activeOverlayScrollContainer.scrollHeight - activeOverlayScrollContainer.clientHeight);
-    const atTop = activeOverlayScrollContainer.scrollTop <= 0;
-    const atBottom = activeOverlayScrollContainer.scrollTop >= maxScrollTop - 1;
+    const atTop = activeOverlayScrollContainer.scrollTop <= 0.5;
+    const atBottom = activeOverlayScrollContainer.scrollTop >= maxScrollTop - 0.5;
     if (maxScrollTop <= 0 || (deltaY > 0 && atTop) || (deltaY < 0 && atBottom)) event.preventDefault();
   }
 

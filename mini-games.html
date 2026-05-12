@@ -29,7 +29,7 @@
             /* Android/Mobile Optimizations */
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
-            overscroll-behavior-y: contain;
+            overscroll-behavior-y: auto; /* Changed from contain to auto for better Android handoff */
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
             padding-left: env(safe-area-inset-left);
@@ -40,7 +40,7 @@
             display: grid;
             grid-template-columns: 240px 1fr;
             grid-template-rows: var(--header-height) 1fr;
-            height: 100vh;
+            height: 100dvh; /* Using dynamic viewport height for better mobile behavior */
             overflow: hidden;
             /* Hardware Acceleration */
             transform: translateZ(0);
