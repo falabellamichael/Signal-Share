@@ -1852,7 +1852,10 @@ export function createAppUi(context) {
       document.body.classList.toggle("viewer-open", modalOverlayOpen);
       lastModalOverlayOpen = modalOverlayOpen;
     }
+
+    document.body.classList.toggle("messenger-expanded", Boolean(state.messengerExpanded));
   }
+
 
   function syncProfileNavAvatar() {
     if (!elements.profileNavAvatar || !elements.profileNavLink) return;
