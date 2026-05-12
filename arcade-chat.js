@@ -21,6 +21,11 @@ async function bridgeFetch(path, options = {}) {
     const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 1500);
 
     try {
+        return await fetch(`${BRIDGE_BASE_URL}${path}`, {
+            method,
+            mode: "cors",
+            cache: "no-store",
+            credentials: "omit",
             ...options,
             headers,
             signal: options.signal || controller.signal,
