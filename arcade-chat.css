@@ -17,6 +17,11 @@ body > .steam-chat-sidebar {
     right: 0;
     height: 100vh;
     box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body > .steam-chat-sidebar.collapsed {
+    transform: translateX(100%);
 }
 
 body > .chat-resize-handle {
@@ -24,6 +29,39 @@ body > .chat-resize-handle {
     top: 0;
     right: 380px;
     height: 100vh;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body > .chat-resize-handle.collapsed {
+    transform: translateX(100%);
+}
+
+.chat-toggle-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background: #67c1f5;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: #171a21;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+    z-index: 1000;
+    border: none;
+    transition: all 0.2s;
+}
+
+.chat-toggle-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 8px 25px rgba(103, 193, 245, 0.4);
+}
+
+body > .chat-toggle-btn.visible {
+    display: flex;
 }
 
 .chat-header {
@@ -33,6 +71,25 @@ body > .chat-resize-handle {
     display: flex;
     align-items: center;
     justify-content: space-between;
+}
+
+.close-chat-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.4);
+    padding: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.close-chat-btn:hover {
+    background: #e11d48;
+    color: #fff;
+    border-color: transparent;
 }
 
 .chat-messages {

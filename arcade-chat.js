@@ -322,6 +322,30 @@ function setupResizing() {
         }
     });
 }
+window.toggleChat = function() {
+    const sidebar = document.querySelector('.steam-chat-sidebar');
+    const handle = document.querySelector('.chat-resize-handle');
+    const toggleBtn = document.querySelector('.chat-toggle-btn');
+    
+    if (!sidebar) return;
+    
+    const isCollapsed = sidebar.classList.toggle('collapsed');
+    if (handle) handle.classList.toggle('collapsed', isCollapsed);
+    if (toggleBtn) toggleBtn.classList.toggle('visible', isCollapsed);
+    
+    localStorage.setItem('arcade-chat-collapsed', isCollapsed);
+};
+
+function setupToggle() {
+    // Add toggle button to DOM if it doesn't exist
+    if (!document.querySelector('.chat-toggle-btn')) {
+        const btn = document.createElement('button');
+        btn.className = 'chat-toggle-btn';
+        btn.onclick = window.toggleChat;
+        btn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+        document.body.appendChild(btn);
+    }
+}
 
 // Initialization - Runs after all functions are defined
 (function initChat() {
@@ -333,4 +357,11 @@ function setupResizing() {
         startNewChat();
     }
     setupResizing();
+    setupToggle();
+    
+    // Restore collapsed state
+    const wasCollapsed = localStorage.getItem('arcade-chat-collapsed') === 'true';
+    if (wasCollapsed) {
+        window.toggleChat();
+    }
 })();
