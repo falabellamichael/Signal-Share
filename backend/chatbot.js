@@ -14,7 +14,7 @@ EXTREMELY IMPORTANT:
 - If asked to do something you have a tool for, USE THE TOOL immediately.
 
 WEB INTELLIGENCE & MEDIA TOOLS:
-1. [SEARCH: query] -> Search DuckDuckGo for real-time info.
+1. [SEARCH: query] -> Search DuckDuckGo for real-time info. USE THIS EXACT TAG. Do NOT say "[Searching for...]".
 2. [FETCH: url] -> Read the text content of any website.
 3. [OPEN: url] -> Open a browser link OR a system app.
    - For Spotify search: [OPEN: spotify:search:Artist or Song]
@@ -29,27 +29,29 @@ CORE PERSONALITY:
 
 /**
  * Process a chat request using local LLM fallbacks.
- * @param {string} message - The user's input message.
- * @param {Array} history - Previous conversation rounds.
- * @param {string} pageContext - The current page the user is on.
- * @returns {Promise<string>} - The AI's response.
  */
 export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0) {
-    if (!message) return "I didn't receive a message to process.";
+    if (!message && iteration === 0) return "I didn't receive a message to process.";
     
     // Safety check for infinite recursion
-    const MAX_ITERATIONS = 2;
+    const MAX_ITERATIONS = 3;
     if (iteration >= MAX_ITERATIONS) {
         console.warn("[Chatbot] Maximum tool-calling iterations reached. Stopping loop.");
         return "I've hit a limit while trying to execute tools for you. Please try rephrasing your request!";
     }
 
-    console.log(`[Chatbot] Processing (Pass ${iteration + 1}): "${message.substring(0, 50)}..."`);
+    console.log(`[Chatbot] Processing (Pass ${iteration + 1}): "${(message || 'Recursion').substring(0, 50)}..."`);
     if (pageContext && iteration === 0) console.log(`[Chatbot] Context Received: ${pageContext.substring(0, 100)}...`);
 
     const contextAwarePrompt = `${SYSTEM_PROMPT}\n\nCURRENT CONTEXT: You are looking at the "${pageContext}" page. USE THIS INFORMATION. It is your current 'vision'.`;
 
     let lmResponse = "";
+    
+    // Prepare message history
+    const conversation = [...history];
+    if (iteration === 0) {
+        conversation.push({ role: "user", content: message });
+    }
 
     // 1. Try LM Studio (Local Inference)
     try {
@@ -60,8 +62,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 model: 'google/gemme-4-e2b',
                 messages: [
                     { role: "system", content: contextAwarePrompt },
-                    ...history,
-                    { role: "user", content: message }
+                    ...conversation
                 ],
                 temperature: 0.7,
                 max_tokens: 1000
@@ -75,7 +76,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
             }
         }
     } catch (e) {
-        console.log("[Chatbot] LM Studio not reachable. Trying Ollama...");
+        if (iteration === 0) console.log("[Chatbot] LM Studio not reachable. Trying Ollama...");
     }
 
     // 2. Try Ollama (Local Fallback)
@@ -88,8 +89,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                     model: 'google/gemme-4-e2b',
                     messages: [
                         { role: "system", content: contextAwarePrompt },
-                        ...history,
-                        { role: "user", content: message }
+                        ...conversation
                     ],
                     stream: false
                 })
@@ -102,7 +102,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 }
             }
         } catch (e) {
-            console.log("[Chatbot] Ollama not reachable. Using heuristic fallback.");
+            if (iteration === 0) console.log("[Chatbot] Ollama not reachable. Using heuristic fallback.");
         }
     }
 
@@ -117,18 +117,18 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
             console.log(`[Chatbot] Tool detected (Iteration ${iteration + 1}). Executing...`);
             const toolResult = await executeWebTools(lmResponse);
             
-            // Re-prompt with the tool results
-            return getChatResponse(message, [
-                ...history,
+            // Re-prompt with the tool results as a system/observation role
+            return getChatResponse(null, [
+                ...conversation,
                 { role: "assistant", content: lmResponse },
-                { role: "system", content: `TOOL EXECUTION SUCCESSFUL. RESULTS:\n${toolResult}` }
+                { role: "system", content: `OBSERVATION/TOOL RESULT: ${toolResult}\n\nINSTRUCTION: Now use this information to give the final answer to the user.` }
             ], pageContext, iteration + 1);
         }
     }
 
     // Final response delivery
     let finalResponse = lmResponse;
-    if (!finalResponse) return getOfflineResponse(message);
+    if (!finalResponse && iteration === 0) return getOfflineResponse(message);
     return finalResponse;
 }
 
