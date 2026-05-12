@@ -53,7 +53,7 @@ $files = @(
   "gameLogic.js",
   "Calculator.html",
   "basketball-game.html",
-  "basketball-gamev2realistic.js",
+  "basketball-game-v2.js",
   "pinball-game.html",
   "pinball-game-v2.js",
   "snake_game_poster_1778466261855.png",
