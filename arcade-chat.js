@@ -121,7 +121,11 @@ function updateChatPlaceholder() {
         "Ask for gaming advice...",
         "Ask to open the library...",
         "Say 'Play some music'...",
-        "Say 'Open Pinball'..."
+        "Say 'Open Pinball'...",
+        "Ask to see the leaderboard...",
+        "Ask to open the shop...",
+        "Ask for gameplay tips...",
+        "Ask to see your high scores..."
     ];
 
     const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)];
@@ -688,23 +692,7 @@ function setupResizing() {
         }
     }
 }
-const CHAT_PLACEHOLDERS = [
-    "Ask to see the leaderboard...",
-    "Ask to play Neon Pinball...",
-    "Ask to play Neon Snake...",
-    "Ask to open the shop...",
-    "Ask to open YouTube...",
-    "Ask to play Spotify...",
-    "Ask for gameplay tips...",
-    "Ask to see your high scores..."
-];
 
-function updateChatPlaceholder() {
-    const input = document.getElementById('arc-chat-input');
-    if (!input) return;
-    const randomText = CHAT_PLACEHOLDERS[Math.floor(Math.random() * CHAT_PLACEHOLDERS.length)];
-    input.placeholder = randomText;
-}
 
 window.toggleChat = function() {
     const sidebar = document.querySelector('.steam-chat-sidebar');
