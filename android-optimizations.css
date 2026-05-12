@@ -38,7 +38,41 @@ html.platform-android .play-btn {
     touch-action: manipulation;
 }
 
-/* 5. Scroll Container Fixes - Prevent Locking */
+/* 5. Scroll & Background Fixes */
+
+/* IMPORTANT: Fixes for "can't scroll" and "messed up background" */
+html.platform-android body {
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    position: relative !important;
+    width: 100% !important;
+    -webkit-overflow-scrolling: touch;
+
+    /* Simplify background to resolve Android Shader Compilation failures */
+    background: var(--bg, #f6efe3) !important;
+}
+
+/* Modal states - still need to lock if active */
+html.platform-android body.viewer-open,
+html.platform-android body.settings-open,
+html.platform-android body.modal-open {
+    overflow: hidden !important;
+    position: fixed !important;
+}
+
+/* Performance: Disable expensive filters that often "mess up" Android rendering */
+html.platform-android * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Ensure background covers everything */
+html.platform-android {
+    background-color: var(--bg, #f6efe3) !important;
+}
+
 html.platform-android .scroll-container,
 html.platform-android .feed-container,
 html.platform-android .message-list,
@@ -48,23 +82,15 @@ html.platform-android .chat-messages {
     -webkit-overflow-scrolling: touch !important;
     overflow-y: auto !important;
     overscroll-behavior-y: auto !important;
-    scrollbar-width: none; /* Hide scrollbar but keep scrolling */
+    scrollbar-width: none;
 }
 
-html.platform-android .steam-shell {
-    height: 100% !important;
-    height: -webkit-fill-available !important;
-    overflow: hidden !important;
-}
-
-html.platform-android body {
-    height: auto !important;
-    min-height: 100dvh !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    position: relative !important;
-    width: 100%;
-    -webkit-overflow-scrolling: touch;
+/* Ensure page shell can grow and scroll naturally */
+html.platform-android .page-shell {
+    min-height: 100dvh;
+    display: flex !important;
+    flex-direction: column;
+    overflow: visible !important;
 }
 
 /* 6. Safe Area Utility Classes */
@@ -81,7 +107,6 @@ html.platform-android #game-canvas-container {
     margin: auto !important;
 }
 
-/* Ensure no bounce on scrollable game areas */
 canvas, .game-container {
     user-select: none;
     -webkit-user-select: none;
@@ -106,14 +131,6 @@ html.platform-android .runner-header {
 
 /* 9. Library Layout Overrides */
 @media (max-width: 768px) {
-    html.platform-android .steam-shell {
-        grid-template-columns: 1fr !important;
-    }
-
-    html.platform-android .steam-sidebar {
-        display: none !important;
-    }
-
     html.platform-android .steam-content {
         padding-top: max(15px, var(--safe-area-top)) !important;
         padding-bottom: max(20px, var(--safe-area-bottom)) !important;

@@ -20,6 +20,17 @@ WEB INTELLIGENCE & MEDIA TOOLS (USE THESE EXACTLY):
    - For Spotify search: [OPEN: spotify:search:Artist or Song]
 4. [PLAY: action] -> System media control (play_pause, next, previous).
 
+ARCADE SYSTEM TOOLS (USE THESE FOR INTERNAL NAVIGATION):
+5. [ARCADE: action] -> Trigger internal arcade functions.
+   - [ARCADE: pinball] -> Start Neon Pinball.
+   - [ARCADE: snake] -> Start Neon Snake.
+   - [ARCADE: hoops] -> Start Neon Hoops.
+   - [ARCADE: calc] -> Open Scientific Calculator.
+   - [ARCADE: leaderboards] -> Navigate to Leaderboards.
+   - [ARCADE: shop] -> Navigate to Store.
+   - [ARCADE: library] -> Navigate to Library/All Games.
+   - [ARCADE: home] -> Go to home/featured.
+
 CORE PERSONALITY:
 - Friendly, encouraging, and slightly retro-themed.
 - Keep non-technical responses concise (1-3 sentences).
@@ -200,7 +211,7 @@ async function executeWebTools(text) {
         const url = openMatch[1].trim();
         try {
             // Call our own bridge API to open the URI
-            const bridgeUrl = `http://localhost:3000/api/system-media/action`;
+            const bridgeUrl = `http://127.0.0.1:3000/api/system-media/action`;
             const response = await fetch(bridgeUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -239,6 +250,15 @@ async function executeWebTools(text) {
         } catch (e) {
             results.push(`MEDIA ACTION FAILED: ${e.message}`);
         }
+    }
+
+    // Handle [ARCADE: action]
+    const arcadeMatch = text.match(/\[ARCADE:\s*([^\]]+)\]/);
+    if (arcadeMatch) {
+        const action = arcadeMatch[1].trim().toLowerCase();
+        // The backend doesn't actually execute these, it just acknowledges them 
+        // so the AI knows the command was "sent" to the frontend protocol.
+        results.push(`ARCADE PROTOCOL COMMAND REGISTERED: ${action}. The frontend will execute this action immediately.`);
     }
 
     return results.join('\n\n');

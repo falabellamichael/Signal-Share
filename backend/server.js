@@ -918,7 +918,12 @@ app.post("/api/system-media/action", (req, res) => {
     return res.json({ ok: true, queued: true });
   }
 
-  if (!MEDIA_KEY_CODES[action]) return res.status(400).json({ ok: false });
+  if (!MEDIA_KEY_CODES[action]) {
+    return res.status(400).json({ 
+      ok: false, 
+      error: `Invalid media action: "${action}". Supported actions are: ${Object.keys(MEDIA_KEY_CODES).join(", ")}. For arcade navigation, use [ARCADE: action] instead.` 
+    });
+  }
 
   const actionKey = `${preferredSource || "all"}|${action}|${appPackage}`;
   const now = Date.now();

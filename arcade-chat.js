@@ -343,8 +343,62 @@ function addChatMessage(role, content) {
         msgDiv.textContent = content;
     }
 
+    // Process [ARCADE: action] tags
+    const arcadeMatch = content.match(/\[ARCADE:\s*([^\]]+)\]/);
+    if (arcadeMatch) {
+        const action = arcadeMatch[1].trim().toLowerCase();
+        executeArcadeAction(action);
+    }
+
     container.appendChild(msgDiv);
     container.scrollTop = container.scrollHeight;
+}
+
+function executeArcadeAction(action) {
+    console.log(`[Arcade Chat] Executing Protocol Action: ${action}`);
+    
+    // Most actions are available as global functions in mini-games.js
+    try {
+        switch (action) {
+            case 'pinball':
+                if (typeof window.launchPinball === 'function') window.launchPinball();
+                else if (typeof window.showGameDetails === 'function') window.showGameDetails('pinball');
+                break;
+            case 'snake':
+                if (typeof window.launchSnake === 'function') window.launchSnake();
+                else if (typeof window.showGameDetails === 'function') window.showGameDetails('snake');
+                break;
+            case 'hoops':
+            case 'basketball':
+                if (typeof window.launchBasketball === 'function') window.launchBasketball();
+                else if (typeof window.showGameDetails === 'function') window.showGameDetails('basketball');
+                break;
+            case 'calc':
+            case 'calculator':
+                if (typeof window.launchCalc === 'function') window.launchCalc();
+                else if (typeof window.showGameDetails === 'function') window.showGameDetails('calc');
+                break;
+            case 'leaderboards':
+            case 'leaderboard':
+                if (typeof window.setCategory === 'function') window.setCategory('leaderboard');
+                break;
+            case 'shop':
+            case 'store':
+                if (typeof window.setCategory === 'function') window.setCategory('store');
+                break;
+            case 'library':
+            case 'games':
+                if (typeof window.setCategory === 'function') window.setCategory('all');
+                break;
+            case 'home':
+                if (typeof window.setCategory === 'function') window.setCategory('all');
+                break;
+            default:
+                console.warn(`[Arcade Chat] Unknown protocol action: ${action}`);
+        }
+    } catch (err) {
+        console.error(`[Arcade Chat] Failed to execute ${action}:`, err);
+    }
 }
 
 function addTypingIndicator() {
@@ -547,16 +601,14 @@ function setupResizing() {
     }
 }
 const CHAT_PLACEHOLDERS = [
-    "Ask for advice or code...",
-    "Ask to play Spotify...",
-    "Ask to open YouTube...",
-    "Ask to search the web...",
-    "Ask to check the weather...",
-    "Ask to change the theme...",
-    "Ask for arcade tips...",
-    "Ask to start a game...",
     "Ask to see the leaderboard...",
-    "Ask for a system report..."
+    "Ask to play Neon Pinball...",
+    "Ask to play Neon Snake...",
+    "Ask to open the shop...",
+    "Ask to open YouTube...",
+    "Ask to play Spotify...",
+    "Ask for gameplay tips...",
+    "Ask to see your high scores..."
 ];
 
 function updateChatPlaceholder() {
