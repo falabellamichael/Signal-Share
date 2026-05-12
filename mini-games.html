@@ -138,9 +138,24 @@
             .steam-shell {
                 grid-template-columns: 240px 1fr;
             }
-            .steam-chat-sidebar {
+            .steam-chat-sidebar, .chat-resize-handle {
                 display: none;
             }
+        }
+
+        .chat-resize-handle {
+            width: 6px;
+            background: transparent;
+            cursor: col-resize;
+            transition: background 0.2s, box-shadow 0.2s;
+            z-index: 100;
+            position: relative;
+            margin-left: -3px;
+        }
+
+        .chat-resize-handle:hover, .chat-resize-handle.active {
+            background: var(--steam-light);
+            box-shadow: 0 0 15px var(--steam-light);
         }
 
         .steam-content {
@@ -1143,6 +1158,8 @@
             </div>
         </main>
 
+        <div class="chat-resize-handle" id="chat-resize-handle"></div>
+
         <aside class="steam-chat-sidebar">
             <div class="chat-header">
                 <div style="width: 10px; height: 10px; background: #75b022; border-radius: 50%; box-shadow: 0 0 8px #75b022;"></div>
@@ -1348,6 +1365,46 @@
             if (isNative || /Android/i.test(navigator.userAgent)) {
                 document.documentElement.classList.add('platform-android');
             }
+        })();
+    <script>
+        // Chat Resizing Logic
+        (function() {
+            const handle = document.getElementById('chat-resize-handle');
+            const shell = document.querySelector('.steam-shell');
+            const sidebar = document.querySelector('.steam-chat-sidebar');
+            let isResizing = false;
+            let initialMax = 0;
+
+            if (!handle || !shell || !sidebar) return;
+
+            handle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                initialMax = sidebar.offsetWidth; // Current expanded width is the cap
+                handle.classList.add('active');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const shellRect = shell.getBoundingClientRect();
+                let newWidth = shellRect.right - e.clientX;
+                
+                // Constraints: only smaller from initial max, not larger
+                if (newWidth > initialMax) newWidth = initialMax;
+                if (newWidth < 280) newWidth = 280; // Hard minimum to keep chat usable
+                
+                shell.style.gridTemplateColumns = `240px auto ${newWidth}px`;
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    handle.classList.remove('active');
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
         })();
     </script>
 </body>
