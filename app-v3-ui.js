@@ -1665,7 +1665,7 @@ export function createAppUi(context) {
 
   function handleViewportResize() { updateViewportMetrics(); syncMobileHeaderVisibility(); syncMobileMessengerMode(); if (!state.playerPostId || !state.playerPosition) return; applyMiniPlayerPosition(); }
 
-  function isMobileHeaderViewport() { return isTouchCompactViewport(); }
+  function isMobileHeaderViewport() { const isAndroid = /Android/i.test(navigator.userAgent) || (window.Capacitor && window.Capacitor.getPlatform() === 'android'); return isAndroid || isTouchCompactViewport(); }
 
   function isMobileMessengerViewport() { return isTouchCompactViewport(); }
 
@@ -1686,7 +1686,19 @@ export function createAppUi(context) {
 
   function syncMobileHeaderVisibility() { if (!isMobileHeaderViewport()) { setMobileHeaderHidden(false); state.lastScrollY = window.scrollY; return; } if (state.settingsPanelOpen || window.scrollY <= 24) setMobileHeaderHidden(false); state.lastScrollY = window.scrollY; }
 
-  function handleWindowScroll() { if (!isMobileHeaderViewport()) return; const currentScrollY = window.scrollY; if (state.settingsPanelOpen || currentScrollY <= 24) { setMobileHeaderHidden(false); state.lastScrollY = currentScrollY; return; } const delta = currentScrollY - state.lastScrollY; if (Math.abs(delta) < 8) { state.lastScrollY = currentScrollY; return; } if (delta > 0) setMobileHeaderHidden(true); else setMobileHeaderHidden(false); state.lastScrollY = currentScrollY; }
+  function handleWindowScroll() {
+    if (!isMobileHeaderViewport()) return;
+    const currentScrollY = window.scrollY;
+
+    const isAtBottom = (window.innerHeight + currentScrollY) >= (document.documentElement.scrollHeight - 10);
+    document.documentElement.classList.toggle("is-at-bottom", isAtBottom);
+
+    if (state.settingsPanelOpen || currentScrollY <= 24) { setMobileHeaderHidden(false); state.lastScrollY = currentScrollY; return; }
+    const delta = currentScrollY - state.lastScrollY;
+    if (Math.abs(delta) < 8) { state.lastScrollY = currentScrollY; return; }
+    if (delta > 0) setMobileHeaderHidden(true); else setMobileHeaderHidden(false);
+    state.lastScrollY = currentScrollY;
+  }
 
   function getOpenOverlayRoots() {
     return [

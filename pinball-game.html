@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Neon Pinball | Signal Share</title>
     <link rel="stylesheet" href="./android-optimizations.css?v=1.0">
+    <script>
+        // Signal Share Android Optimization Suite - Detection
+        (function() {
+            const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+            if (isNative || /Android/i.test(navigator.userAgent)) {
+                document.documentElement.classList.add('platform-android');
+            }
+        })();
+    </script>
     <style>
         :root {
             --neon-magenta: #ff00ff;
@@ -282,7 +291,7 @@
         }
     </style>
 </head>
-<body>
+<body class="game-body">
     <div class="runner-header">
         <div class="runner-title-group">
             <img src="neon_pinball_v2_poster.png" class="runner-icon">

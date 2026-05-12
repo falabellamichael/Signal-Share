@@ -6,6 +6,16 @@
     <title>Hero Player Deep Dive | Signal Share</title>
     <!-- Assuming you use questions-guide.css for styling consistency -->
     <link rel="stylesheet" href="./questions-guide.css?v=1.5"> 
+    <link rel="stylesheet" href="./android-optimizations.css?v=1.0">
+    <script>
+        // Signal Share Android Optimization Suite - Detection
+        (function() {
+            const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+            if (isNative || /Android/i.test(navigator.userAgent)) {
+                document.documentElement.classList.add('platform-android');
+            }
+        })();
+    </script>
     <link rel="icon" href="./icons/icon.svg?v=5" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=5" />
     <style>

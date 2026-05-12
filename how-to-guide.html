@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>How To Guide | Signal Share</title>
     <link rel="stylesheet" href="./questions-guide.css?v=1.4">
+    <link rel="stylesheet" href="./android-optimizations.css?v=1.0">
+    <script>
+        // Signal Share Android Optimization Suite - Detection
+        (function() {
+            const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+            if (isNative || /Android/i.test(navigator.userAgent)) {
+                document.documentElement.classList.add('platform-android');
+            }
+        })();
+    </script>
 </head>
 <body class="questions-page">
   <main class="questions-page-shell">

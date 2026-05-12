@@ -8,6 +8,7 @@
     --safe-area-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-left: env(safe-area-inset-left, 0px);
     --safe-area-right: env(safe-area-inset-right, 0px);
+    --bg-android: #f6efe3;
 }
 
 /* 1. Global Reset & Performance */
@@ -39,14 +40,13 @@ html.platform-android .play-btn {
 
 /* 5. Scroll & Background Fixes - CRITICAL FOR ANDROID */
 
-/* Re-enable natural scrolling for Android */
+/* Natural scrolling reset */
 html.platform-android {
     height: auto !important;
     min-height: 100% !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    /* Default light background for rubber-banding */
-    background-color: #f6efe3 !important;
+    background-color: var(--bg-android) !important;
 }
 
 html.platform-android body {
@@ -59,16 +59,16 @@ html.platform-android body {
     -webkit-overflow-scrolling: touch !important;
 
     /* Theme-aware solid background to avoid Shader Compilation failures */
-    background-color: #f6efe3 !important;
+    background: var(--bg-android) !important;
     background-image: none !important;
 }
 
-/* Theme color overrides for Android - Force correct colors on body and html */
-html.platform-android body[data-theme="midnight"] { background-color: #081017 !important; }
-html.platform-android body[data-theme="gallery"]  { background-color: #fffdf7 !important; }
-html.platform-android body[data-theme="aurora"]   { background-color: #f5fcfb !important; }
-html.platform-android body[data-theme="contrast"] { background-color: #000000 !important; }
-html.platform-android body[data-theme="ember"]    { background-color: #140302 !important; }
+/* Theme color overrides for Android solid background */
+html.platform-android body[data-theme="midnight"] { --bg-android: #081017; }
+html.platform-android body[data-theme="gallery"]  { --bg-android: #fffdf7; }
+html.platform-android body[data-theme="aurora"]   { --bg-android: #f5fcfb; }
+html.platform-android body[data-theme="contrast"] { --bg-android: #000000; }
+html.platform-android body[data-theme="ember"]    { --bg-android: #140302; }
 
 /* Kill fixed-position blobs that cause "messed up background" (Shader failures) */
 html.platform-android body::before,
@@ -76,6 +76,7 @@ html.platform-android body::after,
 html.platform-android #top::before,
 html.platform-android #top::after {
     display: none !important;
+    content: none !important;
 }
 
 /* Modal Lock - only lock when explicit modals are open */
@@ -105,4 +106,96 @@ html.platform-android .page-shell {
 /* 7. Game Specific */
 canvas, .game-container {
     touch-action: none;
+}
+
+/* 8. Emoji Tray Portrait Fix */
+html.platform-android .message-emoji-panel {
+    position: absolute !important;
+    left: 4px !important;
+    right: 4px !important;
+    bottom: calc(100% + 10px) !important;
+    width: auto !important;
+    max-height: 38dvh !important;
+    z-index: 1000 !important;
+    border-radius: 20px !important;
+    display: flex;
+}
+
+html.platform-android .message-emoji-panel[hidden] {
+    display: none !important;
+}
+
+html.platform-android .emoji-panel-grid {
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)) !important;
+    gap: 8px !important;
+    padding: 6px !important;
+}
+
+/* 9. Header Reveal-on-Scroll Fix */
+html.platform-android .site-header {
+    position: sticky !important;
+    top: var(--safe-area-top, 0px) !important;
+    margin-top: 10px !important;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease !important;
+}
+
+html.platform-android .site-header.is-hidden {
+    transform: translateY(calc(-100% - 20px)) !important;
+    opacity: 0 !important;
+}
+
+/* 10. Floating Icons Slide-away at Bottom */
+html.platform-android.is-at-bottom .messenger-launcher,
+html.platform-android.is-at-bottom .chat-toggle-btn {
+    transform: translateX(calc(100% + 40px)) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+html.platform-android.is-at-bottom .admin-ban-launcher {
+    transform: translateX(calc(-100% - 40px)) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Ensure smooth transitions for these elements on Android */
+html.platform-android .messenger-launcher,
+html.platform-android .chat-toggle-btn,
+html.platform-android .admin-ban-launcher {
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;
+}
+
+/* 11. Mini-Games & Tools Overrides (Steam Shell) */
+html.platform-android .steam-shell {
+    height: auto !important;
+    min-height: 100dvh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: visible !important;
+}
+
+html.platform-android .steam-content {
+    height: auto !important;
+    overflow: visible !important;
+    padding-top: var(--safe-area-top) !important;
+}
+
+/* Simplified dark backgrounds for Games/Notes to avoid shader failures */
+html.platform-android body.questions-page,
+html.platform-android body.game-body,
+html.platform-android .steam-shell,
+html.platform-android .calculator-body {
+    background: #08080b !important;
+    background-image: none !important;
+}
+
+/* Specific for Mini-Games background which is steam-blue */
+html.platform-android body:has(.steam-shell) {
+    background: #1b2838 !important;
+}
+
+/* Fix for Calculator specific body scroll */
+html.platform-android body:has(.calc-wrapper) {
+    overflow-y: auto !important;
+    height: auto !important;
 }
