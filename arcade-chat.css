@@ -82,6 +82,11 @@ body.chat-collapsed .messenger-launcher {
 /* Move the button with the sidebar when NOT collapsed */
 body:not(.chat-collapsed) .chat-toggle-btn {
     right: 400px; /* sidebar width (380) + margin (20) */
+    opacity: 0.8;
+}
+
+body:not(.chat-collapsed) .chat-toggle-btn:hover {
+    opacity: 1;
 }
 
 /* Rotate icon when open */
@@ -93,6 +98,45 @@ body:not(.chat-collapsed) .chat-toggle-btn svg {
 body:not(.chat-collapsed) .messenger-launcher,
 body:not(.chat-collapsed) .messenger-section {
     right: 400px !important; /* sidebar width (380) + margin (20) */
+}
+
+/* When collapsed, we have TWO floating buttons. Offset messenger to the left of the chat toggle. */
+body.chat-collapsed .messenger-launcher {
+    right: 86px !important; /* 20 (base) + 56 (chat btn) + 10 (gap) */
+}
+
+body.chat-collapsed .messenger-section {
+    right: 86px !important;
+}
+
+.chat-toggle-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: #171a21;
+    border: 1px solid rgba(103, 193, 245, 0.3);
+    color: #67c1f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5), 0 0 10px rgba(103, 193, 245, 0.1);
+}
+
+.chat-toggle-btn:hover {
+    background: #1b2838;
+    border-color: #67c1f5;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6), 0 0 15px rgba(103, 193, 245, 0.2);
+}
+
+.chat-toggle-btn svg {
+    transition: transform 0.3s ease;
 }
 
 body:not(.chat-collapsed) .messenger-launcher {

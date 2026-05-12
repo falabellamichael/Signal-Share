@@ -359,25 +359,56 @@ function setupResizing() {
 
     if (!handle || !sidebar || !shell) return;
 
+    const onMove = (e) => {
+        if (!isResizing) return;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        handleResize(clientX);
+    };
+
+    const onEnd = () => {
+        if (isResizing) {
+            isResizing = false;
+            handle.classList.remove('active');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onEnd);
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onEnd);
+        }
+    };
+
     handle.addEventListener('mousedown', (e) => {
         isResizing = true;
         initialMax = sidebar.offsetWidth;
         handle.classList.add('active');
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
+        
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onEnd);
     });
 
-    document.addEventListener('mousemove', (e) => {
-        if (!isResizing) return;
+    handle.addEventListener('touchstart', (e) => {
+        isResizing = true;
+        initialMax = sidebar.offsetWidth;
+        handle.classList.add('active');
+        document.body.style.userSelect = 'none';
         
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onEnd);
+    }, { passive: true });
+
+    function handleResize(clientX) {
         const isFixed = window.getComputedStyle(sidebar).position === 'fixed';
         let newWidth;
         
         if (isFixed) {
-            newWidth = window.innerWidth - e.clientX;
+            newWidth = window.innerWidth - clientX;
         } else {
             const shellRect = shell.getBoundingClientRect();
-            newWidth = shellRect.right - e.clientX;
+            newWidth = shellRect.right - clientX;
         }
 
         if (newWidth > initialMax) newWidth = initialMax;
@@ -386,7 +417,7 @@ function setupResizing() {
         if (!isFixed && shell.classList.contains('steam-shell')) {
             // In integrated mode, we resize the TILES section (column 2) 
             // and the chat (column 4) fills the rest.
-            const tilesWidth = e.clientX - 240; // 240 is the fixed left sidebar
+            const tilesWidth = clientX - 240; // 240 is the fixed left sidebar
             const clampedTilesWidth = Math.max(300, Math.min(tilesWidth, window.innerWidth - 600));
             shell.style.gridTemplateColumns = `240px ${clampedTilesWidth}px 6px 1fr`;
         } else {
@@ -407,16 +438,7 @@ function setupResizing() {
             if (messengerBtn) messengerBtn.style.setProperty('right', `${gapWidth}px`, 'important');
             if (messengerSection) messengerSection.style.setProperty('right', `${gapWidth}px`, 'important');
         }
-    });
-
-    document.addEventListener('mouseup', () => {
-        if (isResizing) {
-            isResizing = false;
-            handle.classList.remove('active');
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-        }
-    });
+    }
 }
 window.toggleChat = function() {
     const sidebar = document.querySelector('.steam-chat-sidebar');
@@ -454,17 +476,7 @@ window.toggleChat = function() {
 };
 
 function setupToggle() {
-    // If we are in a grid-based layout (like mini-games), the chatbot is integrated.
-    // We don't need a floating toggle button there.
-    const isIntegrated = document.querySelector('.steam-shell') || 
-                        window.location.pathname.includes('mini-games.html');
-
-    if (isIntegrated) {
-        console.log('[Arcade Chat] Integrated mode detected. Skipping floating toggle.');
-        return;
-    }
-
-    // Add toggle button to DOM if it doesn't exist
+    // Create toggle button regardless of mode, CSS will handle visibility
     if (!document.querySelector('.chat-toggle-btn')) {
         const btn = document.createElement('button');
         btn.className = 'chat-toggle-btn';
@@ -489,12 +501,18 @@ function setupToggle() {
     
     // Restore collapsed state
     const wasCollapsed = localStorage.getItem('arcade-chat-collapsed') === 'true';
-    if (wasCollapsed && !document.querySelector('.steam-shell')) {
+    if (wasCollapsed) {
         const sidebar = document.querySelector('.steam-chat-sidebar');
         const handle = document.querySelector('.chat-resize-handle');
+        const shell = document.querySelector('.steam-shell');
+        
         if (sidebar) sidebar.classList.add('collapsed');
         if (handle) handle.classList.add('collapsed');
         document.body.classList.add('chat-collapsed');
+        
+        if (shell) {
+            shell.style.gridTemplateColumns = '240px 1fr 0px 0px';
+        }
     }
 })();
 /**

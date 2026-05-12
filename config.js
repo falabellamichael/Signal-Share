@@ -1,4 +1,5 @@
-const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const isCapacitor = !!window.Capacitor;
+const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || isCapacitor;
 const redirectUrl = "https://falabellamichael.github.io/Signal-Share/";
 
 window.SIGNAL_SHARE_CONFIG = {

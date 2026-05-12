@@ -1124,11 +1124,19 @@ export function createAppUi(context) {
     const existingRows = Array.from(elements.messageList.querySelectorAll(".message-row"));
     const existingIds = new Set(existingRows.map(row => row.dataset.id).filter(Boolean));
 
-    // If the thread has changed entirely, or the list is empty, clear it once
+    // If the thread has changed entirely, clear it
     if (elements.messageList.dataset.currentThreadId !== activeThread.id) {
       elements.messageList.innerHTML = "";
       elements.messageList.dataset.currentThreadId = activeThread.id;
       existingIds.clear();
+    } else {
+      // Remove any messages from DOM that are no longer in state (e.g. thinking indicators)
+      existingRows.forEach(row => {
+        if (!state.activeMessages.some(m => m.id === row.dataset.id)) {
+          row.remove();
+          existingIds.delete(row.dataset.id);
+        }
+      });
     }
 
     state.activeMessages.forEach((message) => {

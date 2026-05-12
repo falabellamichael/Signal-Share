@@ -1665,7 +1665,7 @@ async function handleMessageSubmit(event) {
 
       // Prepare history for LLM (excluding current message)
       const history = state.activeMessages
-        .filter(m => !m.isThinking)
+        .filter(m => !m.isThinking && m.id !== userMessage.id)
         .map(m => ({
           role: m.senderId === AI_COMPANION_ID ? "assistant" : "user",
           content: m.body
@@ -1693,10 +1693,13 @@ async function handleMessageSubmit(event) {
       const pageText = document.body.innerText.substring(0, 1000);
       const fullContext = `${pageContext} (Visible text: ${pageText})`;
 
-      const aiResponse = await callLocalAI(body, history, fullContext);
-      
-      // Remove thinking indicator
-      state.activeMessages = state.activeMessages.filter(m => m.id !== thinkingId);
+      let aiResponse;
+      try {
+        aiResponse = await callLocalAI(body, history, fullContext);
+      } finally {
+        // ALWAYS remove thinking indicator before rendering the response or error
+        state.activeMessages = state.activeMessages.filter(m => m.id !== thinkingId);
+      }
       
       const aiMessage = {
         id: crypto.randomUUID(),
@@ -1809,10 +1812,13 @@ async function handleMessageSubmit(event) {
 }
 
 async function callLocalAI(text, history = [], pageContext = "") {
+  // Prioritize direct local bridge access
   const candidates = [
-    '/api/llm/chat',
     'http://localhost:3000/api/llm/chat',
-    'http://127.0.0.1:3000/api/llm/chat'
+    'http://127.0.0.1:3000/api/llm/chat',
+    window.location.origin + '/api/llm/chat',
+    '/api/llm/chat',
+    'http://10.0.2.2:3000/api/llm/chat'
   ];
 
   let abortController = null;
@@ -1823,17 +1829,34 @@ async function callLocalAI(text, history = [], pageContext = "") {
     }
   };
 
+  const secret = localStorage.getItem("ss_bridge_secret");
+
   for (const url of candidates) {
     try {
+      const isLoopback = url.includes('localhost') || url.includes('127.0.0.1');
+      const isRelative = url.startsWith('/') || !url.startsWith('http');
+      
+      // Skip relative paths on GitHub Pages as they will always 404/405
+      if (isRelative && window.location.hostname.includes('github.io')) {
+          continue;
+      }
+
       abortController = new AbortController();
+      
+      const headers = { 
+        'Content-Type': 'application/json'
+      };
+      if (secret) headers["X-Bridge-Secret"] = secret;
+
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'target-address-space': 'private'
-        },
-        targetAddressSpace: 'private',
+        headers: headers,
+        // Standardize on W3C PNA spec: loopback for localhost, private for LAN
+        // This MUST match the actual address space or the browser blocks it.
+        targetAddressSpace: isLoopback ? 'loopback' : 'private',
         signal: abortController.signal,
+        cache: 'no-store',
+        credentials: 'omit',
         body: JSON.stringify({ 
           message: text, 
           history,
@@ -1849,7 +1872,39 @@ async function callLocalAI(text, history = [], pageContext = "") {
       console.warn(`[AI Messenger] Endpoint failed ${url}:`, err);
     }
   }
-  throw new Error("All AI endpoints failed");
+
+  // Final Fallback: Internal Global Protocol
+  console.log('[AI Messenger] All endpoints failed. Switching to Global Protocol Offline mode.');
+  return getGlobalProtocolOfflineResponse(text);
+}
+
+/**
+ * Lightweight client-side fallback for general site support when offline.
+ */
+function getGlobalProtocolOfflineResponse(text) {
+    const query = (text || "").toLowerCase();
+    
+    const responses = {
+        "hello": "Hello! I'm the Signal Share protocol assistant. My primary logic core is currently offline, but I can still help you with site basics.",
+        "hi": "Hi there! I'm running on emergency protocol. How can I help you navigate the platform today?",
+        "help": "I can help you with: \n- **Feed**: How to post and view media.\n- **Messenger**: Sending direct messages.\n- **Account**: Signing in and profile settings.\n- **Media**: Using the Hero Player.\nWhat do you need help with?",
+        "post": "To post media, use the **Publish Post** section in the sidebar. You can drop images, videos, or audio files there. Note: You need to be signed in to publish to the live feed.",
+        "feed": "The live feed shows the latest posts from all members. You can filter by 'All', 'Image', 'Video', or 'Audio' using the sort controls at the top.",
+        "messenger": "You can start a private conversation with any member by clicking 'Message' on their profile. Your conversations sync live across all your devices.",
+        "profile": "Click on your name in the account section to view your profile. You can change your display name and view your own posts there.",
+        "hero": "The Hero Media Player at the top handles all your media playback. It supports YouTube, Spotify, and direct file uploads. You can control it using the floating play bar.",
+        "player": "The Hero Media Player at the top handles all your media playback. It supports YouTube, Spotify, and direct file uploads. You can control it using the floating play bar.",
+        "who": "I am the Signal Share A.I. Companion. I'm currently running in 'Offline Protocol' mode because I can't reach my primary brain.",
+        "error": "If you're seeing errors, make sure you have a stable internet connection. If you're running locally, ensure the Bridge server is active on port 3000.",
+        "offline": "I'm in offline mode because the local bridge server is unreachable. Please check if your backend is running."
+    };
+
+    // Keyword matching
+    for (const key in responses) {
+        if (query.includes(key)) return `📶 [Signal Protocol] ${responses[key]}`;
+    }
+
+    return "📶 [Signal Protocol] I'm currently operating in offline mode and don't have a specific response for that. Try asking about 'help', 'posting', 'messenger', or 'the player'.";
 }
 
 function saveAiMessagesLocally() {

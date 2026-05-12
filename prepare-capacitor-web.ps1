@@ -19,6 +19,8 @@ $files = @(
   "app-v3-ui.js",
   "shared-utils.js",
   "arcade-api.js",
+  "arcade-chat.js",
+  "arcade-chat.css",
   "hero-media-player.js",
   "hero-media-player-preview.js",
   "notifications.js",

@@ -1118,6 +1118,12 @@
     <script type="module">
         import * as ArcadeAPI from './arcade-api.js?v=2.0';
         
+        // Detect platform for CSS optimizations
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        if (isAndroid || (window.Capacitor && window.Capacitor.getPlatform() === 'android')) {
+            document.documentElement.classList.add('platform-android');
+        }
+
         console.log('[Arcade Launcher] API Module Loading...', ArcadeAPI);
 
         // Initialize Supabase and Arcade API

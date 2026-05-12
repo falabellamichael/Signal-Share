@@ -42,10 +42,27 @@ html.platform-android .play-btn {
 html.platform-android .scroll-container,
 html.platform-android .feed-container,
 html.platform-android .message-list,
-html.platform-android .steam-content {
+html.platform-android .steam-content,
+html.platform-android .steam-sidebar,
+html.platform-android .chat-messages {
     -webkit-overflow-scrolling: touch !important;
     overflow-y: auto !important;
     overscroll-behavior-y: auto !important;
+    scrollbar-width: none; /* Hide scrollbar but keep scrolling */
+}
+
+html.platform-android .steam-shell {
+    height: 100% !important;
+    height: -webkit-fill-available !important;
+    overflow: hidden !important;
+}
+
+html.platform-android body {
+    height: 100% !important;
+    height: -webkit-fill-available !important;
+    overflow: hidden;
+    position: fixed; /* Prevent body scroll entirely to force container scroll */
+    width: 100%;
 }
 
 /* 6. Safe Area Utility Classes */
