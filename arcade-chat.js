@@ -329,8 +329,16 @@ window.sendChatMessage = async function() {
             saveCurrentChat();
             updateChatStatus('active');
         } else {
-            addChatMessage('ai', `⚠️ [Connection Error] I couldn't reach my logic core. (Error: ${lastError})`);
-            updateChatStatus('error');
+            // AUTO-SWITCH TO OFFLINE CHATBOT
+            console.warn(`[Arcade Chat] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
+            const offlineReply = getArcadeProtocolOfflineResponse(text);
+            addChatMessage('ai', offlineReply);
+            
+            // Still save to history so the conversation flows
+            arcadeChatHistory.push({ role: 'user', content: text });
+            arcadeChatHistory.push({ role: 'assistant', content: offlineReply });
+            saveCurrentChat();
+            updateChatStatus('offline');
         }
     } catch (e) {
         console.error("[Arcade Chat] Error in sendChatMessage:", e);
@@ -489,3 +497,42 @@ function setupToggle() {
         document.body.classList.add('chat-collapsed');
     }
 })();
+/**
+ * Provides arcade-themed responses when the backend is unreachable.
+ */
+function getArcadeProtocolOfflineResponse(message) {
+    const input = message.toLowerCase();
+    
+    const responses = [
+        { 
+            keywords: ["pinball", "gravity"], 
+            answer: "🕹️ [Arcade Protocol]: In Neon Pinball, keep your eyes on the top bumpers. Hitting them in sequence triggers the 'Gravity Shift' multiplier, which can triple your score in seconds!" 
+        },
+        { 
+            keywords: ["basketball", "hoops", "shot"], 
+            answer: "🏀 [Arcade Protocol]: For Neon Hoops, consistency is key. Try to release the ball at the peak of your swipe for a 'Perfect' shot bonus. The net gets smaller as your streak increases!" 
+        },
+        { 
+            keywords: ["snake", "wrap", "trap"], 
+            answer: "🐍 [Arcade Protocol]: In Neon Snake, the board is edge-wrapped. If you're about to crash, move through the wall to appear on the other side. Use this to surprise high-value fruit!" 
+        },
+        { 
+            keywords: ["hello", "hi", "hey"], 
+            answer: "👋 [Arcade Protocol]: Intelligence core is currently offline, but I am standing by for tactical support. Ask me about the games or how to improve your high score!" 
+        },
+        { 
+            keywords: ["help", "what can you do"], 
+            answer: "🎮 [Arcade Protocol]: I am your tactical game assistant. Even in offline mode, I can provide tips for Pinball, Hoops, and Snake. Just ask about a specific game!" 
+        },
+        { 
+            keywords: ["thank", "thanks"], 
+            answer: "🕹️ [Arcade Protocol]: You're welcome, player. Now get back in there and break that record!" 
+        }
+    ];
+
+    for (const r of responses) {
+        if (r.keywords.some(k => input.includes(k))) return r.answer;
+    }
+
+    return "📶 [Arcade Protocol]: My advanced logic core is currently out of range, but my tactical database is active. I can still give you tips for the arcade games—just name one!";
+}
