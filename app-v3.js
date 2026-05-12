@@ -826,6 +826,17 @@ function isBanningBackendUnavailable(error) {
 }
 
 async function initialize() {
+  // SCOPE PLATFORM FOR CSS
+  try {
+    const platform = getCapacitorPlatform();
+    document.documentElement.classList.add(`platform-${platform}`);
+    if (isNativeCapacitorApp()) {
+      document.documentElement.classList.add('is-native');
+    }
+  } catch (error) {
+    console.error("Platform class injection failed", error);
+  }
+
   // DEBUG OVERLAY
   const debugOverlay = document.createElement("div");
   debugOverlay.id = "debug-overlay";

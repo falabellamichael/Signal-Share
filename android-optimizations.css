@@ -12,7 +12,7 @@
 }
 
 /* 2. Global Performance & Interaction */
-* {
+html.platform-android * {
     /* Disable long-press context menu on images/links for app-like feel */
     -webkit-touch-callout: none;
     /* Prevent blue highlight on tap */
@@ -22,11 +22,10 @@
     -moz-osx-font-smoothing: grayscale;
 }
 
-html, body {
+html.platform-android, 
+html.platform-android body {
     /* Prevent bounce/rubber-band effects that break fixed layouts */
     overscroll-behavior: none;
-    /* Hardware acceleration for the root */
-    transform: translateZ(0);
 }
 
 /* 3. Fluid Scrolling */
