@@ -1929,7 +1929,7 @@ h1 {
   letter-spacing: -0.01em;
   padding: 0 24px;
   height: auto;
-  min-height: 72px;
+  min-height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1954,6 +1954,20 @@ h1 {
   filter: brightness(0.95);
 }
 
+#toggleHeroDeepDive {
+  width: 86px;
+  height: 60px;
+  border-radius: 999px;
+  padding: 0;
+  line-height: 1.1;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+
 body[data-theme="midnight"] #heroPlayerOpenMiniButton,
 body[data-theme="contrast"] #heroPlayerOpenMiniButton,
 body[data-theme="ember"] #heroPlayerOpenMiniButton {
@@ -1964,7 +1978,7 @@ body[data-theme="ember"] #heroPlayerOpenMiniButton {
 .hero-player-toggles-stack {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   justify-content: center;
   align-items: center;
 }
@@ -1973,7 +1987,7 @@ body[data-theme="ember"] #heroPlayerOpenMiniButton {
 .hero-player-source-toggle {
   display: flex;
   background: rgba(19, 33, 43, 0.08);
-  padding: 3px;
+  padding: 2px;
   border-radius: 999px;
   border: 1px solid var(--line);
   width: fit-content;
@@ -1983,7 +1997,7 @@ body[data-theme="ember"] #heroPlayerOpenMiniButton {
 .source-toggle-button {
   border: 0;
   background: transparent;
-  padding: 4px 10px;
+  padding: 3px 10px;
   border-radius: 999px;
   font-size: 0.65rem;
   font-weight: 700;
@@ -2345,5 +2359,4 @@ body[data-theme="ember"] .source-toggle-button.is-active {
     transform: translate(-2%, 8%) scale(1);
     opacity: 0.5;
   }
-}
 }
