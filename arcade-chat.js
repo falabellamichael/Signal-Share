@@ -159,27 +159,52 @@ function updateEngineStatus(online) {
 let arcadeChatHistory = [];
 let currentChatId = null;
 let currentChatAttachment = null;
+let currentChatAttachmentType = null;
+let currentChatAttachmentName = null;
 
 /**
- * Handles image selection for the chat.
+ * Handles image, video, or file selection for the chat.
  */
 window.handleChatFileSelect = function(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-        alert('Please select an image file.');
-        return;
-    }
-
+    currentChatAttachmentName = file.name;
     const reader = new FileReader();
     reader.onload = function(e) {
         currentChatAttachment = e.target.result;
         const preview = document.getElementById('chat-attachment-preview');
-        const previewImg = document.getElementById('chat-preview-img');
-        if (preview && previewImg) {
-            previewImg.src = currentChatAttachment;
-            preview.hidden = false;
+        const img = document.getElementById('chat-preview-img');
+        const video = document.getElementById('chat-preview-video');
+        const fileDiv = document.getElementById('chat-preview-file');
+        const fileName = document.getElementById('chat-preview-filename');
+
+        if (!preview) return;
+        preview.hidden = false;
+
+        // Reset all
+        if (img) img.style.display = 'none';
+        if (video) video.style.display = 'none';
+        if (fileDiv) fileDiv.style.display = 'none';
+
+        if (file.type.startsWith('image/')) {
+            currentChatAttachmentType = 'image';
+            if (img) {
+                img.src = currentChatAttachment;
+                img.style.display = 'block';
+            }
+        } else if (file.type.startsWith('video/')) {
+            currentChatAttachmentType = 'video';
+            if (video) {
+                video.src = currentChatAttachment;
+                video.style.display = 'block';
+            }
+        } else {
+            currentChatAttachmentType = 'file';
+            if (fileDiv && fileName) {
+                fileName.textContent = file.name;
+                fileDiv.style.display = 'flex';
+            }
         }
     };
     reader.readAsDataURL(file);
@@ -190,6 +215,8 @@ window.handleChatFileSelect = function(event) {
  */
 window.clearChatAttachment = function() {
     currentChatAttachment = null;
+    currentChatAttachmentType = null;
+    currentChatAttachmentName = null;
     const preview = document.getElementById('chat-attachment-preview');
     const fileInput = document.getElementById('chat-file-input');
     if (preview) preview.hidden = true;
@@ -404,19 +431,43 @@ function addChatMessage(role, content) {
         msgDiv.textContent = content;
     }
 
-    // Handle image attachments if present in history or currently being sent
-    const msgObj = arcadeChatHistory.find(m => m.content === content && m.role === (role === 'ai' ? 'assistant' : 'user') && m.imageUrl);
-    if (msgObj && msgObj.imageUrl) {
-        const img = document.createElement('img');
-        img.src = msgObj.imageUrl;
-        img.className = 'chat-message-image';
-        msgDiv.appendChild(img);
+    // Handle multimedia attachments if present
+    const msgObj = arcadeChatHistory.find(m => m.content === content && m.role === (role === 'ai' ? 'assistant' : 'user') && m.attachment);
+    
+    let attachmentToRender = null;
+    if (msgObj && msgObj.attachment) {
+        attachmentToRender = msgObj.attachment;
     } else if (role === 'user' && currentChatAttachment) {
-        // This is for the message being currently added
-        const img = document.createElement('img');
-        img.src = currentChatAttachment;
-        img.className = 'chat-message-image';
-        msgDiv.appendChild(img);
+        attachmentToRender = {
+            data: currentChatAttachment,
+            type: currentChatAttachmentType,
+            name: currentChatAttachmentName
+        };
+    }
+
+    if (attachmentToRender) {
+        if (attachmentToRender.type === 'image') {
+            const img = document.createElement('img');
+            img.src = attachmentToRender.data;
+            img.className = 'chat-message-image';
+            msgDiv.appendChild(img);
+        } else if (attachmentToRender.type === 'video') {
+            const video = document.createElement('video');
+            video.src = attachmentToRender.data;
+            video.className = 'chat-message-video';
+            video.controls = true;
+            msgDiv.appendChild(video);
+        } else if (attachmentToRender.type === 'file') {
+            const fileLink = document.createElement('a');
+            fileLink.href = attachmentToRender.data;
+            fileLink.download = attachmentToRender.name || 'file';
+            fileLink.className = 'chat-message-file';
+            fileLink.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                <span>${attachmentToRender.name || 'Download File'}</span>
+            `;
+            msgDiv.appendChild(fileLink);
+        }
     }
 
     // Process [ARCADE: action] tags
@@ -514,14 +565,21 @@ window.sendChatMessage = async function() {
     }
 
     try {
-        const attachmentToSend = currentChatAttachment;
+        const attachmentData = currentChatAttachment;
+        const attachmentType = currentChatAttachmentType;
+        const attachmentName = currentChatAttachmentName;
+        
         addChatMessage('user', text);
         
-        // Add to history with image if present
+        // Add to history with attachment if present
         arcadeChatHistory.push({ 
             role: 'user', 
             content: text,
-            imageUrl: attachmentToSend 
+            attachment: attachmentData ? {
+                data: attachmentData,
+                type: attachmentType,
+                name: attachmentName
+            } : null
         });
         
         input.value = '';
@@ -558,7 +616,7 @@ window.sendChatMessage = async function() {
                 signal,
                 body: JSON.stringify({ 
                     message: text,
-                    image: attachmentToSend, // Send image to AI bridge
+                    attachment: arcadeChatHistory[arcadeChatHistory.length - 1].attachment,
                     history: arcadeChatHistory.map(m => ({ role: m.role, content: m.content })),
                     pageContext: `${pageContext} (Visible text: ${pageText})`
                 })
