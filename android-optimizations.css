@@ -58,11 +58,13 @@ html.platform-android .steam-shell {
 }
 
 html.platform-android body {
-    height: 100% !important;
-    height: -webkit-fill-available !important;
-    overflow: hidden;
-    position: fixed; /* Prevent body scroll entirely to force container scroll */
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    position: relative !important;
     width: 100%;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* 6. Safe Area Utility Classes */
