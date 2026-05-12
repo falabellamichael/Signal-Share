@@ -45,26 +45,26 @@ body > .chat-resize-handle.collapsed {
 
 .chat-toggle-btn {
     position: fixed;
-    top: 20px;
-    right: 20px;
-    width: 44px;
-    height: 44px;
-    background: #67c1f5;
-    border-radius: 50%;
-    display: flex; /* Always available */
-    align-items: center;
-    justify-content: center;
-    color: #171a21;
+    bottom: 30px;
+    right: 115px; /* Offset to sit to the left of the Messenger icon */
+    width: 72px;
+    height: 72px;
+    background: rgba(15, 15, 15, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 22px;
     cursor: pointer;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
-    z-index: 2005; /* Above everything */
-    border: none;
+    z-index: 10001;
+    display: grid !important;
+    place-items: center !important;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .chat-toggle-btn:hover {
-    transform: scale(1.1);
-    box-shadow: 0 8px 25px rgba(103, 193, 245, 0.4);
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-4px) scale(1.05);
 }
 
 /* Hide floating toggle and messenger launcher in integrated mode (steam-shell) 
@@ -94,41 +94,19 @@ body:not(.chat-collapsed) .messenger-section {
 /* When collapsed, we have TWO floating buttons. Offset messenger to the left of the chat toggle. */
 /* When collapsed, Messenger takes the primary corner, Sidebar toggle moves left */
 body.chat-collapsed .chat-toggle-btn {
-    right: 106px !important; /* 20 (base) + 72 (messenger btn) + 14 (gap) */
+    right: 115px !important; /* Positioned right next to the Messenger icon */
 }
 
 body.chat-collapsed .messenger-section {
     right: 20px !important;
 }
 
-.chat-toggle-btn {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 56px;
-    height: 56px;
-    border-radius: 16px;
-    background: #171a21;
-    border: 1px solid rgba(103, 193, 245, 0.3);
-    color: #67c1f5;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    z-index: 1000;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.5), 0 0 10px rgba(103, 193, 245, 0.1);
-}
-
-.chat-toggle-btn:hover {
-    background: #1b2838;
-    border-color: #67c1f5;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.6), 0 0 15px rgba(103, 193, 245, 0.2);
-}
-
+/* SVG within the toggle */
 .chat-toggle-btn svg {
-    transition: transform 0.3s ease;
+    width: 32px;
+    height: 32px;
+    color: #4facfe;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body:not(.chat-collapsed) .messenger-launcher {
