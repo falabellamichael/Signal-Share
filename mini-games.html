@@ -6,10 +6,9 @@
     <title>Mini Games and Tools | Signal Share</title>
     <link rel="stylesheet" href="./questions-guide.css?v=1.3">
     <link rel="stylesheet" href="./android-optimizations.css?v=1.0">
+    <link rel="stylesheet" href="arcade-chat.css">
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         :root {
             --steam-blue: #1b2838;
@@ -26,10 +25,9 @@
             margin: 0;
             font-family: 'Inter', system-ui, sans-serif;
             overflow-x: hidden;
-            /* Android/Mobile Optimizations */
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
-            overscroll-behavior-y: auto; /* Changed from contain to auto for better Android handoff */
+            overscroll-behavior-y: auto;
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
             padding-left: env(safe-area-inset-left);
@@ -38,7 +36,7 @@
 
         .steam-shell {
             display: grid;
-            grid-template-columns: 240px auto 6px 1fr; /* 4 columns: Sidebar, Content, Handle, Chat */
+            grid-template-columns: 240px auto 6px 1fr;
             grid-template-rows: var(--header-height) 1fr;
             height: 100dvh;
             overflow: hidden;
@@ -46,128 +44,9 @@
             backface-visibility: hidden;
         }
 
-        /* LLM Chat Sidebar */
-        .steam-chat-sidebar {
-            background: rgba(0,0,0,0.4);
-            border-left: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        .chat-header {
-            padding: 20px;
-            background: rgba(255,255,255,0.02);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .chat-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(255,255,255,0.1) transparent;
-        }
-
-        .chat-message {
-            max-width: 85%;
-            padding: 12px 16px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            line-height: 1.4;
-            position: relative;
-        }
-
-        .message-ai {
-            background: var(--glass);
-            color: #fff;
-            align-self: flex-start;
-            border-bottom-left-radius: 2px;
-            border: 1px solid rgba(102, 192, 244, 0.2);
-        }
-
-        .message-user {
-            background: var(--steam-light);
-            color: #000;
-            align-self: flex-end;
-            border-bottom-right-radius: 2px;
-            font-weight: 600;
-        }
-
-    <link rel="stylesheet" href="arcade-chat.css">
-    <style>
-        :root {
-            --steam-dark: #171a21;
-            --steam-blue: #1b2838;
-            --steam-light: #66c0f4;
-            --glass: rgba(255,255,255,0.03);
-            --border: rgba(255,255,255,0.05);
-        }
-
-
-        .chat-history-item {
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .chat-history-item:hover {
-            background: rgba(255,255,255,0.08);
-            border-color: var(--steam-light);
-        }
-
-        .chat-history-item .history-name {
-            font-size: 0.8rem;
-            font-weight: 700;
-            color: #fff;
-            margin-bottom: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .chat-history-item .history-meta {
-            font-size: 0.6rem;
-            color: rgba(255,255,255,0.4);
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .history-btn {
-            background: none;
-            border: 1px solid rgba(255,255,255,0.1);
-            color: rgba(255,255,255,0.4);
-            font-size: 0.6rem;
-            font-weight: 900;
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .history-btn:hover {
-            color: var(--steam-light);
-            border-color: var(--steam-light);
-        }
-
         .steam-content {
             overflow-y: auto;
-            -webkit-overflow-scrolling: touch; /* 60fps fluid scroll on mobile */
+            -webkit-overflow-scrolling: touch;
             padding: 40px;
         }
 
@@ -180,7 +59,7 @@
                 grid-template-columns: 1fr;
             }
             .steam-sidebar {
-                display: none; /* Hide sidebar on mobile for now, or could use a drawer */
+                display: none;
             }
             .steam-header {
                 padding: 15px 20px;
@@ -300,7 +179,7 @@
         .steam-content {
             padding: 40px;
             width: auto;
-            max-width: 1200px; /* Constrain tiles to keep them organized */
+            max-width: 1200px;
             height: 100%;
             overflow-y: auto;
             transition: opacity 0.3s;
@@ -308,13 +187,12 @@
             scrollbar-color: rgba(255,255,255,0.1) transparent;
         }
 
-        /* Hero Section */
         .featured-hero {
             height: 350px;
             background: linear-gradient(45deg, #000, #1b2838);
             border-radius: 16px;
             margin-bottom: 50px;
-            position: relative; /* CRITICAL: Anchor for background */
+            position: relative;
             overflow: hidden;
             display: flex;
             align-items: center;
@@ -329,17 +207,16 @@
             inset: 0;
             opacity: 0.4;
             filter: blur(20px);
-            z-index: 0; /* Stays behind content */
-            pointer-events: none; /* Never blocks clicks */
+            z-index: 0;
+            pointer-events: none;
         }
 
         .hero-content {
             position: relative;
-            z-index: 2; /* Sits above background */
+            z-index: 2;
             max-width: 500px;
         }
 
-        /* Immersive Hub View */
         #detail-view {
             display: none;
             opacity: 0;
@@ -419,7 +296,6 @@
             text-transform: uppercase;
         }
 
-        /* App Runner View */
         #app-runner {
             display: none;
             position: fixed;
@@ -467,7 +343,6 @@
             border-color: transparent;
         }
 
-        /* Auth & Store Views */
         .auth-overlay {
             display: none;
             position: fixed;
@@ -514,7 +389,6 @@
         .nav-item.locked { opacity: 0.4; cursor: not-allowed; }
         .nav-item.locked:hover { background: none; color: inherit; }
 
-        /* Grid & Cards */
         .game-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -572,7 +446,6 @@
             font-weight: 800;
         }
 
-        /* Launch Panel */
         .detail-overlay {
             display: none;
             background: #101822;
@@ -622,7 +495,6 @@
             filter: brightness(1.1);
         }
 
-        /* Publish View Specifics */
         .publish-container {
             max-width: 900px;
             margin: 0 auto;
@@ -1195,7 +1067,9 @@
             <div class="chat-input-area">
                 <div class="chat-input-wrapper">
                     <input type="text" id="arc-chat-input" name="arc-chat-input-v3" class="chat-input" placeholder="Type a message..." onkeydown="if(event.key === 'Enter') sendChatMessage()" autocomplete="new-password" spellcheck="false">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="cursor: pointer; opacity: 0.6;" onclick="sendChatMessage()"><line x1="22" y1="2" x2="11" y2="13"></line><polyline points="22 2 15 22 11 13 2 9 22 2"></polyline></svg>
+                    <button onclick="sendChatMessage()" class="chat-send-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
+                    </button>
                 </div>
             </div>
         </aside>
@@ -1316,7 +1190,7 @@
         });
     </script>
     <script src="mini-games.js?v=1.3"></script>
-    <script src="arcade-chat.js" defer></script>
+    <script src="arcade-chat.js?v=1.1" defer></script>
     <script>
         window.resetArcadeChat = window.startNewChat;
     </script>

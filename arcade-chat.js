@@ -6,17 +6,6 @@
 let arcadeChatHistory = [];
 let currentChatId = null;
 
-// Initialization
-(function initChat() {
-    cleanupOldChats();
-    const lastChatId = localStorage.getItem('arcade-last-chat-id');
-    if (lastChatId) {
-        loadChat(lastChatId);
-    } else {
-        startNewChat();
-    }
-    setupResizing();
-})();
 
 function cleanupOldChats() {
     const chats = JSON.parse(localStorage.getItem('arcade-chats') || '[]');
@@ -74,7 +63,7 @@ function saveCurrentChat() {
     localStorage.setItem('arcade-last-chat-id', currentChatId);
 }
 
-window.loadChat = function(id) {
+function loadChat(id) {
     const chats = JSON.parse(localStorage.getItem('arcade-chats') || '[]');
     const chat = chats.find(c => c.id === id);
     if (chat) {
@@ -102,6 +91,7 @@ window.loadChat = function(id) {
         localStorage.setItem('arcade-chats', JSON.stringify(chats));
     }
 }
+window.loadChat = loadChat;
 
 window.toggleChatHistory = function() {
     const messages = document.getElementById('chat-messages');
@@ -332,3 +322,15 @@ function setupResizing() {
         }
     });
 }
+
+// Initialization - Runs after all functions are defined
+(function initChat() {
+    cleanupOldChats();
+    const lastChatId = localStorage.getItem('arcade-last-chat-id');
+    if (lastChatId && window.loadChat) {
+        window.loadChat(lastChatId);
+    } else {
+        startNewChat();
+    }
+    setupResizing();
+})();

@@ -1,6 +1,6 @@
 /* Arcade Chat System Styles */
 .steam-chat-sidebar {
-    width: 320px;
+    width: 380px;
     background: #1b2838;
     border-left: 1px solid rgba(103, 193, 245, 0.1);
     display: flex;
@@ -22,12 +22,12 @@ body > .steam-chat-sidebar {
 body > .chat-resize-handle {
     position: fixed;
     top: 0;
-    right: 320px;
+    right: 380px;
     height: 100vh;
 }
 
 .chat-header {
-    padding: 15px;
+    padding: 20px;
     background: rgba(0,0,0,0.3);
     border-bottom: 1px solid rgba(255,255,255,0.05);
     display: flex;
@@ -45,11 +45,11 @@ body > .chat-resize-handle {
 }
 
 .chat-message {
-    padding: 10px 14px;
-    border-radius: 8px;
+    padding: 12px 18px;
+    border-radius: 12px;
     max-width: 90%;
-    font-size: 0.85rem;
-    line-height: 1.4;
+    font-size: 0.95rem;
+    line-height: 1.5;
     word-wrap: break-word;
 }
 
@@ -77,10 +77,10 @@ body > .chat-resize-handle {
 .chat-input-wrapper {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     background: #101822;
-    padding: 8px 12px;
-    border-radius: 4px;
+    padding: 12px 16px;
+    border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.1);
 }
 
@@ -89,8 +89,30 @@ body > .chat-resize-handle {
     border: none;
     color: white;
     flex: 1;
-    font-size: 0.85rem;
+    font-size: 1rem;
     outline: none;
+}
+.chat-send-btn {
+    background: none;
+    border: none;
+    color: #67c1f5;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    opacity: 0.7;
+}
+
+.chat-send-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.chat-send-btn svg {
+    width: 20px;
+    height: 20px;
 }
 
 .history-btn {

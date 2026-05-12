@@ -1494,13 +1494,13 @@
         <div class="chat-input-area">
             <div class="chat-input-wrapper">
                 <input type="text" id="arc-chat-input" class="chat-input" placeholder="Ask for advice or code..." onkeydown="if(event.key === 'Enter') sendChatMessage()">
-                <button onclick="sendChatMessage()" style="background: none; border: none; color: #67c1f5; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
+                <button onclick="sendChatMessage()" class="chat-send-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
                 </button>
             </div>
         </div>
     </aside>
 
-    <script src="arcade-chat.js" defer></script>
+    <script src="arcade-chat.js?v=1.1" defer></script>
 </body>
 </html>
