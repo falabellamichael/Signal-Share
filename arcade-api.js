@@ -14,6 +14,7 @@ let supabase = null;
 export function initArcadeApi(state) {
     supabase = state.supabase;
 }
+window.initArcadeApi = initArcadeApi;
 
 /**
  * Save a game score to Supabase
@@ -54,6 +55,7 @@ export async function saveGameScore(gameId, score, metadata = {}) {
     console.log('[Arcade API] Score saved successfully:', data);
     return data;
 }
+window.saveGameScore = saveGameScore;
 
 /**
  * Load global leaderboard for a specific game
@@ -95,6 +97,7 @@ export async function getLeaderboard(gameId, limit = 10) {
         userId: row.user_id
     }));
 }
+window.getLeaderboard = getLeaderboard;
 
 /**
  * Load personal bests for the current user
