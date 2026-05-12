@@ -78,7 +78,7 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY || ""
 );
 
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "10mb" }));
 
 // Security & CORS Middleware
 app.use((req, res, next) => {
@@ -117,11 +117,11 @@ app.use((req, res, next) => {
 // Chat integration using the intelligence module
 app.post('/api/llm/chat', async (req, res) => {
   try {
-    const { message, history, pageContext } = req.body;
-    console.log(`[Chatbot] Incoming POST request. Message length: ${message?.length || 0}`);
+    const { message, history, pageContext, attachment } = req.body;
+    console.log(`[Chatbot] Incoming POST request. Message length: ${message?.length || 0}, Attachment: ${attachment ? attachment.type : 'none'}`);
     if (!message) return res.status(400).json({ error: 'No message provided' });
 
-    const reply = await getChatResponse(message, history || [], pageContext);
+    const reply = await getChatResponse(message, history || [], pageContext, 0, attachment);
     res.json({ reply });
   } catch (err) {
     console.error('[Bridge] LLM chat error:', err);

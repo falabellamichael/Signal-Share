@@ -39,7 +39,7 @@ CORE PERSONALITY:
 /**
  * Process a chat request using local LLM fallbacks.
  */
-export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0) {
+export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0, attachment = null) {
     if (!message && iteration === 0) return "I didn't receive a message to process.";
     
     // Safety check for infinite recursion
@@ -59,8 +59,20 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         conversation.push({ role: "user", content: message });
     }
 
+    // Process image attachment if present (Ollama vision support)
+    let imageBase64 = null;
+    if (attachment && attachment.type === 'image' && attachment.data) {
+        // Remove data URL prefix if present
+        imageBase64 = attachment.data.split(',')[1] || attachment.data;
+    }
+
     // Attempt local inference (Ollama/LM Studio)
-    const models = ['google/gemma-2-2b', 'gemma2', 'llama3', 'mistral'];
+    // Vision models list for Ollama
+    const visionModels = ['llava', 'moondream', 'bakllava'];
+    const standardModels = ['google/gemma-2-2b', 'gemma2', 'llama3', 'mistral'];
+    
+    // If we have an image, prioritize vision models
+    const models = imageBase64 ? [...visionModels, ...standardModels] : standardModels;
     let success = false;
 
     for (const model of models) {
@@ -70,15 +82,30 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
             const ports = [1234, 11434];
             for (const port of ports) {
                 const endpoint = port === 1234 ? 'http://localhost:1234/v1/chat/completions' : 'http://localhost:11434/api/chat';
-                const body = port === 1234 ? {
-                    model: model,
-                    messages: [{ role: "system", content: contextAwarePrompt }, ...conversation],
-                    temperature: 0.7
-                } : {
-                    model: model,
-                    messages: [{ role: "system", content: contextAwarePrompt }, ...conversation],
-                    stream: false
-                };
+                
+                const messages = [{ role: "system", content: contextAwarePrompt }, ...conversation];
+                
+                let body;
+                if (port === 1234) {
+                    body = {
+                        model: model,
+                        messages: messages,
+                        temperature: 0.7
+                    };
+                    // LM Studio doesn't strictly follow Ollama's vision format yet, 
+                    // but some versions might support it in messages. 
+                    // For now we focus vision on Ollama.
+                } else {
+                    body = {
+                        model: model,
+                        messages: messages,
+                        stream: false
+                    };
+                    // Attach image to the LAST message if it's the first pass and we have one
+                    if (imageBase64 && iteration === 0) {
+                        body.images = [imageBase64];
+                    }
+                }
 
                 const response = await fetch(endpoint, {
                     method: 'POST',
