@@ -136,28 +136,40 @@ async function executeWebTools(text) {
     if (searchMatch) {
         const query = searchMatch[1].trim();
         try {
-            // Using DuckDuckGo's "lite" or "html" version for easier scraping
-            const searchUrl = `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+            // Using DuckDuckGo Lite (minimalist, low-bandwidth, and better for scraping)
+            const searchUrl = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`;
             const resp = await fetch(searchUrl, {
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36' }
+                headers: { 
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
+                    'Accept': 'text/html'
+                }
             });
             const html = await resp.text();
             
-            // Basic regex to pull result titles and snippets from DDG HTML
+            // Robust regex for DDG Lite: matches the result-link and the following snippet
             const resultsList = [];
-            const resultRegex = /<a class="result__a" href="([^"]+)">([^<]+)<\/a>[\s\S]*?<a class="result__snippet" href="[^"]+">([^<]+)<\/a>/g;
+            // DDG Lite uses <td> for results. We look for the link and the snippet text.
+            const resultRegex = /<a class='result-link' href='([^']+)'>([\s\S]*?)<\/a>[\s\S]*?<td class='result-snippet'>([\s\S]*?)<\/td>/g;
+            
             let match;
             let count = 0;
-            while ((match = resultRegex.exec(html)) !== null && count < 3) {
-                resultsList.push(`- ${match[2]} (${match[1]})\n  ${match[3]}`);
-                count++;
+            while ((match = resultRegex.exec(html)) !== null && count < 4) {
+                const title = match[2].replace(/<[^>]*>/g, '').trim();
+                const snippet = match[3].replace(/<[^>]*>/g, '').trim();
+                const link = match[1];
+                
+                if (title && snippet) {
+                    resultsList.push(`- ${title} (${link})\n  ${snippet}`);
+                    count++;
+                }
             }
             
             if (resultsList.length > 0) {
                 resultsList.push(`\nFull search results: ${searchUrl}`);
-                results.push(`SEARCH RESULTS FOR "${query}":\n${resultsList.join('\n\n')}`);
+                results.push(`WEB SEARCH RESULTS FOR "${query}":\n${resultsList.join('\n\n')}`);
             } else {
-                results.push(`SEARCH RESULTS FOR "${query}":\nNo results found in the simplified view.`);
+                // Fallback: Just return the URL if scraping fails
+                results.push(`SEARCH TRIGGERED FOR "${query}":\nNo direct snippets parsed. See full results here: ${searchUrl}`);
             }
         } catch (e) {
             results.push(`SEARCH FAILED FOR "${query}": ${e.message}`);
