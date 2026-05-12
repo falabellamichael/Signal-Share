@@ -158,10 +158,10 @@ const triRollovers = [
 ];
 
 const targets = [
-    { x: 30, y: 340, w: 10, h: 40, color: COLORS.accent, lit: false, points: 180 },
-    { x: 30, y: 390, w: 10, h: 40, color: COLORS.accent, lit: false, points: 180 },
-    { x: 350, y: 340, w: 10, h: 40, color: COLORS.success, lit: false, points: 180 },
-    { x: 350, y: 390, w: 10, h: 40, color: COLORS.success, lit: false, points: 180 }
+    { x: 30, y: 340, w: 10, h: 40, color: COLORS.accent, lit: false, points: 180, basePoints: 180, hits: 0, level: 0, side: 'left' },
+    { x: 30, y: 390, w: 10, h: 40, color: COLORS.accent, lit: false, points: 180, basePoints: 180, hits: 0, level: 0, side: 'left' },
+    { x: 350, y: 340, w: 10, h: 40, color: COLORS.accent, lit: false, points: 180, basePoints: 180, hits: 0, level: 0, side: 'right' }, // Matches left now
+    { x: 350, y: 390, w: 10, h: 40, color: COLORS.accent, lit: false, points: 180, basePoints: 180, hits: 0, level: 0, side: 'right' }
 ];
 
 const loop = {
@@ -316,7 +316,13 @@ function startGame() {
         t.points = 400;
         t.color = `hsl(210, 100%, 60%)`; // Reset to initial blue
     });
-    targets.forEach((t) => { t.lit = false; });
+    targets.forEach((t) => { 
+        t.lit = false; 
+        t.hits = 0;
+        t.level = 0;
+        t.color = COLORS.accent;
+        t.points = t.basePoints;
+    });
     loop.gates.forEach((g) => { g.lit = false; });
     loop.pulse = 0;
     loop.gateCooldown = 0;
@@ -833,9 +839,31 @@ function checkTargetCollision(t) {
 
     if (!t.lit) {
         t.lit = true;
+        t.hits += 1;
+        
+        // Advanced 100-Level Logic: Each side follows opposite spectrum paths
+        const maxLevels = 100;
+        const nextLevel = Math.min(maxLevels, Math.floor(t.hits / 8)); // Level up every 8 hits
+        
+        if (nextLevel > t.level) {
+            t.level = nextLevel;
+            const hueBase = 40; // Starting Orange
+            // Left side moves forward through spectrum, Right side moves backward
+            const hueShift = t.level * (360 / maxLevels);
+            const finalHue = t.side === 'left' ? (hueBase + hueShift) % 360 : (hueBase - hueShift + 360) % 360;
+            t.color = `hsl(${finalHue}, 90%, 60%)`;
+            t.points = Math.round(t.basePoints * (1 + t.level * 0.5));
+            
+            spawnText('LEVEL UP!', t.x, t.y, t.color);
+            explode(t.x, t.y, t.color, 25);
+        }
+
         addScore(t.points, t.x + t.w / 2, t.y, t.color, 'HIT');
         vibrate(10);
         explode(t.x + t.w / 2, t.y + t.h / 2, t.color, 18);
+        
+        // Auto-unlit after delay to allow more hits
+        setTimeout(() => { t.lit = false; }, 1500);
     }
 }
 
