@@ -46,6 +46,7 @@ $files = @(
   "llm-deepdive.html",
   "llm-deepdive-2.html",
   "mini-games.html",
+  "mini-games.js",
   "snake-game.html",
   "gameLogic.js",
   "Calculator.html",

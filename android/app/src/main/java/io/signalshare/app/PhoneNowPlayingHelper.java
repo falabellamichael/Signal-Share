@@ -457,8 +457,12 @@ final class PhoneNowPlayingHelper {
         String normalized = packageName.trim().toLowerCase();
         return normalized.contains("spotify")
                 || normalized.contains("youtube")
-                || normalized.equals(YOUTUBE_PACKAGE_NAME)
-                || normalized.equals(YOUTUBE_MUSIC_PACKAGE_NAME)
+                || normalized.contains("music.youtube")
+                || normalized.contains("applemusic")
+                || normalized.contains("soundcloud")
+                || normalized.contains("tidal")
+                || normalized.contains("amazon.mp3")
+                || normalized.contains("pandora")
                 || normalized.contains("signalshare");
     }
 
