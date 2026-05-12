@@ -281,25 +281,27 @@ window.sendChatMessage = async function() {
     const fullMessage = text;
 
     try {
+        const secret = localStorage.getItem("ss_bridge_secret");
         for (const url of candidates) {
             try {
-                // Determine the correct target address space for PNA
                 const isLoopback = url.includes('localhost') || url.includes('127.0.0.1');
                 const isRelative = url.startsWith('/') || !url.startsWith('http');
                 
-                // Skip relative paths if we are on GitHub Pages (it will 405)
                 if (isRelative && window.location.hostname.includes('github.io')) {
                     continue;
                 }
 
+                const headers = { 'Content-Type': 'application/json' };
+                if (secret) headers["X-Bridge-Secret"] = secret;
+
                 const response = await fetch(url, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json'
-                    },
-                    // Chrome PNA requirement: must match the actual destination type (loopback/private)
+                    headers: headers,
+                    // Standardize on W3C PNA spec: loopback for localhost, private for LAN
                     targetAddressSpace: isLoopback ? 'loopback' : 'private',
                     signal,
+                    cache: 'no-store',
+                    credentials: 'omit',
                     body: JSON.stringify({ 
                         message: fullMessage,
                         history: arcadeChatHistory,
@@ -312,10 +314,11 @@ window.sendChatMessage = async function() {
                     reply = data.reply;
                     break;
                 } else {
-                    lastError = `Status ${response.status}`;
+                    lastError = `Bridge returned ${response.status}`;
                 }
             } catch (err) {
-                lastError = err.message;
+                lastError = err.message || "Connection refused or blocked by browser";
+                console.warn(`[Arcade Chat] Candidate ${url} failed:`, err);
             }
         }
 
