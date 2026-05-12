@@ -644,6 +644,15 @@ function Matches-AppId([string]$candidate, [string]$target) {
   return ($candidateNorm -eq $targetNorm) -or ($candidateNorm.StartsWith($targetNorm)) -or ($targetNorm.StartsWith($candidateNorm))
 }
 
+$appCommandSig = '[DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);'
+$user32 = Add-Type -MemberDefinition $appCommandSig -Name "User32" -Namespace "Win32" -PassThru
+function Send-AppCommand($cmd) {
+  $WM_APPCOMMAND = 0x0319
+  $targetHWnd = [IntPtr]0xffff # HWND_BROADCAST
+  $lParam = [IntPtr]($cmd -shl 16)
+  [Win32.User32]::SendMessage($targetHWnd, $WM_APPCOMMAND, [IntPtr]::Zero, $lParam)
+}
+
 function Is-Browser-App([string]$id) {
   $n = Normalize-AppId $id
   return ($n -match "chrome|msedge|edge|firefox|opera|browser")
@@ -850,7 +859,6 @@ app.post("/api/system-media/action", (req, res) => {
     const uri = `${req.body?.uri || ""}`.trim();
     if (!uri) return res.status(400).json({ ok: false });
 
-    // Improved PowerShell launcher with fallbacks for Phone Link
     const psCommand = `
       $uri = "${uri.replace(/"/g, '`"')}"
       if ($uri -eq "mobilephonelink:" -or $uri -eq "ms-phone:") {
@@ -874,9 +882,8 @@ app.post("/api/system-media/action", (req, res) => {
 
   const actionKey = `${preferredSource || "all"}|${action}|${appPackage}`;
   const now = Date.now();
-  const lastActionAt = lastMediaActionAtByKey.get(actionKey) || 0;
-  if (now - lastActionAt < MEDIA_ACTION_COOLDOWN_MS) {
-    return res.json({ ok: true, queued: false, skipped: true, reason: "duplicate-action-cooldown" });
+  if (now - (lastMediaActionAtByKey.get(actionKey) || 0) < MEDIA_ACTION_COOLDOWN_MS) {
+    return res.json({ ok: true, queued: false, skipped: true });
   }
   lastMediaActionAtByKey.set(actionKey, now);
 
@@ -890,32 +897,42 @@ app.post("/api/system-media/action", (req, res) => {
         try {
           buildSnapshotPayload({ force: true, preferredSource });
           void syncToSupabase();
-        } catch (_error) { }
+        } catch (_e) { }
       }, 180);
     })
-    .catch(() => {
-      invalidateSnapshotCache();
-    });
+    .catch(() => invalidateSnapshotCache());
 });
 
-app.get("/security", (req, res) => { res.sendFile(path.join(projectRoot, "security.html")); });
-app.get("/security.html", (req, res) => { res.sendFile(path.join(projectRoot, "security.html")); });
-app.get("/", (req, res) => { res.sendFile(path.join(projectRoot, "index.html")); });
+// Arcade Activity Reporting
+app.post("/api/activity/report", async (req, res) => {
+  const { activity } = req.body;
+  if (!activity || !userId || !enableRemoteMediaSync) return res.status(400).json({ ok: false });
+  try {
+    const { error } = await supabase.from("system_media").upsert({
+      user_id: userId,
+      playback_state: "playing",
+      title: activity.title || "Arcade Game",
+      meta: activity.meta || "Playing now",
+      artwork_uri: activity.artworkUri || "https://signal-share.com/neon_pinball_v2_poster.png",
+      app_package: "io.signalshare.arcade",
+      device_name: "Desktop PC (Arcade Mode)",
+      updated_at: new Date().toISOString(),
+    });
+    if (!error) lastSupabaseSyncKey = `activity|${activity.title}|${Date.now()}`;
+    return res.json({ ok: !error });
+  } catch (error) {
+    return res.status(500).json({ ok: false });
+  }
+});
+
+app.get("/security", (req, res) => res.sendFile(path.join(projectRoot, "security.html")));
+app.get("/", (req, res) => res.sendFile(path.join(projectRoot, "index.html")));
 
 async function syncToSupabase() {
   if (!enableRemoteMediaSync || !isWindows || !userId || !supabase) return;
   try {
     const payload = buildSnapshotPayload();
-    const syncKey = [
-      payload.playbackState,
-      payload.title,
-      payload.meta,
-      payload.artworkUri ? "art" : "no-art",
-      payload.openUri,
-      payload.appPackage,
-      payload.smtcHealthy === false ? "smtc-error" : "smtc-ok",
-    ].join("|");
-
+    const syncKey = [payload.playbackState, payload.title, payload.meta, payload.artworkUri ? "art" : "no-art", payload.openUri, payload.appPackage, payload.smtcHealthy].join("|");
     if (syncKey === lastSupabaseSyncKey) return;
 
     const { error } = await supabase.from("system_media").upsert({
@@ -929,17 +946,8 @@ async function syncToSupabase() {
       device_name: "Desktop PC",
       updated_at: new Date().toISOString(),
     });
-
-    if (error) {
-      console.error("[Bridge] Supabase sync error:", error.message);
-      return;
-    }
-
-    lastSupabaseSyncKey = syncKey;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error || "Unknown sync error");
-    console.warn("[Bridge] Supabase sync skipped:", message);
-  }
+    if (!error) lastSupabaseSyncKey = syncKey;
+  } catch (error) { }
 }
 
 function subscribeToMediaActions() {
@@ -948,12 +956,10 @@ function subscribeToMediaActions() {
   supabase.channel('media_actions').on('postgres_changes', {
     event: 'INSERT', schema: 'public', table: 'system_media_actions', filter: `user_id=eq.${userId}`
   }, async (payload) => {
-    const { action, app_package, uri } = payload.new;
+    const { action, app_package } = payload.new;
     console.log(`[Bridge] Remote action: ${action}`);
     if (action === "open_uri") {
-      if (uri) {
-        spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${uri.replace(/"/g, '`"')}"`], { windowsHide: true });
-      }
+      if (payload.new.uri) spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${payload.new.uri.replace(/"/g, '`"')}"`], { windowsHide: true });
     } else {
       await sendSystemMediaKey(action, app_package, payload.new?.payload?.preferredSource || "");
     }
@@ -968,9 +974,5 @@ app.listen(port, "127.0.0.1", () => {
     setInterval(syncToSupabase, SUPABASE_SYNC_INTERVAL_MS);
     subscribeToMediaActions();
     syncToSupabase();
-  } else if (isWindows && !enableRemoteMediaSync) {
-    console.log("[Bridge] Remote Supabase media sync disabled. Local controls stay faster. Set SIGNAL_SHARE_ENABLE_REMOTE_MEDIA=true to sync with the live site.");
-  } else if (!userId) {
-    console.warn("[Bridge] No User ID found in .env. Local bridge controls still work.");
   }
 });
