@@ -376,7 +376,11 @@ function setupResizing() {
         if (newWidth < 280) newWidth = 280;
         
         if (!isFixed && shell.classList.contains('steam-shell')) {
-            shell.style.gridTemplateColumns = `240px 1fr 6px ${newWidth}px`;
+            // In integrated mode, we resize the TILES section (column 2) 
+            // and the chat (column 4) fills the rest.
+            const tilesWidth = e.clientX - 240; // 240 is the fixed left sidebar
+            const clampedTilesWidth = Math.max(300, Math.min(tilesWidth, window.innerWidth - 600));
+            shell.style.gridTemplateColumns = `240px ${clampedTilesWidth}px 6px 1fr`;
         } else {
             sidebar.style.width = `${newWidth}px`;
             if (isFixed && handle) {
@@ -419,11 +423,12 @@ window.toggleChat = function() {
     // Update grid if in integrated mode
     if (shell) {
         if (isCollapsed) {
+            // When collapsed, tiles fill the rest of the screen
             shell.style.gridTemplateColumns = '240px 1fr 0px 0px';
         } else {
-            const savedWidth = sidebar.offsetWidth || 380;
-            const targetWidth = savedWidth < 280 ? 380 : savedWidth;
-            shell.style.gridTemplateColumns = `240px 1fr 6px ${targetWidth}px`;
+            // When expanded, we go back to the standard auto/1fr split
+            // The 'auto' column will be based on tiles content, or we could use a fixed width if we saved it.
+            shell.style.gridTemplateColumns = '240px auto 6px 1fr';
         }
     }
     
