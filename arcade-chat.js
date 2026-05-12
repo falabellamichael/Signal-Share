@@ -232,15 +232,20 @@ window.sendChatMessage = async function() {
     let reply = null;
     let lastError = null;
 
+    // Prepare context (what page we are on and what's on it)
+    const pageContext = document.title || 'Signal Share';
+    const pageText = document.body.innerText.substring(0, 1000); // Send a snippet of the current page
+    const fullMessage = text;
+
     for (const url of candidates) {
         try {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    message: text,
+                    message: fullMessage,
                     history: arcadeChatHistory,
-                    pageContext: document.title || 'Signal Share'
+                    pageContext: `${pageContext} (Visible text: ${pageText})`
                 })
             });
 
