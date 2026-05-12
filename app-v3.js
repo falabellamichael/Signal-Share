@@ -1,5 +1,6 @@
 import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js';
 import { createAppUi } from './app-v3-ui.js';
+import {
   getMessageAttachmentKind, isPlayablePost, formatTimestamp, 
   formatFileSize, formatKind, formatProviderName,
   formatPostBadge, formatPostMeta,
