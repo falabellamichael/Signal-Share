@@ -312,15 +312,16 @@ function setupResizing() {
             }
         }
         
-        // Dynamic toggle button and messenger launcher position
+        // Dynamic toggle button and messenger elements position
         const toggleBtn = document.querySelector('.chat-toggle-btn');
         const messengerBtn = document.querySelector('.messenger-launcher');
+        const messengerSection = document.querySelector('.messenger-section');
         
         if (!sidebar.classList.contains('collapsed')) {
-            if (toggleBtn) toggleBtn.style.right = `${newWidth + 20}px`;
-            if (messengerBtn) {
-                messengerBtn.style.setProperty('right', `${newWidth + 20}px`, 'important');
-            }
+            const gapWidth = newWidth + 20;
+            if (toggleBtn) toggleBtn.style.right = `${gapWidth}px`;
+            if (messengerBtn) messengerBtn.style.setProperty('right', `${gapWidth}px`, 'important');
+            if (messengerSection) messengerSection.style.setProperty('right', `${gapWidth}px`, 'important');
         }
     });
 
@@ -344,8 +345,11 @@ window.toggleChat = function() {
     
     const toggleBtn = document.querySelector('.chat-toggle-btn');
     const messengerBtn = document.querySelector('.messenger-launcher');
+    const messengerSection = document.querySelector('.messenger-section');
+    
     if (toggleBtn) toggleBtn.style.right = '';
     if (messengerBtn) messengerBtn.style.setProperty('right', '', '');
+    if (messengerSection) messengerSection.style.setProperty('right', '', '');
     
     if (handle) handle.classList.toggle('collapsed', isCollapsed);
     

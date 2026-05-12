@@ -70,10 +70,18 @@ body:not(.chat-collapsed) .chat-toggle-btn svg {
     transform: rotate(180deg);
 }
 
-/* Move the Direct Messenger launcher with the sidebar when NOT collapsed */
-body:not(.chat-collapsed) .messenger-launcher {
+/* Move the Direct Messenger launcher and OPENED window with the sidebar when NOT collapsed */
+body:not(.chat-collapsed) .messenger-launcher,
+body:not(.chat-collapsed) .messenger-section {
     right: 400px !important; /* sidebar width (380) + margin (20) */
+}
+
+body:not(.chat-collapsed) .messenger-launcher {
     transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body:not(.chat-collapsed) .messenger-section {
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 260ms ease, opacity 180ms ease !important;
 }
 
 /* Also move the admin ban launcher if it's on the same side, 
