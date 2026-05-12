@@ -54,16 +54,24 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
     const contextAwarePrompt = `${SYSTEM_PROMPT}\n\nCURRENT CONTEXT: You are looking at the "${pageContext}" page. USE THIS INFORMATION.`;
 
     let lmResponse = "";
-    const conversation = [...history];
-    if (iteration === 0) {
-        conversation.push({ role: "user", content: message });
-    }
-
-    // Process image attachment if present (Ollama vision support)
+    // Process attachments
     let imageBase64 = null;
-    if (attachment && attachment.type === 'image' && attachment.data) {
-        // Remove data URL prefix if present
-        imageBase64 = attachment.data.split(',')[1] || attachment.data;
+    let fileContentBlock = "";
+
+    if (attachment && attachment.data) {
+        if (attachment.type === 'image') {
+            imageBase64 = attachment.data.split(',')[1] || attachment.data;
+        } else {
+            // It's a non-image file (js, html, txt, etc.)
+            try {
+                const base64Data = attachment.data.split(',')[1] || attachment.data;
+                const decoded = Buffer.from(base64Data, 'base64').toString('utf-8');
+                fileContentBlock = `\n\n[ATTACHED FILE: ${attachment.name}]\n\`\`\`\n${decoded}\n\`\`\``;
+            } catch (err) {
+                console.error("[Chatbot] Failed to decode attachment:", err);
+                fileContentBlock = `\n\n[ATTACHED FILE: ${attachment.name}] (Error: Could not read file content)`;
+            }
+        }
     }
 
     // Attempt local inference (Ollama/LM Studio)
@@ -74,6 +82,11 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
     // If we have an image, prioritize vision models
     const models = imageBase64 ? [...visionModels, ...standardModels] : standardModels;
     let success = false;
+
+    const conversation = [...history];
+    if (iteration === 0) {
+        conversation.push({ role: "user", content: message + fileContentBlock });
+    }
 
     for (const model of models) {
         if (success) break;
