@@ -20,12 +20,16 @@ import androidx.core.content.ContextCompat;
 import com.capacitorjs.plugins.pushnotifications.MessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
+import android.util.Log;
+
 public class DirectMessageMessagingService extends MessagingService {
+    private static final String TAG = "SignalShareMessaging";
     private static final String CHANNEL_ID = "messages_alerts";
     private static final String CHANNEL_NAME = "Messages";
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
+        Log.d(TAG, "Message received: " + remoteMessage.getData());
         // Always call super to ensure Capacitor JS listeners receive the event
         super.onMessageReceived(remoteMessage);
 
@@ -96,14 +100,15 @@ public class DirectMessageMessagingService extends MessagingService {
             deepLink += "/" + Uri.encode(threadId);
         }
 
-        Intent intent = new Intent(this, MainActivity.class);
+        Context context = getApplicationContext();
+        Intent intent = new Intent(context, MainActivity.class);
         intent.setAction(Intent.ACTION_VIEW);
         intent.setData(Uri.parse(deepLink));
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
         int requestCode = !TextUtils.isEmpty(threadId) ? threadId.hashCode() : 0;
         return PendingIntent.getActivity(
-                this,
+                context,
                 requestCode,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE

@@ -979,6 +979,11 @@ The companion bridge is designed with several security layers to keep your PC sa
       pushDesktopEndpointCandidate(candidates, "http://127.0.0.1:3000/api/system-media/current", seen);
     }
 
+    // Android Emulator: 10.0.2.2 refers to the PC host.
+    if (isNativeCapacitorApp && isNativeCapacitorApp()) {
+      pushDesktopEndpointCandidate(candidates, "http://10.0.2.2:3000/api/system-media/current", seen);
+    }
+
     return candidates.map((endpoint) => appendPreferredSourceToEndpoint(endpoint, { force: options.force }));
   }
 

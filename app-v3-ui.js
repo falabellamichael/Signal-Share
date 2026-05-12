@@ -1843,8 +1843,9 @@ export function createAppUi(context) {
       window.__signalShareOverlayOpen = scrollOverlayOpen;
 
       // Native bridge: Disable pull-to-refresh when any overlay is open
-      if (window.NativeBridge && typeof window.NativeBridge.setPullToRefreshEnabled === "function") {
-        window.NativeBridge.setPullToRefreshEnabled(!scrollOverlayOpen);
+      const bridge = window.NativeBridge;
+      if (bridge && typeof bridge.setPullToRefreshEnabled === "function") {
+        bridge.setPullToRefreshEnabled(!scrollOverlayOpen);
       }
     }
 

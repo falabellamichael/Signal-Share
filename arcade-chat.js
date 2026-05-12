@@ -545,6 +545,26 @@ function setupResizing() {
         }
     }
 }
+const CHAT_PLACEHOLDERS = [
+    "Ask for advice or code...",
+    "Ask to play Spotify...",
+    "Ask to open YouTube...",
+    "Ask to search the web...",
+    "Ask to check the weather...",
+    "Ask to change the theme...",
+    "Ask for arcade tips...",
+    "Ask to start a game...",
+    "Ask to see the leaderboard...",
+    "Ask for a system report..."
+];
+
+function updateChatPlaceholder() {
+    const input = document.getElementById('arc-chat-input');
+    if (!input) return;
+    const randomText = CHAT_PLACEHOLDERS[Math.floor(Math.random() * CHAT_PLACEHOLDERS.length)];
+    input.placeholder = randomText;
+}
+
 window.toggleChat = function() {
     const sidebar = document.querySelector('.steam-chat-sidebar');
     const handle = document.querySelector('.chat-resize-handle');
@@ -554,15 +574,17 @@ window.toggleChat = function() {
     
     const isCollapsed = sidebar.classList.toggle('collapsed');
     document.body.classList.toggle('chat-collapsed', isCollapsed);
+
+    // Randomize placeholder when opening
+    if (!isCollapsed) {
+        updateChatPlaceholder();
+    }
     
     // Update grid if in integrated mode
     if (shell) {
         if (isCollapsed) {
-            // When collapsed, tiles fill the rest of the screen
             shell.style.gridTemplateColumns = '240px 1fr 0px 0px';
         } else {
-            // When expanded, we go back to the standard auto/1fr split
-            // The 'auto' column will be based on tiles content, or we could use a fixed width if we saved it.
             shell.style.gridTemplateColumns = '240px auto 6px 1fr';
         }
     }
@@ -579,6 +601,7 @@ window.toggleChat = function() {
     
     localStorage.setItem('arcade-chat-collapsed', isCollapsed);
 };
+
 
 function setupToggle() {
     // Create toggle button regardless of mode, CSS will handle visibility
@@ -619,8 +642,11 @@ function setupToggle() {
         if (shell) {
             shell.style.gridTemplateColumns = '240px 1fr 0px 0px';
         }
+    } else {
+        updateChatPlaceholder();
     }
 })();
+
 /**
  * Provides arcade-themed responses when the backend is unreachable.
  */
