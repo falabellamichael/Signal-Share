@@ -647,6 +647,11 @@ The companion bridge is designed with several security layers to keep your PC sa
     return false;
   }
 
+  function getExternalProviderName(post) {
+    const kind = post?.sourceKind || "app";
+    return formatProviderName(kind);
+  }
+
   function getNativeBridge() {
     return window.NativeBridge && typeof window.NativeBridge === "object" ? window.NativeBridge : null;
   }
