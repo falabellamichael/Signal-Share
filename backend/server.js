@@ -86,30 +86,23 @@ app.use((req, res, next) => {
   const isWhitelisted = origin && CORS_WHITELIST.some((allowed) => origin.startsWith(allowed));
   const isLocalhost = !origin || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("::1");
 
-  // CORS Logic - Very permissive for local dev
+  // CORS Logic
   if (isWhitelisted || isLocalhost) {
     res.setHeader("Access-Control-Allow-Origin", origin || "*");
   } else {
-    res.setHeader("Access-Control-Allow-Origin", "*"); // Fallback for dev
+    res.setHeader("Access-Control-Allow-Origin", origin || "*");
   }
 
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS,PUT,DELETE");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, Authorization, target-address-space, x-requested-with");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, Authorization, target-address-space, x-requested-with, access-control-allow-private-network");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
   res.setHeader("Access-Control-Allow-Local-Network", "true");
   res.setHeader("Access-Control-Max-Age", "86400");
-  res.setHeader("Vary", "Origin, Access-Control-Request-Headers");
+  res.setHeader("Vary", "Origin, Access-Control-Request-Private-Network");
 
-  if (req.method === "OPTIONS") return res.status(204).end();
-
-  // Basic Security Headers
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-XSS-Protection", "1; mode=block");
-
-  // Local-Only Mode Enforcement
-  if (process.env.SIGNAL_SHARE_LOCAL_ONLY === "true" && !isLocalhost) {
-    console.warn(`[Security] Blocked non-local request from ${req.ip} while in LOCAL_ONLY mode.`);
-    return res.status(403).json({ error: "Access Denied: Local-only mode is active." });
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
   }
 
   // Content-Type Enforcement for POST

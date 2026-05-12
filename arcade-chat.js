@@ -283,13 +283,22 @@ window.sendChatMessage = async function() {
     try {
         for (const url of candidates) {
             try {
+                // Determine the correct target address space for PNA
+                const isLoopback = url.includes('localhost') || url.includes('127.0.0.1');
+                const isRelative = url.startsWith('/') || !url.startsWith('http');
+                
+                // Skip relative paths if we are on GitHub Pages (it will 405)
+                if (isRelative && window.location.hostname.includes('github.io')) {
+                    continue;
+                }
+
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 
-                        'Content-Type': 'application/json',
-                        'target-address-space': 'private'
+                        'Content-Type': 'application/json'
                     },
-                    targetAddressSpace: 'private',
+                    // Chrome PNA requirement: must match the actual destination type
+                    targetAddressSpace: isLoopback ? 'loopback' : 'private',
                     signal,
                     body: JSON.stringify({ 
                         message: fullMessage,
