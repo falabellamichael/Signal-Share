@@ -409,11 +409,23 @@ function setupResizing() {
 window.toggleChat = function() {
     const sidebar = document.querySelector('.steam-chat-sidebar');
     const handle = document.querySelector('.chat-resize-handle');
+    const shell = document.querySelector('.steam-shell');
     
     if (!sidebar) return;
     
     const isCollapsed = sidebar.classList.toggle('collapsed');
     document.body.classList.toggle('chat-collapsed', isCollapsed);
+    
+    // Update grid if in integrated mode
+    if (shell) {
+        if (isCollapsed) {
+            shell.style.gridTemplateColumns = '240px 1fr 0px 0px';
+        } else {
+            const savedWidth = sidebar.offsetWidth || 380;
+            const targetWidth = savedWidth < 280 ? 380 : savedWidth;
+            shell.style.gridTemplateColumns = `240px 1fr 6px ${targetWidth}px`;
+        }
+    }
     
     const toggleBtn = document.querySelector('.chat-toggle-btn');
     const messengerBtn = document.querySelector('.messenger-launcher');
