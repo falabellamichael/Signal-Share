@@ -21,14 +21,10 @@ async function bridgeFetch(path, options = {}) {
     const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 1500);
 
     try {
-        return await fetch(`${BRIDGE_BASE_URL}${path}`, {
-            method,
-            mode: "cors",
-            cache: "no-store",
-            credentials: "omit",
             ...options,
             headers,
             signal: options.signal || controller.signal,
+            targetAddressSpace: 'private' // Resolve Chrome PNA warnings
         });
     } finally {
         clearTimeout(timeout);
@@ -60,14 +56,10 @@ let bridgeEnabled = false;
  * Starts background polling for the desktop bridge state.
  */
 function startDesktopBridgePolling() {
-    if (bridgePollTimer) return;
-
+    // Background polling removed to avoid duplicate intervals and reduce lag.
+    // The bridge will be polled on-demand when chat is opened or a message is sent.
     bridgeEnabled = true;
     pollDesktopBridge();
-
-    bridgePollTimer = setInterval(() => {
-        if (!document.hidden) pollDesktopBridge();
-    }, 5000);
 }
 
 /**
@@ -106,6 +98,28 @@ async function pollDesktopBridge() {
     } finally {
         bridgePollInFlight = false;
     }
+}
+
+/**
+ * Updates the chat input placeholder with a random suggestion.
+ */
+function updateChatPlaceholder() {
+    const input = document.getElementById('arc-chat-input');
+    if (!input) return;
+
+    const suggestions = [
+        "Ask to play Spotify...",
+        "Ask to open YouTube...",
+        "Ask to play a game...",
+        "How can I help you today?",
+        "Ask for gaming advice...",
+        "Ask to open the library...",
+        "Say 'Play some music'...",
+        "Say 'Open Pinball'..."
+    ];
+
+    const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)];
+    input.placeholder = randomSuggestion;
 }
 
 /**
@@ -440,6 +454,11 @@ window.sendChatMessage = async function() {
     try {
         addChatMessage('user', text);
         input.value = '';
+        
+        // Refresh bridge context on demand so AI has latest info
+        if (typeof pollDesktopBridge === 'function') {
+            await pollDesktopBridge();
+        }
         
         const typingId = addTypingIndicator();
         let activeAiAbortController = new AbortController();

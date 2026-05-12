@@ -301,7 +301,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
   } = context;
 
   // 1. AUTHORITATIVE COOLDOWN
-  if (debounce("play-pause", 0)) return;
+  if (debounce("play-pause", 500)) return;
 
   // 2. STABILIZATION LOCKOUT
   const now = Date.now();
@@ -423,7 +423,7 @@ export function handlePreviousAction(context) {
     isNativeCapacitorApp
   } = context;
 
-  if (debounce("previous", 0)) return;
+  if (debounce("previous", 500)) return;
 
   const now = Date.now();
   state._mediaActionLockoutUntil = now + 0;
@@ -503,7 +503,7 @@ export function handleNextAction(context) {
     isNativeCapacitorApp
   } = context;
 
-  if (debounce("next", 0)) return;
+  if (debounce("next", 500)) return;
 
   const now = Date.now();
   state._mediaActionLockoutUntil = now + 0;

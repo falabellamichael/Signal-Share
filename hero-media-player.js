@@ -48,11 +48,11 @@ export function createHeroMediaPlayerController(options) {
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
   const NATIVE_ACTION_NEXT = "next";
   const NATIVE_ACTION_PREVIOUS = "previous";
-  const NATIVE_POLL_INTERVAL_MS = 32;
+  const NATIVE_POLL_INTERVAL_MS = 3000;
   const DESKTOP_ACTION_PLAY_PAUSE = "play_pause";
   const DESKTOP_ACTION_NEXT = "next";
   const DESKTOP_ACTION_PREVIOUS = "previous";
-  const DESKTOP_POLL_INTERVAL_MS = 32;
+  const DESKTOP_POLL_INTERVAL_MS = 3000;
   const LOCAL_NETWORK_PROMPT_COOLDOWN_MS = 30000;
   const SNAPSHOT_INGEST_DELAY_MS = 0;
 
@@ -1318,7 +1318,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     // Media mode can retry sooner, but avoid hammering the Windows SMTC bridge.
-    if (isMediaMode) waitTime = 32;  // More aggressive polling in Media mode
+    if (isMediaMode) waitTime = 1000;  // More aggressive but safe polling in Media mode
 
     if (!force && now - lastDesktopPollTime < waitTime) {
       return Promise.resolve(desktopSnapshot);
