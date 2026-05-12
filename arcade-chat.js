@@ -29,7 +29,8 @@ async function bridgeFetch(path, options = {}) {
             ...options,
             headers,
             signal: options.signal || controller.signal,
-            targetAddressSpace: 'private' // Resolve Chrome PNA warnings
+            // Only apply 'private' for LAN IPs. 127.0.0.1 is 'loopback' and should not have this header
+            ...(BRIDGE_BASE_URL.includes('127.0.0.1') || BRIDGE_BASE_URL.includes('localhost') ? {} : { targetAddressSpace: 'private' })
         });
     } finally {
         clearTimeout(timeout);
