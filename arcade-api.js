@@ -74,7 +74,7 @@ export async function getLeaderboard(gameId, limit = 10) {
             created_at,
             metadata,
             user_id,
-            profiles:user_id (
+            profiles (
                 display_name,
                 id
             )
