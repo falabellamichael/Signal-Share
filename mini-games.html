@@ -1172,7 +1172,7 @@
             </div>
             <div class="chat-input-area">
                 <div class="chat-input-wrapper">
-                    <input type="text" id="chat-input" class="chat-input" placeholder="Type a message..." onkeydown="if(event.key === 'Enter') sendChatMessage()">
+                    <input type="text" id="chat-input" class="chat-input" placeholder="Type a message..." onkeydown="if(event.key === 'Enter') sendChatMessage()" autocomplete="off" spellcheck="false">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="cursor: pointer; opacity: 0.6;" onclick="sendChatMessage()"><line x1="22" y1="2" x2="11" y2="13"></line><polyline points="22 2 15 22 11 13 2 9 22 2"></polyline></svg>
                 </div>
             </div>
