@@ -141,6 +141,24 @@ class SnakeGame {
         this.overlay.classList.remove('hidden');
         this.updateStats();
         this.vibrate(40);
+
+        // Signal Share Arcade API Integration: Send score to launcher for Supabase persistence
+        if (window.parent !== window) {
+            window.parent.postMessage({
+                type: 'GAME_SCORE',
+                gameId: 'snake',
+                score: this.score,
+                metadata: {
+                    foodEaten: this.foodEaten,
+                    moves: this.moves,
+                    timeSeconds: this.elapsedSec,
+                    speedLevel: this.speedLevel,
+                    streak: this.sessionStreak,
+                    cause: cause,
+                    timestamp: new Date().toISOString()
+                }
+            }, '*');
+        }
     }
 
 

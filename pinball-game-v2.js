@@ -351,6 +351,21 @@ function gameOver() {
     ui.overlayTitle.style.fontSize = '2.5rem';
     ui.overlayTitle.style.color = COLORS.white;
     ui.overlaySub.innerHTML = `Final Score: <span style="color:${COLORS.accent}">${formatScore(state.score)}</span><br>Best: ${formatScore(state.highScore)}`;
+
+    // Signal Share Arcade API Integration: Send score to launcher for Supabase persistence
+    if (window.parent !== window) {
+        window.parent.postMessage({
+            type: 'GAME_SCORE',
+            gameId: 'pinball',
+            score: state.score,
+            metadata: {
+                highScore: state.highScore,
+                multiplier: state.multiplier,
+                ballsLeft: state.balls,
+                timestamp: new Date().toISOString()
+            }
+        }, '*');
+    }
 }
 
 function loseBall() {

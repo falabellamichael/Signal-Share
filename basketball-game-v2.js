@@ -1058,6 +1058,22 @@ function gameOver() {
     menuSub.textContent = `Mode: ${gameMode.toUpperCase()} | Score: ${score} | Best: ${bestScores[gameMode]}`;
     overlay.style.display = 'flex';
     setTimeout(() => overlay.style.opacity = '1', 10);
+
+    // Signal Share Arcade API Integration: Send score to launcher for Supabase persistence
+    if (window.parent !== window) {
+        window.parent.postMessage({
+            type: 'GAME_SCORE',
+            gameId: 'basketball',
+            score: score,
+            metadata: {
+                mode: gameMode,
+                level: level,
+                physics: physicsMode,
+                best: bestScores[gameMode],
+                timestamp: new Date().toISOString()
+            }
+        }, '*');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

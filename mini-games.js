@@ -412,7 +412,12 @@ function setCategory(cat, skipPush = false) {
         const content = document.getElementById('leader-content');
         if (msg) msg.style.display = currentUser ? 'none' : 'block';
         if (content) content.style.display = currentUser ? 'block' : 'none';
-        if (currentUser) renderLeaderboard();
+        if (currentUser) {
+            renderLeaderboard();
+            if (typeof window.renderGlobalLeaderboards === 'function') {
+                window.renderGlobalLeaderboards();
+            }
+        }
     } else {
         if (library) library.style.display = 'block';
         if (hero) hero.style.display = (cat === 'all') ? 'flex' : 'none';

@@ -1013,8 +1013,17 @@
                         </div>
                     </div>
 
-                    <div id="leader-grid" style="display: flex; flex-direction: column; gap: 15px;">
-                        <!-- Dynamically populated -->
+                    <div id="leader-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-bottom: 60px;">
+                        <!-- Dynamically populated personal stats -->
+                    </div>
+
+                    <div id="global-leaderboard" style="margin-top: 40px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
+                            <h3 style="font-size: 0.85rem; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; font-weight: 900; margin: 0;">Community High Scores</h3>
+                        </div>
+                        <div id="global-leaderboard-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px;">
+                            <div style="grid-column: 1/-1; padding: 40px; text-align: center; opacity: 0.3; font-size: 0.9rem;">Connecting to Signal Share telemetry...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1076,7 +1085,78 @@
 
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="leaderboard-metrics.js"></script>
+    <script type="module">
+        import { initArcadeApi, saveGameScore } from './arcade-api.js';
+        
+        // Initialize Supabase and Arcade API
+        const config = window.SIGNAL_SHARE_CONFIG || {
+            supabaseUrl: "https://gswptxeikjmihdjxoiar.supabase.co",
+            supabaseAnonKey: "sb_publishable_gIwGxzf1C4cD55l9XS16wg_Qn-LuYqT"
+        };
+        
+        const supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+        initArcadeApi({ supabase });
+
+        // Global exposing for use in other functions
+        window.renderGlobalLeaderboards = async () => {
+            const games = ['pinball', 'basketball', 'snake'];
+            const container = document.getElementById('global-leaderboard-grid');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            for (const gameId of games) {
+                try {
+                    const stats = await getLeaderboard(gameId, 5);
+                    const gameInfo = (window.GAMES || []).find(g => g.id === gameId) || { title: gameId.toUpperCase() };
+                    
+                    const group = document.createElement('div');
+                    group.style.cssText = 'background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 20px;';
+                    
+                    let rowsHtml = stats.length > 0 ? stats.map((s, i) => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: ${i === stats.length-1 ? 'none' : '1px solid rgba(255,255,255,0.03)'};">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 0.65rem; font-weight: 900; opacity: 0.3; width: 15px;">${i+1}</span>
+                                <span style="font-size: 0.85rem; font-weight: 700; color: rgba(255,255,255,0.8);">${s.displayName}</span>
+                            </div>
+                            <span style="font-weight: 900; font-size: 0.95rem; color: #f59e0b;">${Number(s.score).toLocaleString()}</span>
+                        </div>
+                    `).join('') : '<div style="padding: 20px 0; opacity: 0.2; font-size: 0.75rem; text-align: center;">No scores recorded yet</div>';
+                    
+                    group.innerHTML = `
+                        <div style="font-size: 0.65rem; color: var(--steam-light); font-weight: 900; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 15px;">${gameInfo.title}</div>
+                        ${rowsHtml}
+                    `;
+                    container.appendChild(group);
+                } catch (err) {
+                    console.error(`Failed to load ${gameId} leaderboard:`, err);
+                }
+            }
+        };
+
+        // Listen for scores from mini-games (running in iframes)
+        window.addEventListener('message', async (event) => {
+            if (event.data && event.data.type === 'GAME_SCORE') {
+                const { gameId, score, metadata } = event.data;
+                console.log(`[Arcade Launcher] Received score for ${gameId}: ${score}`, metadata);
+                
+                try {
+                    await saveGameScore(gameId, score, metadata);
+                    // Notify the game that the score was saved if needed
+                    event.source.postMessage({ type: 'SCORE_SAVED', success: true }, '*');
+                    
+                    // Refresh if viewing leaderboard
+                    if (window.currentCategory === 'leaderboard') {
+                        window.renderGlobalLeaderboards();
+                    }
+                } catch (err) {
+                    console.error('[Arcade Launcher] Failed to save score to Supabase:', err);
+                }
+            }
+        });
+    </script>
     <script src="mini-games.js?v=1.3"></script>
     <script>
         // Signal Share Android Optimization Suite - Detection
