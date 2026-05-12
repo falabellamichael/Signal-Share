@@ -312,10 +312,15 @@ function setupResizing() {
             }
         }
         
-        // Dynamic toggle button position
+        // Dynamic toggle button and messenger launcher position
         const toggleBtn = document.querySelector('.chat-toggle-btn');
-        if (toggleBtn && !sidebar.classList.contains('collapsed')) {
-            toggleBtn.style.right = `${newWidth + 20}px`;
+        const messengerBtn = document.querySelector('.messenger-launcher');
+        
+        if (!sidebar.classList.contains('collapsed')) {
+            if (toggleBtn) toggleBtn.style.right = `${newWidth + 20}px`;
+            if (messengerBtn) {
+                messengerBtn.style.setProperty('right', `${newWidth + 20}px`, 'important');
+            }
         }
     });
 
@@ -338,10 +343,9 @@ window.toggleChat = function() {
     document.body.classList.toggle('chat-collapsed', isCollapsed);
     
     const toggleBtn = document.querySelector('.chat-toggle-btn');
-    if (toggleBtn) {
-        // Clear any inline style set by resizing
-        toggleBtn.style.right = '';
-    }
+    const messengerBtn = document.querySelector('.messenger-launcher');
+    if (toggleBtn) toggleBtn.style.right = '';
+    if (messengerBtn) messengerBtn.style.setProperty('right', '', '');
     
     if (handle) handle.classList.toggle('collapsed', isCollapsed);
     
