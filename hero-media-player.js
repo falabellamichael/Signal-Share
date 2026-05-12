@@ -864,7 +864,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       return {
         ...init,
         headers,
-        targetAddressSpace: (addressSpace === "loopback" || addressSpace === "local" || addressSpace === "private") ? "private" : addressSpace
+        targetAddressSpace: addressSpace
       };
     } catch {
       return init;
@@ -906,10 +906,8 @@ The companion bridge is designed with several security layers to keep your PC sa
       .catch(() => null)
       .finally(() => {
         localNetworkPromptInFlight = false;
-        window.setTimeout(() => {
-          if (document.hidden || !canUseDesktopBridge()) return;
-          refreshDesktopSnapshot();
-        }, 900);
+        // Do NOT automatically retry here to avoid console spam. 
+        // The user can refresh manually or it will pick up on window focus.
       });
   }
 
@@ -1253,12 +1251,16 @@ The companion bridge is designed with several security layers to keep your PC sa
     const endpoints = resolveDesktopSnapshotEndpoints({ force });
     for (const endpoint of endpoints) {
       try {
+        const isLoopback = getEndpointAddressSpace(endpoint) === "loopback";
         const response = await window.fetch(endpoint, withLocalNetworkFetchOptions(endpoint, {
           method: "GET",
           cache: "no-store",
           credentials: "omit",
+          targetAddressSpace: isLoopback ? "loopback" : "private",
           headers: {
             Accept: "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type",
           },
         }));
         if (!response.ok) throw new Error(`Desktop media endpoint returned ${response.status}.`);
