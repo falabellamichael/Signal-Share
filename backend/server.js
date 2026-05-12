@@ -94,7 +94,7 @@ app.use((req, res, next) => {
   }
 
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, Authorization, target-address-space, x-requested-with, access-control-allow-private-network");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, Authorization, target-address-space, x-requested-with, access-control-allow-private-network, *");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
   res.setHeader("Access-Control-Allow-Local-Network", "true");
   res.setHeader("Access-Control-Max-Age", "86400");

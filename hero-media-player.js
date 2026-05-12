@@ -1259,8 +1259,6 @@ The companion bridge is designed with several security layers to keep your PC sa
           targetAddressSpace: isLoopback ? "loopback" : "private",
           headers: {
             Accept: "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type",
           },
         }));
         if (!response.ok) throw new Error(`Desktop media endpoint returned ${response.status}.`);
