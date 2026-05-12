@@ -998,8 +998,8 @@ app.post('/api/llm/chat', async (req, res) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          model: 'llama3', // You can change this to 'mistral' or any model you have pulled
-          prompt: `Context: You are the Signal Share Arcade Companion, a helpful AI built into a retro-neon arcade suite. Keep your responses concise, friendly, and arcade-themed. 
+          model: 'google/gemme-4-e2b', 
+          prompt: `Context: You are the Signal Share Arcade Companion, a helpful AI built into a retro-neon arcade suite. Keep your responses concise (1-2 sentences), friendly, and arcade-themed. 
           User Message: ${message}`, 
           stream: false 
         })
