@@ -16,6 +16,11 @@ const levelBox = document.getElementById('level-box');
 const menuTitle = document.getElementById('menu-title');
 const menuSub = document.getElementById('menu-sub');
 
+function vibrate(ms) {
+    if (navigator.vibrate) navigator.vibrate(ms);
+}
+
+
 console.info('[Neon Hoops] realistic-net-v2 loaded');
 window.__NEON_HOOPS_BUILD = 'realistic-net-v2';
 
@@ -359,8 +364,9 @@ function scoreShot(isPerfectShot) {
     ball.vy = Math.max(ball.vy, 360);
     ball.isOnFire = false;
     ball.isPerfect = false;
-
+    vibrate(perfect ? 45 : 25);
     punchNet(ball.x, hoop.y + hoop.radius * 0.65, ball.vx, Math.abs(ball.vy) + 260, hoop.radius * 2.25, perfect ? 1.35 : 1.0);
+
 
     if (gameMode === 'playoff' && score >= targetScore) nextLevel();
 }
@@ -387,7 +393,9 @@ function hitBackboard() {
         ball.vy = -Math.abs(ball.vy) * BACKBOARD_RESTITUTION;
         ball.vx += (ball.x - hoop.x) * 0.8;
         ball.rimHits += 1;
+        vibrate(12);
         punchNet(ball.x, hoop.y + 18, ball.vx, 110, hoop.radius * 1.55, 0.38);
+
         return true;
     }
     return false;
@@ -428,7 +436,9 @@ function hitRimAndScore() {
     ball.scaleVelocity += 0.08;
     ball.isOnFire = false;
     ball.isPerfect = false;
+    vibrate(15);
     punchNet(ball.x, hoop.y + 12, ball.vx, 130, hoop.radius * 1.45, 0.42);
+
 }
 
 function updateBall(dt) {
@@ -900,7 +910,9 @@ function releaseShot() {
     ball.shotAge = 0;
     ball.isPerfect = false;
     ball.isOnFire = false;
+    vibrate(10);
     ball.releaseQuality = clamp(speedQuality * 0.4 + straightQuality * 0.3 + timingQuality * 0.3, 0, 1);
+
 
     // Flight time and target bias tuned to feel like a real set shot/flick.
     const flightTime = lerp(1.15, 1.65, power);

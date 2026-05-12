@@ -14,6 +14,11 @@ const ctx = canvas.getContext('2d');
 const particleCanvas = document.getElementById('particle-canvas');
 const pCtx = particleCanvas.getContext('2d');
 
+function vibrate(ms) {
+    if (navigator.vibrate) navigator.vibrate(ms);
+}
+
+
 const W = 400;
 const H = 700;
 const DPR_LIMIT = 2.5;
@@ -442,8 +447,10 @@ function releaseLaunchCharge() {
     state.launchHolding = false;
     state.launchReady = false;
     state.launchCharge = 0;
+    vibrate(25);
     explode(384, 648, COLORS.accent, 25);
 }
+
 
 window.addEventListener('keydown', (event) => {
     if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', 'KeyA', 'KeyD', 'KeyS', 'KeyW', 'KeyT', 'ShiftLeft', 'ShiftRight'].includes(event.code)) event.preventDefault();
@@ -698,12 +705,10 @@ function checkSegmentCollision(seg, restitution) {
     if (vn < 0) {
         ball.vx -= (1 + restitution) * vn * nx;
         ball.vy -= (1 + restitution) * vn * ny;
+        vibrate(12);
 
         const tx = -ny, ty = nx;
         const vt = ball.vx * tx + ball.vy * ty;
-        ball.vx -= vt * CFG.wallFriction * tx;
-        ball.vy -= vt * CFG.wallFriction * ty;
-
         ball.spin += (vt * CFG.wallFriction) / ball.r;
 
         if (seg.slingshot && Math.abs(vn) > 1.5) {
@@ -769,8 +774,10 @@ function checkBumperCollision(b) {
 
     const currentPoints = Math.round(b.basePoints * BUMPER_LEVELS[b.level].pointsMult);
     addScore(currentPoints, b.x, b.y - b.r - 10, b.color, 'BUMP');
+    vibrate(15);
     explode(b.x, b.y, b.color, 30);
 }
+
 
 function checkRollover(r) {
     if (r.cooldown > 0) return;
@@ -827,9 +834,11 @@ function checkTargetCollision(t) {
     if (!t.lit) {
         t.lit = true;
         addScore(t.points, t.x + t.w / 2, t.y, t.color, 'HIT');
+        vibrate(10);
         explode(t.x + t.w / 2, t.y + t.h / 2, t.color, 18);
     }
 }
+
 
 function checkFlipperCollision(f, dt) {
     const ang = f.currentAngle || f.angle;

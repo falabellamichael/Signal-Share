@@ -1,4 +1,8 @@
 class SnakeGame {
+    vibrate(ms) {
+        if (navigator.vibrate) navigator.vibrate(ms);
+    }
+
     constructor(canvasId, opts = {}) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
@@ -136,7 +140,9 @@ class SnakeGame {
         this.startBtn.textContent    = 'Try Again';
         this.overlay.classList.remove('hidden');
         this.updateStats();
+        this.vibrate(40);
     }
+
 
     // ─── Core Loop ──────────────────────────────────────────────────────
 
@@ -183,7 +189,9 @@ class SnakeGame {
                 this.gameSpeed = Math.max(40, this.gameSpeed - 10);
                 this.gameLoop = setInterval(() => this.gameStep(), this.gameSpeed);
             }
+            this.vibrate(10);
             this.placeFood();
+
             if (this.obstacleMode === 'dynamic') this.generateObstacles();
         } else {
             this.snake.pop();

@@ -208,7 +208,10 @@
         </div>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
+    <div id="game-canvas-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
 
     <div id="overlay">
         <h1 style="font-size: 4rem; margin: 0; color: var(--neon-orange); text-shadow: 0 0 20px rgba(255,119,0,0.6); letter-spacing: -2px; text-align: center;" id="menu-title">NEON HOOPS</h1>
@@ -233,6 +236,14 @@
 
     <script src="basketball-gamev2realistic.js?v=1.3"></script>
     <script>
+        // Signal Share Android Optimization Suite - Detection
+        (function() {
+            const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+            if (isNative || /Android/i.test(navigator.userAgent)) {
+                document.documentElement.classList.add('platform-android');
+            }
+        })();
+
         // Standardize Signal Share Suite UI - Hide redundant header in App Runner
         if (window.self !== window.top) {
             const header = document.querySelector('.runner-header');

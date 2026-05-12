@@ -293,6 +293,18 @@
     </main>
 
     <script>
+        // Signal Share Android Optimization Suite - Detection
+        (function() {
+            const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+            if (isNative || /Android/i.test(navigator.userAgent)) {
+                document.documentElement.classList.add('platform-android');
+            }
+        })();
+
+        function vibrate(ms) {
+            if (navigator.vibrate) navigator.vibrate(ms);
+        }
+
         let currentExpr = '';
         let lastResult = null;
         let memory = 0;
@@ -335,6 +347,7 @@
         };
 
         function setMode(mode) {
+            vibrate(8);
             currentMode = mode;
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById(`nav-${mode}`).classList.add('active');
@@ -366,7 +379,7 @@
                 row.forEach(btn => {
                     if (!btn) return;
                     const b = document.createElement('button');
-                    b.className = 'btn';
+                    b.className = 'btn vibrate-on-touch';
                     if (['+','-','*','/','='].includes(btn)) b.classList.add('operator');
                     if (['AC','del'].includes(btn)) b.classList.add('clear');
                     if (['sin','cos','tan','log','ln','sqrt','fact'].includes(btn)) b.classList.add('function');
@@ -380,6 +393,7 @@
         }
 
         function handleBtn(btn) {
+            vibrate(10);
             if (btn === 'AC') clearAll();
             else if (btn === 'del') backspace();
             else if (btn === '=') calculate();
@@ -541,6 +555,7 @@
 
         function setTrigMode(m) {
             trigMode = m;
+            vibrate(5);
             document.getElementById('deg-btn').classList.toggle('active', m === 'deg');
             document.getElementById('rad-btn').classList.toggle('active', m === 'rad');
         }
@@ -615,14 +630,14 @@
 
         function renderHistory() {
             document.getElementById('history-list').innerHTML = history.map(h => `
-                <div class="history-item" onclick="currentExpr='${h.res}';updateDisplay()">
+                <div class="history-item" onclick="currentExpr='${h.res}';updateDisplay();vibrate(5);">
                     <div class="hist-expr">${h.expr}</div>
                     <div class="hist-res">${h.res}</div>
                 </div>
             `).join('');
         }
 
-        function clearHistory() { history = []; localStorage.setItem('calc-history', '[]'); renderHistory(); }
+        function clearHistory() { history = []; localStorage.setItem('calc-history', '[]'); renderHistory(); vibrate(20); }
 
         // KEYBOARD SUPPORT
         window.addEventListener('keydown', (e) => {

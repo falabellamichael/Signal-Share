@@ -410,8 +410,10 @@
             </div>
         </div>
 
-        <div style="position: relative; width: 100%;">
+        <div id="game-canvas-container">
             <canvas id="gameCanvas" width="400" height="400"></canvas>
+        </div>
+
             
             <div id="overlay">
                 <p class="overlay-msg" id="message">Neon Snake</p>
@@ -437,6 +439,14 @@
 
     <script src="gameLogic.js?v=1.3"></script>
     <script>
+        // Signal Share Android Optimization Suite - Detection
+        (function() {
+            const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+            if (isNative || /Android/i.test(navigator.userAgent)) {
+                document.documentElement.classList.add('platform-android');
+            }
+        })();
+
         // Populate settings badges from URL
         document.addEventListener('DOMContentLoaded', () => {
             const p = new URLSearchParams(window.location.search);

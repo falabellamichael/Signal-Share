@@ -14,6 +14,11 @@ const GAMES = [
 let currentCategory = 'all';
 let currentUser = JSON.parse(localStorage.getItem('ss-user') || 'null');
 let isNavigatingHistory = false;
+
+function vibrate(ms) {
+    if (navigator.vibrate) navigator.vibrate(ms);
+}
+
 let customGames = JSON.parse(localStorage.getItem('ss-custom-games') || '[]');
 let uploadedFiles = [];
 
@@ -358,7 +363,9 @@ function updateAuthUI() {
 }
 
 function setCategory(cat, skipPush = false) {
+    vibrate(5);
     currentCategory = cat;
+
 
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     const navEl = document.getElementById(`nav-${cat}`);
@@ -747,7 +754,9 @@ function launchCalc() {
 }
 
 function openApp(url, title, icon, appId, skipPush = false) {
+    vibrate(15);
     const runner = document.getElementById('app-runner');
+
     const frame = document.getElementById('app-frame');
     const titleEl = document.getElementById('runner-title');
     const iconEl = document.getElementById('runner-icon');
@@ -778,7 +787,9 @@ function openApp(url, title, icon, appId, skipPush = false) {
 }
 
 function closeApp(skipPush = false) {
+    vibrate(10);
     const runner = document.getElementById('app-runner');
+
     const frame = document.getElementById('app-frame');
 
     if (!runner || runner.style.display === 'none') return;

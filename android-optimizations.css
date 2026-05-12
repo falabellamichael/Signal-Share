@@ -127,3 +127,101 @@ canvas, .game-container {
     -webkit-user-select: none;
     touch-action: none;
 }
+/* 11. Game Specific High-Fidelity Overrides */
+html.platform-android .game-container,
+html.platform-android #game-canvas-container {
+    box-shadow: 0 0 40px rgba(0,0,0,0.8);
+    transform: translateZ(0); /* Force GPU */
+    max-width: 98vw !important;
+    max-height: calc(100vh - 120px) !important;
+    margin: auto !important;
+}
+
+
+/* Ensure canvas takes priority and is centered */
+html.platform-android canvas {
+    image-rendering: pixelated; /* Sharpness on mobile */
+    touch-action: none;
+    -webkit-user-select: none;
+}
+
+/* 12. App Runner Immersive Experience */
+html.platform-android #app-runner {
+    padding-top: var(--safe-area-top);
+    padding-bottom: var(--safe-area-bottom);
+    padding-left: var(--safe-area-left);
+    padding-right: var(--safe-area-right);
+    background: #000;
+}
+
+html.platform-android .runner-header {
+    height: 60px;
+    padding-top: 0; /* Handled by runner container */
+}
+
+/* 13. System Feedback */
+.vibrate-on-touch:active {
+    outline: none;
+}
+
+/* 14. Library & Layout Overrides */
+html.platform-android .steam-shell {
+    grid-template-columns: 1fr !important;
+}
+
+html.platform-android .steam-sidebar {
+    display: none !important;
+}
+
+html.platform-android .steam-content {
+    padding: 15px !important;
+    padding-top: max(15px, var(--safe-area-top)) !important;
+    padding-bottom: max(15px, var(--safe-area-bottom)) !important;
+}
+
+html.platform-android .featured-hero {
+    padding: 20px !important;
+    min-height: 240px !important;
+}
+
+html.platform-android .mobile-category-nav {
+    display: flex !important;
+    margin-bottom: 20px !important;
+}
+
+
+/* 14. Calculator Mobile Overrides */
+html.platform-android .calc-wrapper {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+}
+
+html.platform-android .sidebar {
+    width: 100% !important;
+    height: auto !important;
+    padding: 20px !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+
+html.platform-android .workspace {
+    padding: 15px !important;
+}
+
+html.platform-android .display-container {
+    padding: 20px !important;
+}
+
+html.platform-android .main-line {
+    font-size: 2.2rem !important;
+}
+
+html.platform-android .btn {
+    padding: 12px !important;
+    font-size: 0.95rem !important;
+}
+
+html.platform-android .history-panel {
+    min-height: 200px !important;
+    margin-top: 20px !important;
+}
