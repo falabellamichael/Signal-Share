@@ -794,9 +794,22 @@ function setupToggle() {
     // Create toggle button regardless of mode, CSS will handle visibility
     if (!document.querySelector('.chat-toggle-btn')) {
         const btn = document.createElement('button');
-        btn.className = 'chat-toggle-btn';
+        const isSteamShell = document.documentElement.classList.contains('is-steam-shell');
+        
+        if (isSteamShell) {
+            btn.className = 'chat-toggle-btn chat-tab-mode';
+            btn.innerHTML = `
+                <div class="tab-label" style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; font-weight: 900; letter-spacing: 2px; color: #67c1f5; text-transform: uppercase;">Companion</div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: #67c1f5; margin-top: 5px;">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+            `;
+        } else {
+            btn.className = 'chat-toggle-btn';
+            btn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+        }
+        
         btn.onclick = window.toggleChat;
-        btn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
         document.body.appendChild(btn);
     }
 }
