@@ -334,10 +334,10 @@
 
     .messenger-toolbar {
       position: relative;
-      align-items: start;
+      align-items: center;
       flex-wrap: wrap;
-      gap: 16px;
-      margin-bottom: 0;
+      gap: 12px;
+      margin-bottom: 0 !important;
       padding-right: 56px;
     }
 
@@ -345,7 +345,7 @@
       grid-row: 1;
       display: grid;
       grid-template-columns: minmax(0, 1fr);
-      gap: 18px;
+      gap: 12px;
       padding-right: 108px;
     }
 
@@ -585,6 +585,7 @@
       min-height: 0;
       overflow: hidden;
       padding-bottom: 24px;
+      gap: 20px;
     }
 
     .messenger-sidebar {
@@ -613,7 +614,7 @@
 
     .messenger-card,
     .messenger-thread {
-      padding: 16px 16px 14px;
+      padding: 18px 20px 20px;
       border-radius: var(--radius-lg);
       border: 1px solid rgba(19, 33, 43, 0.1);
       background: rgba(255, 255, 255, 0.68);
