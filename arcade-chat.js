@@ -192,6 +192,7 @@ function startNewChat() {
     }
     updateChatStatus('idle');
     showChatView();
+    updateChatPlaceholder();
     saveCurrentChat();
 }
 
@@ -585,7 +586,7 @@ window.toggleChat = function() {
         if (isCollapsed) {
             shell.style.gridTemplateColumns = '240px 1fr 0px 0px';
         } else {
-            shell.style.gridTemplateColumns = '240px auto 6px 1fr';
+            shell.style.gridTemplateColumns = '240px 1fr 6px 380px';
         }
     }
     
