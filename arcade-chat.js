@@ -3,6 +3,136 @@
  * Shared component for cross-page companion interactions.
  */
 
+const BRIDGE_BASE_URL = "http://127.0.0.1:3000";
+
+function getBridgeSecret() {
+    return localStorage.getItem("signal-share-bridge-secret") || "";
+}
+
+async function bridgeFetch(path, options = {}) {
+    const method = options.method || "GET";
+    const headers = {
+        ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
+        ...(getBridgeSecret() ? { "X-Bridge-Secret": getBridgeSecret() } : {}),
+        ...(options.headers || {}),
+    };
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 1500);
+
+    try {
+        return await fetch(`${BRIDGE_BASE_URL}${path}`, {
+            method,
+            mode: "cors",
+            cache: "no-store",
+            credentials: "omit",
+            targetAddressSpace: "local",
+            ...options,
+            headers,
+            signal: options.signal || controller.signal,
+        });
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function getDesktopBridgeSnapshot() {
+    const res = await bridgeFetch("/api/system-media/current");
+    if (!res.ok) return null;
+    return res.json();
+}
+
+async function sendDesktopBridgeAction(action, appPackage = "") {
+    const res = await bridgeFetch("/api/system-media/action", {
+        method: "POST",
+        body: JSON.stringify({ action, appPackage }),
+    });
+
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    return Boolean(data?.ok);
+}
+
+let bridgePollTimer = null;
+let bridgePollInFlight = false;
+let bridgeEnabled = false;
+
+/**
+ * Starts background polling for the desktop bridge state.
+ */
+function startDesktopBridgePolling() {
+    if (bridgePollTimer) return;
+
+    bridgeEnabled = true;
+    pollDesktopBridge();
+
+    bridgePollTimer = setInterval(() => {
+        if (!document.hidden) pollDesktopBridge();
+    }, 5000);
+}
+
+/**
+ * Stops background polling.
+ */
+function stopDesktopBridgePolling() {
+    bridgeEnabled = false;
+    clearInterval(bridgePollTimer);
+    bridgePollTimer = null;
+}
+
+/**
+ * Executes a single poll request to the desktop bridge.
+ */
+async function pollDesktopBridge() {
+    if (!bridgeEnabled || bridgePollInFlight) return;
+
+    bridgePollInFlight = true;
+    try {
+        const snapshot = await getDesktopBridgeSnapshot();
+        if (snapshot) {
+            // Update global state if available
+            if (window.state) {
+                window.state.desktopSnapshot = snapshot;
+            }
+            // Notify hero player controller if available
+            if (window.heroMediaPlayerController && typeof window.heroMediaPlayerController.render === 'function') {
+                window.heroMediaPlayerController.render();
+            }
+            updateEngineStatus(true);
+        } else {
+            updateEngineStatus(false);
+        }
+    } catch (_error) {
+        updateEngineStatus(false);
+    } finally {
+        bridgePollInFlight = false;
+    }
+}
+
+/**
+ * Updates the Engine Status UI indicator if it exists on the page.
+ * @param {boolean} online - Whether the bridge is connected
+ */
+function updateEngineStatus(online) {
+    const statusText = document.getElementById('engine-status-text');
+    const statusDot = document.getElementById('engine-status-dot');
+    const statusContainer = document.getElementById('engine-status-container');
+    
+    if (!statusText || !statusDot) return;
+    
+    if (online) {
+        statusText.textContent = 'LOCAL LLM ONLINE';
+        if (statusContainer) statusContainer.style.color = '#75b022';
+        statusDot.style.background = '#75b022';
+        statusDot.style.boxShadow = '0 0 8px #75b022';
+    } else {
+        statusText.textContent = 'BRIDGE OFFLINE';
+        if (statusContainer) statusContainer.style.color = '#e74c3c';
+        statusDot.style.background = '#e74c3c';
+        statusDot.style.boxShadow = '0 0 8px #e74c3c';
+    }
+}
+
 let arcadeChatHistory = [];
 let currentChatId = null;
 
@@ -281,46 +411,26 @@ window.sendChatMessage = async function() {
     const fullMessage = text;
 
     try {
-        const secret = localStorage.getItem("ss_bridge_secret");
-        for (const url of candidates) {
-            try {
-                const isLoopback = url.includes('localhost') || url.includes('127.0.0.1');
-                const isRelative = url.startsWith('/') || !url.startsWith('http');
-                
-                if (isRelative && window.location.hostname.includes('github.io')) {
-                    continue;
-                }
+        const response = await bridgeFetch('/api/llm/chat', {
+            method: 'POST',
+            signal,
+            body: JSON.stringify({ 
+                message: text,
+                history: arcadeChatHistory,
+                pageContext: `${pageContext} (Visible text: ${pageText})`
+            })
+        });
 
-                const headers = { 'Content-Type': 'application/json' };
-                if (secret) headers["X-Bridge-Secret"] = secret;
-
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: headers,
-                    // Standardize on W3C PNA spec: loopback for localhost, private for LAN
-                    targetAddressSpace: isLoopback ? 'loopback' : 'private',
-                    signal,
-                    cache: 'no-store',
-                    credentials: 'omit',
-                    body: JSON.stringify({ 
-                        message: fullMessage,
-                        history: arcadeChatHistory,
-                        pageContext: `${pageContext} (Visible text: ${pageText})`
-                    })
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    reply = data.reply;
-                    break;
-                } else {
-                    lastError = `Bridge returned ${response.status}`;
-                }
-            } catch (err) {
-                lastError = err.message || "Connection refused or blocked by browser";
-                console.warn(`[Arcade Chat] Candidate ${url} failed:`, err);
-            }
+        if (response.ok) {
+            const data = await response.json();
+            reply = data.reply;
+        } else {
+            lastError = `Bridge returned ${response.status}`;
         }
+    } catch (err) {
+        lastError = err.message || "Connection refused or blocked by browser";
+        console.warn(`[Arcade Chat] Bridge request failed:`, err);
+    }
 
         if (reply !== null) {
             addChatMessage('ai', reply || "...");
@@ -497,6 +607,7 @@ function setupToggle() {
     }
     setupResizing();
     setupToggle();
+    startDesktopBridgePolling();
     updateChatStatus('idle');
     
     // Restore collapsed state

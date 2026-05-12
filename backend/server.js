@@ -57,9 +57,9 @@ const actionCounts = new Map(); // ip -> { count, resetAt }
 const MAX_ACTIONS_PER_MINUTE = 30;
 
 const CORS_WHITELIST = [
-  "https://falabellamichael.github.io",
   "https://signal-share.pages.dev",
   "https://signal-share.com",
+  "https://falabellamichael.github.io",
   "http://localhost",
   "http://127.0.0.1"
 ];
