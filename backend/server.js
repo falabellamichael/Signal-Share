@@ -125,6 +125,7 @@ app.use((req, res, next) => {
 app.post('/api/llm/chat', async (req, res) => {
   try {
     const { message, history, pageContext } = req.body;
+    console.log(`[Chatbot] Incoming POST request. Message length: ${message?.length || 0}`);
     if (!message) return res.status(400).json({ error: 'No message provided' });
 
     const reply = await getChatResponse(message, history || [], pageContext);
@@ -135,9 +136,18 @@ app.post('/api/llm/chat', async (req, res) => {
   }
 });
 
+// Health check for the chat endpoint
+app.get('/api/llm/chat', (req, res) => {
+  res.json({ ok: true, status: 'AI Chat Bridge is active and awaiting POST requests.' });
+});
+
 // Catch-all for /api/llm/chat with wrong method
 app.all('/api/llm/chat', (req, res) => {
-  res.status(405).json({ error: `Method ${req.method} not allowed for this endpoint.` });
+  console.warn(`[Chatbot] 405 Error: Received ${req.method} request for /api/llm/chat from ${req.ip}`);
+  res.status(405).json({ 
+    error: `Method ${req.method} not allowed.`,
+    tip: 'The Signal Share AI Companion requires a POST request with a JSON body.' 
+  });
 });
 
 app.use(express.static(projectRoot));
