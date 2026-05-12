@@ -102,13 +102,13 @@
   .viewer-dialog {
     position: relative;
     z-index: 1;
-    width: min(1100px, 100%);
-    max-height: calc(100vh - 48px);
+    width: min(1100px, calc(100vw - 2 * var(--container-padding)));
+    max-height: calc(100vh - 2 * var(--container-padding));
     display: grid;
     grid-template-columns: 1.2fr 0.8fr;
-    gap: 20px;
-    padding: 20px;
-    border-radius: 28px;
+    gap: var(--section-gap);
+    padding: var(--container-padding);
+    border-radius: var(--radius-xl);
     background: rgba(255, 250, 242, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.45);
     box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
@@ -358,17 +358,17 @@
 
   .mini-player {
     position: fixed;
-    right: 20px;
-    bottom: 20px;
+    right: clamp(1rem, 3vw, 2rem);
+    bottom: clamp(1rem, 3vw, 2rem);
     z-index: 24;
-    width: min(360px, calc(100vw - 24px));
+    width: min(400px, calc(100vw - 2 * var(--container-padding)));
     display: none;
     gap: 12px;
-    padding: 14px;
+    padding: var(--radius-sm);
     max-height: min(88vh, 720px);
     overflow: auto;
     overscroll-behavior: contain;
-    border-radius: 22px;
+    border-radius: var(--radius-lg);
     border: 1px solid rgba(19, 33, 43, 0.12);
     background: rgba(255, 250, 242, 0.96);
     box-shadow: 0 24px 60px rgba(15, 23, 32, 0.24);
@@ -681,9 +681,9 @@
 
   @media (max-width: 760px) {
     .page-shell {
-      width: min(var(--shell-max-width), calc(100% - 16px));
-      padding-top: calc(12px + var(--status-bar-safe-space));
-      padding-bottom: calc(42px + env(safe-area-inset-bottom, 0px));
+      width: min(var(--shell-max-width), calc(100% - 1rem));
+      padding-top: calc(var(--container-padding) + var(--status-bar-safe-space));
+      padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
     }
 
     .site-header {
@@ -738,8 +738,8 @@
     .compose-card,
     .account-card,
     .feed-section {
-      padding: 18px;
-      border-radius: 22px;
+      padding: var(--container-padding);
+      border-radius: var(--radius-lg);
     }
 
     .hero-player-controls {
@@ -826,11 +826,11 @@
 
     h1 {
       max-width: 12ch;
-      font-size: clamp(2.6rem, 13vw, 4.4rem);
+      font-size: var(--font-size-h1);
     }
 
     .section-heading h2 {
-      font-size: clamp(1.7rem, 7vw, 2.4rem);
+      font-size: var(--font-size-h2);
     }
 
     .hero-text {
@@ -897,14 +897,14 @@
     }
 
     .messenger-section {
-      right: 8px;
-      left: 8px;
-      bottom: calc(var(--viewport-offset-bottom) + 8px);
+      right: clamp(0.5rem, 2vw, 1rem);
+      left: clamp(0.5rem, 2vw, 1rem);
+      bottom: calc(var(--viewport-offset-bottom) + clamp(0.5rem, 2vw, 1rem));
       width: auto;
       max-height: min(86dvh, 720px);
-      padding: 14px;
+      padding: var(--container-padding);
       gap: 12px;
-      border-radius: 22px;
+      border-radius: var(--radius-lg);
     }
 
     .admin-ban-panel {

@@ -42,13 +42,26 @@
   --accent-2: #2a9d8f;
   --accent-3: #f4a261;
   --shadow: 0 20px 60px rgba(15, 23, 32, 0.12);
+  
+  /* Responsive Shell & Spacing */
   --shell-max-width: 1200px;
-  --section-gap: 24px;
+  --section-gap: clamp(1rem, 3vw, 2.5rem);
+  --container-padding: clamp(1rem, 4vw, 2rem);
+  
+  /* Fluid Typography */
+  --font-size-h1: clamp(2rem, 5vw, 4.5rem);
+  --font-size-h2: clamp(1.5rem, 4vw, 2.75rem);
+  --font-size-h3: clamp(1.25rem, 3vw, 2rem);
+  --font-size-base: 1rem;
+  --font-size-sm: 0.875rem;
+  --font-size-xs: 0.75rem;
+  
   --feed-media-fit: cover;
-  --radius-xl: 32px;
-  --radius-lg: 24px;
-  --radius-md: 18px;
-  --radius-sm: 12px;
+  --radius-xl: clamp(1.5rem, 4vw, 2rem);
+  --radius-lg: clamp(1.25rem, 3vw, 1.5rem);
+  --radius-md: 1.125rem;
+  --radius-sm: 0.75rem;
+  
   --viewport-offset-top: 0px;
   --viewport-offset-bottom: 0px;
   --viewport-visible-height: 100dvh;
@@ -942,10 +955,10 @@ select {
 }
 
 .page-shell {
-  width: min(var(--shell-max-width), calc(100% - 32px));
+  width: min(var(--shell-max-width), calc(100% - 2 * var(--container-padding)));
   margin: 0 auto;
   padding:
-    calc(24px + var(--status-bar-safe-space)) 0 calc(32px + env(safe-area-inset-bottom, 0px));
+    calc(var(--container-padding) + var(--status-bar-safe-space)) 0 calc(2rem + env(safe-area-inset-bottom, 0px));
 }
 
 .site-header {
@@ -1098,7 +1111,7 @@ select {
   display: grid;
   grid-template-columns: 1.25fr 0.85fr;
   gap: var(--section-gap);
-  margin-bottom: 32px;
+  margin-bottom: var(--section-gap);
 }
 
 .hero-copy,
@@ -1113,11 +1126,10 @@ select {
   box-shadow: var(--shadow);
   position: relative;
   overflow: hidden;
+  padding: var(--container-padding);
 }
 
-.hero-copy {
-  padding: 48px;
-}
+/* hero-copy specific additions can go here */
 
 .hero-copy>* {
   position: relative;
@@ -1222,8 +1234,8 @@ h2 {
 }
 
 h1 {
-  max-width: 10ch;
-  font-size: clamp(3.2rem, 8vw, 6.3rem);
+  max-width: 15ch;
+  font-size: var(--font-size-h1);
 }
 
 .hero-text {
@@ -2134,13 +2146,13 @@ body[data-theme="ember"] .source-toggle-button.is-active {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
   gap: var(--section-gap);
-  margin-bottom: 32px;
+  margin-bottom: var(--section-gap);
 }
 
 .compose-card,
 .account-card,
 .feed-section {
-  padding: 28px;
+  /* Using inherited fluid padding */
 }
 
 .section-heading {

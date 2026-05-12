@@ -253,12 +253,12 @@
 
     .messenger-section {
       position: fixed;
-      right: 20px;
-      bottom: calc(var(--viewport-offset-bottom) + 20px);
+      right: clamp(1rem, 3vw, 2rem);
+      bottom: calc(var(--viewport-offset-bottom) + clamp(1rem, 3vw, 2rem));
       z-index: 23;
-      width: min(360px, calc(100vw - 24px));
+      width: min(400px, calc(100vw - 2 * var(--container-padding)));
       max-height: min(920px, calc(100vh - 96px));
-      padding: 20px;
+      padding: var(--container-padding);
       margin: 0;
       display: grid;
       gap: 18px;
@@ -1417,8 +1417,8 @@
       display: flex;
       align-items: end;
       justify-content: space-between;
-      gap: 20px;
-      margin-bottom: 20px;
+      gap: var(--section-gap);
+      margin-bottom: var(--section-gap);
     }
 
     .toolbar-controls {
