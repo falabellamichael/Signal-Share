@@ -1309,7 +1309,16 @@ async function refreshMessengerState(options = {}) {
     state.directThreads = sortThreads(threads);
     
     if (!preserveActiveThread || !state.directThreads.some((t) => t.id === state.activeThreadId)) state.activeThreadId = state.directThreads[0]?.id ?? null;
-    if (state.activeThreadId) state.activeMessages = await loadMessagesFromSupabase(state.activeThreadId); else state.activeMessages = [];
+    if (state.activeThreadId) {
+      if (state.activeThreadId === "thread-ai-companion") {
+        const localAiMessages = localStorage.getItem(`ai-messages-${state.currentUser.id}`);
+        state.activeMessages = localAiMessages ? JSON.parse(localAiMessages) : [];
+      } else {
+        state.activeMessages = await loadMessagesFromSupabase(state.activeThreadId);
+      }
+    } else {
+      state.activeMessages = [];
+    }
     subscribeMessagingChannels(); state.messengerError = "";
   } catch (error) { console.error("Messenger state could not be loaded", error); state.profileRecord = null; state.availableProfiles = []; state.blockedUserIds = []; state.bannedUserIds = []; state.blockingAvailable = true; state.banningAvailable = true; state.directThreads = []; state.activeThreadId = null; state.activeMessages = []; state.messengerError = formatBackendError(error) || "Messenger could not load for this account."; }
   finally { state.messengerBusy = Math.max(0, state.messengerBusy - 1); renderMessenger(); }
