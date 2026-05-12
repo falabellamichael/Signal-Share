@@ -931,20 +931,38 @@ app.post("/api/system-media/action", (req, res) => {
 app.post("/api/activity/report", async (req, res) => {
   const { activity } = req.body;
   if (!activity || !userId || !enableRemoteMediaSync) return res.status(400).json({ ok: false });
+
   try {
-    const { error } = await supabase.from("system_media").upsert({
+    const gameId = activity.gameId || "arcade";
+    const rank = activity.rank || "";
+    const score = activity.score || 0;
+
+    // 1. Update Live Status (Shared View)
+    const { error: mediaError } = await supabase.from("system_media").upsert({
       user_id: userId,
       playback_state: "playing",
       title: activity.title || "Arcade Game",
-      meta: activity.meta || "Playing now",
+      meta: rank ? `Rank: ${rank}` : (activity.meta || "Playing now"),
       artwork_uri: activity.artworkUri || "https://signal-share.com/neon_pinball_v2_poster.png",
       app_package: "io.signalshare.arcade",
       device_name: "Desktop PC (Arcade Mode)",
       updated_at: new Date().toISOString(),
     });
-    if (!error) lastSupabaseSyncKey = `activity|${activity.title}|${Date.now()}`;
-    return res.json({ ok: !error });
+
+    // 2. Save Persistent Stats (High Scores / Ranks)
+    const { error: statsError } = await supabase.from("game_stats").upsert({
+      user_id: userId,
+      game_id: gameId,
+      score: score,
+      rank: rank,
+      metadata: { ...activity, updatedAt: new Date().toISOString() },
+      created_at: new Date().toISOString()
+    }, { onConflict: "user_id,game_id" });
+
+    if (!mediaError) lastSupabaseSyncKey = `activity|${activity.title}|${rank}|${Date.now()}`;
+    return res.json({ ok: !mediaError && !statsError, mediaError, statsError });
   } catch (error) {
+    console.error("[Bridge] Activity report failed:", error);
     return res.status(500).json({ ok: false });
   }
 });

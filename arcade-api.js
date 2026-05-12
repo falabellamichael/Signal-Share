@@ -17,12 +17,13 @@ export function initArcadeApi(state) {
 window.initArcadeApi = initArcadeApi;
 
 /**
- * Save a game score to Supabase
+ * Save a game score and rank to Supabase
  * @param {string} gameId - Unique identifier for the game (e.g., 'pinball')
  * @param {number} score - The score achieved
- * @param {object} metadata - Optional additional data (levels reached, etc.)
+ * @param {string} rank - The rank achieved (e.g., 'LEGENDARY')
+ * @param {object} metadata - Optional additional data
  */
-export async function saveGameScore(gameId, score, metadata = {}) {
+export async function saveGameScore(gameId, score, rank = "", metadata = {}) {
     if (!supabase) {
         console.error('[Arcade API] Supabase client not initialized');
         return null;
@@ -38,12 +39,13 @@ export async function saveGameScore(gameId, score, metadata = {}) {
         user_id: user.id,
         game_id: gameId,
         score: Math.round(score),
+        rank: rank,
         metadata: metadata
     };
 
     const { data, error } = await supabase
         .from('game_stats')
-        .insert(payload)
+        .upsert(payload, { onConflict: 'user_id,game_id' })
         .select()
         .single();
 
@@ -52,7 +54,7 @@ export async function saveGameScore(gameId, score, metadata = {}) {
         throw error;
     }
 
-    console.log('[Arcade API] Score saved successfully:', data);
+    console.log('[Arcade API] Score/Rank saved successfully:', data);
     return data;
 }
 window.saveGameScore = saveGameScore;
