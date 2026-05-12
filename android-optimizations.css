@@ -1,7 +1,6 @@
 /*
     Signal Share Suite - Android Layout Optimizations
     Targeting Capacitor/WebView environments.
-    Focuses on safe areas and performance without overriding core layout.
 */
 
 :root {
@@ -20,7 +19,7 @@
 html.platform-android input,
 html.platform-android textarea,
 html.platform-android select {
-    font-size: 16px !important; /* Prevent auto-zoom */
+    font-size: 16px !important;
     user-select: text !important;
 }
 
@@ -38,59 +37,79 @@ html.platform-android .play-btn {
     touch-action: manipulation;
 }
 
-/* 5. Scroll & Background Fixes */
+/* 5. Scroll & Background Fixes - CRITICAL FOR ANDROID */
 
-/* IMPORTANT: Fixes for "can't scroll" and "messed up background" */
+/* Force natural scrolling for Android - Nuclear reset */
+html.platform-android {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    background-color: var(--bg, #f6efe3) !important;
+    overscroll-behavior-y: auto !important;
+    scrollbar-gutter: auto !important;
+}
+
 html.platform-android body {
     height: auto !important;
     min-height: 100dvh !important;
-    overflow-y: auto !important;
+    overflow-y: visible !important;
     overflow-x: hidden !important;
     position: relative !important;
     width: 100% !important;
-    -webkit-overflow-scrolling: touch;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: auto !important;
 
-    /* Simplify background to resolve Android Shader Compilation failures */
+    /* Ensure the background covers everything without shader errors */
+    /* Many Android WebViews fail on radial-gradients (Shader failures) */
     background: var(--bg, #f6efe3) !important;
+    background-image: none !important;
+    background-attachment: scroll !important;
 }
 
-/* Modal states - still need to lock if active */
+/* Kill all fixed-position background blobs that cause "messed up" rendering and lag */
+html.platform-android body::before,
+html.platform-android body::after,
+html.platform-android #top::before,
+html.platform-android #top::after {
+    display: none !important;
+    background: none !important;
+    background-image: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* Modal Lock - only lock when explicit modals are open */
 html.platform-android body.viewer-open,
 html.platform-android body.settings-open,
 html.platform-android body.modal-open {
     overflow: hidden !important;
     position: fixed !important;
+    width: 100% !important;
 }
 
-/* Performance: Disable expensive filters that often "mess up" Android rendering */
+/* Disable expensive filters that cause "messed up background" (Shader failures) on Android */
 html.platform-android * {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
 }
 
-/* Ensure background covers everything */
-html.platform-android {
-    background-color: var(--bg, #f6efe3) !important;
-}
-
-html.platform-android .scroll-container,
-html.platform-android .feed-container,
-html.platform-android .message-list,
-html.platform-android .steam-content,
-html.platform-android .steam-sidebar,
-html.platform-android .chat-messages {
-    -webkit-overflow-scrolling: touch !important;
-    overflow-y: auto !important;
-    overscroll-behavior-y: auto !important;
-    scrollbar-width: none;
-}
-
-/* Ensure page shell can grow and scroll naturally */
+/* Ensure the main container grows and allows scrolling */
 html.platform-android .page-shell {
     min-height: 100dvh;
-    display: flex !important;
-    flex-direction: column;
+    display: block !important;
     overflow: visible !important;
+    padding-top: max(var(--container-padding), var(--safe-area-top)) !important;
+    padding-bottom: max(var(--container-padding), var(--safe-area-bottom)) !important;
+}
+
+/* Prevent hidden sections from swallowing touch events (antigravity fix) */
+html.platform-android .viewer:not(.is-open),
+html.platform-android .profile-view:not(.is-open),
+html.platform-android .settings-panel:not(.is-open),
+html.platform-android .messenger-section:not(.is-open) {
+    display: none !important;
+    pointer-events: none !important;
 }
 
 /* 6. Safe Area Utility Classes */
@@ -98,41 +117,7 @@ html.platform-android .page-shell {
 .safe-p-bottom { padding-bottom: var(--safe-area-bottom); }
 .safe-m-top { margin-top: var(--safe-area-top); }
 
-/* 7. Game Specific High-Fidelity Overrides */
-html.platform-android .game-container,
-html.platform-android #game-canvas-container {
-    box-shadow: 0 0 40px rgba(0,0,0,0.8);
-    transform: translateZ(0);
-    max-width: 98vw !important;
-    margin: auto !important;
-}
-
+/* 7. Game Specific */
 canvas, .game-container {
-    user-select: none;
-    -webkit-user-select: none;
     touch-action: none;
-}
-
-html.platform-android canvas {
-    image-rendering: pixelated;
-    touch-action: none;
-    -webkit-user-select: none;
-}
-
-/* 8. App Runner Immersive Experience */
-html.platform-android #app-runner {
-    background: #000;
-}
-
-html.platform-android .runner-header {
-    height: calc(var(--header-height, 72px) + var(--safe-area-top)) !important;
-    padding-top: var(--safe-area-top) !important;
-}
-
-/* 9. Library Layout Overrides */
-@media (max-width: 768px) {
-    html.platform-android .steam-content {
-        padding-top: max(15px, var(--safe-area-top)) !important;
-        padding-bottom: max(20px, var(--safe-area-bottom)) !important;
-    }
 }

@@ -594,9 +594,11 @@ function setupResizing() {
         
         if (!sidebar.classList.contains('collapsed')) {
             const gapWidth = newWidth + 20;
+            const appRunner = document.getElementById('app-runner');
             if (toggleBtn) toggleBtn.style.right = `${gapWidth}px`;
             if (messengerBtn) messengerBtn.style.setProperty('right', `${gapWidth}px`, 'important');
             if (messengerSection) messengerSection.style.setProperty('right', `${gapWidth}px`, 'important');
+            if (appRunner) appRunner.style.right = `${newWidth}px`;
         }
     }
 }

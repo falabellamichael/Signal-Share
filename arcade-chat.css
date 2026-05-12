@@ -8,6 +8,8 @@
     position: relative;
     z-index: 50;
     transition: width 0.1s ease;
+    overflow: hidden; /* Ensure content doesn't bleed out */
+    height: 100%; /* Fill the grid area */
 }
 
 /* Ensure the sidebar fills the grid area in integrated mode */
@@ -143,7 +145,7 @@ body:not(.chat-collapsed) .messenger-section {
         position: fixed !important;
         top: 0;
         right: 0;
-        height: 100dvh;
+        height: 100vh;
         width: 100% !important;
         z-index: 10002;
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -181,6 +183,7 @@ body:not(.chat-collapsed) .messenger-section {
 .chat-messages {
     flex: 1;
     overflow-y: auto;
+    min-height: 0; /* Crucial for flex shrinking */
     padding: 15px;
     display: flex;
     flex-direction: column;

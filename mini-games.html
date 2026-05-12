@@ -26,21 +26,19 @@
             color: #fff;
             margin: 0;
             font-family: 'Inter', system-ui, sans-serif;
-            overflow-x: hidden;
+            overflow: hidden; /* Prevent page-level scrolling */
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
-            overscroll-behavior-y: auto;
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
-            padding-left: env(safe-area-inset-left);
-            padding-right: env(safe-area-inset-right);
+            overscroll-behavior-y: none;
+            height: 100vh;
+            width: 100vw;
         }
 
         .steam-shell {
             display: grid;
             grid-template-columns: 240px 1fr 6px 380px;
-            grid-template-rows: var(--header-height) 1fr;
-            height: 100dvh;
+            grid-template-rows: calc(var(--header-height) + env(safe-area-inset-top)) 1fr;
+            height: 100vh;
             overflow: hidden;
             transform: translateZ(0);
             backface-visibility: hidden;
@@ -1044,7 +1042,7 @@
         <aside id="arcadeCompanionSidebar" class="steam-chat-sidebar">
             <div class="chat-header">
                 <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                    <div style="width: 10px; height: 10px; background: #75b022; border-radius: 50%; box-shadow: 0 0 8px #75b022;"></div>
+                    <div id="chat-status-dot" style="width: 10px; height: 10px; background: #75b022; border-radius: 50%; box-shadow: 0 0 8px #75b022;"></div>
                     <span id="chat-mode-title" style="font-size: 0.75rem; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Companion</span>
                 </div>
                 <div style="display: flex; gap: 5px;">
