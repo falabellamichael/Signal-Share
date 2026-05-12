@@ -311,6 +311,12 @@ function setupResizing() {
                 handle.style.right = `${newWidth}px`;
             }
         }
+        
+        // Dynamic toggle button position
+        const toggleBtn = document.querySelector('.chat-toggle-btn');
+        if (toggleBtn && !sidebar.classList.contains('collapsed')) {
+            toggleBtn.style.right = `${newWidth + 20}px`;
+        }
     });
 
     document.addEventListener('mouseup', () => {
@@ -325,13 +331,19 @@ function setupResizing() {
 window.toggleChat = function() {
     const sidebar = document.querySelector('.steam-chat-sidebar');
     const handle = document.querySelector('.chat-resize-handle');
-    const toggleBtn = document.querySelector('.chat-toggle-btn');
     
     if (!sidebar) return;
     
     const isCollapsed = sidebar.classList.toggle('collapsed');
+    document.body.classList.toggle('chat-collapsed', isCollapsed);
+    
+    const toggleBtn = document.querySelector('.chat-toggle-btn');
+    if (toggleBtn) {
+        // Clear any inline style set by resizing
+        toggleBtn.style.right = '';
+    }
+    
     if (handle) handle.classList.toggle('collapsed', isCollapsed);
-    if (toggleBtn) toggleBtn.classList.toggle('visible', isCollapsed);
     
     localStorage.setItem('arcade-chat-collapsed', isCollapsed);
 };
@@ -362,6 +374,10 @@ function setupToggle() {
     // Restore collapsed state
     const wasCollapsed = localStorage.getItem('arcade-chat-collapsed') === 'true';
     if (wasCollapsed) {
-        window.toggleChat();
+        const sidebar = document.querySelector('.steam-chat-sidebar');
+        const handle = document.querySelector('.chat-resize-handle');
+        if (sidebar) sidebar.classList.add('collapsed');
+        if (handle) handle.classList.add('collapsed');
+        document.body.classList.add('chat-collapsed');
     }
 })();
