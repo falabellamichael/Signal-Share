@@ -193,11 +193,17 @@ async function executeWebTools(text) {
         try {
             // Call our own bridge API to open the URI
             const bridgeUrl = `http://localhost:3000/api/system-media/action`;
-            await fetch(bridgeUrl, {
+            const response = await fetch(bridgeUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'open_uri', uri: url })
             });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`Server error: ${response.status} - ${errorData.error || response.statusText}`);
+            }
+            
             results.push(`SUCCESSFULLY OPENED SYSTEM LINK: ${url}`);
         } catch (e) {
             results.push(`FAILED TO OPEN SYSTEM LINK ${url}: ${e.message}`);
@@ -210,11 +216,17 @@ async function executeWebTools(text) {
         const action = playMatch[1].trim().toLowerCase();
         try {
             const bridgeUrl = `http://localhost:3000/api/system-media/action`;
-            await fetch(bridgeUrl, {
+            const response = await fetch(bridgeUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: action })
             });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`Server error: ${response.status} - ${errorData.error || response.statusText}`);
+            }
+            
             results.push(`MEDIA ACTION EXECUTED: ${action}`);
         } catch (e) {
             results.push(`MEDIA ACTION FAILED: ${e.message}`);

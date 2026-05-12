@@ -895,7 +895,26 @@ app.post("/api/system-media/action", (req, res) => {
       }
     `.trim();
 
-    spawn("powershell.exe", ["-NoProfile", "-Command", psCommand], { windowsHide: true });
+    try {
+      const psProcess = spawn("powershell.exe", ["-NoProfile", "-Command", psCommand], { windowsHide: true });
+      
+      // Handle errors from the spawned process
+      psProcess.on('error', (err) => {
+        console.error(`[Bridge] Failed to spawn PowerShell for open_uri: ${err.message}`);
+      });
+      
+      // Capture stderr for debugging
+      psProcess.stderr?.on('data', (data) => {
+        const error = data.toString().trim();
+        if (error && !error.includes("Start-Process")) {
+          console.warn(`[Bridge] PowerShell stderr: ${error}`);
+        }
+      });
+    } catch (err) {
+      console.error(`[Bridge] Exception while spawning PowerShell: ${err.message}`);
+      return res.status(500).json({ ok: false, error: "Failed to execute system command" });
+    }
+    
     return res.json({ ok: true, queued: true });
   }
 
@@ -999,7 +1018,24 @@ function subscribeToMediaActions() {
     const { action, app_package } = payload.new;
     console.log(`[Bridge] Remote action: ${action}`);
     if (action === "open_uri") {
-      if (payload.new.uri) spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${payload.new.uri.replace(/"/g, '`"')}"`], { windowsHide: true });
+      if (payload.new.uri) {
+        try {
+          const psProcess = spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${payload.new.uri.replace(/"/g, '`"')}"`], { windowsHide: true });
+          
+          psProcess.on('error', (err) => {
+            console.error(`[Bridge] Failed to spawn PowerShell for remote open_uri: ${err.message}`);
+          });
+          
+          psProcess.stderr?.on('data', (data) => {
+            const error = data.toString().trim();
+            if (error && !error.includes("Start-Process")) {
+              console.warn(`[Bridge] PowerShell remote stderr: ${error}`);
+            }
+          });
+        } catch (err) {
+          console.error(`[Bridge] Exception while spawning PowerShell for remote open_uri: ${err.message}`);
+        }
+      }
     } else {
       await sendSystemMediaKey(action, app_package, payload.new?.payload?.preferredSource || "");
     }
