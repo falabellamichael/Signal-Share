@@ -997,12 +997,15 @@
     }
 
     .messenger-launcher {
+      position: fixed;
       right: 20px;
       left: auto;
       bottom: calc(var(--viewport-offset-bottom) + 20px);
+      z-index: 22;
       width: 72px;
       height: 72px;
-      padding: 0;
+      padding: 0 !important;
+      margin: 0 !important;
       border-radius: 24px;
       background: rgba(255, 255, 255, 0.05);
       backdrop-filter: blur(20px) saturate(180%);
@@ -1010,10 +1013,30 @@
       box-shadow: 
         0 8px 32px rgba(0, 0, 0, 0.3),
         inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: grid !important;
+      place-items: center !important;
+      cursor: pointer;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .messenger-launcher-badge {
+      width: 50px;
+      height: 50px;
+      padding: 0 !important;
+      margin: 0 !important;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      display: grid !important;
+      place-items: center !important;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      transition: transform 0.3s ease;
+    }
+
+    .messenger-launcher-badge svg {
+      width: 26px;
+      height: 26px;
+      display: block;
     }
 
     .messenger-launcher:hover {
@@ -1023,38 +1046,27 @@
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
     }
 
-    .messenger-launcher-badge {
-      width: 50px;
-      height: 50px;
-      border-radius: 18px;
-      background: linear-gradient(135deg, #10b981, #059669); /* Premium Emerald */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-      transition: transform 0.3s ease;
-    }
-
     .messenger-launcher:hover .messenger-launcher-badge {
       transform: rotate(5deg);
     }
 
     .admin-ban-launcher {
+      position: fixed;
       left: 20px;
       right: auto;
       bottom: calc(var(--viewport-offset-bottom) + 20px);
       width: 72px;
       height: 72px;
-      padding: 0;
+      padding: 0 !important;
+      margin: 0 !important;
       border-radius: 24px;
       background: rgba(255, 255, 255, 0.05);
       backdrop-filter: blur(20px) saturate(180%);
       border: 1px solid rgba(255, 255, 255, 0.1);
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: grid !important;
+      place-items: center !important;
+      cursor: pointer;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
@@ -1064,9 +1076,22 @@
     }
 
     .admin-ban-launcher-badge {
-      width: 42px;
-      height: 42px;
-      border-radius: 14px;
+      width: 50px;
+      height: 50px;
+      padding: 0 !important;
+      margin: 0 !important;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(180, 68, 68, 0.94), rgba(42, 157, 143, 0.86));
+      display: grid !important;
+      place-items: center !important;
+      color: #fff;
+      box-shadow: 0 14px 28px rgba(15, 23, 32, 0.18);
+    }
+
+    .admin-ban-launcher-badge svg {
+      width: 25px;
+      height: 25px;
+      display: block;
     }
 
     .messenger-floating-controls {
