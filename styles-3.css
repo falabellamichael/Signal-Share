@@ -997,29 +997,70 @@
     }
 
     .messenger-launcher {
-      right: 8px;
+      right: 20px;
       left: auto;
-      bottom: calc(var(--viewport-offset-bottom) + 8px);
-      width: 60px;
-      height: 60px;
+      bottom: calc(var(--viewport-offset-bottom) + 20px);
+      width: 72px;
+      height: 72px;
       padding: 0;
-      border-radius: 18px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .admin-ban-launcher {
-      left: 8px;
-      right: auto;
-      bottom: calc(var(--viewport-offset-bottom) + 8px);
-      width: 60px;
-      height: 60px;
-      padding: 0;
-      border-radius: 18px;
+    .messenger-launcher:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-4px) scale(1.05);
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
     }
 
     .messenger-launcher-badge {
-      width: 42px;
-      height: 42px;
-      border-radius: 14px;
+      width: 50px;
+      height: 50px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #10b981, #059669); /* Premium Emerald */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      transition: transform 0.3s ease;
+    }
+
+    .messenger-launcher:hover .messenger-launcher-badge {
+      transform: rotate(5deg);
+    }
+
+    .admin-ban-launcher {
+      left: 20px;
+      right: auto;
+      bottom: calc(var(--viewport-offset-bottom) + 20px);
+      width: 72px;
+      height: 72px;
+      padding: 0;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .admin-ban-launcher:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-4px) scale(1.05);
     }
 
     .admin-ban-launcher-badge {

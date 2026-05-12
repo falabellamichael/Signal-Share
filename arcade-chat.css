@@ -95,18 +95,19 @@ body:not(.chat-collapsed) .chat-toggle-btn svg {
 }
 
 /* Move the Direct Messenger launcher and OPENED window with the sidebar when NOT collapsed */
-body:not(.chat-collapsed) .messenger-launcher,
+/* Messenger launcher stays in the corner; sidebar elements move to accommodate it */
 body:not(.chat-collapsed) .messenger-section {
     right: 400px !important; /* sidebar width (380) + margin (20) */
 }
 
 /* When collapsed, we have TWO floating buttons. Offset messenger to the left of the chat toggle. */
-body.chat-collapsed .messenger-launcher {
-    right: 86px !important; /* 20 (base) + 56 (chat btn) + 10 (gap) */
+/* When collapsed, Messenger takes the primary corner, Sidebar toggle moves left */
+body.chat-collapsed .chat-toggle-btn {
+    right: 106px !important; /* 20 (base) + 72 (messenger btn) + 14 (gap) */
 }
 
 body.chat-collapsed .messenger-section {
-    right: 86px !important;
+    right: 20px !important;
 }
 
 .chat-toggle-btn {
