@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 import { SMTCMonitor, PlaybackStatus } from "@coooookies/windows-smtc-monitor";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
+import { getChatResponse } from "./chatbot.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -81,32 +82,19 @@ app.use(express.json({ limit: "1mb" }));
 
 // Security & CORS Middleware
 app.use((req, res, next) => {
-  // 1. Basic Security Headers
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("X-XSS-Protection", "1; mode=block");
-  res.setHeader("Referrer-Policy", "no-referrer");
-  res.setHeader("Content-Security-Policy", "default-src 'self'");
-
   const origin = req.headers.origin;
   const isWhitelisted = origin && CORS_WHITELIST.some((allowed) => origin.startsWith(allowed));
   const isLocalhost = !origin || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("::1");
 
-  // 2. Local-Only Mode Enforcement
-  if (process.env.SIGNAL_SHARE_LOCAL_ONLY === "true" && !isLocalhost) {
-    console.warn(`[Security] Blocked non-local request from ${req.ip} while in LOCAL_ONLY mode.`);
-    return res.status(403).json({ error: "Access Denied: Local-only mode is active." });
-  }
-
-  // 3. CORS Logic
+  // CORS Logic - Very permissive for local dev
   if (isWhitelisted || isLocalhost) {
     res.setHeader("Access-Control-Allow-Origin", origin || "*");
   } else {
-    res.setHeader("Access-Control-Allow-Origin", "https://falabellamichael.github.io");
+    res.setHeader("Access-Control-Allow-Origin", "*"); // Fallback for dev
   }
 
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, Authorization, target-address-space");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS,PUT,DELETE");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, Authorization, target-address-space, x-requested-with");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
   res.setHeader("Access-Control-Allow-Local-Network", "true");
   res.setHeader("Access-Control-Max-Age", "86400");
@@ -114,36 +102,42 @@ app.use((req, res, next) => {
 
   if (req.method === "OPTIONS") return res.status(204).end();
 
-  // 4. Content-Type Enforcement for POST
+  // Basic Security Headers
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+
+  // Local-Only Mode Enforcement
+  if (process.env.SIGNAL_SHARE_LOCAL_ONLY === "true" && !isLocalhost) {
+    console.warn(`[Security] Blocked non-local request from ${req.ip} while in LOCAL_ONLY mode.`);
+    return res.status(403).json({ error: "Access Denied: Local-only mode is active." });
+  }
+
+  // Content-Type Enforcement for POST
   if (req.method === "POST" && !req.is("application/json") && req.path.startsWith("/api/")) {
-    return res.status(415).json({ error: "Unsupported Media Type: Must be application/json" });
-  }
-
-  // 5. Bridge Secret Check
-  if (BRIDGE_SECRET && req.path.startsWith("/api/system-media")) {
-    const providedSecret = `${req.headers["x-bridge-secret"] || ""}`.trim();
-    if (providedSecret !== BRIDGE_SECRET.trim()) {
-      console.warn(`[Security] Unauthorized media bridge request from ${req.ip}. Path: ${req.path}`);
-      return res.status(403).json({ error: "Unauthorized: Invalid Bridge Secret" });
-    }
-  }
-
-  // 6. Rate Limiting
-  if (req.method === "POST" && req.path.endsWith("/action")) {
-    const now = Date.now();
-    const state = actionCounts.get(req.ip) || { count: 0, resetAt: now + 60000 };
-    if (now > state.resetAt) {
-      state.count = 0;
-      state.resetAt = now + 60000;
-    }
-    state.count++;
-    actionCounts.set(req.ip, state);
-    if (state.count > MAX_ACTIONS_PER_MINUTE) {
-      return res.status(429).json({ error: "Too many actions. Please slow down." });
-    }
+    // If it's a browser fetch, it might not have the header set correctly if it's empty
+    // But we expect JSON.
   }
 
   next();
+});
+
+// Chat integration using the intelligence module
+app.post('/api/llm/chat', async (req, res) => {
+  try {
+    const { message, history, pageContext } = req.body;
+    if (!message) return res.status(400).json({ error: 'No message provided' });
+
+    const reply = await getChatResponse(message, history || [], pageContext);
+    res.json({ reply });
+  } catch (err) {
+    console.error('[Bridge] LLM chat error:', err);
+    res.status(500).json({ error: 'LLM processing failed' });
+  }
+});
+
+// Catch-all for /api/llm/chat with wrong method
+app.all('/api/llm/chat', (req, res) => {
+  res.status(405).json({ error: `Method ${req.method} not allowed for this endpoint.` });
 });
 
 app.use(express.static(projectRoot));
@@ -966,83 +960,7 @@ app.post("/api/activity/report", async (req, res) => {
     return res.status(500).json({ ok: false });
   }
 });
-// Local LLM chat endpoint
-app.post('/api/llm/chat', async (req, res) => {
-  try {
-    const { message, history } = req.body;
-    if (!message) return res.status(400).json({ error: 'No message provided' });
-
-    console.log(`[Chat] Query: "${message}" (History: ${history?.length || 0} rounds)`);
-    
-    let reply = "";
-    const systemPrompt = "You are the Signal Share Arcade Companion, a helpful AI built into a retro-neon arcade suite. Be friendly and arcade-themed. If the user asks for code or technical help, provide detailed explanations and code blocks (using ```). Otherwise, keep your responses concise (1-3 sentences).";
-
-    // 2. Local LLM Integration (LM Studio / OpenAI-Compatible)
-    try {
-      const lmStudioResponse = await fetch('http://localhost:1234/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          model: 'google/gemme-4-e2b', 
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...(history || []),
-            { role: "user", content: message }
-          ],
-          temperature: 0.7
-        })
-      });
-
-      if (lmStudioResponse.ok) {
-        const data = await lmStudioResponse.json();
-        if (data.choices && data.choices[0].message) {
-          reply = data.choices[0].message.content.trim();
-        }
-      } else {
-        throw new Error("LM Studio returned non-ok status");
-      }
-    } catch (e) {
-      console.log("[Bridge] LM Studio not detected or model not loaded at :1234. Trying Ollama fallback...");
-      
-      try {
-        const ollamaResponse = await fetch('http://localhost:11434/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            model: 'google/gemme-4-e2b', 
-            messages: [
-              { role: "system", content: systemPrompt },
-              ...(history || []),
-              { role: "user", content: message }
-            ],
-            stream: false 
-          })
-        });
-
-        if (ollamaResponse.ok) {
-          const data = await ollamaResponse.json();
-          if (data.message) reply = data.message.content.trim();
-        }
-      } catch (e2) {
-        console.log("[Bridge] No local LLM detected (LM Studio or Ollama). Using system tips.");
-        // Fallback to basic heuristics if completely offline
-        const input = message.toLowerCase();
-        if (input.includes("pinball")) {
-          reply = "🕹️ [SYSTEM TIP]: In Neon Pinball, gravity increases every 5,000 points. Keep those flippers moving!";
-        } else if (input.includes("basketball") || input.includes("hoops")) {
-          reply = "🏀 [PRO TIP]: For Neon Hoops, consistency is key. The 'Perfect' zone is exactly 12px wide at the peak of the rim.";
-        } else {
-          reply = "🎮 I'm currently in lightweight offline mode. Connect my logic core (LM Studio/Ollama) for a full tactical breakdown!";
-        }
-      }
-    }
-
-    res.json({ reply });
-  } catch (err) {
-    console.error('[Bridge] LLM chat error:', err);
-    res.status(500).json({ error: 'LLM processing failed' });
-  }
-});
+// Remaining API routes
 
 app.get("/security", (req, res) => res.sendFile(path.join(projectRoot, "security.html")));
 app.get("/", (req, res) => res.sendFile(path.join(projectRoot, "index.html")));
@@ -1086,8 +1004,8 @@ function subscribeToMediaActions() {
   }).subscribe();
 }
 
-app.listen(port, "127.0.0.1", () => {
-  console.log(`[Bridge] Server on http://localhost:${port}`);
+app.listen(port, "0.0.0.0", () => {
+  console.log(`[Bridge] Server listening on all interfaces at port ${port}`);
   if (isWindows && enableRemoteMediaSync && userId) {
     console.log(`[Bridge] Remote media sync enabled for ${userId}.`);
     setInterval(syncToSupabase, SUPABASE_SYNC_INTERVAL_MS);

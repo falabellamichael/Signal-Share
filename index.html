@@ -35,6 +35,7 @@
     </style>
     <link rel="stylesheet" href="./notifications.css?v=1.3" />
     <link rel="stylesheet" href="./android-optimizations.css?v=1.3" />
+    <link rel="stylesheet" href="arcade-chat.css">
     <script>
       // Early SDK placeholders for async script loading
       window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || (() => {});
@@ -1464,5 +1465,42 @@
         <span style="opacity: 0.8;">Signal Share Engineering Documentation</span><br>
         <span style="opacity: 0.8;">&copy; 2026 Deep Dive Series</span>
     </div>
-  </body>
+    <div class="chat-resize-handle" id="chat-resize-handle"></div>
+    <aside class="steam-chat-sidebar" id="arcadeCompanionSidebar">
+        <div class="chat-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="width: 8px; height: 8px; background: #67c1f5; border-radius: 50%; box-shadow: 0 0 8px #67c1f5;"></div>
+                <span id="chat-mode-title" style="font-weight: 800; font-size: 0.75rem; letter-spacing: 1.5px; text-transform: uppercase; color: #67c1f5;">Companion</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="history-btn" onclick="toggleChatHistory()" title="View History">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    History
+                </button>
+                <button class="history-btn" onclick="startNewChat()" title="New Chat">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="chat-messages" class="chat-messages">
+            <!-- Messages injected here -->
+        </div>
+
+        <div id="chat-history" class="chat-history-view">
+            <!-- History items injected here -->
+        </div>
+
+        <div class="chat-input-area">
+            <div class="chat-input-wrapper">
+                <input type="text" id="arc-chat-input" class="chat-input" placeholder="Ask for advice or code..." onkeydown="if(event.key === 'Enter') sendChatMessage()">
+                <button onclick="sendChatMessage()" style="background: none; border: none; color: #67c1f5; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <script src="arcade-chat.js" defer></script>
+</body>
 </html>

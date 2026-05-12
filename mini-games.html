@@ -101,61 +101,68 @@
             font-weight: 600;
         }
 
-        .chat-input-area {
-            padding: 20px;
-            background: rgba(0,0,0,0.2);
-            border-top: 1px solid var(--border);
+    <link rel="stylesheet" href="arcade-chat.css">
+    <style>
+        :root {
+            --steam-dark: #171a21;
+            --steam-blue: #1b2838;
+            --steam-light: #66c0f4;
+            --glass: rgba(255,255,255,0.03);
+            --border: rgba(255,255,255,0.05);
         }
 
-        .chat-input-wrapper {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--border);
+
+        .chat-history-item {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
             border-radius: 8px;
-            display: flex;
-            align-items: center;
-            padding: 5px 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
             transition: all 0.2s;
         }
 
-        .chat-input-wrapper:focus-within {
-            border-color: var(--steam-light);
+        .chat-history-item:hover {
             background: rgba(255,255,255,0.08);
-            box-shadow: 0 0 15px rgba(102, 192, 244, 0.1);
+            border-color: var(--steam-light);
         }
 
-        .chat-input {
-            flex: 1;
-            background: none;
-            border: none;
-            color: #fff;
-            padding: 10px 0;
+        .chat-history-item .history-name {
             font-size: 0.8rem;
-            outline: none;
-            font-family: inherit;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        @media (max-width: 1200px) {
-            .steam-shell {
-                grid-template-columns: 240px 1fr;
-            }
-            .steam-chat-sidebar, .chat-resize-handle {
-                display: none;
-            }
+        .chat-history-item .history-meta {
+            font-size: 0.6rem;
+            color: rgba(255,255,255,0.4);
+            display: flex;
+            justify-content: space-between;
         }
 
-        .chat-resize-handle {
-            width: 6px;
-            background: transparent;
-            cursor: col-resize;
-            transition: background 0.2s, box-shadow 0.2s;
-            z-index: 100;
-            position: relative;
-            margin-left: -3px;
+        .history-btn {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.4);
+            font-size: 0.6rem;
+            font-weight: 900;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
-        .chat-resize-handle:hover, .chat-resize-handle.active {
-            background: var(--steam-light);
-            box-shadow: 0 0 15px var(--steam-light);
+        .history-btn:hover {
+            color: var(--steam-light);
+            border-color: var(--steam-light);
         }
 
         .steam-content {
@@ -1164,14 +1171,26 @@
             <div class="chat-header">
                 <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
                     <div style="width: 10px; height: 10px; background: #75b022; border-radius: 50%; box-shadow: 0 0 8px #75b022;"></div>
-                    <span style="font-size: 0.75rem; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Companion</span>
+                    <span id="chat-mode-title" style="font-size: 0.75rem; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Companion</span>
                 </div>
-                <button onclick="resetArcadeChat()" style="background: none; border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); font-size: 0.6rem; font-weight: 900; padding: 4px 8px; border-radius: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">New Chat</button>
+                <div style="display: flex; gap: 5px;">
+                    <button id="history-toggle-btn" class="history-btn" onclick="toggleChatHistory()">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        History
+                    </button>
+                    <button id="new-chat-btn" class="history-btn" onclick="startNewChat()">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        New
+                    </button>
+                </div>
             </div>
             <div id="chat-messages" class="chat-messages">
                 <div class="chat-message message-ai">
                     Hello! I'm your local arcade assistant. How can I help you optimize your gameplay today?
                 </div>
+            </div>
+            <div id="chat-history" class="chat-history-view">
+                <!-- Chat history items will be injected here -->
             </div>
             <div class="chat-input-area">
                 <div class="chat-input-wrapper">
@@ -1297,139 +1316,9 @@
         });
     </script>
     <script src="mini-games.js?v=1.3"></script>
+    <script src="arcade-chat.js" defer></script>
     <script>
-        let arcadeChatHistory = [];
-
-        function resetArcadeChat() {
-            arcadeChatHistory = [];
-            const container = document.getElementById('chat-messages');
-            container.innerHTML = `
-                <div class="chat-message message-ai">
-                    Hello! I'm your local arcade assistant. How can I help you optimize your gameplay today?
-                </div>
-            `;
-            console.log('[Arcade Chat] Context cleared.');
-        }
-
-        async function sendChatMessage() {
-            const input = document.getElementById('arc-chat-input');
-            const messagesContainer = document.getElementById('chat-messages');
-            const text = input.value.trim();
-            
-            if (!text) return;
-            
-            // Add user message to UI
-            const userMsg = document.createElement('div');
-            userMsg.className = 'chat-message message-user';
-            userMsg.textContent = text;
-            messagesContainer.appendChild(userMsg);
-            
-            input.value = '';
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            
-            // Add AI thinking placeholder
-            const thinkingMsg = document.createElement('div');
-            thinkingMsg.className = 'chat-message message-ai';
-            thinkingMsg.innerHTML = '<span style="opacity: 0.5;">Thinking...</span>';
-            messagesContainer.appendChild(thinkingMsg);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            
-            console.log('[Arcade Chat] Initializing LLM call...');
-
-            const candidates = [
-                'http://localhost:3000/api/llm/chat',
-                'http://127.0.0.1:3000/api/llm/chat',
-                '/api/llm/chat'
-            ];
-
-            let success = false;
-            for (const url of candidates) {
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            message: text,
-                            history: arcadeChatHistory 
-                        }),
-                        targetAddressSpace: 'loopback' 
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        const reply = data.reply || "I'm having trouble connecting to my logic core right now.";
-                        
-                        // Update UI with real reply
-                        thinkingMsg.textContent = reply;
-                        
-                        // Update local history
-                        arcadeChatHistory.push({ role: 'user', content: text });
-                        arcadeChatHistory.push({ role: 'assistant', content: reply });
-                        
-                        success = true;
-                        break;
-                    }
-                } catch (err) {
-                    console.warn(`[Arcade Chat] Endpoint failed ${url}:`, err);
-                }
-            }
-
-            if (!success) {
-                thinkingMsg.textContent = "Offline. Please ensure the local bridge is running.";
-            }
-            
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-    </script>
-    <script>
-        // Signal Share Android Optimization Suite - Detection
-        (function() {
-            const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
-            if (isNative || /Android/i.test(navigator.userAgent)) {
-                document.documentElement.classList.add('platform-android');
-            }
-        })();
-    </script>
-    <script>
-        // Chat Resizing Logic
-        (function() {
-            const handle = document.getElementById('chat-resize-handle');
-            const shell = document.querySelector('.steam-shell');
-            const sidebar = document.querySelector('.steam-chat-sidebar');
-            let isResizing = false;
-            let initialMax = 0;
-
-            if (!handle || !shell || !sidebar) return;
-
-            handle.addEventListener('mousedown', (e) => {
-                isResizing = true;
-                initialMax = sidebar.offsetWidth; // Current expanded width is the cap
-                handle.classList.add('active');
-                document.body.style.cursor = 'col-resize';
-                document.body.style.userSelect = 'none';
-            });
-
-            document.addEventListener('mousemove', (e) => {
-                if (!isResizing) return;
-                const shellRect = shell.getBoundingClientRect();
-                let newWidth = shellRect.right - e.clientX;
-                
-                // Constraints: only smaller from initial max, not larger
-                if (newWidth > initialMax) newWidth = initialMax;
-                if (newWidth < 280) newWidth = 280; // Hard minimum to keep chat usable
-                
-                shell.style.gridTemplateColumns = `240px auto 6px ${newWidth}px`;
-            });
-
-            document.addEventListener('mouseup', () => {
-                if (isResizing) {
-                    isResizing = false;
-                    handle.classList.remove('active');
-                    document.body.style.cursor = '';
-                    document.body.style.userSelect = '';
-                }
-            });
-        })();
+        window.resetArcadeChat = window.startNewChat;
     </script>
 </body>
 </html>
