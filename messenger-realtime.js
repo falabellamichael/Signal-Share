@@ -11,7 +11,8 @@ window.MessengerRealtime = class MessengerRealtime {
     this.sessionHash = Math.random().toString(36).substring(2, 10);
     this.isConnecting = false;
     this.processedMessageIds = new Set(); // Prevent double-counting messages in same session
-    this.retryTimeout = null;
+    this.hasReportedError = false;
+    this.lastStatus = null;
   }
 
   init() {
@@ -28,8 +29,6 @@ window.MessengerRealtime = class MessengerRealtime {
     const userId = this.state.currentUser.id;
     const channelName = `messenger_live_${userId.slice(0, 8)}`; 
     
-    console.log("[Realtime] Connecting to hardened channel:", channelName);
-    
     this.channel = this.state.supabase.channel(channelName)
       .on("postgres_changes", { 
         event: "INSERT", 
@@ -44,26 +43,42 @@ window.MessengerRealtime = class MessengerRealtime {
       .subscribe((status, err) => {
         if (status === "SUBSCRIBED") {
           this.isConnecting = false;
-          console.log("[Realtime] Connected.");
+          this.hasReportedError = false;
+          if (this.lastStatus !== "SUBSCRIBED") {
+            console.log("[Realtime] Connected.");
+            this.lastStatus = "SUBSCRIBED";
+          }
           return;
         }
+        
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED" || err) {
           this.isConnecting = false;
-          console.error("[Realtime] Transport issue. Retrying...", err || status);
+          
+          if (!this.hasReportedError) {
+            console.error("[Realtime] Transport issue. Retrying in background...", err || status);
+            this.hasReportedError = true;
+          }
+          
+          this.lastStatus = status;
+
           if (!this.retryTimeout) {
             this.retryTimeout = setTimeout(() => {
               this.retryTimeout = null;
               this.init();
-            }, 7000);
+            }, 10000); // Slower retry for stability
           }
         }
       }, 20000);
 
-    // Heartbeat to monitor health
+    // Silent heartbeat
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = setInterval(() => {
-      console.log("[Realtime] Heartbeat. Status:", this.channel ? "Connected" : "Disconnected");
-    }, 30000);
+      // Only log if connection is actually lost to keep console clean
+      if (!this.channel) {
+         console.warn("[Realtime] Heartbeat: Disconnected. Attempting recovery...");
+         this.init();
+      }
+    }, 60000);
   }
 
   handleNewMessage(rawData) {
