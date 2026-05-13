@@ -324,6 +324,19 @@ body:not(.chat-collapsed) .messenger-section {
     text-overflow: ellipsis;
     white-space: nowrap;
     overflow: hidden;
+    background: var(--arc-input-wrapper-bg);
+    color: var(--arc-msg-ai-text);
+    border: 1px solid var(--arc-border);
+    border-radius: 4px;
+    padding: 2px 4px;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+#chat-model-select option {
+    background: var(--arc-input-wrapper-bg);
+    color: var(--arc-msg-ai-text);
 }
 
 @media (max-width: 768px) {

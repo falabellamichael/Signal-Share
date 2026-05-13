@@ -171,7 +171,6 @@ async function hydrateChatModelSelect({ forceRefresh = false } = {}) {
         const autoOption = document.createElement('option');
         autoOption.value = 'auto';
         autoOption.textContent = 'Auto-Select';
-        autoOption.style.background = '#1a1a1a';
         select.appendChild(autoOption);
 
         const seen = new Set(['auto']);
@@ -188,7 +187,6 @@ async function hydrateChatModelSelect({ forceRefresh = false } = {}) {
             option.textContent = provider && provider !== 'unknown'
                 ? `${toModelDisplayName(modelId)} (${provider.toUpperCase()})`
                 : toModelDisplayName(modelId);
-            option.style.background = '#1a1a1a';
             select.appendChild(option);
         }
 

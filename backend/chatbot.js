@@ -60,6 +60,9 @@ const LLM_ENDPOINTS = Object.freeze([
 ]);
 
 const MODEL_CATALOG_TTL_MS = 15000;
+const LM_STUDIO_REST_BASE_URL = "http://localhost:1234/api/v1";
+const LM_STUDIO_API_TOKEN = `${process.env.LM_API_TOKEN || ""}`.trim();
+const LM_STUDIO_SWITCH_TIMEOUT_MS = Number(process.env.SIGNAL_SHARE_LM_MODEL_SWITCH_TIMEOUT_MS || 8000);
 let modelCatalogCache = { at: 0, data: null };
 
 function normalizeModelKey(value = "") {
@@ -148,6 +151,137 @@ async function fetchJsonWithTimeout(url, timeoutMs = 1800) {
         return null;
     } finally {
         clearTimeout(timer);
+    }
+}
+
+function getLmStudioRequestHeaders() {
+    const headers = {
+        "Content-Type": "application/json"
+    };
+    if (LM_STUDIO_API_TOKEN) {
+        headers.Authorization = `Bearer ${LM_STUDIO_API_TOKEN}`;
+    }
+    return headers;
+}
+
+async function fetchLmStudioJson(path, { method = "GET", body = null, timeoutMs = LM_STUDIO_SWITCH_TIMEOUT_MS } = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(`${LM_STUDIO_REST_BASE_URL}${path}`, {
+            method,
+            headers: getLmStudioRequestHeaders(),
+            signal: controller.signal,
+            ...(body ? { body: JSON.stringify(body) } : {})
+        });
+        if (!response.ok) {
+            throw new Error(`LM Studio ${method} ${path} failed with ${response.status}`);
+        }
+        return await response.json().catch(() => ({}));
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function parseLmStudioModelRows(payload) {
+    const rows = Array.isArray(payload?.models) ? payload.models : [];
+    return rows.filter((row) => row && typeof row === "object");
+}
+
+function resolveLmStudioModelKey(requestedModel, modelRows) {
+    const requested = `${requestedModel || ""}`.trim();
+    if (!requested || !Array.isArray(modelRows) || modelRows.length === 0) return requested;
+
+    let bestKey = "";
+    let bestScore = 0;
+    for (const row of modelRows) {
+        const key = `${row?.key || ""}`.trim();
+        const displayName = `${row?.display_name || ""}`.trim();
+        const variants = Array.isArray(row?.variants) ? row.variants : [];
+        const candidates = [key, displayName, ...variants].filter(Boolean);
+
+        for (const candidate of candidates) {
+            const score = scoreModelMatch(requested, candidate);
+            if (score > bestScore) {
+                bestScore = score;
+                bestKey = key || `${candidate}`.trim();
+            }
+        }
+    }
+
+    return bestKey && bestScore >= 45 ? bestKey : requested;
+}
+
+function matchesModelTarget(candidate = "", target = "") {
+    const left = `${candidate || ""}`.trim();
+    const right = `${target || ""}`.trim();
+    if (!left || !right) return false;
+    return scoreModelMatch(left, right) >= 45 || scoreModelMatch(right, left) >= 45;
+}
+
+function getLoadedLmStudioInstances(modelRows) {
+    const rows = Array.isArray(modelRows) ? modelRows : [];
+    const loaded = [];
+    for (const row of rows) {
+        if (`${row?.type || ""}`.toLowerCase() !== "llm") continue;
+        const key = `${row?.key || ""}`.trim();
+        const instances = Array.isArray(row?.loaded_instances) ? row.loaded_instances : [];
+        for (const instance of instances) {
+            const id = `${instance?.id || ""}`.trim();
+            if (!id) continue;
+            loaded.push({ id, key });
+        }
+    }
+    return loaded;
+}
+
+async function ensureLmStudioExclusiveModel(targetModel) {
+    const requestedTarget = `${targetModel || ""}`.trim();
+    if (!requestedTarget) return;
+
+    try {
+        const initialPayload = await fetchLmStudioJson("/models", { timeoutMs: 3000 });
+        const initialRows = parseLmStudioModelRows(initialPayload);
+        if (initialRows.length === 0) return;
+
+        const resolvedTarget = resolveLmStudioModelKey(requestedTarget, initialRows);
+        const loadedBefore = getLoadedLmStudioInstances(initialRows);
+        const targetLoaded = loadedBefore.some((instance) =>
+            matchesModelTarget(instance.id, resolvedTarget) || matchesModelTarget(instance.key, resolvedTarget)
+        );
+
+        if (!targetLoaded) {
+            await fetchLmStudioJson("/models/load", {
+                method: "POST",
+                body: { model: resolvedTarget },
+                timeoutMs: 120000
+            });
+            console.log(`[Chatbot] LM Studio loaded model: ${resolvedTarget}`);
+        }
+
+        const refreshedPayload = targetLoaded
+            ? initialPayload
+            : await fetchLmStudioJson("/models", { timeoutMs: 3000 });
+        const refreshedRows = parseLmStudioModelRows(refreshedPayload);
+        const loadedNow = getLoadedLmStudioInstances(refreshedRows);
+
+        for (const instance of loadedNow) {
+            if (matchesModelTarget(instance.id, resolvedTarget) || matchesModelTarget(instance.key, resolvedTarget)) {
+                continue;
+            }
+            try {
+                await fetchLmStudioJson("/models/unload", {
+                    method: "POST",
+                    body: { instance_id: instance.id },
+                    timeoutMs: 15000
+                });
+                console.log(`[Chatbot] LM Studio unloaded model: ${instance.id}`);
+            } catch (unloadError) {
+                console.warn(`[Chatbot] Failed to unload LM Studio model "${instance.id}": ${unloadError.message}`);
+            }
+        }
+    } catch (error) {
+        console.warn(`[Chatbot] LM Studio model switch skipped: ${error.message}`);
     }
 }
 
@@ -303,11 +437,23 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         }
     ];
 
+    const hasPinnedModel = Boolean(preferredModel && preferredModel !== "auto");
+    let lmStudioPreparedForPinnedModel = false;
+
     for (const endpoint of endpointConfigs) {
         if (success) break;
-        const endpointModels = endpoint.models && endpoint.models.length > 0
+        const endpointFallbackModels = endpoint.models && endpoint.models.length > 0
             ? endpoint.models
             : models;
+        const endpointModels = (hasPinnedModel && endpoint.provider === "lmstudio")
+            ? endpointFallbackModels.slice(0, 1)
+            : endpointFallbackModels;
+
+        if (hasPinnedModel && endpoint.provider === "lmstudio" && !lmStudioPreparedForPinnedModel) {
+            const pinnedLmStudioModel = endpointModels[0] || preferredModel;
+            await ensureLmStudioExclusiveModel(pinnedLmStudioModel);
+            lmStudioPreparedForPinnedModel = true;
+        }
 
         for (const model of endpointModels) {
             if (success) break;
@@ -373,7 +519,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 ...conversation,
                 { role: "assistant", content: lmResponse },
                 { role: "system", content: "You said you were searching/checking, but you forgot to use the [SEARCH: query] tag. DO NOT apologize. JUST emit the [SEARCH: query] tag now so I can get the data for you." }
-            ], pageContext, iteration + 1);
+            ], pageContext, iteration + 1, null, preferredModel);
         }
 
         if (hasTools) {
@@ -386,7 +532,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 ...conversation,
                 { role: "assistant", content: lmResponse },
                 { role: "user", content: `[SYSTEM OBSERVATION]: ${toolResult}\n\nPlease analyze this result and give your final answer to the user now.` }
-            ], pageContext, iteration + 1);
+            ], pageContext, iteration + 1, null, preferredModel);
         }
     }
 
