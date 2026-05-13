@@ -19,6 +19,7 @@ $files = @(
   "notifications.css",
   "questions-guide.css",
   "android-optimizations.css",
+  "favicon.ico",
   
   # Core Logic
   "config.js",
@@ -85,7 +86,6 @@ $files = @(
   "basketball_game_poster.png",
   "neon_pinball_v2_poster.png",
   "pinball_poster_1778481948543.png",
-  "neon_sudoku_poster.png",
   
   # System Icons & Avatars
   "apple-touch-icon-180.png",
@@ -96,8 +96,13 @@ $files = @(
   "profile_avatar.png",
   
   # Capacitor Requirements
-  "cordova.js",
   "cordova_plugins.js"
+)
+
+# Optional files that may not exist in every workspace/environment
+$optionalFiles = @(
+  "neon_sudoku_poster.png",
+  "cordova.js"
 )
 
 $directories = @(
@@ -106,6 +111,7 @@ $directories = @(
 
 # Clean and recreate dist
 if (Test-Path -LiteralPath $dist) {
+  Write-Host "Cleaning existing dist directory..." -ForegroundColor Gray
   Remove-Item -LiteralPath $dist -Recurse -Force
 }
 New-Item -ItemType Directory -Path $dist | Out-Null
@@ -122,6 +128,18 @@ foreach ($file in $files) {
   }
 }
 
+Write-Host "`n--- Copying Optional Files ---" -ForegroundColor DarkCyan
+foreach ($file in $optionalFiles) {
+  $src = Join-Path $root $file
+  $dest = Join-Path $dist $file
+  if (Test-Path -LiteralPath $src) {
+    Copy-Item -Path $src -Destination $dest -Force
+    Write-Host "[Optional] $file"
+  } else {
+    Write-Host "[Optional missing] $file" -ForegroundColor DarkGray
+  }
+}
+
 Write-Host "`n--- Copying Directories ---" -ForegroundColor Cyan
 foreach ($directory in $directories) {
   $src = Join-Path $root $directory
@@ -135,6 +153,7 @@ foreach ($directory in $directories) {
 
 Write-Host "`n--- Syncing with Capacitor ---" -ForegroundColor Green
 Set-Location -Path $root
-npx cap copy android
+# Use sync instead of copy to ensure plugins and project structure are updated
+npx cap sync android
 
 Write-Host "`nSync Complete! Ready to build in Android Studio." -ForegroundColor White
