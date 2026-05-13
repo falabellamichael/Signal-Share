@@ -26,6 +26,7 @@ $files = @(
   "api-v3.js",
   "app-v3.js",
   "app-v3-ui.js",
+  "app-v3-ai.js",
   "shared-utils.js",
   "notifications.js",
   "profiles.js",
