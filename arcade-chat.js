@@ -1697,47 +1697,72 @@ function setupResizing() {
     const sidebar = document.querySelector('.steam-chat-sidebar');
     const shell = document.querySelector('.steam-shell') || document.querySelector('.page-shell');
     let isResizing = false;
+    let activePointerId = null;
 
     if (!handle || !sidebar || !shell) return;
 
-    const onMove = (e) => {
+    const endResize = () => {
         if (!isResizing) return;
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        handleResize(clientX);
-    };
-
-    const onEnd = () => {
-        if (isResizing) {
-            isResizing = false;
-            handle.classList.remove('active');
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-            
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onEnd);
-            document.removeEventListener('touchmove', onMove);
-            document.removeEventListener('touchend', onEnd);
+        isResizing = false;
+        handle.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        document.removeEventListener('pointercancel', onPointerUp);
+        if (activePointerId !== null && typeof handle.releasePointerCapture === 'function') {
+            try {
+                handle.releasePointerCapture(activePointerId);
+            } catch (_error) {
+                // Ignore capture release failures.
+            }
         }
+        activePointerId = null;
     };
 
-    handle.addEventListener('mousedown', (e) => {
+    const onPointerMove = (event) => {
+        if (!isResizing) return;
+        if (activePointerId !== null && event.pointerId !== activePointerId) return;
+        // Mouse safety: if button is no longer held, stop immediately.
+        if (event.pointerType === 'mouse' && typeof event.buttons === 'number' && event.buttons === 0) {
+            endResize();
+            return;
+        }
+        handleResize(event.clientX);
+        if (event.cancelable) event.preventDefault();
+    };
+
+    const onPointerUp = (event) => {
+        if (activePointerId !== null && event.pointerId !== activePointerId) return;
+        endResize();
+    };
+
+    const onPointerDown = (event) => {
+        if (event.button !== undefined && event.button !== 0) return;
+        if (handle.classList.contains('collapsed')) return;
+
         isResizing = true;
+        activePointerId = event.pointerId ?? null;
         handle.classList.add('active');
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
-        
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onEnd);
-    });
 
-    handle.addEventListener('touchstart', (e) => {
-        isResizing = true;
-        handle.classList.add('active');
-        document.body.style.userSelect = 'none';
-        
-        document.addEventListener('touchmove', onMove, { passive: false });
-        document.addEventListener('touchend', onEnd);
-    }, { passive: true });
+        if (activePointerId !== null && typeof handle.setPointerCapture === 'function') {
+            try {
+                handle.setPointerCapture(activePointerId);
+            } catch (_error) {
+                // Ignore capture failures.
+            }
+        }
+
+        document.addEventListener('pointermove', onPointerMove, { passive: false });
+        document.addEventListener('pointerup', onPointerUp);
+        document.addEventListener('pointercancel', onPointerUp);
+        if (event.cancelable) event.preventDefault();
+    };
+
+    handle.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('blur', endResize);
 
     function handleResize(clientX) {
         if (!clientX || clientX <= 0) return;

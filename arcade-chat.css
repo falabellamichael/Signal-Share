@@ -709,15 +709,16 @@ body[data-theme="aurora"] #chat-model-select {
 
 /* Resize Handle */
 .chat-resize-handle {
-    width: 12px;
-    background: rgba(103, 193, 245, 0.16);
+    width: 8px;
+    background: rgba(103, 193, 245, 0.12);
     cursor: col-resize;
     transition: background 0.2s, box-shadow 0.2s;
     z-index: 2201;
     position: relative;
-    margin-left: -6px;
-    border-left: 1px solid rgba(103, 193, 245, 0.2);
-    border-right: 1px solid rgba(103, 193, 245, 0.2);
+    margin-left: -4px;
+    border-left: 1px solid rgba(103, 193, 245, 0.16);
+    border-right: 1px solid rgba(103, 193, 245, 0.16);
+    touch-action: none;
 }
 
 .chat-resize-handle.collapsed {
@@ -730,24 +731,24 @@ body[data-theme="aurora"] #chat-model-select {
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 2px;
-    height: 56px;
+    width: 1px;
+    height: 48px;
     border-radius: 99px;
     transform: translate(-50%, -50%);
-    background: rgba(103, 193, 245, 0.65);
-    box-shadow: 0 0 10px rgba(103, 193, 245, 0.5);
+    background: rgba(103, 193, 245, 0.72);
+    box-shadow: 0 0 8px rgba(103, 193, 245, 0.45);
     pointer-events: none;
 }
 
 .chat-resize-handle:hover, .chat-resize-handle.active {
     background: var(--arc-accent);
-    box-shadow: 0 0 15px var(--arc-accent);
+    box-shadow: 0 0 10px var(--arc-accent);
 }
 
 /* During active game sessions, keep the splitter explicitly visible above the runner. */
 body.runner-open .chat-resize-handle {
-    background: rgba(103, 193, 245, 0.28);
-    box-shadow: 0 0 14px rgba(103, 193, 245, 0.35);
+    background: rgba(103, 193, 245, 0.2);
+    box-shadow: 0 0 10px rgba(103, 193, 245, 0.3);
 }
 
 /* Attachments */
