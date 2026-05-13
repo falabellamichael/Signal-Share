@@ -8,6 +8,7 @@ const GAMES = [
     { id: 'snake', title: 'Neon Snake', category: 'ARCADE', poster: 'snake_game_poster_1778466261855.png', tag: 'ARCADE • READY', type: 'game', trackedStats: ['snake-best', 'snake-food-total', 'snake-games-played'] },
     { id: 'basketball', title: 'Neon Hoops', category: 'ARCADE', poster: 'basketball_game_poster.png', tag: 'ARCADE • 3D', type: 'game', trackedStats: ['hoops-bests', 'hoops-total-points', 'hoops-sessions'] },
     { id: 'pinball', title: 'Neon Pinball', category: 'ARCADE', poster: 'neon_pinball_v2_poster.png', tag: 'ARCADE • NEW', type: 'game', trackedStats: ['pinball-pro-best', 'pinball-total-score', 'pinball-avg-score', 'pinball-sessions'] },
+    { id: 'sudoku', title: 'Neon Sudoku', category: 'ARCADE', poster: 'neon_sudoku_poster.png', tag: 'ARCADE • PUZZLE', type: 'game', trackedStats: ['sudoku-best-time', 'sudoku-puzzles-solved'] },
     { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility', trackedStats: [] }
 ];
 
@@ -1116,6 +1117,11 @@ function launchPinball() {
     openApp(`./pinball-game.html`, 'Neon Pinball', 'pinball_poster_1778481948543.png', 'pinball');
 }
 
+function launchSudoku() {
+    recordLaunch('sudoku');
+    openApp(`./sudoku-game.html`, 'Neon Sudoku', 'neon_sudoku_poster.png', 'sudoku');
+}
+
 function launchCalc() {
     recordLaunch('calc');
     openApp('./Calculator.html', 'Scientific Calc', 'calculator_tool_poster_1778466276736.png', 'calc');
@@ -1219,6 +1225,7 @@ window.showLibrary = showLibrary;
 window.launchSnake = launchSnake;
 window.launchBasketball = launchBasketball;
 window.launchPinball = launchPinball;
+window.launchSudoku = launchSudoku;
 window.launchCalc = launchCalc;
 window.closeApp = closeApp;
 window.toggleAuth = toggleAuth;

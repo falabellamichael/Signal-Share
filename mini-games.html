@@ -1064,6 +1064,44 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Sudoku Specific Content -->
+                    <div id="hub-sudoku" style="display: none;">
+                        <div class="game-hub-header">
+                            <img src="neon_sudoku_poster.png" class="hub-poster">
+                            <div>
+                                <h1 style="font-size: 4rem; margin: 0 0 10px 0; letter-spacing: -3px; font-weight: 900;">Neon Sudoku</h1>
+                                <div style="display: flex; gap: 10px; margin-bottom: 30px;">
+                                    <span class="badge">ARCADE</span>
+                                    <span class="badge">PUZZLE</span>
+                                    <span class="badge" style="color: var(--steam-light);">NEW</span>
+                                </div>
+                                <p style="color: rgba(255,255,255,0.6); line-height: 1.8; font-size: 1.1rem; max-width: 600px;">
+                                    A high-performance neon Sudoku engine with dynamic puzzle generation. Master the logic grid with real-time validation and backtracking assistance.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="play-bar">
+                            <div>
+                                <span style="font-size: 0.7rem; font-weight: 900; color: var(--steam-light); letter-spacing: 2px;">STATUS: ONLINE</span>
+                                <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">Puzzle Session Ready</div>
+                            </div>
+                            <button class="play-btn" onclick="launchSudoku()">Launch Sudoku</button>
+                        </div>
+
+                        <h3 style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.3; margin-bottom: 20px; font-weight: 900;">GAMEPLAY FEATURES</h3>
+                        <div class="config-grid">
+                            <div style="color: rgba(255,255,255,0.8); font-size: 0.85rem; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 4px; height: 4px; background: var(--steam-light); border-radius: 50%;"></div> Dynamic Board Generation</div>
+                                <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 4px; height: 4px; background: var(--steam-light); border-radius: 50%;"></div> Smart Hint System</div>
+                            </div>
+                            <div style="color: rgba(255,255,255,0.8); font-size: 0.85rem; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 4px; height: 4px; background: var(--steam-light); border-radius: 50%;"></div> Real-time Validation</div>
+                                <div style="display: flex; align-items: center; gap: 10px;"><div style="width: 4px; height: 4px; background: var(--steam-light); border-radius: 50%;"></div> Multi-Level Difficulty</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1368,7 +1406,7 @@
         // Global exposing for use in other functions
         window.renderGlobalLeaderboards = async () => {
             console.log('[Arcade Launcher] Rendering global leaderboards...');
-            const games = ['pinball', 'basketball', 'snake'];
+            const games = ['pinball', 'basketball', 'snake', 'sudoku'];
             const container = document.getElementById('global-leaderboard-grid');
             if (!container) return;
             

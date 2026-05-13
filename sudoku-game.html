@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Neon Sudoku | Signal Share</title>
+    <link rel="stylesheet" href="./android-optimizations.css?v=1.5">
+    <script>
+        // Signal Share Android Optimization Suite - Detection
+        (function() {
+            const isNative = !!window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() !== 'web';
+            if (isNative || /Android/i.test(navigator.userAgent)) {
+                document.documentElement.classList.add('platform-android');
+                document.documentElement.classList.add('is-signal-app');
+            }
+        })();
+    </script>
+    <style>
+        :root {
+            --neon-red: #ff3e3e;
+            --neon-blue: #00d2ff;
+            --neon-purple: #bd00ff;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-strong: rgba(255, 255, 255, 0.1);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #1b2838 0%, #000 100%);
+            color: #fff;
+            font-family: 'Inter', system-ui, sans-serif;
+            touch-action: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Signal Share Menu Bar Styles */
+        .runner-header {
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(20px);
+            padding: 12px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            width: 100%;
+            z-index: 1000;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+
+        .close-runner {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .close-runner:hover {
+            background: #ff3e3e;
+            border-color: transparent;
+        }
+
+        .runner-title-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .runner-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+
+        .runner-title {
+            font-weight: 900;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #fff;
+        }
+
+        .game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+
+        .game-container::-webkit-scrollbar { display: none; }
+
+        .info-bar {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            background: var(--glass);
+            padding: 12px 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 0.6rem;
+            letter-spacing: 1.5px;
+            opacity: 0.5;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: var(--neon-blue);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            aspect-ratio: 1;
+            width: 100%;
+            margin-bottom: 24px;
+            box-shadow: 0 0 30px rgba(0, 210, 255, 0.1);
+        }
+
+        .cell {
+            background: #111;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            position: relative;
+        }
+
+        .cell:hover {
+            background: #222;
+        }
+
+        .cell.fixed {
+            color: rgba(255,255,255,0.4);
+        }
+
+        .cell.selected {
+            background: var(--neon-blue) !important;
+            color: #000;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.3);
+        }
+
+        .cell.highlighted {
+            background: rgba(0, 210, 255, 0.1);
+        }
+
+        .cell.same-number {
+            background: rgba(0, 210, 255, 0.2);
+            color: var(--neon-blue);
+        }
+
+        .cell.error {
+            color: var(--neon-red);
+            text-shadow: 0 0 10px var(--neon-red);
+        }
+
+        .cell.solved {
+            color: #00ff9d;
+            text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
+        }
+
+        /* 3x3 Box Dividers */
+        .cell:nth-child(3n) { border-right: 2px solid var(--border); }
+        .cell:nth-child(9n) { border-right: none; }
+        .cell:nth-child(n+19):nth-child(-n+27),
+        .cell:nth-child(n+46):nth-child(-n+54) {
+            border-bottom: 2px solid var(--border);
+        }
+
+        .controls-panel {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .number-pad {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 6px;
+        }
+
+        .num-btn {
+            aspect-ratio: 1;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 900;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .num-btn:hover {
+            background: var(--glass-strong);
+            border-color: var(--neon-blue);
+            color: var(--neon-blue);
+            transform: translateY(-2px);
+        }
+
+        .action-row {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--glass);
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background: var(--glass-strong);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        .btn-primary {
+            background: linear-gradient(to bottom, var(--neon-blue), #0088aa);
+            border: none;
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.2);
+        }
+
+        .btn-danger {
+            background: linear-gradient(to bottom, var(--neon-red), #aa0000);
+            border: none;
+        }
+
+        .btn.active {
+            border-color: var(--neon-blue);
+            background: rgba(0, 210, 255, 0.1);
+            color: var(--neon-blue);
+        }
+
+        #overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .play-btn {
+            background: linear-gradient(to bottom, var(--neon-blue), #0088aa);
+            color: #fff;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            border-radius: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 0 20px rgba(0, 210, 255, 0.4);
+            margin-top: 30px;
+            width: 200px;
+            transition: transform 0.2s;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.05);
+        }
+
+        @media (max-width: 480px) {
+            .game-container { padding: 10px; }
+            .cell { font-size: 1.1rem; }
+            .num-btn { font-size: 0.9rem; }
+            .btn { font-size: 0.6rem; padding: 10px 5px; }
+        }
+    </style>
+</head>
+<body class="game-body">
+    <div class="runner-header">
+        <div class="runner-title-group">
+            <img src="neon_sudoku_poster.png" class="runner-icon">
+            <span class="runner-title">Neon Sudoku</span>
+        </div>
+        <a href="mini-games.html" class="close-runner">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            EXIT SESSION
+        </a>
+    </div>
+
+    <div class="game-container">
+        <div class="info-bar">
+            <div class="stat-item">
+                <span class="stat-label">TIME</span>
+                <span class="stat-value" id="timeDisplay">00:00</span>
+            </div>
+            <div class="stat-item" id="difficultyDisplay" style="opacity: 0.8;">
+                <span class="stat-label">LEVEL</span>
+                <span class="stat-value" style="color: var(--neon-purple); font-size: 0.9rem;">MEDIUM</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">MOVES</span>
+                <span class="stat-value" id="moveDisplay">0</span>
+            </div>
+        </div>
+
+        <div class="grid" id="grid"></div>
+
+        <div class="controls-panel">
+            <div class="number-pad" id="numberPad"></div>
+            
+            <div class="action-row">
+                <button class="btn" data-action="hint">💡 Hint</button>
+                <button class="btn" data-action="undo">↩️ Undo</button>
+                <button class="btn" data-action="erase">🗑️ Erase</button>
+            </div>
+
+            <div class="action-row">
+                <button class="btn btn-primary" id="checkBtn">✓ Check Puzzle</button>
+                <button class="btn btn-danger" id="newGameBtn">🔄 New Game</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="overlay">
+        <h1 style="font-size: 3.5rem; margin: 0; color: var(--neon-blue); text-shadow: 0 0 20px rgba(0,210,255,0.6); letter-spacing: -2px; font-weight: 900;">NEON SUDOKU</h1>
+        <p style="opacity: 0.6; font-size: 1rem; margin-top: 10px;">Master the grid, escape the simulation</p>
+        
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 40px; width: 100%; max-width: 300px;">
+            <div style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.5; font-weight: 900; margin-bottom: 10px;">SELECT DIFFICULTY</div>
+            <button class="play-btn" style="width: 100%; margin: 0;" onclick="startGame('easy')">EASY</button>
+            <button class="play-btn" style="width: 100%; margin: 0; background: linear-gradient(to bottom, var(--neon-purple), #8a00bb); box-shadow: 0 0 20px rgba(189, 0, 255, 0.4);" onclick="startGame('medium')">MEDIUM</button>
+            <button class="play-btn" style="width: 100%; margin: 0; background: linear-gradient(to bottom, var(--neon-red), #aa0000); box-shadow: 0 0 20px rgba(255, 62, 62, 0.4);" onclick="startGame('hard')">HARD</button>
+        </div>
+    </div>
+
+    <script src="sudoku-game.js?v=1.0"></script>
+    <script>
+        // Standardize Signal Share Suite UI - Hide redundant header in App Runner
+        if (window.self !== window.top) {
+            const header = document.querySelector('.runner-header');
+            if (header) header.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

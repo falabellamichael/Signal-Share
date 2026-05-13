@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sudoku Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 540px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2rem;
+        }
+
+        .info-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .timer, .moves {
+            font-size: 0.9rem;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .difficulty-selector {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .difficulty-selector label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .difficulty-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd6;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .btn-danger {
+            background: #e53935;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c62828;
+        }
+
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #43a047;
+        }
+
+        .btn.active {
+            outline: 2px solid #667eea;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 1px;
+            background: #333;
+            border: 3px solid #333;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .cell {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .cell:hover {
+            background: #f0f8ff;
+        }
+
+        .cell.selected {
+            background: #667eea !important;
+            color: white;
+        }
+
+        .cell.highlighted {
+            background: #e8f4fc !important;
+        }
+
+        .cell.fixed {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .cell.error {
+            background: #ffcdd2 !important;
+            color: #c62828;
+        }
+
+        .cell.solved {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .cell.same-number {
+            background: #fff9c4 !important;
+        }
+
+        /* Box borders */
+        .cell:nth-child(3n) {
+            border-right: 2px solid #333;
+        }
+
+        .cell:nth-child(9n) {
+            border-right: none;
+        }
+
+        .cell:nth-child(n+19):nth-child(-n+27),
+        .cell:nth-child(n+46):nth-child(-n+54) {
+            border-bottom: 2px solid #333;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        .number-pad {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 4px;
+            max-width: 360px;
+            margin: 0 auto;
+        }
+
+        .num-btn {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            border: none;
+            background: #f5f5f5;
+            font-size: 1.3rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .num-btn:hover {
+            background: #e0e0e0;
+            transform: scale(1.05);
+        }
+
+        /* Number selection panel */
+        .number-selector {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        .number-option {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .number-option:hover {
+            border-color: #667eea;
+        }
+
+        .number-option.selected {
+            background: #667eea;
+            color: white;
+            border-color: #5a6fd6;
+        }
+
+        /* Action buttons */
+        .actions-row {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .modal p {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        /* Accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                transition: none !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .game-container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 1.6rem;
+            }
+
+            .cell {
+                font-size: 1.2rem;
+            }
+
+            .number-pad {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Sudoku Game</h1>
+
+        <div class="difficulty-selector">
+            <label for="difficulty">Difficulty:</label>
+            <div class="difficulty-buttons" id="difficultyButtons"></div>
+        </div>
+
+        <div class="info-bar">
+            <span class="timer">⏱️ <span id="timeDisplay">00:00</span></span>
+            <span class="moves">🔄 Moves: <span id="moveDisplay">0</span></span>
+        </div>
+
+        <div class="grid" id="grid"></div>
+
+        <div class="number-selector" id="numberSelector"></div>
+
+        <div class="actions-row">
+            <button class="btn btn-secondary" data-action="hint">💡 Hint</button>
+            <button class="btn btn-secondary" data-action="error-mark">✏️ Error Mark</button>
+            <button class="btn btn-danger" data-action="erase">🗑️ Erase</button>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" id="checkBtn">✓ Check</button>
+            <button class="btn btn-secondary" id="undoBtn">↩️ Undo</button>
+            <button class="btn btn-success" id="newGameBtn">🔄 New Game</button>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-danger" id="giveUpBtn">💀 Give Up</button>
+            <button class="btn btn-secondary" id="solveBtn">✨ Solve</button>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay"></div>
+
+    <script type="module" src="sudoku-game.js"></script>
+</body>
+</html>
