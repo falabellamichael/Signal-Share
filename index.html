@@ -1492,21 +1492,21 @@
     <aside class="steam-chat-sidebar" id="arcadeCompanionSidebar">
         <div class="chat-header">
             <div style="display: flex; flex-direction: column; gap: 4px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div id="chat-status-dot" style="width: 8px; height: 8px; background: #67c1f5; border-radius: 50%; box-shadow: 0 0 8px #67c1f5; transition: all 0.3s ease;"></div>
-                    <div style="display: flex; flex-direction: column;">
+                <div style="display: flex; flex-direction: column;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div id="chat-status-dot" style="width: 8px; height: 8px; background: #67c1f5; border-radius: 50%; box-shadow: 0 0 8px #67c1f5; transition: all 0.3s ease;"></div>
                         <span id="chat-mode-title" style="font-weight: 800; font-size: 0.65rem; letter-spacing: 1px; text-transform: uppercase; color: #67c1f5;">Companion</span>
-                        <select id="chat-model-select" style="background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 0.6rem; font-weight: 700; padding: 0; cursor: pointer; outline: none; text-transform: uppercase;">
-                            <option value="auto" style="background: #1a1a1a;">Auto-Select</option>
-                            <option value="deepseek-r1-distill-qwen-1.5b" style="background: #1a1a1a;">DeepSeek R1 Distill (1.5B)</option>
-                            <option value="google/gemma-4-e2b" style="background: #1a1a1a;">Gemma 4 E2B</option>
-                            <option value="google/gemma-4-e4b" style="background: #1a1a1a;">Gemma 4 E4B</option>
-                            <option value="qwen/qwen3.5-9b" style="background: #1a1a1a;">Qwen 3.5 (9B)</option>
-                        </select>
                     </div>
+                    <select id="chat-model-select" style="background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 0.6rem; font-weight: 700; padding: 0; cursor: pointer; outline: none; text-transform: uppercase; margin-left: 16px;">
+                        <option value="auto" style="background: #1a1a1a;">Auto-Select</option>
+                        <option value="deepseek-r1-distill-qwen-1.5b" style="background: #1a1a1a;">DeepSeek R1 Distill (1.5B)</option>
+                        <option value="google/gemma-4-e2b" style="background: #1a1a1a;">Gemma 4 E2B</option>
+                        <option value="google/gemma-4-e4b" style="background: #1a1a1a;">Gemma 4 E4B</option>
+                        <option value="qwen/qwen3.5-9b" style="background: #1a1a1a;">Qwen 3.5 (9B)</option>
+                    </select>
                 </div>
                 <!-- Bridge Engine Status -->
-                <div id="engine-status-container" style="display: flex; align-items: center; gap: 6px; font-size: 0.55rem; font-weight: 700; color: rgba(255,255,255,0.3); margin-left: 16px;">
+                <div id="engine-status-container" style="display: flex; align-items: center; gap: 6px; font-size: 0.55rem; font-weight: 700; color: rgba(255,255,255,0.3); margin-left: 1px;">
                     <div id="engine-status-dot" style="width: 6px; height: 6px; background: rgba(255,255,255,0.2); border-radius: 50%;"></div>
                     <span id="engine-status-text">LLM BRIDGE DISCONNECTED</span>
                 </div>
