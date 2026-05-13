@@ -1344,6 +1344,10 @@ function openApp(url, title, icon, appId, skipPush = false) {
     // Synchronize offsets to ensure runner respects the companion sidebar
     if (window.syncArcadeSidebarOffsets) {
         window.syncArcadeSidebarOffsets();
+        // Run again after layout/paint so the companion width is fully measured.
+        requestAnimationFrame(() => {
+            window.syncArcadeSidebarOffsets();
+        });
     }
 
     if (!skipPush && !isNavigatingHistory) {

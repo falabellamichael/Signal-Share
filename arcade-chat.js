@@ -757,13 +757,13 @@ window.syncArcadeSidebarOffsets = function() {
         // Runner positioning
         if (appRunner) {
             // Shift right to accommodate the companion sidebar
-            appRunner.style.right = `${currentWidth}px`;
+            appRunner.style.setProperty('right', `${currentWidth}px`, 'important');
             
             // In Steam Shell mode, also shift left to accommodate the navigation sidebar
             if (isSteamShell && !window.matchMedia('(max-width: 768px)').matches) {
-                appRunner.style.left = '240px';
+                appRunner.style.setProperty('left', '240px', 'important');
             } else {
-                appRunner.style.left = '0';
+                appRunner.style.setProperty('left', '0', 'important');
             }
         }
     } else {
@@ -776,8 +776,8 @@ window.syncArcadeSidebarOffsets = function() {
             messengerSection.style.width = '';
         }
         if (appRunner) {
-            appRunner.style.right = '';
-            appRunner.style.left = '';
+            appRunner.style.removeProperty('right');
+            appRunner.style.removeProperty('left');
         }
     }
 };
