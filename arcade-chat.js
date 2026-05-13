@@ -77,6 +77,9 @@ function resolveBridgeBaseCandidates() {
 
     if (candidates.length > 0) {
         BRIDGE_BASE_URL = candidates[0];
+        console.log(`[Arcade Chat] Resolved bridge candidates: ${candidates.join(", ")}. Using: ${BRIDGE_BASE_URL}`);
+    } else {
+        console.warn("[Arcade Chat] No bridge candidates resolved. AI features may be unavailable.");
     }
 
     return candidates;
@@ -91,10 +94,27 @@ function parseBridgeBoolean(value) {
 }
 
 function isLoopbackSiteOrigin() {
-    const protocol = `${window.location?.protocol || ''}`.toLowerCase();
-    const host = `${window.location?.hostname || ''}`.trim().toLowerCase();
+    const protocol = `${window.location.protocol || ""}`.toLowerCase();
+    const host = `${window.location.hostname || ""}`.trim().toLowerCase();
     if (protocol === 'file:') return true;
-    return !host || host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]' || host.endsWith('.localhost');
+    return host === 'localhost'
+        || host === '127.0.0.1'
+        || host === '::1'
+        || host === '[::1]'
+        || host.endsWith('.localhost');
+}
+
+/**
+ * Checks if the current origin is a private network (LAN) address.
+ */
+function isPrivateNetworkOrigin() {
+    const host = `${window.location.hostname || ""}`.trim().toLowerCase();
+    if (!host) return false;
+    if (host.startsWith('10.') || host.startsWith('192.168.')) return true;
+    const octets = host.split('.').map(v => parseInt(v, 10));
+    if (octets.length === 4 && octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return true;
+    if (host.endsWith('.local')) return true;
+    return false;
 }
 
 function isBridgeFeatureEnabled() {
@@ -118,7 +138,7 @@ function isBridgeFeatureEnabled() {
         return false;
     }
 
-    return isLoopbackSiteOrigin();
+    return isLoopbackSiteOrigin() || isPrivateNetworkOrigin();
 }
 
 function toModelDisplayName(modelId = '') {
@@ -357,6 +377,7 @@ async function bridgeFetch(path, options = {}) {
 
             lastHttpResponse = response;
         } catch (error) {
+            console.warn(`[Arcade Chat] Bridge candidate failed: ${baseUrl} - ${error.message}`);
             lastNetworkError = error;
         } finally {
             clearTimeout(timeout);
@@ -1590,6 +1611,9 @@ window.toggleChat = function() {
     // Randomize placeholder when opening
     if (!isCollapsed) {
         updateChatPlaceholder();
+        if (typeof pollDesktopBridge === 'function') {
+            pollDesktopBridge();
+        }
     }
     
     // Update grid if in integrated mode
