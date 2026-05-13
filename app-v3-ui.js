@@ -202,6 +202,13 @@ export function createAppUi(context) {
     viewerTags: document.querySelector("#viewerTags"),
     viewerPrevButton: document.querySelector("#viewerPrevButton"),
     viewerNextButton: document.querySelector("#viewerNextButton"),
+    viewerZoomControls: document.querySelector("#viewerZoomControls"),
+    viewerZoomLevel: document.querySelector("#viewerZoomLevel"),
+    viewerZoomIn: document.querySelector("#viewerZoomIn"),
+    viewerZoomOut: document.querySelector("#viewerZoomOut"),
+    viewerZoomReset: document.querySelector("#viewerZoomReset"),
+    viewerMediaScroller: document.querySelector("#viewerMediaScroller"),
+    viewerMediaContainer: document.querySelector("#viewerMediaContainer"),
     profileCloseButton: document.querySelector("#profileCloseButton"),
     profileBadge: document.querySelector("#profileBadge"),
     profileTitle: document.querySelector("#profileTitle"),
@@ -520,6 +527,9 @@ export function createAppUi(context) {
     elements.viewer.addEventListener("click", (event) => { if (event.target.closest("[data-close-viewer]")) closeViewer(); });
     elements.profileView.addEventListener("click", (event) => { if (event.target.closest("[data-close-profile]")) closeProfile(); });
     elements.viewerCloseButton.addEventListener("click", closeViewer);
+    elements.viewerZoomIn.addEventListener("click", () => handleViewerZoom(0.2));
+    elements.viewerZoomOut.addEventListener("click", () => handleViewerZoom(-0.2));
+    elements.viewerZoomReset.addEventListener("click", () => handleViewerZoom(0, { reset: true }));
     elements.profileCloseButton.addEventListener("click", closeProfile);
     elements.viewerCollapseButton.addEventListener("click", collapseViewerToPlayer);
     elements.viewerPrevButton.addEventListener("click", () => stepViewer(-1));
@@ -1977,9 +1987,100 @@ export function createAppUi(context) {
 
   function renderSpotlightMedia(container, post) { appendMedia(container, post, { variant: "spotlight" }); }
 
-  function renderViewerMedia(container, post) { if (isPlayablePost(post)) mountPersistentPlayer(container, post, "viewer"); else appendMedia(container, post, { variant: "viewer", sourceResolver: resolveViewerSource }); }
+  function renderViewerMedia(container, post) {
+    const target = elements.viewerMediaContainer || container;
+    target.replaceChildren();
+    
+    // Reset zoom state
+    state.viewerZoom = 1.0;
+    
+    if (isPlayablePost(post)) {
+      if (elements.viewerZoomControls) elements.viewerZoomControls.hidden = true;
+      mountPersistentPlayer(target, post, "viewer");
+    } else {
+      // For images/non-playable content in feed
+      if (elements.viewerZoomControls && post.mediaKind === 'image') {
+        elements.viewerZoomControls.hidden = false;
+        renderViewerZoom();
+      } else if (elements.viewerZoomControls) {
+        elements.viewerZoomControls.hidden = true;
+      }
+      
+      appendMedia(target, post, { variant: "viewer", sourceResolver: resolveViewerSource });
+      
+      // If it's an image, we need to ensure it gets the 'viewer-media' class and ID for zooming
+      const image = target.querySelector('img');
+      if (image) {
+        image.classList.add('viewer-media');
+        image.id = "viewerMedia";
+      }
+    }
+  }
+  
+  function handleViewerZoom(delta, options = {}) {
+    const { reset = false } = options;
+    if (reset) {
+      state.viewerZoom = 1.0;
+    } else {
+      state.viewerZoom = Math.min(5.0, Math.max(0.2, state.viewerZoom + delta));
+    }
+    renderViewerZoom();
+  }
 
-  function renderViewerAttachmentMedia(container, attachment) { if (!attachment?.url || !attachment?.kind) return; if (attachment.kind === "image") { const image = document.createElement("img"); image.className = "viewer-media"; image.loading = "eager"; image.alt = attachment.title || "Shared image"; image.src = attachment.url; container.appendChild(image); return; } const video = document.createElement("video"); video.className = "viewer-media"; video.controls = true; video.preload = "metadata"; video.playsInline = true; video.src = attachment.url; container.appendChild(video); }
+  function renderViewerZoom() {
+    if (!elements.viewerZoomLevel) return;
+    const percentage = Math.round(state.viewerZoom * 100);
+    elements.viewerZoomLevel.textContent = `${percentage}%`;
+    
+    const media = document.getElementById("viewerMedia");
+    if (media) {
+      media.style.transform = `scale(${state.viewerZoom})`;
+      
+      // If zoomed in, allow the image to grow beyond its container
+      if (state.viewerZoom > 1.0) {
+        media.style.maxWidth = 'none';
+        media.style.maxHeight = 'none';
+      } else {
+        media.style.maxWidth = '100%';
+        media.style.maxHeight = '100%';
+      }
+    }
+  }
+
+  function renderViewerAttachmentMedia(container, attachment) {
+    if (!attachment?.url || !attachment?.kind) return;
+    
+    // Use the container from elements if we are on the main viewer
+    const target = elements.viewerMediaContainer || container;
+    target.replaceChildren();
+    
+    // Reset zoom state
+    state.viewerZoom = 1.0;
+    
+    if (attachment.kind === "image") {
+      const image = document.createElement("img");
+      image.className = "viewer-media";
+      image.id = "viewerMedia";
+      image.loading = "eager";
+      image.alt = attachment.title || "Shared image";
+      image.src = attachment.url;
+      target.appendChild(image);
+      
+      if (elements.viewerZoomControls) elements.viewerZoomControls.hidden = false;
+      renderViewerZoom();
+      return;
+    }
+    
+    if (elements.viewerZoomControls) elements.viewerZoomControls.hidden = true;
+    
+    const video = document.createElement("video");
+    video.className = "viewer-media";
+    video.controls = true;
+    video.preload = "metadata";
+    video.playsInline = true;
+    video.src = attachment.url;
+    target.appendChild(video);
+  }
 
   function renderMiniPlayerMedia(container, post) { mountPersistentPlayer(container, post, "mini"); }
 
@@ -3271,7 +3372,16 @@ export function createAppUi(context) {
 
   function clearSelectedMedia(options = {}) { const { preserveFeedback = false } = options; state.selectedFile = null; elements.mediaInput.value = ""; clearPreviewOnly(); if (state.previewUrl) { URL.revokeObjectURL(state.previewUrl); state.previewUrl = ""; } if (!preserveFeedback) elements.formFeedback.classList.remove("is-error"); }
 
-  function clearViewerMedia() { elements.viewerStage.replaceChildren(); if (state.viewerUrl) { URL.revokeObjectURL(state.viewerUrl); state.viewerUrl = ""; } }
+  function clearViewerMedia() {
+    if (elements.viewerMediaContainer) {
+      elements.viewerMediaContainer.replaceChildren();
+    } else {
+      elements.viewerStage.replaceChildren();
+    }
+    
+    if (elements.viewerZoomControls) elements.viewerZoomControls.hidden = true;
+    if (state.viewerUrl) { URL.revokeObjectURL(state.viewerUrl); state.viewerUrl = ""; }
+  }
 
   function clearMiniPlayerMedia() { elements.miniPlayerStage.replaceChildren(); }
 

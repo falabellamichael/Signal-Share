@@ -72,7 +72,6 @@ html.platform-android.is-steam-shell,
 html.platform-android.is-steam-shell body,
 html.platform-android.is-signal-app,
 html.platform-android.is-signal-app body {
-    height: 100vh !important;
     height: 100dvh !important;
     overflow: hidden !important;
     overscroll-behavior-y: none !important;

@@ -304,7 +304,6 @@ body:not(.chat-collapsed) .messenger-section {
     /* Android Safe Area Fix: Ensure companion starts below status bar */
     html.platform-android .steam-chat-sidebar {
         top: var(--safe-area-top, 0px) !important;
-        height: calc(100vh - var(--safe-area-top, 0px)) !important;
         height: calc(100dvh - var(--safe-area-top, 0px)) !important;
     }
     

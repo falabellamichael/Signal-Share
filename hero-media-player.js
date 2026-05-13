@@ -1390,10 +1390,6 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function stopDesktopSnapshotPolling() {
-    // No-op since polling is disabled
-  }
-
-  function stopDesktopSnapshotPolling() {
     if (!desktopPollTimerId) return;
     window.clearTimeout(desktopPollTimerId);
     desktopPollTimerId = 0;

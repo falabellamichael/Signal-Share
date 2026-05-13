@@ -1133,7 +1133,23 @@
           Close
         </button>
 
-        <div class="viewer-stage" id="viewerStage"></div>
+        <div class="viewer-stage" id="viewerStage">
+          <div class="viewer-zoom-controls" id="viewerZoomControls" hidden>
+            <button class="zoom-btn" id="viewerZoomOut" type="button" title="Zoom Out">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+            <span class="zoom-level" id="viewerZoomLevel">100%</span>
+            <button class="zoom-btn" id="viewerZoomIn" type="button" title="Zoom In">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+            <button class="zoom-btn" id="viewerZoomReset" type="button" title="Fit to Screen">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h6v6M9 21H3v-6M21 15v6h-6M3 9V3h6"></path></svg>
+            </button>
+          </div>
+          <div class="viewer-media-scroller" id="viewerMediaScroller">
+            <div class="viewer-media-container" id="viewerMediaContainer"></div>
+          </div>
+        </div>
 
         <aside class="viewer-panel">
           <p class="viewer-kind" id="viewerKind"></p>

@@ -335,6 +335,7 @@ if (!window[globalStateKey]) {
     miniPlayerPlaybackState: "none",
     viewerPostId: null,
     viewerAttachment: null,
+    viewerZoom: 1.0,
     miniPlayerUrl: "",
     heroControlMode: "feed",
     desktopBridgeSuspended: false,
