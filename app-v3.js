@@ -2313,6 +2313,30 @@ async function callLocalAI(text, history = [], pageContext = "", attachment = nu
     attachment
   });
 
+  if (typeof window.bridgeFetch === "function") {
+    try {
+      abortController = new AbortController();
+      const response = await window.bridgeFetch("/api/llm/chat", {
+        method: "POST",
+        signal: abortController.signal,
+        timeoutMs: 45000,
+        body: payload
+      });
+      if (response?.ok) {
+        const data = await response.json().catch(() => ({}));
+        return data.reply || "I'm having trouble thinking right now.";
+      }
+      console.debug(
+        `[AI Messenger] Shared bridgeFetch returned status ${response?.status ?? "unknown"}; falling back to internal resolver.`
+      );
+    } catch (err) {
+      if (stopRequested) {
+        return "🛑 [Signal Protocol] AI request stopped.";
+      }
+      console.debug("[AI Messenger] Shared bridgeFetch path failed:", err);
+    }
+  }
+
   let lastNetworkError = null;
   let lastHttpResponse = null;
 
