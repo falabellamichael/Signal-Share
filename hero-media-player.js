@@ -1,4 +1,4 @@
-import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js";
+﻿import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js";
 import {
   handleOpenMediaAction, handleOpenPhoneAction,
   handlePlayPauseAction, handleNextAction, handlePreviousAction,
@@ -498,7 +498,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       providerName,
       title,
       creator: directCreator,
-      caption: directCreator ? `${providerName} · ${directCreator}` : providerName,
+      caption: directCreator ? `${providerName} Â· ${directCreator}` : providerName,
     };
   }
 
@@ -550,7 +550,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         ...fallback,
         title,
         creator,
-        caption: creator ? `${fallback.providerName} · ${creator}` : fallback.caption,
+        caption: creator ? `${fallback.providerName} Â· ${creator}` : fallback.caption,
       };
     }
 
@@ -2219,7 +2219,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     } else if (mode === "app" && !post && fallbackMedia instanceof HTMLMediaElement) {
       const modeLabel = "BROWSER MEDIA";
       const fallbackTitle = browserMetadata?.title || fallbackMedia.getAttribute("title") || "Now playing in this browser";
-      const fallbackMeta = [browserMetadata?.artist, browserMetadata?.album].filter(Boolean).join(" · ");
+      const fallbackMeta = [browserMetadata?.artist, browserMetadata?.album].filter(Boolean).join(" Â· ");
       nextTitle = fallbackTitle;
       nextCaption = fallbackMeta || "Active browser media session";
       nextStatus = modeLabel;
@@ -2239,10 +2239,10 @@ The companion bridge is designed with several security layers to keep your PC sa
         const creatorSummary = getProfileSummaryForPost(post);
         const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
         nextTitle = post?.title || "Ready to play";
-        nextCaption = post ? `${post.caption} · ${creatorName}` : "";
+        nextCaption = post ? `${post.caption} Â· ${creatorName}` : "";
       }
 
-      nextStatus = post ? `${formatKind(post.mediaKind)} · ${getSignalLabel(post)}` : modeLabel;
+      nextStatus = post ? `${formatKind(post.mediaKind)} Â· ${getSignalLabel(post)}` : modeLabel;
       if (!post) nextStatus = modeLabel;
 
       syncTitle = nextTitle;
@@ -2376,6 +2376,10 @@ The companion bridge is designed with several security layers to keep your PC sa
       }
       if (canUseDesktopBridge()) {
         return performDesktopAction("open_uri", { uri });
+      }
+      if (uri) {
+        window.open(uri, "_blank");
+        return true;
       }
       return false;
     },
