@@ -457,6 +457,25 @@ function isLoopbackBridgeUrl(url) {
   }
 }
 
+function getBridgeTargetAddressSpace(url) {
+  if (isLoopbackBridgeUrl(url)) return "local";
+  try {
+    const parsed = new URL(url, window.location.href);
+    const host = `${parsed.hostname || ""}`.trim().toLowerCase();
+    if (!host) return "";
+    if (host.startsWith("10.") || host.startsWith("192.168.") || host === "10.0.2.2") return "private";
+    const octets = host.split(".").map((value) => Number.parseInt(value, 10));
+    if (octets.length === 4 && octets.every((value) => Number.isInteger(value) && value >= 0 && value <= 255)) {
+      if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return "private";
+      if (octets[0] === 169 && octets[1] === 254) return "private";
+    }
+    if (host.endsWith(".local")) return "private";
+  } catch (_error) {
+    return "";
+  }
+  return "";
+}
+
 async function probeLocalNetworkPermission() {
   if (!window.isSecureContext) return false;
   if (localNetworkPermissionProbePromise) return localNetworkPermissionProbePromise;
@@ -465,7 +484,7 @@ async function probeLocalNetworkPermission() {
     for (const url of LOCAL_NETWORK_PERMISSION_PROBE_URLS) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 1800);
-      const loopback = isLoopbackBridgeUrl(url);
+      const targetAddressSpace = getBridgeTargetAddressSpace(url);
       try {
         await fetch(url, {
           method: "GET",
@@ -473,7 +492,7 @@ async function probeLocalNetworkPermission() {
           cache: "no-store",
           credentials: "omit",
           signal: controller.signal,
-          ...(loopback ? {} : { targetAddressSpace: "private" })
+          ...(targetAddressSpace ? { targetAddressSpace } : {})
         });
         return true;
       } catch (_error) {
@@ -1985,7 +2004,7 @@ async function callLocalAI(text, history = [], pageContext = "", attachment = nu
 
   for (const url of candidates) {
     try {
-      const isLoopback = url.includes('localhost') || url.includes('127.0.0.1');
+      const targetAddressSpace = getBridgeTargetAddressSpace(url);
       const isRelative = url.startsWith('/') || !url.startsWith('http');
       
       // Skip relative paths on GitHub Pages as they will always 404/405
@@ -2003,8 +2022,7 @@ async function callLocalAI(text, history = [], pageContext = "", attachment = nu
       const response = await fetch(url, {
         method: 'POST',
         headers: headers,
-        // Standardize on W3C PNA spec: omit for loopback (handled as secure origin), 'private' for LAN
-        ...(isLoopback ? {} : { targetAddressSpace: 'private' }),
+        ...(targetAddressSpace ? { targetAddressSpace } : {}),
         signal: abortController.signal,
         cache: 'no-store',
         credentials: 'omit',

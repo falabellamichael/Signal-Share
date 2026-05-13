@@ -5,6 +5,25 @@
 
 const BRIDGE_BASE_URL = "http://127.0.0.1:3000";
 
+function getBridgeTargetAddressSpace(baseUrl = "") {
+    try {
+        const parsed = new URL(baseUrl, window.location.href);
+        const host = `${parsed.hostname || ""}`.trim().toLowerCase();
+        if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]") return "local";
+        if (!host) return "";
+        if (host.startsWith("10.") || host.startsWith("192.168.") || host === "10.0.2.2") return "private";
+        const octets = host.split(".").map((value) => Number.parseInt(value, 10));
+        if (octets.length === 4 && octets.every((value) => Number.isInteger(value) && value >= 0 && value <= 255)) {
+            if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return "private";
+            if (octets[0] === 169 && octets[1] === 254) return "private";
+        }
+        if (host.endsWith(".local")) return "private";
+    } catch (_error) {
+        return "";
+    }
+    return "";
+}
+
 function getBridgeSecret() {
     return localStorage.getItem("signal-share-bridge-secret") || "";
 }
@@ -19,6 +38,7 @@ async function bridgeFetch(path, options = {}) {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 1500);
+    const targetAddressSpace = getBridgeTargetAddressSpace(BRIDGE_BASE_URL);
 
     try {
         return await fetch(`${BRIDGE_BASE_URL}${path}`, {
@@ -29,8 +49,7 @@ async function bridgeFetch(path, options = {}) {
             ...options,
             headers,
             signal: options.signal || controller.signal,
-            // Only apply 'private' for LAN IPs. 127.0.0.1 is 'loopback' and should not have this header
-            ...(BRIDGE_BASE_URL.includes('127.0.0.1') || BRIDGE_BASE_URL.includes('localhost') ? {} : { targetAddressSpace: 'private' })
+            ...(targetAddressSpace ? { targetAddressSpace } : {})
         });
     } finally {
         clearTimeout(timeout);

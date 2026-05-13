@@ -850,6 +850,8 @@ The companion bridge is designed with several security layers to keep your PC sa
         headers["X-Bridge-Secret"] = secret;
       }
 
+      const targetAddressSpace = addressSpace === "loopback" ? "local" : addressSpace;
+
       // Ensure we do NOT send 'target-address-space' as a header, as it's a restricted 
       // fetch option property, not a header. Sending it as a header triggers CORS failures.
       delete headers["target-address-space"];
@@ -858,7 +860,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       return {
         ...init,
         headers,
-        ...(addressSpace !== "loopback" ? { targetAddressSpace: addressSpace } : {})
+        targetAddressSpace
       };
     } catch {
       return init;
@@ -1250,7 +1252,6 @@ The companion bridge is designed with several security layers to keep your PC sa
     const endpoints = resolveDesktopSnapshotEndpoints({ force });
     for (const endpoint of endpoints) {
       try {
-        const isLoopback = getEndpointAddressSpace(endpoint) === "loopback";
         const response = await window.fetch(endpoint, {
           ...withLocalNetworkFetchOptions(endpoint, {
             method: "GET",
@@ -1260,8 +1261,6 @@ The companion bridge is designed with several security layers to keep your PC sa
               Accept: "application/json",
             },
           }),
-          // Standardize on W3C PNA spec: omit for loopback, 'private' for LAN
-          ...(isLoopback ? {} : { targetAddressSpace: 'private' }),
         });
         if (!response.ok) throw new Error(`Desktop media endpoint returned ${response.status}.`);
         const payload = await response.json();

@@ -99,6 +99,25 @@ function isLoopbackBridgeUrl(url) {
     }
 }
 
+function getBridgeTargetAddressSpace(url) {
+    if (isLoopbackBridgeUrl(url)) return 'local';
+    try {
+        const parsed = new URL(url, window.location.href);
+        const host = `${parsed.hostname || ''}`.trim().toLowerCase();
+        if (!host) return '';
+        if (host.startsWith('10.') || host.startsWith('192.168.') || host === '10.0.2.2') return 'private';
+        const octets = host.split('.').map((value) => Number.parseInt(value, 10));
+        if (octets.length === 4 && octets.every((value) => Number.isInteger(value) && value >= 0 && value <= 255)) {
+            if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return 'private';
+            if (octets[0] === 169 && octets[1] === 254) return 'private';
+        }
+        if (host.endsWith('.local')) return 'private';
+    } catch (_error) {
+        return '';
+    }
+    return '';
+}
+
 async function probeLocalNetworkPermission() {
     if (!window.isSecureContext) return false;
     if (localNetworkPermissionProbePromise) return localNetworkPermissionProbePromise;
@@ -107,7 +126,7 @@ async function probeLocalNetworkPermission() {
         for (const url of LOCAL_NETWORK_PERMISSION_PROBE_URLS) {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 1800);
-            const isLoopback = isLoopbackBridgeUrl(url);
+            const targetAddressSpace = getBridgeTargetAddressSpace(url);
             try {
                 await fetch(url, {
                     method: 'GET',
@@ -115,7 +134,7 @@ async function probeLocalNetworkPermission() {
                     cache: 'no-store',
                     credentials: 'omit',
                     signal: controller.signal,
-                    ...(isLoopback ? {} : { targetAddressSpace: 'private' })
+                    ...(targetAddressSpace ? { targetAddressSpace } : {})
                 });
                 return true;
             } catch (_error) {
