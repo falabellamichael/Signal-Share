@@ -7,7 +7,11 @@
     "prepare:web": "powershell -ExecutionPolicy Bypass -File ./prepare-capacitor-web.ps1",
     "cap:sync": "npm run prepare:web && npx cap sync android",
     "cap:open": "npx cap open android",
-    "start": "node backend/server.js"
+    "start": "node backend/server.js",
+    "version:major": "node scripts/version-manager.mjs major",
+    "version:minor": "node scripts/version-manager.mjs minor",
+    "version:patch": "node scripts/version-manager.mjs patch",
+    "version:preview": "node scripts/version-manager.mjs preview"
   },
   "devDependencies": {
     "@capacitor/android": "^8.0.0",
