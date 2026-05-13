@@ -219,12 +219,41 @@ Signal Share features a deeply integrated, "stacked" AI assistant called the **A
     - **Messenger Integration**: Use the `[COMPOSE]` tool to draft messages and focus the communication dock.
 - **Multimodal Support**: Attach images, videos, or documents to your chat for the AI to analyze and discuss using vision-capable local models.
 
-### Local LLM Integration
+### Local LLM & Fortress Mode Setup
 
-The Arcade Companion utilizes a local bridge to communicate with your private AI infrastructure:
+The Arcade Companion is designed to run primarily on **Local LLM** infrastructure to ensure maximum privacy and zero latency. To enable the full "stacked" AI experience:
 
-1. **Bridge Connectivity**: It connects to the Signal Share Bridge (`backend/server.js`) to process complex requests without exposing your data to third-party clouds.
-2. **Offline Protocol**: If the local bridge is unreachable, the companion automatically switches to a tactical "Offline Protocol," providing game tips and advice from its internal database.
+#### 1. Configure the Bridge
+The bridge acts as the secure tunnel between the website and your computer.
+- Navigate to the `backend/` directory.
+- Create a `.env` file (see `.env.example` if available) and define your secrets:
+  ```env
+  SIGNAL_SHARE_BRIDGE_SECRET=your_secure_passphrase
+  SIGNAL_SHARE_DEVICE_ID=your_hardware_fingerprint
+  ```
+- Install dependencies and start the bridge:
+  ```powershell
+  npm install
+  node backend/server.js
+  ```
+
+#### 2. Secure with Fortress Mode
+Fortress Mode protects your computer from unauthorized remote access:
+- **Handshake Secret**: Only devices providing the matching `X-Bridge-Secret` header can execute system commands.
+- **Hardware Locking**: Use the **Security Dashboard** in the Arcade Sidebar to lock the bridge to your specific device ID. The server will reject any commands coming from other hardware, even if they have your secret key.
+- **Automatic IP Banning**: The `SecurityEngine` automatically applies permanent IP bans to any address attempting path traversal or brute-forcing your handshake.
+
+#### 3. Connect your LLM
+The bridge is compatible with any OpenAI-standard local server:
+- **Ollama**: Run `ollama serve` and ensure your model is pulled.
+- **LM Studio / LocalAI**: Start the local server on port `1234` or `8080`.
+- In the Arcade Companion UI, select your model from the dropdown (e.g., Qwen 3.5, Gemma 4, or DeepSeek R1).
+
+#### 4. Dashboard Management
+Monitor your security status in real-time:
+- Open the **Arcade Companion Sidebar**.
+- Click the **Security** button (shield icon) or use the shortcut in the **Main Settings** panel.
+- View live audit logs, manage active IP bans, and verify your hardware lock status.
 
 ## Remote Media & PC Bridge
 
