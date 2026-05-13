@@ -243,8 +243,8 @@ html.platform-android .messenger-section {
 /* 13. SET METHOD: Robust Fitting for Signal Share Applications */
 
 /* Global App Shell */
-html.platform-android.is-signal-app,
-html.platform-android.is-signal-app body {
+.is-signal-app,
+.is-signal-app body {
     display: flex !important;
     flex-direction: column !important;
     justify-content: flex-start !important;
@@ -252,16 +252,19 @@ html.platform-android.is-signal-app body {
     background-color: #000 !important;
     padding: 0 !important;
     margin: 0 !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
 }
 
 /*
    Generic Application Stage Scaling.
    Targeting common container patterns used in mini-games.
 */
-html.platform-android.is-signal-app .game-container,
-html.platform-android.is-signal-app .calc-wrapper,
-html.platform-android.is-signal-app main,
-html.platform-android.is-signal-app .app-stage {
+.is-signal-app .game-container,
+.is-signal-app .calc-wrapper,
+.is-signal-app main,
+.is-signal-app .app-stage {
     flex: 1 !important;
     width: 100% !important;
     max-width: 500px !important;
@@ -276,9 +279,9 @@ html.platform-android.is-signal-app .app-stage {
 }
 
 /* Auto-scale Canvas/Central Stage to fill available area */
-html.platform-android.is-signal-app #game-canvas-container,
-html.platform-android.is-signal-app .canvas-stage,
-html.platform-android.is-signal-app .app-content {
+.is-signal-app #game-canvas-container,
+.is-signal-app .canvas-stage,
+.is-signal-app .app-content {
     flex: 1 !important;
     display: flex !important;
     align-items: center !important;
@@ -288,8 +291,8 @@ html.platform-android.is-signal-app .app-content {
     padding: 5px 0 !important;
 }
 
-html.platform-android.is-signal-app canvas,
-html.platform-android.is-signal-app .fit-content {
+.is-signal-app canvas,
+.is-signal-app .fit-content {
     max-width: 100% !important;
     max-height: 100% !important;
     width: auto !important;
@@ -299,11 +302,11 @@ html.platform-android.is-signal-app .fit-content {
 }
 
 /* Control Area Preservation */
-html.platform-android.is-signal-app .controls-pad,
-html.platform-android.is-signal-app #touchControls,
-html.platform-android.is-signal-app .calc-controls,
-html.platform-android.is-signal-app footer,
-html.platform-android.is-signal-app .app-controls {
+.is-signal-app .controls-pad,
+.is-signal-app #touchControls,
+.is-signal-app .calc-controls,
+.is-signal-app footer,
+.is-signal-app .app-controls {
     flex-shrink: 0 !important;
     margin-top: auto !important;
     padding-bottom: max(20px, var(--safe-area-bottom)) !important;
@@ -311,14 +314,14 @@ html.platform-android.is-signal-app .app-controls {
 
 /* Responsive UI scaling for tighter screens */
 @media (max-height: 700px) {
-    html.platform-android.is-signal-app .game-header,
-    html.platform-android.is-signal-app header {
+    .is-signal-app .game-header,
+    .is-signal-app header {
         transform: scale(0.85) !important;
         transform-origin: top !important;
         margin-bottom: -15px !important;
     }
-    html.platform-android.is-signal-app .controls-pad,
-    html.platform-android.is-signal-app #touchControls {
+    .is-signal-app .controls-pad,
+    .is-signal-app #touchControls {
         transform: scale(0.8) !important;
         transform-origin: bottom !important;
         margin-top: -10px !important;
@@ -327,8 +330,8 @@ html.platform-android.is-signal-app .app-controls {
 
 /* Landscape Mode: Horizontal Split */
 @media (orientation: landscape) and (max-height: 500px) {
-    html.platform-android.is-signal-app .game-container,
-    html.platform-android.is-signal-app .app-stage {
+    .is-signal-app .game-container,
+    .is-signal-app .app-stage {
         flex-direction: row !important;
         max-width: none !important;
         justify-content: center !important;
@@ -336,15 +339,15 @@ html.platform-android.is-signal-app .app-controls {
         padding-top: 5px !important;
     }
 
-    html.platform-android.is-signal-app .game-header,
-    html.platform-android.is-signal-app .stats-bar,
-    html.platform-android.is-signal-app header {
+    .is-signal-app .game-header,
+    .is-signal-app .stats-bar,
+    .is-signal-app header {
         display: none !important;
     }
 
-    html.platform-android.is-signal-app .controls-pad,
-    html.platform-android.is-signal-app #touchControls,
-    html.platform-android.is-signal-app .app-controls {
+    .is-signal-app .controls-pad,
+    .is-signal-app #touchControls,
+    .is-signal-app .app-controls {
         transform: scale(0.65) !important;
         margin: 0 !important;
         padding-bottom: 5px !important;

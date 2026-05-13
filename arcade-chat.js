@@ -726,9 +726,13 @@ window.syncArcadeSidebarOffsets = function() {
     const appRunner = document.getElementById('app-runner');
     const isCollapsed = sidebar.classList.contains('collapsed');
 
+    const isSteamShell = document.querySelector('.steam-shell') || document.documentElement.classList.contains('is-steam-shell');
+
     if (!isCollapsed) {
         // Use offsetWidth for current real-time geometry, fallback to style width, then default 380
         const currentWidth = sidebar.offsetWidth || parseInt(sidebar.style.width) || 380;
+        
+        // Messenger/Floating UI offset (Sidebar width + 20px gutter)
         const gapWidth = currentWidth + 20;
 
         if (toggleBtn) toggleBtn.style.right = `${gapWidth}px`;
@@ -749,7 +753,19 @@ window.syncArcadeSidebarOffsets = function() {
                 messengerSection.style.width = '';
             }
         }
-        if (appRunner) appRunner.style.right = `${currentWidth}px`;
+
+        // Runner positioning
+        if (appRunner) {
+            // Shift right to accommodate the companion sidebar
+            appRunner.style.right = `${currentWidth}px`;
+            
+            // In Steam Shell mode, also shift left to accommodate the navigation sidebar
+            if (isSteamShell && !window.matchMedia('(max-width: 768px)').matches) {
+                appRunner.style.left = '240px';
+            } else {
+                appRunner.style.left = '0';
+            }
+        }
     } else {
         // Clear inline overrides so CSS defaults take over for collapsed state
         if (toggleBtn) toggleBtn.style.right = '';
@@ -759,7 +775,10 @@ window.syncArcadeSidebarOffsets = function() {
             messengerSection.style.maxWidth = '';
             messengerSection.style.width = '';
         }
-        if (appRunner) appRunner.style.right = '';
+        if (appRunner) {
+            appRunner.style.right = '';
+            appRunner.style.left = '';
+        }
     }
 };
 

@@ -1322,13 +1322,16 @@ function openApp(url, title, icon, appId, skipPush = false) {
         frame.src = url;
     }
 
-    // Signal Share Fitting Suite: Ensure all applications fit the screen on Android
+    // Signal Share Fitting Suite: Ensure all applications fit the screen
     frame.onload = () => {
         try {
             const doc = frame.contentDocument || frame.contentWindow.document;
+            
+            // Mark as a Signal Share App for global CSS targeting
+            doc.documentElement.classList.add('is-signal-app');
+            
             if (isAndroid) {
                 doc.documentElement.classList.add('platform-android');
-                doc.documentElement.classList.add('is-signal-app');
             }
         } catch (e) {
             console.warn('[App Runner] Could not inject fitting classes (Cross-origin or early load)', e);
