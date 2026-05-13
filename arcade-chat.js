@@ -858,11 +858,15 @@ window.sendChatMessage = async function() {
         const pageText = document.body.innerText.substring(0, 800);
 
         try {
+            const modelSelect = document.getElementById('chat-model-select');
+            const selectedModel = modelSelect ? modelSelect.value : 'auto';
+
             const response = await bridgeFetch('/api/llm/chat', {
                 method: 'POST',
                 signal,
                 body: JSON.stringify({ 
                     message: text,
+                    model: selectedModel,
                     attachment: arcadeChatHistory[arcadeChatHistory.length - 1].attachment,
                     history: arcadeChatHistory.map(m => ({ role: m.role, content: m.content })),
                     pageContext: `${pageContext} (Visible text: ${pageText})`

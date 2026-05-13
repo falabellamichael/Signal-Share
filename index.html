@@ -1489,7 +1489,23 @@
         <div class="chat-header">
             <div style="display: flex; align-items: center; gap: 8px;">
                 <div id="chat-status-dot" style="width: 8px; height: 8px; background: #67c1f5; border-radius: 50%; box-shadow: 0 0 8px #67c1f5; transition: all 0.3s ease;"></div>
-                <span id="chat-mode-title" style="font-weight: 800; font-size: 0.75rem; letter-spacing: 1.5px; text-transform: uppercase; color: #67c1f5;">Companion</span>
+                <div style="display: flex; flex-direction: column;">
+                    <span id="chat-mode-title" style="font-weight: 800; font-size: 0.65rem; letter-spacing: 1px; text-transform: uppercase; color: #67c1f5;">Companion</span>
+                    <select id="chat-model-select" style="background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 0.6rem; font-weight: 700; padding: 0; cursor: pointer; outline: none; text-transform: uppercase;">
+                        <option value="auto" style="background: #1a1a1a;">Auto-Select</option>
+                        <option value="qwen3.5-9b" style="background: #1a1a1a;">Qwen 3.5 (9B)</option>
+                        <option value="qwen3-4b-thinking-2507" style="background: #1a1a1a;">Qwen 3 Thinking (4B)</option>
+                        <option value="qwen3-vl-4b" style="background: #1a1a1a;">Qwen 3 VL (4B)</option>
+                        <option value="deepseek-r1-0528-qwen3-8b" style="background: #1a1a1a;">DeepSeek R1 (Q3-8B)</option>
+                        <option value="DeepSeek-R1-Distill-Qwen-1.5B-GGUF" style="background: #1a1a1a;">DeepSeek R1 Distill (1.5B)</option>
+                        <option value="qwen2.5-coder" style="background: #1a1a1a;">Qwen 2.5 Coder</option>
+                        <option value="Qwen2.5-Coder-7B-Instruct-GGUF" style="background: #1a1a1a;">Qwen 2.5 Coder (7B GGUF)</option>
+                        <option value="gemma-4-e4b" style="background: #1a1a1a;">Gemma 4 E4B</option>
+                        <option value="gemma2:2b" style="background: #1a1a1a;">Gemma 2</option>
+                        <option value="llama3" style="background: #1a1a1a;">Llama 3</option>
+                        <option value="mistral" style="background: #1a1a1a;">Mistral</option>
+                    </select>
+                </div>
             </div>
             <div style="display: flex; gap: 8px;">
                 <button class="history-btn" onclick="toggleChatHistory()" title="View History">

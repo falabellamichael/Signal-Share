@@ -318,6 +318,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
 
   // 3. RESOLVE INTENT (Strictly based on resolved mode)
   let shouldPlay = true;
+  let isPlayingOnSystem = false;
 
   let localState = "none";
   if (mode === "app") {
@@ -341,7 +342,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
       ((preferredSource === "youtube" && systemIsYouTube) || (preferredSource === "spotify" && systemIsSpotify));
 
     // Determine if the *system* should be controlling playback: it must be playing, and either we are not locked OR the lock matches what's playing.
-    const isPlayingOnSystem = snapshot?.playbackState === "playing" && (!isSourceLocked || sourceMatchesLock);
+    isPlayingOnSystem = snapshot?.playbackState === "playing" && (!isSourceLocked || sourceMatchesLock);
     shouldPlay = (typeof forcePlay === "boolean") ? forcePlay : !isPlayingOnSystem;
   }
 

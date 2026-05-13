@@ -47,7 +47,7 @@ CORE PERSONALITY:
 /**
  * Process a chat request using local LLM fallbacks.
  */
-export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0, attachment = null) {
+export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0, attachment = null, preferredModel = 'auto') {
     if (!message && iteration === 0) return "I didn't receive a message to process.";
     
     // Safety check for infinite recursion
@@ -57,7 +57,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         return "I've hit a limit while trying to execute tools for you. Please try rephrasing your request!";
     }
 
-    console.log(`[Chatbot] Processing (Pass ${iteration + 1}): "${(message || 'Recursion').substring(0, 50)}..."`);
+    console.log(`[Chatbot] Processing (Pass ${iteration + 1}): "${(message || 'Recursion').substring(0, 50)}..." (Model: ${preferredModel})`);
 
     const contextAwarePrompt = `${SYSTEM_PROMPT}\n\nCURRENT CONTEXT: You are looking at the "${pageContext}" page. USE THIS INFORMATION.`;
 
@@ -89,11 +89,39 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
 
     // Attempt local inference (Ollama/LM Studio)
     // Vision models list for Ollama
-    const visionModels = ['llava', 'llava:7b', 'moondream', 'bakllava', 'minicpm-v'];
-    const standardModels = ['google/gemma-2-2b', 'gemma2', 'llama3', 'mistral'];
+    const visionModels = ['qwen3-vl-4b', 'llava', 'llava:7b', 'moondream', 'bakllava', 'minicpm-v'];
+    const standardModels = [
+        'qwen3.5-9b', 
+        'deepseek-r1-0528-qwen3-8b', 
+        'DeepSeek-R1-Distill-Qwen-1.5B-GGUF', 
+        'qwen3-4b-thinking-2507', 
+        'qwen3-4b', 
+        'qwen2.5-coder', 
+        'Qwen2.5-Coder-7B-Instruct-GGUF',
+        'gemma-4-e4b',
+        'google/gemma-2-2b', 
+        'gemma2', 
+        'llama3', 
+        'mistral'
+    ];
     
-    // If we have an image, prioritize vision models
-    const models = imageBase64 ? [...visionModels, ...standardModels] : standardModels;
+    // Build the list of models to try. If the user picked a specific one, put it first.
+    let models = [];
+    if (preferredModel && preferredModel !== 'auto') {
+        models.push(preferredModel);
+    }
+    
+    // Add vision models if there's an image
+    if (imageBase64) {
+        models = [...models, ...visionModels];
+    }
+    
+    // Add standard models as fallbacks
+    models = [...models, ...standardModels];
+    
+    // Deduplicate
+    models = [...new Set(models)];
+
     let success = false;
 
     const conversation = [...history];

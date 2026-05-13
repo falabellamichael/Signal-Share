@@ -118,11 +118,11 @@ app.use((req, res, next) => {
 // Chat integration using the intelligence module
 app.post('/api/llm/chat', async (req, res) => {
   try {
-    const { message, history, pageContext, attachment } = req.body;
-    console.log(`[Chatbot] Incoming POST request. Message length: ${message?.length || 0}, Attachment: ${attachment ? attachment.type : 'none'}`);
+    const { message, history, pageContext, attachment, model } = req.body;
+    console.log(`[Chatbot] Incoming POST request. Message length: ${message?.length || 0}, Model: ${model || 'auto'}, Attachment: ${attachment ? attachment.type : 'none'}`);
     if (!message) return res.status(400).json({ error: 'No message provided' });
 
-    const reply = await getChatResponse(message, history || [], pageContext, 0, attachment);
+    const reply = await getChatResponse(message, history || [], pageContext, 0, attachment, model);
     res.json({ reply });
   } catch (err) {
     console.error('[Bridge] LLM chat error:', err);
