@@ -1031,7 +1031,7 @@
       height: auto;
       min-height: 0;
       max-width: none;
-      max-height: min(90dvh, 760px);
+      max-height: min(var(--viewport-visible-height, 90dvh), 760px);
       padding: 16px;
       resize: none;
     }
@@ -1571,7 +1571,7 @@
 
     .mini-player.is-expanded {
       width: auto;
-      max-height: min(90dvh, 760px);
+      max-height: min(var(--viewport-visible-height, 90dvh), 760px);
       padding: 14px;
       border-radius: 24px;
     }

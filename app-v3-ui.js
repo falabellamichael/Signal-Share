@@ -786,7 +786,7 @@ export function createAppUi(context) {
       elements.notificationsPanel.classList.toggle("is-open", isOpen);
       elements.notificationsPanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
     }
-    syncOverlayBodyState();
+    if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
   }
 
   function renderStats() {
@@ -866,7 +866,7 @@ export function createAppUi(context) {
     elements.messengerExpandButton.setAttribute("aria-label", state.messengerExpanded ? "Collapse Direct Messenger" : "Expand Direct Messenger");
     elements.messengerExpandButton.classList.toggle("is-collapsing", state.messengerExpanded);
     elements.messagesNavLink.setAttribute("aria-expanded", state.messengerOpen ? "true" : "false");
-    syncOverlayBodyState();
+    if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
   }
 
   function syncMessengerDockScrollState() {
@@ -984,7 +984,7 @@ export function createAppUi(context) {
     }
     elements.adminBanLauncherButton.hidden = false; elements.adminBanLauncherButton.classList.toggle("is-hidden", state.adminBanPanelOpen); elements.adminBanLauncherButton.setAttribute("aria-expanded", state.adminBanPanelOpen ? "true" : "false"); elements.adminBanPanel.hidden = !state.adminBanPanelOpen; elements.adminBanPanel.classList.toggle("is-open", state.adminBanPanelOpen); elements.adminBanPanel.setAttribute("aria-hidden", state.adminBanPanelOpen ? "false" : "true"); elements.adminBanSearchInput.disabled = state.adminBanBusy || !state.banningAvailable; elements.adminBanRefreshButton.disabled = state.adminBanBusy; elements.adminBanCloseButton.disabled = state.adminBanBusy;
 
-    syncOverlayBodyState();
+    if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
 
     if (document.activeElement !== elements.adminBanSearchInput) elements.adminBanSearchInput.value = state.adminBanSearch;
     elements.adminBanFeedback.textContent = state.adminBanFeedback; elements.adminBanFeedback.classList.toggle("is-error", state.adminBanFeedbackIsError);
@@ -1502,7 +1502,7 @@ export function createAppUi(context) {
     elements.settingsPanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
     elements.settingsToggleButton.setAttribute("aria-expanded", isOpen ? "true" : "false");
 
-    syncOverlayBodyState();
+    if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
 
     if (isOpen) {
       if (elements.settingsMainPage) elements.settingsMainPage.style.display = 'block';
@@ -1587,7 +1587,7 @@ export function createAppUi(context) {
       elements.keyboardShortcutsPanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
       if (isOpen) renderKeyboardShortcuts();
     }
-    syncOverlayBodyState();
+    if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
   }
 
   // Initial setup for the notification bell
@@ -1719,7 +1719,7 @@ export function createAppUi(context) {
 
   function endMiniPlayerDrag(event) { if (!state.playerDrag || event.pointerId !== state.playerDrag.pointerId) return; if (typeof elements.miniPlayerHead.releasePointerCapture === "function") { try { elements.miniPlayerHead.releasePointerCapture(event.pointerId); } catch { } } state.playerDrag = null; elements.miniPlayer.classList.remove("is-dragging"); savePlayerPosition(state.playerPosition); }
 
-  function handleViewportResize() { updateViewportMetrics(); syncMobileHeaderVisibility(); syncMobileMessengerMode(); if (!state.playerPostId || !state.playerPosition) return; applyMiniPlayerPosition(); }
+  function handleViewportResize() { updateViewportMetrics(); if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncMobileHeaderVisibility(); syncMobileMessengerMode(); if (!state.playerPostId || !state.playerPosition) return; applyMiniPlayerPosition(); }
 
   function isMobileHeaderViewport() { const isAndroid = /Android/i.test(navigator.userAgent) || (window.Capacitor && typeof window.Capacitor.getPlatform === "function" && window.Capacitor.getPlatform() === "android"); return isAndroid || isTouchCompactViewport(); }
 
@@ -3036,7 +3036,7 @@ export function createAppUi(context) {
         elements.miniPlayerVolume.hidden = true;
         renderMiniPlayerPlaybackButton(null);
         clearMiniPlayerMedia();
-        syncOverlayBodyState();
+        if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
       }
       return;
     }
@@ -3049,7 +3049,7 @@ export function createAppUi(context) {
     elements.miniPlayer.classList.toggle("is-expanded", state.miniPlayerExpanded);
     elements.miniPlayer.setAttribute("aria-hidden", "false");
 
-    syncOverlayBodyState();
+    if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
 
     // Artwork/Metadata resolution
     const spotifyUrl = post.sourceKind === "spotify" ? resolveSpotifyPreviewSourceUrl(post) : null;
@@ -3102,9 +3102,9 @@ export function createAppUi(context) {
   }
 
   function renderViewer() {
-    if (!state.viewerPostId && !state.viewerAttachment) { elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); syncOverlayBodyState(); return; }
+    if (!state.viewerPostId && !state.viewerAttachment) { elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState(); return; }
     if (state.viewerAttachment) {
-      const attachment = state.viewerAttachment; clearViewerMedia(); elements.viewer.classList.add("is-open"); elements.viewer.setAttribute("aria-hidden", "false"); syncOverlayBodyState();
+      const attachment = state.viewerAttachment; clearViewerMedia(); elements.viewer.classList.add("is-open"); elements.viewer.setAttribute("aria-hidden", "false"); if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
       renderViewerAttachmentMedia(elements.viewerStage, attachment);
       elements.viewerKind.textContent = `${attachment.title} · ${attachment.creator}`;
       elements.viewerTitle.textContent = attachment.title;
@@ -3121,7 +3121,7 @@ export function createAppUi(context) {
       return;
     }
     const post = getPostById(state.viewerPostId); if (!post) { closeViewer(); return; }
-    const creatorSummary = getProfileSummaryForPost(post); clearViewerMedia(); elements.viewer.classList.add("is-open"); elements.viewer.setAttribute("aria-hidden", "false"); syncOverlayBodyState();
+    const creatorSummary = getProfileSummaryForPost(post); clearViewerMedia(); elements.viewer.classList.add("is-open"); elements.viewer.setAttribute("aria-hidden", "false"); if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
     renderViewerMedia(elements.viewerStage, post);
     const spotifyViewerUrl = post.sourceKind === "spotify" ? resolveSpotifyPreviewSourceUrl(post) : null;
     const cachedViewerExt = externalPreviewCache.get(post.sourceKind === "spotify" ? `spotify:preview:v10:${spotifyViewerUrl}` : (post.sourceKind === "youtube" ? `youtube:preview:${resolveYouTubePreviewId(post, parseYouTubeUrl)}` : null));
@@ -3148,13 +3148,13 @@ export function createAppUi(context) {
   }
 
   function renderProfileView() {
-    if (!state.activeProfileKey) { elements.profileView.classList.remove("is-open"); elements.profileView.setAttribute("aria-hidden", "true"); syncOverlayBodyState(); return; }
-    const profile = getProfileSummaryByKey(state.activeProfileKey); if (!profile) { state.activeProfileKey = ""; elements.profileView.classList.remove("is-open"); elements.profileView.setAttribute("aria-hidden", "true"); syncOverlayBodyState(); return; }
+    if (!state.activeProfileKey) { elements.profileView.classList.remove("is-open"); elements.profileView.setAttribute("aria-hidden", "true"); if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState(); return; }
+    const profile = getProfileSummaryByKey(state.activeProfileKey); if (!profile) { state.activeProfileKey = ""; elements.profileView.classList.remove("is-open"); elements.profileView.setAttribute("aria-hidden", "true"); if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState(); return; }
     const posts = getPostsForProfileKey(profile.key); const totalLikes = posts.reduce((sum, post) => sum + getLikeCount(post), 0); const latestPost = posts[0] ?? null; const isSelf = Boolean(profile.userId && profile.userId === state.currentUser?.id); const metaParts = [];
     const visibleEmail = resolveVisibleMemberEmail(profile.email);
     if (visibleEmail) metaParts.push(visibleEmail);
     metaParts.push(isSelf ? "Your live profile" : "Live member profile"); if (profile.createdAt) metaParts.push(`Joined ${formatTimestamp(profile.createdAt)}`);
-    elements.profileView.classList.add("is-open"); elements.profileView.setAttribute("aria-hidden", "false"); syncOverlayBodyState();
+    elements.profileView.classList.add("is-open"); elements.profileView.setAttribute("aria-hidden", "false"); if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
     elements.profileBadge.textContent = getProfileInitials(profile.displayName); elements.profileTitle.textContent = profile.displayName; elements.profileMeta.textContent = metaParts.join(" · ");
     elements.profileStats.innerHTML = "";
     [{ label: "Posts", value: String(posts.length) }, { label: "Likes", value: String(totalLikes) }, { label: latestPost ? "Latest" : "Status", value: latestPost ? formatTimestamp(latestPost.createdAt) : (isSelf ? "Ready to publish" : "No posts yet") }].forEach((stat) => { const card = document.createElement("div"); card.className = "profile-stat"; const value = document.createElement("strong"); value.className = "profile-stat-value"; value.textContent = stat.value; const label = document.createElement("span"); label.className = "profile-stat-label"; label.textContent = stat.label; card.append(value, label); elements.profileStats.appendChild(card); });
@@ -3196,7 +3196,7 @@ export function createAppUi(context) {
 
   function openProfileByKey(profileKey, returnFocusElement) { const profile = getProfileSummaryByKey(profileKey); if (!profile) return; if (state.viewerPostId || state.viewerAttachment) closeViewer({ restoreFocus: false }); state.activeProfileKey = profile.key; state.profileReturnFocusElement = returnFocusElement ?? document.activeElement; state.profileFeedPage = 1; renderProfileView(); elements.profileCloseButton.focus(); }
 
-  function closeProfile(options = {}) { const { restoreFocus = true } = options; if (!state.activeProfileKey) return; state.activeProfileKey = ""; elements.profileView.classList.remove("is-open"); elements.profileView.setAttribute("aria-hidden", "true"); syncOverlayBodyState(); if (restoreFocus && state.profileReturnFocusElement instanceof HTMLElement) state.profileReturnFocusElement.focus(); state.profileReturnFocusElement = null; }
+  function closeProfile(options = {}) { const { restoreFocus = true } = options; if (!state.activeProfileKey) return; state.activeProfileKey = ""; elements.profileView.classList.remove("is-open"); elements.profileView.setAttribute("aria-hidden", "true"); if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState(); if (restoreFocus && state.profileReturnFocusElement instanceof HTMLElement) state.profileReturnFocusElement.focus(); state.profileReturnFocusElement = null; }
 
   function openViewer(postId, returnFocusElement) {
     if (state.activeProfileKey) closeProfile({ restoreFocus: false });
@@ -3215,7 +3215,7 @@ export function createAppUi(context) {
     elements.viewerCloseButton.focus();
   }
 
-  function closeViewer(options = {}) { const { restoreFocus = true } = options; if (!state.viewerPostId && !state.viewerAttachment) return; state.viewerPostId = null; state.viewerAttachment = null; elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); syncOverlayBodyState(); if (restoreFocus && state.returnFocusElement instanceof HTMLElement) state.returnFocusElement.focus(); state.returnFocusElement = null; heroMediaPlayerController.render(); }
+  function closeViewer(options = {}) { const { restoreFocus = true } = options; if (!state.viewerPostId && !state.viewerAttachment) return; state.viewerPostId = null; state.viewerAttachment = null; elements.viewer.classList.remove("is-open"); elements.viewer.setAttribute("aria-hidden", "true"); clearViewerMedia(); if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState(); if (restoreFocus && state.returnFocusElement instanceof HTMLElement) state.returnFocusElement.focus(); state.returnFocusElement = null; heroMediaPlayerController.render(); }
 
   function stepViewer(delta) {
     if (state.visiblePostIds.length <= 1 || !state.viewerPostId) return;
@@ -3229,7 +3229,7 @@ export function createAppUi(context) {
       elements.viewer.classList.remove("is-open");
       elements.viewer.setAttribute("aria-hidden", "true");
       clearViewerMedia();
-      syncOverlayBodyState();
+      if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
       heroMediaPlayerController.render();
       return;
     }
@@ -3261,7 +3261,7 @@ export function createAppUi(context) {
     elements.viewer.classList.remove("is-open");
     elements.viewer.setAttribute("aria-hidden", "true");
     clearViewerMedia();
-    syncOverlayBodyState();
+    if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
     heroMediaPlayerController.render();
   }
 
@@ -3279,7 +3279,7 @@ export function createAppUi(context) {
     renderMiniPlayerPlaybackButton(null);
     clearMiniPlayerMedia();
     destroyActivePlayer();
-    syncOverlayBodyState();
+    if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
     heroMediaPlayerController.render();
     state.returnFocusElement = null;
   }

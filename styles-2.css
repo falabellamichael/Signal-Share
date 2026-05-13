@@ -257,7 +257,7 @@
       bottom: calc(var(--viewport-offset-bottom) + clamp(1rem, 3vw, 2rem));
       z-index: 23;
       width: min(400px, calc(100vw - 2 * var(--container-padding)));
-      max-height: min(920px, calc(100vh - 96px));
+      max-height: min(920px, calc(var(--viewport-visible-height, 100vh) - 96px));
       padding: var(--container-padding);
       margin: 0;
       display: grid;
@@ -304,9 +304,9 @@
     .messenger-section.is-expanded {
       width: min(1120px, calc(100vw - 32px));
       min-width: min(640px, calc(100vw - 32px));
-      height: min(860px, calc(100dvh - 48px));
+      top: calc(var(--viewport-offset-top, 0px) + 24px); bottom: calc(var(--viewport-offset-bottom, 0px) + 24px); height: auto;
       max-width: calc(100vw - 32px);
-      max-height: calc(100dvh - 48px);
+      max-height: none;
 
       grid-template-rows: auto minmax(0, 1fr);
       align-content: stretch;
@@ -816,7 +816,7 @@
 
     .message-list {
       min-height: 140px;
-      max-height: min(42vh, 560px);
+      max-height: min(42vh, 560px, calc(var(--viewport-visible-height, 100vh) * 0.42));
       display: flex;
       flex: 1 1 auto;
       flex-direction: column;
@@ -846,7 +846,7 @@
       bottom: calc(var(--viewport-offset-bottom) + 20px);
       z-index: 23;
       width: min(360px, calc(100vw - 24px));
-      max-height: min(760px, calc(100vh - 96px));
+      max-height: min(760px, calc(var(--viewport-visible-height, 100vh) - 96px));
       padding: 20px;
       display: grid;
       gap: 14px;
