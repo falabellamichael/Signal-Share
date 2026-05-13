@@ -170,6 +170,7 @@ function showMessage(text, x, y, color = '#fff') {
     messages.push({ text, x, y, life: 1, color, vy: -66 });
 }
 
+function spawnParticles(x, y, amount = 18, color = '#ffffff') {
     const limit = PERF.particleLimit;
     const finalAmount = Math.min(amount, limit - particles.length);
     if (finalAmount <= 0) return;

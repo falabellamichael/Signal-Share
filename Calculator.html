@@ -39,36 +39,192 @@
             overflow: hidden;
         }
 
-        @media (max-width: 768px) {
+        .calculator-shell {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            min-height: 0;
+            width: 100%;
+        }
+
+        @media (max-width: 900px) {
             body {
                 flex-direction: column;
-                overflow-y: auto;
+                overflow: hidden;
             }
+
+            .runner-header {
+                padding: 10px 12px;
+            }
+
+            .runner-title {
+                font-size: 0.8rem;
+            }
+
+            .close-runner {
+                padding: 6px 10px;
+                font-size: 0.65rem;
+            }
+
+            .calculator-shell {
+                flex-direction: column;
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+
             .sidebar {
                 width: 100%;
                 border-right: none;
                 border-bottom: 1px solid var(--border);
-                padding: 20px;
+                padding: 8px 10px;
                 box-sizing: border-box;
-                height: auto;
                 min-height: auto;
+                height: auto;
+                gap: 8px;
+                display: flex;
+                flex-wrap: nowrap;
+                align-items: center;
+                overflow-x: auto;
+                overflow-y: hidden;
+                scrollbar-width: none;
             }
+
+            .sidebar::-webkit-scrollbar {
+                display: none;
+            }
+
+            .sidebar > div:first-child,
+            .nav-label {
+                display: none;
+            }
+
+            .nav-group {
+                flex-direction: row;
+                gap: 8px;
+                flex: 0 0 auto;
+            }
+
+            .nav-item {
+                flex: 0 0 auto;
+                padding: 7px 11px;
+                border-radius: 999px;
+                font-size: 0.7rem;
+                letter-spacing: 0.4px;
+                border: 1px solid rgba(255,255,255,0.12);
+                color: rgba(255,255,255,0.75);
+            }
+
+            .nav-item.active {
+                border-left: 1px solid rgba(102, 192, 244, 0.55);
+                background: rgba(102, 192, 244, 0.18);
+                box-shadow: none;
+            }
+
             .workspace {
-                padding: 20px;
+                padding: 12px;
+                overflow: visible;
             }
+
             .calc-wrapper {
                 grid-template-columns: 1fr;
+                gap: 12px;
+                max-width: 100%;
+                min-height: auto;
             }
+
+            .display-container {
+                padding: 18px;
+                border-radius: 16px;
+            }
+
+            .mode-indicator {
+                top: 12px;
+                left: 18px;
+            }
+
+            #memory-badge {
+                top: 12px !important;
+                right: 18px !important;
+            }
+
             .main-line {
                 font-size: 2rem;
             }
+
             .controls-grid {
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 8px;
             }
+
+            .btn {
+                min-height: 48px;
+                padding: 10px 8px;
+                font-size: 0.92rem;
+            }
+
+            .btn.function {
+                font-size: 0.72rem;
+            }
+
+            .btn.equals {
+                font-size: 1.2rem;
+            }
+
             .history-panel {
-                margin-top: 40px;
-                min-height: 300px;
+                padding: 14px;
+                border-radius: 16px;
+                min-height: 200px;
             }
+
+            .history-list {
+                margin-top: 12px;
+                gap: 12px;
+            }
+
+            .converter-panel {
+                padding: 16px;
+                border-radius: 16px;
+                gap: 16px;
+            }
+
+            .conv-row {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+
+            .conv-row > div:nth-child(2) {
+                display: none;
+            }
+
+            .conv-input-box input {
+                font-size: 1.1rem;
+                padding: 12px;
+            }
+        }
+
+        /* Override generic Android app-shell clamp for this calculator layout */
+        html.platform-android.is-signal-app body.calculator-body {
+            align-items: stretch !important;
+            justify-content: flex-start !important;
+            max-width: none !important;
+            width: 100% !important;
+            height: 100dvh !important;
+        }
+
+        html.platform-android.is-signal-app body.calculator-body .calculator-shell {
+            width: 100% !important;
+            max-width: none !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+        }
+
+        html.platform-android.is-signal-app body.calculator-body .workspace,
+        html.platform-android.is-signal-app body.calculator-body main.workspace,
+        html.platform-android.is-signal-app body.calculator-body .calc-wrapper {
+            max-width: none !important;
+            overflow: visible !important;
+            width: 100% !important;
+            flex: initial !important;
         }
 
         /* Custom Scrollbar */
@@ -228,7 +384,7 @@
         </a>
     </div>
 
-    <div style="display: flex; flex: 1; overflow: hidden;">
+    <div class="calculator-shell">
         <aside class="sidebar">
         <div style="padding: 0 15px; margin-bottom: 20px;">
             <h2 style="font-size: 1.4rem; margin: 0; letter-spacing: -1px; font-weight: 900;">Academic Pro</h2>
