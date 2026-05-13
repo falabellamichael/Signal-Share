@@ -9,6 +9,8 @@
     const DEFAULT_MAX_PAGE_TEXT_CHARS = 600;
     const DEFAULT_MAX_STEAM_HINTS = 20;
     const DEFAULT_MAX_VISIBLE_TEXT_SAMPLE = 1200;
+    const CUSTOM_INSTRUCTIONS_STORAGE_KEY = "ss_ai_custom_instructions";
+    const DEFAULT_MAX_CUSTOM_INSTRUCTIONS_CHARS = 2000;
     const STEAM_GAME_APP_IDS = Object.freeze({
         "grand theft auto v": 271590,
         "gta v": 271590,
@@ -138,6 +140,30 @@
         if (!text) return "";
         if (text.length <= limit) return text;
         return text.slice(0, limit);
+    }
+
+    function getStoredCustomInstructions(maxLength = DEFAULT_MAX_CUSTOM_INSTRUCTIONS_CHARS) {
+        try {
+            const raw = global?.localStorage?.getItem(CUSTOM_INSTRUCTIONS_STORAGE_KEY) || "";
+            return clampText(raw, maxLength);
+        } catch (_error) {
+            return "";
+        }
+    }
+
+    function setStoredCustomInstructions(value, maxLength = DEFAULT_MAX_CUSTOM_INSTRUCTIONS_CHARS) {
+        const next = clampText(value, maxLength);
+        try {
+            if (!global?.localStorage) return next;
+            if (next) {
+                global.localStorage.setItem(CUSTOM_INSTRUCTIONS_STORAGE_KEY, next);
+            } else {
+                global.localStorage.removeItem(CUSTOM_INSTRUCTIONS_STORAGE_KEY);
+            }
+        } catch (_error) {
+            // Ignore storage failures; caller still receives normalized text.
+        }
+        return next;
     }
 
     function estimateDataUrlBytes(dataUrl) {
@@ -530,10 +556,14 @@
         DEFAULT_MAX_PAGE_TEXT_CHARS,
         DEFAULT_MAX_STEAM_HINTS,
         DEFAULT_MAX_VISIBLE_TEXT_SAMPLE,
+        CUSTOM_INSTRUCTIONS_STORAGE_KEY,
+        DEFAULT_MAX_CUSTOM_INSTRUCTIONS_CHARS,
         ACTION_TAGS,
         ARCADE_ACTION_PLAYBOOK,
         SUPPORTED_ATTACHMENT_TYPES,
         clampText,
+        getStoredCustomInstructions,
+        setStoredCustomInstructions,
         normalizeHistory,
         normalizeGameKey,
         resolveSteamGame,

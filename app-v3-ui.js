@@ -102,6 +102,7 @@ export function createAppUi(context) {
     notificationHideBodyToggle: document.getElementById("notificationHideBodyToggle"),
     showEmailToggle: document.getElementById("showEmailToggle"),
     bridgeSecretInput: document.getElementById("bridgeSecretInput"),
+    aiCustomInstructionsInput: document.getElementById("aiCustomInstructionsInput"),
     resetPlayerPositionButton: document.getElementById("resetPlayerPositionButton"),
     resetPreferencesButton: document.querySelector("#resetPreferencesButton"),
     messagesNavLink: document.querySelector("#messagesNavLink"),
@@ -483,6 +484,30 @@ export function createAppUi(context) {
         }
       });
     }
+
+    if (elements.aiCustomInstructionsInput) {
+      const coreGetInstructions = window.SignalShareAiCore?.getStoredCustomInstructions;
+      const currentInstructions = typeof coreGetInstructions === "function"
+        ? coreGetInstructions()
+        : `${localStorage.getItem("ss_ai_custom_instructions") || ""}`.trim().slice(0, 2000);
+      elements.aiCustomInstructionsInput.value = currentInstructions;
+
+      elements.aiCustomInstructionsInput.addEventListener("input", (event) => {
+        const rawInstructions = `${event.target.value || ""}`;
+        const coreSetInstructions = window.SignalShareAiCore?.setStoredCustomInstructions;
+        if (typeof coreSetInstructions === "function") {
+          coreSetInstructions(rawInstructions);
+          return;
+        }
+        const normalized = rawInstructions.trim().slice(0, 2000);
+        if (normalized) {
+          localStorage.setItem("ss_ai_custom_instructions", normalized);
+        } else {
+          localStorage.removeItem("ss_ai_custom_instructions");
+        }
+      });
+    }
+
     window.heroMediaPlayerController = heroMediaPlayerController;
 
     elements.resetPlayerPositionButton.addEventListener("click", resetPlayerDockPosition);

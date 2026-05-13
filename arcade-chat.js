@@ -1392,6 +1392,9 @@ window.sendChatMessage = async function() {
             const modelSelect = document.getElementById('chat-model-select');
             const selectedModel = modelSelect ? modelSelect.value : 'auto';
             const requestModel = resolveChatRequestModel(selectedModel);
+            const customInstructions = typeof getAiCore()?.getStoredCustomInstructions === 'function'
+                ? getAiCore().getStoredCustomInstructions()
+                : `${localStorage.getItem('ss_ai_custom_instructions') || ''}`.trim().slice(0, 2000);
             if (!isBridgeFeatureEnabled()) {
                 // User explicitly asked the companion for an AI reply, so enable bridge attempts.
                 localStorage.setItem('ss_bridge_enabled', '1');
@@ -1403,6 +1406,7 @@ window.sendChatMessage = async function() {
                 body: JSON.stringify({ 
                     message: text,
                     model: requestModel,
+                    customInstructions,
                     attachment: arcadeChatHistory[arcadeChatHistory.length - 1].attachment,
                     history: normalizedHistory,
                     pageContext: fullPageContext

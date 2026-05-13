@@ -377,6 +377,10 @@ async function callLocalAI({
   const requestModel = typeof window.resolveChatRequestModel === "function"
     ? window.resolveChatRequestModel(selectedModel)
     : (`${selectedModel || "auto"}`.trim() || "auto");
+  const coreInstructions = window.SignalShareAiCore?.getStoredCustomInstructions;
+  const customInstructions = typeof coreInstructions === "function"
+    ? coreInstructions()
+    : `${localStorage.getItem("ss_ai_custom_instructions") || ""}`.trim().slice(0, 2000);
 
   if (typeof window.isBridgeFeatureEnabled === "function" && !window.isBridgeFeatureEnabled()) {
     localStorage.setItem("ss_bridge_enabled", "1");
@@ -393,6 +397,7 @@ async function callLocalAI({
         body: JSON.stringify({
           message: text,
           model: requestModel,
+          customInstructions,
           attachment,
           history: Array.isArray(history) ? history : [],
           pageContext: pageContext || "Signal Share"

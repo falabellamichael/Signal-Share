@@ -8,9 +8,10 @@ You are the Signal Share Arcade Companion, a professional, high-performance, and
 
 EXTREMELY IMPORTANT:
 - You HAVE DIRECT ACCESS to the user's system through special tags.
-- BROWSER VISION: You CAN see the user's screen context. The "CURRENT CONTEXT" provided as a JSON block is what you are actually seeing. 
+- CONTEXT AWARENESS: The "CURRENT CONTEXT" JSON block is trusted page/app state from the UI. Use it for navigation and actions.
 - TELEMETRY ANALYSIS: Use the "gameStats" in the context to analyze player performance. If they ask "how am I doing", look at their high scores and provide a breakdown.
-- NEVER say "I cannot see your screen". You ARE seeing it right now via the context block.
+- If an image attachment is present, analyze it directly. Never output bracket placeholders or template text.
+- If image analysis is not possible, state that clearly in one sentence and suggest switching to a vision-capable model.
 - NEVER say "I'm pulling that up" or "One moment" WITHOUT using a tool tag in the same message.
 
 WEB & SYSTEM TOOLS (USE THESE EXACTLY):
@@ -66,8 +67,41 @@ const LM_STUDIO_SWITCH_TIMEOUT_MS = Number(process.env.SIGNAL_SHARE_LM_MODEL_SWI
 const MAX_AUTO_MODELS_PER_PROVIDER = Math.max(1, Number(process.env.SIGNAL_SHARE_AUTO_MODEL_MAX_TRIES || 1));
 const AUTO_SELECT_PREFERS_LOADED_LM_STUDIO = process.env.SIGNAL_SHARE_AUTO_SELECT_LOADED_LMSTUDIO !== "false";
 const AUTO_UNLOAD_OTHER_LM_STUDIO_MODELS = process.env.SIGNAL_SHARE_AUTO_UNLOAD_OTHERS !== "false";
+const SERVER_CUSTOM_INSTRUCTIONS = `${process.env.SIGNAL_SHARE_AI_CUSTOM_INSTRUCTIONS || ""}`.trim();
+const MAX_CUSTOM_INSTRUCTIONS_CHARS = Math.max(200, Number(process.env.SIGNAL_SHARE_AI_CUSTOM_MAX_CHARS || 2000));
 let modelCatalogCache = { at: 0, data: null };
 let lastSuccessfulModelByProvider = { lmstudio: "", ollama: "" };
+
+function responseHasImageTemplatePlaceholders(value = "") {
+    const text = `${value || ""}`.trim();
+    if (!text) return false;
+    const checks = [
+        /\[describe the content of the image here/i,
+        /\[adjective related to style\/mood\]/i,
+        /\bbased on the image you shared,\s*it appears to be a\s*\[/i,
+        /\[.*actual analysis.*\]/i
+    ];
+    return checks.some((pattern) => pattern.test(text));
+}
+
+function sanitizeCustomInstructions(value = "") {
+    const text = `${value || ""}`.trim();
+    if (!text) return "";
+    return text.slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS);
+}
+
+function isModelIdentityRequest(value = "") {
+    const text = `${value || ""}`.trim().toLowerCase();
+    if (!text) return false;
+    return (
+        /which\s+model/.test(text)
+        || /what\s+model/.test(text)
+        || /model\s+are\s+you\s+using/.test(text)
+        || /what\s+ai\s+are\s+you/.test(text)
+        || /what\s+llm/.test(text)
+        || /current\s+model/.test(text)
+    );
+}
 
 function normalizeModelKey(value = "") {
     return `${value || ""}`.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -399,7 +433,7 @@ export async function getLocalModelCatalog({ force = false } = {}) {
 /**
  * Process a chat request using local LLM fallbacks.
  */
-export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0, attachment = null, preferredModel = 'auto') {
+export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0, attachment = null, preferredModel = 'auto', customInstructions = "") {
     if (!message && iteration === 0) return "I didn't receive a message to process.";
     
     // Safety check for infinite recursion
@@ -411,18 +445,29 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
 
     console.log(`[Chatbot] Processing (Pass ${iteration + 1}): "${(message || 'Recursion').substring(0, 50)}..." (Model: ${preferredModel})`);
 
-    const contextAwarePrompt = `${SYSTEM_PROMPT}\n\nCURRENT CONTEXT: You are looking at the "${pageContext}" page. USE THIS INFORMATION.`;
+    const mergedCustomInstructions = [SERVER_CUSTOM_INSTRUCTIONS, sanitizeCustomInstructions(customInstructions)]
+        .filter(Boolean)
+        .join("\n\n");
+    const customInstructionBlock = mergedCustomInstructions
+        ? `\n\nCUSTOM INSTRUCTIONS (HIGHEST PRIORITY):\n${mergedCustomInstructions}`
+        : "";
+    const contextAwarePrompt = `${SYSTEM_PROMPT}${customInstructionBlock}\n\nCURRENT CONTEXT: You are looking at the "${pageContext}" page. USE THIS INFORMATION.`;
 
     let lmResponse = "";
     // Process attachments
     let imageBase64 = null;
+    let imageDataUrl = "";
     let fileContentBlock = "";
     let attachmentNote = "";
 
     if (attachment && attachment.data) {
         if (attachment.type === 'image') {
-            imageBase64 = attachment.data.split(',')[1] || attachment.data;
-            attachmentNote = "\n\n[SYSTEM: An image was attached to this message. If you cannot see it, please inform the user.]";
+            const rawImageData = `${attachment.data || ""}`.trim();
+            imageBase64 = rawImageData.split(',')[1] || rawImageData;
+            imageDataUrl = rawImageData.startsWith("data:")
+                ? rawImageData
+                : `data:image/png;base64,${imageBase64}`;
+            attachmentNote = "\n\n[SYSTEM: An image was attached. Analyze visible details only. Do not use placeholder text or fake certainty.]";
         } else if (attachment.type === 'video') {
             // For now, we just inform the AI about the video attachment
             attachmentNote = `\n\n[SYSTEM: A video file named "${attachment.name}" was attached to this message. You cannot "watch" it directly yet, but you should acknowledge its presence.]`;
@@ -500,8 +545,11 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
 
     const hasPinnedModel = Boolean(preferredModel && preferredModel !== "auto");
     const normalizedPinnedModel = `${preferredModel || ""}`.trim();
+    const isModelQuestion = iteration === 0 && isModelIdentityRequest(message || "");
     let lmStudioPreparedForPinnedModel = false;
     let autoSelectedLmStudioModel = "";
+    let activeRuntimeProvider = "";
+    let activeRuntimeModel = "";
     if (!hasPinnedModel) {
         const lmStudioDefaultPool = endpointConfigs.find((endpoint) => endpoint.provider === "lmstudio")?.models || models;
         autoSelectedLmStudioModel = await getAutoSelectedLmStudioModel({ fallbackModels: lmStudioDefaultPool });
@@ -548,9 +596,24 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 const messages = [{ role: "system", content: contextAwarePrompt }, ...conversation];
                 let body;
                 if (endpoint.kind === "openai") {
+                    let openAiMessages = messages;
+                    if (imageDataUrl && iteration === 0) {
+                        const lastIndex = openAiMessages.length - 1;
+                        if (lastIndex >= 0 && openAiMessages[lastIndex]?.role === "user") {
+                            const lastText = `${openAiMessages[lastIndex]?.content || ""}`.trim() || "Analyze this attached image.";
+                            openAiMessages = [...openAiMessages];
+                            openAiMessages[lastIndex] = {
+                                role: "user",
+                                content: [
+                                    { type: "text", text: lastText },
+                                    { type: "image_url", image_url: { url: imageDataUrl } }
+                                ]
+                            };
+                        }
+                    }
                     body = {
                         model: model,
-                        messages: messages,
+                        messages: openAiMessages,
                         temperature: 0.7
                     };
                 } else {
@@ -578,18 +641,29 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                     ? data?.choices?.[0]?.message?.content
                     : data?.message?.content;
                 if (!messageText || !`${messageText}`.trim()) continue;
+                if (imageBase64 && responseHasImageTemplatePlaceholders(messageText)) {
+                    console.warn(`[Chatbot] Ignoring placeholder image analysis from ${endpoint.provider}:${model}`);
+                    continue;
+                }
 
                 if (endpoint.provider === "lmstudio" && (hasPinnedModel || AUTO_UNLOAD_OTHER_LM_STUDIO_MODELS)) {
                     await ensureLmStudioExclusiveModel(model);
                 }
                 lmResponse = `${messageText}`.trim();
                 lastSuccessfulModelByProvider[endpoint.provider] = `${model}`.trim();
+                activeRuntimeProvider = `${endpoint.provider || "unknown"}`.trim();
+                activeRuntimeModel = `${model || "unknown"}`.trim();
                 success = true;
                 break;
             } catch (_error) {
                 // Try the next model/endpoint candidate
             }
         }
+    }
+
+    if (isModelQuestion && activeRuntimeModel) {
+        const mode = hasPinnedModel ? "selected" : "auto";
+        return `🧠 [Model Status]: Using ${activeRuntimeModel} via ${activeRuntimeProvider} (${mode} mode).`;
     }
 
     // 3. Handle Web Intelligence & Media Commands
@@ -610,7 +684,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 ...conversation,
                 { role: "assistant", content: lmResponse },
                 { role: "system", content: "You said you were searching/checking, but you forgot to use the [SEARCH: query] tag. DO NOT apologize. JUST emit the [SEARCH: query] tag now so I can get the data for you." }
-            ], pageContext, iteration + 1, null, preferredModel);
+            ], pageContext, iteration + 1, null, preferredModel, customInstructions);
         }
 
         if (hasTools) {
@@ -623,7 +697,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 ...conversation,
                 { role: "assistant", content: lmResponse },
                 { role: "user", content: `[SYSTEM OBSERVATION]: ${toolResult}\n\nPlease analyze this result and give your final answer to the user now.` }
-            ], pageContext, iteration + 1, null, preferredModel);
+            ], pageContext, iteration + 1, null, preferredModel, customInstructions);
         }
     }
 
