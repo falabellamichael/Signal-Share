@@ -77,28 +77,36 @@ window.ArcadeChatbotEngine = (function() {
         {
             keywords: ['pause', 'stop', 'hold'],
             action: () => {
-                if (window.heroMediaPlayerController) window.heroMediaPlayerController.pause();
+                if (window.heroMediaPlayerController && typeof window.heroMediaPlayerController.pause === 'function') {
+                    window.heroMediaPlayerController.pause();
+                }
                 return "🎵 [Media Protocol]: Pausing active playback.";
             }
         },
         {
             keywords: ['play', 'resume', 'start'],
             action: () => {
-                if (window.heroMediaPlayerController) window.heroMediaPlayerController.play();
+                if (window.heroMediaPlayerController && typeof window.heroMediaPlayerController.play === 'function') {
+                    window.heroMediaPlayerController.play();
+                }
                 return "🎵 [Media Protocol]: Resuming media playback.";
             }
         },
         {
             keywords: ['next', 'skip'],
             action: () => {
-                if (window.heroMediaPlayerController) window.heroMediaPlayerController.next();
+                if (window.heroMediaPlayerController && typeof window.heroMediaPlayerController.next === 'function') {
+                    window.heroMediaPlayerController.next();
+                }
                 return "🎵 [Media Protocol]: Skipping to the next track.";
             }
         },
         {
             keywords: ['previous', 'back', 'prev'],
             action: () => {
-                if (window.heroMediaPlayerController) window.heroMediaPlayerController.previous();
+                if (window.heroMediaPlayerController && typeof window.heroMediaPlayerController.previous === 'function') {
+                    window.heroMediaPlayerController.previous();
+                }
                 return "🎵 [Media Protocol]: Returning to the previous track.";
             }
         },

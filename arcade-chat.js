@@ -1266,10 +1266,10 @@ function getArcadeProtocolOfflineResponse(message) {
     }
 
     const fallbacks = [
-        "📶 [Arcade Protocol]: My advanced logic core is currently out of range, but my tactical database is active. I can still give you tips for the arcade games—just name one!",
-        "📡 [Arcade Protocol]: Communication with the main intelligence core is unstable. I'm operating on low-power mode. Ask me about Pinball or Snake tactics!",
-        "🕹️ [Arcade Protocol]: Sync failed. I'm relying on cached arcade data. Try asking about 'Hoops' or 'Snake' while I try to reconnect.",
-        "🎮 [Arcade Protocol]: My logic processors are running local-only. I can provide game tips, but complex conversation is limited until I'm back in range of the bridge."
+        "📶 [Arcade Protocol]: My advanced logic core is currently out of range. Check if your Arcade Companion bridge is running on your PC!",
+        "📡 [Arcade Protocol]: Communication with the main intelligence core is unstable. Ensure the bridge server is active and try again.",
+        "🕹️ [Arcade Protocol]: Sync failed. I'm relying on cached arcade data. If you're on a real device, check your bridge IP settings!",
+        "🎮 [Arcade Protocol]: My logic processors are running local-only. (Bridge unreachable). I can still help with game tips though!"
     ];
 
     return fallbacks[Math.floor(Math.random() * fallbacks.length)];
