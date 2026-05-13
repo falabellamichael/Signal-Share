@@ -794,23 +794,15 @@ function setupToggle() {
     // Create toggle button regardless of mode, CSS will handle visibility
     if (!document.querySelector('.chat-toggle-btn')) {
         const btn = document.createElement('button');
-        // Robust detection: Check for .steam-shell anywhere in the document
-        const isSteamShell = document.querySelector('.steam-shell') || document.documentElement.classList.contains('is-steam-shell');
         
-        console.log('[Arcade Chat] Initializing toggle. Steam Shell detected:', !!isSteamShell);
-        
-        if (isSteamShell) {
-            btn.className = 'chat-toggle-btn chat-tab-mode';
-            btn.innerHTML = `
-                <div class="tab-label" style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; font-weight: 900; letter-spacing: 2.5px; color: #67c1f5; text-transform: uppercase; pointer-events: none;">Companion</div>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="color: #67c1f5; margin-top: 8px; pointer-events: none;">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                </svg>
-            `;
-        } else {
-            btn.className = 'chat-toggle-btn';
-            btn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
-        }
+        // Unified Tab Mode for all pages
+        btn.className = 'chat-toggle-btn chat-tab-mode';
+        btn.innerHTML = `
+            <div class="tab-label" style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; font-weight: 900; letter-spacing: 2.5px; color: var(--arc-accent); text-transform: uppercase; pointer-events: none;">Companion</div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="color: var(--arc-accent); margin-top: 8px; pointer-events: none;">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+        `;
         
         btn.onclick = window.toggleChat;
         document.body.appendChild(btn);
