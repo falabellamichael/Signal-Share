@@ -481,6 +481,7 @@ export function createAppUi(context) {
         } else {
           localStorage.removeItem("ss_bridge_enabled");
         }
+      });
     }
     window.heroMediaPlayerController = heroMediaPlayerController;
 
