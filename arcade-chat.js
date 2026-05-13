@@ -492,22 +492,37 @@ function updateChatPlaceholder() {
  * @param {boolean} online - Whether the bridge is connected
  */
 function updateEngineStatus(online) {
-    const statusText = document.getElementById('engine-status-text');
-    const statusDot = document.getElementById('engine-status-dot');
-    const statusContainer = document.getElementById('engine-status-container');
-    
-    if (!statusText || !statusDot) return;
-    
-    if (online) {
-        statusText.textContent = 'LOCAL LLM ONLINE';
-        if (statusContainer) statusContainer.style.color = '#75b022';
-        statusDot.style.background = '#75b022';
-        statusDot.style.boxShadow = '0 0 8px #75b022';
-    } else {
-        statusText.textContent = 'BRIDGE OFFLINE';
-        if (statusContainer) statusContainer.style.color = '#e74c3c';
-        statusDot.style.background = '#e74c3c';
-        statusDot.style.boxShadow = '0 0 8px #e74c3c';
+    const statusKey = online ? 'online' : 'offline';
+    const nextStyle = online
+        ? { text: 'LOCAL LLM ONLINE', color: '#75b022', dot: '#75b022', glow: '0 0 8px #75b022' }
+        : { text: 'LLM BRIDGE DISCONNECTED', color: '#e74c3c', dot: '#e74c3c', glow: '0 0 8px #e74c3c' };
+
+    const containers = Array.from(document.querySelectorAll('#engine-status-container'));
+    const textNodes = Array.from(document.querySelectorAll('#engine-status-text'));
+    const dotNodes = Array.from(document.querySelectorAll('#engine-status-dot'));
+    const widgetCount = Math.max(containers.length, textNodes.length, dotNodes.length);
+
+    if (widgetCount === 0) return;
+
+    for (let i = 0; i < widgetCount; i += 1) {
+        const container = containers[i] || null;
+        const statusText = container?.querySelector('#engine-status-text') || textNodes[i] || null;
+        const statusDot = container?.querySelector('#engine-status-dot') || dotNodes[i] || null;
+        if (!statusText || !statusDot) continue;
+
+        // Only repaint when the effective status changes.
+        if ((container?.dataset?.bridgeStatus || statusText.dataset.bridgeStatus) === statusKey) {
+            continue;
+        }
+
+        statusText.textContent = nextStyle.text;
+        statusDot.style.background = nextStyle.dot;
+        statusDot.style.boxShadow = nextStyle.glow;
+        if (container) {
+            container.style.color = nextStyle.color;
+            container.dataset.bridgeStatus = statusKey;
+        }
+        statusText.dataset.bridgeStatus = statusKey;
     }
 }
 
