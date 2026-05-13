@@ -1722,9 +1722,9 @@ function setupToggle() {
         // Unified Tab Mode for all pages
         btn.className = 'chat-toggle-btn chat-tab-mode';
         btn.innerHTML = `
-            <div class="tab-label" style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; font-weight: 900; letter-spacing: 2.5px; color: var(--arc-accent); text-transform: uppercase; pointer-events: none;">Companion</div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="color: var(--arc-accent); margin-top: 8px; pointer-events: none;">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            <div class="tab-label" style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.7rem; font-weight: 800; letter-spacing: 2px; color: var(--arc-accent); text-transform: uppercase; pointer-events: none; margin-bottom: 12px; font-family: 'Inter', system-ui, sans-serif;">Companion</div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="color: var(--arc-accent); pointer-events: none;">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2z"></path>
             </svg>
         `;
         

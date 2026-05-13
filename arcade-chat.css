@@ -209,20 +209,20 @@ body.messenger-expanded .chat-toggle-btn {
     bottom: auto !important;
     transform: translateY(-50%);
     width: 32px !important;
-    height: 140px !important;
-    background: var(--arc-bg) !important;
-    border: 1px solid var(--arc-border) !important;
+    height: 150px !important;
+    background: #0d121a !important; /* Premium dark background to match image */
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
     border-right: none !important;
     border-radius: 8px 0 0 8px !important;
-    display: flex !important; /* Force flex for the tab content */
+    display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    padding: 15px 0 !important;
+    padding: 20px 0 !important;
     opacity: 1 !important;
-    z-index: 20000 !important; /* Ensure it's above EVERYTHING */
-    box-shadow: -5px 0 15px var(--arc-shadow) !important;
-    transition: transform 0.2s, background 0.3s, right 0.3s ease !important;
+    z-index: 20000 !important;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5) !important;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease !important;
     visibility: visible !important;
     pointer-events: auto !important;
 }
