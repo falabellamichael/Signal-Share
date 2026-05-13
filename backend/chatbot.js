@@ -20,6 +20,7 @@ WEB & SYSTEM TOOLS (USE THESE EXACTLY):
 4. [PLAY: action] -> System media control (play_pause, next, previous).
 5. [COMPOSE: text] -> Pre-fill the messenger input with the specified text.
 6. [LAUNCH: app_id] -> Open a whitelisted system application (taskmgr, calculator, notepad, explorer, spotify, chrome, edge).
+7. [PUBLISH: {"title": "...", "caption": "...", "tags": ["...", "..."]}] -> Publish a post to the live feed. Only use this if the user asks to "publish", "post", or "share" something. If they just sent a file, you can "see" it and suggest a title/description.
 
 ARCADE SYSTEM TOOLS (USE THESE FOR INTERNAL NAVIGATION):
 6. [ARCADE: <action_id>] -> Trigger internal arcade functions.
@@ -329,10 +330,19 @@ async function executeWebTools(text) {
     // Handle [ARCADE: action]
     const arcadeMatch = text.match(/\[ARCADE:\s*([^\]]+)\]/);
     if (arcadeMatch) {
-        const action = arcadeMatch[1].trim().toLowerCase();
-        // The backend doesn't actually execute these, it just acknowledges them 
-        // so the AI knows the command was "sent" to the frontend protocol.
         results.push(`ARCADE PROTOCOL COMMAND REGISTERED: ${action}. The frontend will execute this action immediately.`);
+    }
+
+    // Handle [PUBLISH: data]
+    const pubMatch = text.match(/\[PUBLISH:\s*({.+?})\]/);
+    if (pubMatch) {
+        results.push(`PUBLISH PROTOCOL INITIALIZED: The post is being processed and published to the live feed by the frontend protocol.`);
+    }
+
+    // Handle [COMPOSE: text]
+    const compMatch = text.match(/\[COMPOSE:\s*(.+?)\]/);
+    if (compMatch) {
+        results.push(`COMPOSE PROTOCOL INITIALIZED: The messenger input is being pre-filled with your refined text.`);
     }
 
     return results.join('\n\n');

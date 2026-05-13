@@ -2497,6 +2497,14 @@ window.navigateToGames = (cat) => { window.location.href = 'mini-games.html#' + 
 
 window.renderActiveThread = renderActiveThread;
 window.heroMediaPlayerController = heroMediaPlayerController;
+window.publishPostToSupabase = publishPostToSupabase;
+window.buildUploadPost = buildUploadPost;
+window.buildExternalPost = buildExternalPost;
+window.getMediaKind = getMediaKind;
+window.showFeedback = showFeedback;
+window.resetComposer = resetComposer;
+window.parseExternalMediaUrl = parseExternalMediaUrl;
+window.getDefaultProfileName = getDefaultProfileName;
 
 if (!window.__SIGNAL_SHARE_INITIALIZED__) {
   window.__SIGNAL_SHARE_INITIALIZED__ = true;

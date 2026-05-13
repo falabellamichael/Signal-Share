@@ -3,7 +3,15 @@
  * Shared component for cross-page companion interactions.
  */
 
-const BRIDGE_BASE_URL = "http://127.0.0.1:3000";
+let BRIDGE_BASE_URL = localStorage.getItem('signal-share-bridge-url') || "http://127.0.0.1:3000";
+
+// Dynamically resolve bridge URL for mobile/android if no custom URL is set
+if (!localStorage.getItem('signal-share-bridge-url')) {
+    if (document.documentElement.classList.contains('platform-android') || (window.Capacitor && window.Capacitor.getPlatform() === 'android')) {
+        // 10.0.2.2 is the default bridge for Android emulators to reach the host PC
+        BRIDGE_BASE_URL = "http://10.0.2.2:3000";
+    }
+}
 
 function getBridgeTargetAddressSpace(baseUrl = "") {
     try {
@@ -826,6 +834,9 @@ window.sendChatMessage = async function() {
             arcadeChatHistory.push({ role: 'assistant', content: reply });
             saveCurrentChat();
             updateChatStatus('active');
+            
+            // Execute any tags in the reply
+            executeArcadeChatActions(reply);
         } else {
             console.warn(`[Arcade Chat] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
             const offlineReply = getArcadeProtocolOfflineResponse(text);
@@ -839,6 +850,122 @@ window.sendChatMessage = async function() {
         console.error("[Arcade Chat] Error in sendChatMessage:", e);
     } finally {
         isSendingChatMessage = false;
+    }
+}
+
+/**
+ * Executes AI-generated tags in the chat reply.
+ * Handles [PUBLISH], [COMPOSE], [ARCADE], [OPEN].
+ */
+async function executeArcadeChatActions(text) {
+    if (!text) return;
+
+    // 1. [PUBLISH: {json}]
+    const publishMatch = text.match(/\[PUBLISH:\s*({.+?})\]/);
+    if (publishMatch) {
+        try {
+            const data = JSON.parse(publishMatch[1]);
+            const { title, caption, tags } = data;
+            
+            if (window.publishPostToSupabase) {
+                // Determine what to publish. 
+                // If there's a recent attachment in history, use it.
+                // Otherwise check if there's a URL in the text.
+                let postFile = null;
+                const lastUserMsg = [...arcadeChatHistory].reverse().find(m => m.role === 'user' && m.attachment);
+                if (lastUserMsg && lastUserMsg.attachment && lastUserMsg.attachment.data) {
+                    // Convert data URL back to Blob
+                    const resp = await fetch(lastUserMsg.attachment.data);
+                    const blob = await resp.blob();
+                    postFile = new File([blob], lastUserMsg.attachment.name || "published-file", { type: lastUserMsg.attachment.type });
+                }
+
+                if (!postFile) {
+                    console.warn("[Arcade Chat] No attachment found to publish.");
+                    // Check if there's an external URL to publish instead
+                    const urlMatch = text.match(/https?:\/\/[^\s\]]+/);
+                    if (urlMatch && window.buildExternalPost && window.parseExternalMediaUrl) {
+                         const externalUrl = urlMatch[0];
+                         const parsedExternal = window.parseExternalMediaUrl(externalUrl);
+                         if (parsedExternal) {
+                             const basePost = { 
+                                 id: `ai-${crypto.randomUUID()}`, 
+                                 creator: window.getDefaultProfileName ? window.getDefaultProfileName() : "AI Assistant", 
+                                 title: title || "AI Shared Content", 
+                                 caption: caption || "Check this out!", 
+                                 tags: tags || [], 
+                                 likes: 0, 
+                                 createdAt: new Date().toISOString() 
+                             };
+                             const post = window.buildExternalPost(basePost, parsedExternal);
+                             const inserted = await window.publishPostToSupabase(post);
+                             if (window.state && window.state.userPosts) {
+                                 window.state.userPosts = [inserted, ...window.state.userPosts];
+                                 if (window.render) window.render();
+                             }
+                             if (window.showFeedback) window.showFeedback("Post published successfully via AI!");
+                             return;
+                         }
+                    }
+                    if (window.showFeedback) window.showFeedback("AI wanted to publish but no file/link was found.", true);
+                    return;
+                }
+
+                // Prepare the post object
+                const basePost = { 
+                    id: `ai-${crypto.randomUUID()}`, 
+                    creator: window.getDefaultProfileName ? window.getDefaultProfileName() : "AI Assistant", 
+                    title: title || "AI Shared Content", 
+                    caption: caption || "Check this out!", 
+                    tags: tags || [], 
+                    likes: 0, 
+                    createdAt: new Date().toISOString() 
+                };
+
+                if (window.buildUploadPost) {
+                    const post = window.buildUploadPost(basePost, postFile);
+                    const inserted = await window.publishPostToSupabase(post, (p) => {
+                        console.log(`[AI Publish] Uploading: ${p}%`);
+                    });
+                    
+                    if (window.state && window.state.userPosts) {
+                        window.state.userPosts = [inserted, ...window.state.userPosts];
+                        if (window.render) window.render();
+                    }
+                    if (window.showFeedback) window.showFeedback("Post published successfully via AI!");
+                }
+            }
+        } catch (e) {
+            console.error("[Arcade Chat] Failed to execute [PUBLISH] action:", e);
+        }
+    }
+
+    // 2. [COMPOSE: text]
+    const composeMatch = text.match(/\[COMPOSE:\s*(.+?)\]/);
+    if (composeMatch) {
+        const composeText = composeMatch[1].trim();
+        const messengerInput = document.getElementById('messageInput');
+        if (messengerInput) {
+            messengerInput.value = composeText;
+            if (window.openMessengerDock) window.openMessengerDock();
+            if (window.showFeedback) window.showFeedback("Pre-filled messenger for you.");
+        }
+    }
+
+    // 3. [ARCADE: action]
+    const arcadeMatch = text.match(/\[ARCADE:\s*([^\]]+)\]/);
+    if (arcadeMatch) {
+        const action = arcadeMatch[1].trim().toLowerCase();
+        if (typeof window.executeArcadeAction === 'function') {
+            window.executeArcadeAction(action);
+        }
+    }
+
+    // 4. [OPEN: url]
+    const openMatch = text.match(/\[OPEN:\s*([^\]]+)\]/);
+    if (openMatch) {
+        const url = openMatch[1].trim();
+        window.open(url, '_blank');
     }
 }
 
@@ -1138,6 +1265,13 @@ function getArcadeProtocolOfflineResponse(message) {
         if (r.keywords.some(k => input.includes(k))) return r.answer;
     }
 
-    return "📶 [Arcade Protocol]: My advanced logic core is currently out of range, but my tactical database is active. I can still give you tips for the arcade games—just name one!";
+    const fallbacks = [
+        "📶 [Arcade Protocol]: My advanced logic core is currently out of range, but my tactical database is active. I can still give you tips for the arcade games—just name one!",
+        "📡 [Arcade Protocol]: Communication with the main intelligence core is unstable. I'm operating on low-power mode. Ask me about Pinball or Snake tactics!",
+        "🕹️ [Arcade Protocol]: Sync failed. I'm relying on cached arcade data. Try asking about 'Hoops' or 'Snake' while I try to reconnect.",
+        "🎮 [Arcade Protocol]: My logic processors are running local-only. I can provide game tips, but complex conversation is limited until I'm back in range of the bridge."
+    ];
+
+    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
 
