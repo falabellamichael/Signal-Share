@@ -570,7 +570,6 @@ window.executeArcadeAction = function(action) {
             case 'clear_notifications': triggerClick('#clearNotificationsButton'); break;
             case 'action': console.log('[Arcade Chat] Received generic action placeholder. No-op.'); break;
             default: console.warn(`[Arcade Chat] Unknown protocol action: ${action}`);
-        }`);
         }
     } catch (err) {
         console.error(`[Arcade Chat] Failed to execute ${action}:`, err);
