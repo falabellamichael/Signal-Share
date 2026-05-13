@@ -450,6 +450,16 @@ body:not(.chat-collapsed) .messenger-section {
     flex: 1;
     font-size: 1rem;
     outline: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    min-width: 0; /* Allow it to shrink if needed */
+}
+
+.chat-input::placeholder {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
 }
 .chat-send-btn {
     background: none;
