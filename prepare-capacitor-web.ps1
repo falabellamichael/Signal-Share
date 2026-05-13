@@ -88,6 +88,7 @@ $files = @(
   "basketball_game_poster.png",
   "neon_pinball_v2_poster.png",
   "pinball_poster_1778481948543.png",
+  "neon_sudoku_poster.png",
   
   # System Icons & Avatars
   "apple-touch-icon-180.png",
@@ -103,7 +104,6 @@ $files = @(
 
 # Optional files that may not exist in every workspace/environment
 $optionalFiles = @(
-  "neon_sudoku_poster.png",
   "cordova.js"
 )
 
@@ -150,6 +150,25 @@ foreach ($directory in $directories) {
     Write-Host "[Dir]  $directory"
   } else {
     Write-Warning "Directory missing: $directory"
+  }
+}
+
+Write-Host "`n--- Verifying Critical Dist Files ---" -ForegroundColor DarkCyan
+$criticalDistFiles = @(
+  "index.html",
+  "mini-games.html",
+  "app-v3.js",
+  "arcade-chat.js",
+  "companion-ai-core.js",
+  "hero-media-player.js"
+)
+
+foreach ($file in $criticalDistFiles) {
+  $target = Join-Path $dist $file
+  if (Test-Path -LiteralPath $target) {
+    Write-Host "[OK] $file"
+  } else {
+    throw "Missing critical dist file: $file"
   }
 }
 

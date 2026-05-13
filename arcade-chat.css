@@ -266,10 +266,10 @@ body:not(.chat-collapsed) .chat-toggle-btn {
 body:not(.chat-collapsed) .messenger-launcher,
 body:not(.chat-collapsed) .chat-toggle-btn,
 body:not(.chat-collapsed) .messenger-section,
-body:not(.chat-collapsed) #app-runner:not(.is-steam-shell) {
+body:not(.chat-collapsed) #app-runner {
     right: 400px !important; /* Default sidebar width (380) + 20px gutter */
 }
-body:not(.chat-collapsed) #app-runner:not(.is-steam-shell) {
+body:not(.chat-collapsed) #app-runner {
     right: 380px !important; /* Runner touches the edge, but buttons need the gutter */
 }
 

@@ -1338,6 +1338,11 @@ function openApp(url, title, icon, appId, skipPush = false) {
     if (runner) runner.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 
+    // Synchronize offsets to ensure runner respects the companion sidebar
+    if (window.syncArcadeSidebarOffsets) {
+        window.syncArcadeSidebarOffsets();
+    }
+
     if (!skipPush && !isNavigatingHistory) {
         const stateData = { type: 'app', url, title, icon, appId };
         const current = history.state;
@@ -1361,6 +1366,11 @@ function closeApp(skipPush = false) {
     runner.style.display = 'none';
     frame.src = '';
     document.body.style.overflow = 'auto';
+
+    // Reset offsets when closing the runner
+    if (window.syncArcadeSidebarOffsets) {
+        window.syncArcadeSidebarOffsets();
+    }
 
     if (!skipPush && !isNavigatingHistory) {
         history.back();
