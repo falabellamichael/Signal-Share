@@ -1,4 +1,4 @@
-const CACHE_NAME = "signal-share-shell-v108";
+const CACHE_NAME = "signal-share-shell-v109";
 const APP_SHELL = [
   "./",
   "./index.html",

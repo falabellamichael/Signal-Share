@@ -272,11 +272,17 @@ let nativeBackHandlerAttached = false;
 let permissionBootstrapBound = false;
 let localNetworkPermissionProbePromise = null;
 const externalPreviewCache = new Map();
-const LOCAL_NETWORK_PERMISSION_PROBE_URLS = Object.freeze([
-  "http://localhost:3000/api/llm/chat",
-  "http://127.0.0.1:3000/api/llm/chat",
-  "http://10.0.2.2:3000/api/llm/chat"
-]);
+function getLocalNetworkPermissionProbeUrls() {
+  const urls = [
+    "http://localhost:3000/api/llm/chat",
+    "http://127.0.0.1:3000/api/llm/chat",
+  ];
+  const isSecureHostedPage = window.location.protocol === "https:";
+  if (!isSecureHostedPage || isNativeCapacitorApp()) {
+    urls.push("http://10.0.2.2:3000/api/llm/chat");
+  }
+  return urls;
+}
 
 // Ensure state is shared across multiple instances of app.js (e.g. if loaded with/without query strings)
 const globalStateKey = "__SIGNAL_SHARE_STATE__";
@@ -458,7 +464,7 @@ function isLoopbackBridgeUrl(url) {
 }
 
 function getBridgeTargetAddressSpace(url) {
-  if (isLoopbackBridgeUrl(url)) return "local";
+  if (isLoopbackBridgeUrl(url)) return "loopback";
   try {
     const parsed = new URL(url, window.location.href);
     const host = `${parsed.hostname || ""}`.trim().toLowerCase();
@@ -481,7 +487,7 @@ async function probeLocalNetworkPermission() {
   if (localNetworkPermissionProbePromise) return localNetworkPermissionProbePromise;
 
   localNetworkPermissionProbePromise = (async () => {
-    for (const url of LOCAL_NETWORK_PERMISSION_PROBE_URLS) {
+    for (const url of getLocalNetworkPermissionProbeUrls()) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 1800);
       const targetAddressSpace = getBridgeTargetAddressSpace(url);
@@ -1988,9 +1994,12 @@ async function callLocalAI(text, history = [], pageContext = "", attachment = nu
     'http://localhost:3000/api/llm/chat',
     'http://127.0.0.1:3000/api/llm/chat',
     window.location.origin + '/api/llm/chat',
-    '/api/llm/chat',
-    'http://10.0.2.2:3000/api/llm/chat'
+    '/api/llm/chat'
   ];
+  const isSecureHostedPage = window.location.protocol === "https:";
+  if (!isSecureHostedPage || isNativeCapacitorApp()) {
+    candidates.push('http://10.0.2.2:3000/api/llm/chat');
+  }
 
   let abortController = null;
   window.stopMessengerAi = () => {

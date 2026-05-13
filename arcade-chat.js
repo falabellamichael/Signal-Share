@@ -9,7 +9,7 @@ function getBridgeTargetAddressSpace(baseUrl = "") {
     try {
         const parsed = new URL(baseUrl, window.location.href);
         const host = `${parsed.hostname || ""}`.trim().toLowerCase();
-        if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]") return "local";
+        if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]") return "loopback";
         if (!host) return "";
         if (host.startsWith("10.") || host.startsWith("192.168.") || host === "10.0.2.2") return "private";
         const octets = host.split(".").map((value) => Number.parseInt(value, 10));

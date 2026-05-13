@@ -68,11 +68,17 @@ let currentCategory = 'all';
 let currentUser = normalizeUserRecord(safeParseJson(localStorage.getItem('ss-user'), null));
 let isNavigatingHistory = false;
 const isAndroidPlatform = /Android/i.test(navigator.userAgent) || (window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android');
-const LOCAL_NETWORK_PERMISSION_PROBE_URLS = Object.freeze([
-    'http://localhost:3000/api/llm/chat',
-    'http://127.0.0.1:3000/api/llm/chat',
-    'http://10.0.2.2:3000/api/llm/chat'
-]);
+function getLocalNetworkPermissionProbeUrls() {
+    const urls = [
+        'http://localhost:3000/api/llm/chat',
+        'http://127.0.0.1:3000/api/llm/chat'
+    ];
+    const isSecureHostedPage = window.location.protocol === 'https:';
+    if (!isSecureHostedPage || isNative) {
+        urls.push('http://10.0.2.2:3000/api/llm/chat');
+    }
+    return urls;
+}
 let localNetworkPermissionProbePromise = null;
 let permissionPromptHandlersBound = false;
 
@@ -100,7 +106,7 @@ function isLoopbackBridgeUrl(url) {
 }
 
 function getBridgeTargetAddressSpace(url) {
-    if (isLoopbackBridgeUrl(url)) return 'local';
+    if (isLoopbackBridgeUrl(url)) return 'loopback';
     try {
         const parsed = new URL(url, window.location.href);
         const host = `${parsed.hostname || ''}`.trim().toLowerCase();
@@ -123,7 +129,7 @@ async function probeLocalNetworkPermission() {
     if (localNetworkPermissionProbePromise) return localNetworkPermissionProbePromise;
 
     localNetworkPermissionProbePromise = (async () => {
-        for (const url of LOCAL_NETWORK_PERMISSION_PROBE_URLS) {
+        for (const url of getLocalNetworkPermissionProbeUrls()) {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 1800);
             const targetAddressSpace = getBridgeTargetAddressSpace(url);

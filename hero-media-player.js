@@ -850,7 +850,7 @@ The companion bridge is designed with several security layers to keep your PC sa
         headers["X-Bridge-Secret"] = secret;
       }
 
-      const targetAddressSpace = addressSpace === "loopback" ? "local" : addressSpace;
+      const targetAddressSpace = addressSpace === "loopback" ? "loopback" : addressSpace;
 
       // Ensure we do NOT send 'target-address-space' as a header, as it's a restricted 
       // fetch option property, not a header. Sending it as a header triggers CORS failures.
