@@ -12,6 +12,158 @@ const GAMES = [
     { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility', trackedStats: [] }
 ];
 
+const DEFAULT_GAME_POSTER = 'icon-512.png';
+const STATIC_HUB_IDS = {
+    snake: 'hub-snake',
+    basketball: 'hub-basketball',
+    pinball: 'hub-pinball',
+    calc: 'hub-calc',
+    sudoku: 'hub-sudoku'
+};
+
+function escapeHtml(value) {
+    return `${value ?? ''}`.replace(/[&<>"']/g, (char) => {
+        if (char === '&') return '&amp;';
+        if (char === '<') return '&lt;';
+        if (char === '>') return '&gt;';
+        if (char === '"') return '&quot;';
+        return '&#39;';
+    });
+}
+
+function normalizeCategoryLabel(game) {
+    const rawCategory = `${game?.category || ''}`.trim();
+    if (rawCategory) return rawCategory.toUpperCase();
+    return game?.type === 'utility' ? 'UTILITY' : 'ARCADE';
+}
+
+function resolveGamePoster(game) {
+    const poster = `${game?.poster || ''}`.trim();
+    return poster && !poster.includes('${') ? poster : DEFAULT_GAME_POSTER;
+}
+
+function buildGameTag(game) {
+    const existingTag = `${game?.tag || ''}`.trim();
+    if (existingTag) return existingTag.toUpperCase();
+
+    const category = normalizeCategoryLabel(game);
+    const status = game?.type === 'utility' ? 'UTILITY' : 'READY';
+    return `${category} • ${status}`;
+}
+
+function buildHubBadges(game) {
+    const category = normalizeCategoryLabel(game);
+    const tagParts = buildGameTag(game).split('•').map((part) => part.trim()).filter(Boolean);
+    const secondary = tagParts.length > 1 ? tagParts[1] : (game?.type === 'utility' ? 'TOOLKIT' : 'SINGLE PLAYER');
+    const finalBadge = game?.files?.length ? 'WORKSHOP' : (game?.type === 'utility' ? 'UTILITY READY' : 'READY');
+    return [category, secondary, finalBadge];
+}
+
+function buildHubDescription(game) {
+    const description = `${game?.description || ''}`.trim();
+    if (description) return description;
+    if (game?.type === 'utility') {
+        return 'A curated utility experience integrated into the mini-games shell. Launch instantly, keep your progress, and stay responsive on desktop and Android.';
+    }
+    return 'A polished arcade-ready experience built for the Signal Share launcher with optimized input handling, persistent progress, and responsive session controls.';
+}
+
+function buildHubFeatureItems(game) {
+    const features = [];
+    const typeLabel = game?.type === 'utility' ? 'Utility module routing' : 'Arcade session routing';
+    features.push(typeLabel);
+
+    if (game?.files?.length) {
+        features.push(`${game.files.length} workshop assets bundled`);
+    }
+
+    const trackedCount = Array.isArray(game?.trackedStats) ? game.trackedStats.length : 0;
+    if (trackedCount > 0) {
+        features.push(`${trackedCount} telemetry stats discovered`);
+    }
+
+    const tagsRaw = `${game?.tags || ''}`.trim();
+    if (tagsRaw) {
+        tagsRaw.split(',').map((tag) => tag.trim()).filter(Boolean).slice(0, 2).forEach((tag) => {
+            features.push(`${tag} optimized`);
+        });
+    }
+
+    if (features.length < 4) {
+        features.push('Mobile viewport fitting enabled');
+    }
+
+    return features.slice(0, 4);
+}
+
+function getGameLaunchAction(game) {
+    if (!game || !game.id) return null;
+    if (game.id === 'snake') return launchSnake;
+    if (game.id === 'basketball') return launchBasketball;
+    if (game.id === 'pinball') return launchPinball;
+    if (game.id === 'sudoku') return launchSudoku;
+    if (game.id === 'calc') return launchCalc;
+    return () => launchCustomGame(game.id);
+}
+
+function renderDynamicHub(game) {
+    const dynamicHub = document.getElementById('hub-dynamic');
+    if (!dynamicHub) return;
+    if (!game) {
+        dynamicHub.style.display = 'none';
+        dynamicHub.innerHTML = '';
+        return;
+    }
+
+    const posterUrl = resolveGamePoster(game);
+    const badges = buildHubBadges(game);
+    const statusColor = game.type === 'utility' ? 'var(--steam-light)' : '#a4d007';
+    const statusText = game.files?.length ? 'STATUS: WORKSHOP READY' : (game.type === 'utility' ? 'STATUS: STANDBY' : 'STATUS: ONLINE');
+    const sessionText = game.type === 'utility' ? 'Utility session prepared' : 'Arcade session prepared';
+    const actionLabel = game.type === 'utility' ? 'Launch Utility' : 'Launch Game';
+    const features = buildHubFeatureItems(game).map((item) => `
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 4px; height: 4px; background: var(--steam-light); border-radius: 50%;"></div>
+            ${escapeHtml(item)}
+        </div>
+    `).join('');
+
+    dynamicHub.innerHTML = `
+        <div class="game-hub-header">
+            <img src="${escapeHtml(posterUrl)}" class="hub-poster">
+            <div>
+                <h1 style="font-size: 4rem; margin: 0 0 10px 0; letter-spacing: -3px; font-weight: 900;">${escapeHtml(game.title || 'Untitled')}</h1>
+                <div style="display: flex; gap: 10px; margin-bottom: 30px; flex-wrap: wrap;">
+                    <span class="badge">${escapeHtml(badges[0])}</span>
+                    <span class="badge">${escapeHtml(badges[1])}</span>
+                    <span class="badge" style="color: var(--steam-light);">${escapeHtml(badges[2])}</span>
+                </div>
+                <p style="color: rgba(255,255,255,0.6); line-height: 1.8; font-size: 1.1rem; max-width: 680px;">${escapeHtml(buildHubDescription(game))}</p>
+            </div>
+        </div>
+        <div class="play-bar">
+            <div>
+                <span style="font-size: 0.7rem; font-weight: 900; color: ${statusColor}; letter-spacing: 2px;">${statusText}</span>
+                <div style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">${sessionText}</div>
+            </div>
+            <button class="play-btn" id="dynamic-launch-btn">${actionLabel}</button>
+        </div>
+        <h3 style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.3; margin-bottom: 20px; font-weight: 900;">AUTOMATED FEATURE PROFILE</h3>
+        <div class="config-grid" style="color: rgba(255,255,255,0.8); font-size: 0.85rem; display: grid; gap: 12px;">
+            ${features}
+        </div>
+    `;
+
+    dynamicHub.style.display = 'block';
+    const launchBtn = document.getElementById('dynamic-launch-btn');
+    if (launchBtn) {
+        launchBtn.onclick = () => {
+            const action = getGameLaunchAction(game);
+            if (typeof action === 'function') action();
+        };
+    }
+}
+
 function safeParseJson(rawValue, fallbackValue) {
     if (typeof rawValue !== 'string' || !rawValue.trim()) return fallbackValue;
     try {
@@ -555,11 +707,12 @@ function renderPublishedGames() {
         const desc = (game.description || '').substring(0, 80);
         const descSuffix = (game.description || '').length > 80 ? '...' : '';
 
-        const posterUrl = (game.poster && !game.poster.includes('${')) ? game.poster : 'icon-512.png';
+        const posterUrl = resolveGamePoster(game);
+        const gameTag = buildGameTag(game);
         card.innerHTML = `
             <div style="height: 160px; background: url('${posterUrl}') center/cover; position: relative; overflow: hidden;">
                 <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(16, 24, 34, 0.9), transparent); display: flex; align-items: flex-end; padding: 15px;">
-                    <span style="font-size: 0.6rem; background: rgba(102, 192, 244, 0.2); color: var(--steam-light); padding: 4px 8px; border-radius: 4px; font-weight: 800; letter-spacing: 1px;">${game.tag}</span>
+                    <span style="font-size: 0.6rem; background: rgba(102, 192, 244, 0.2); color: var(--steam-light); padding: 4px 8px; border-radius: 4px; font-weight: 800; letter-spacing: 1px;">${gameTag}</span>
                 </div>
             </div>
             <div style="padding: 20px;">
@@ -759,6 +912,18 @@ function setCategory(cat, skipPush = false) {
         if (content) content.style.display = currentUser ? 'block' : 'none';
         if (currentUser) renderPublishedGames();
     } else if (cat === 'leaderboard') {
+        if (leader) leader.style.display = 'block';
+        const msg = document.getElementById('leader-locked-msg');
+        const content = document.getElementById('leader-content');
+        if (msg) msg.style.display = currentUser ? 'none' : 'block';
+        if (content) content.style.display = currentUser ? 'block' : 'none';
+        if (currentUser) {
+            void renderLeaderboard();
+            if (typeof window.renderGlobalLeaderboards === 'function') {
+                void window.renderGlobalLeaderboards();
+            }
+        }
+    } else {
         if (library) library.style.display = 'block';
         if (hero) hero.style.display = (cat === 'all') ? 'flex' : 'none';
 
@@ -769,6 +934,7 @@ function setCategory(cat, skipPush = false) {
 
         if (title) title.textContent = displayTitle;
         if (clearBtn) clearBtn.style.display = (cat === 'recent') ? 'block' : 'none';
+        renderLibrary();
     }
 
     if (!skipPush && !isNavigatingHistory) {
@@ -776,7 +942,6 @@ function setCategory(cat, skipPush = false) {
     }
 
     resetShellScrollPosition();
-    renderLibrary();
 }
 
 function renderLibrary() {
@@ -803,12 +968,13 @@ function renderLibrary() {
         const card = document.createElement('div');
         card.className = 'steam-card';
         card.onclick = () => showGameDetails(game.id);
-        const posterUrl = (game.poster && !game.poster.includes('${')) ? game.poster : 'icon-512.png';
+        const posterUrl = resolveGamePoster(game);
+        const gameTag = buildGameTag(game);
         card.innerHTML = `
             <div class="poster-wrapper"><img src="${posterUrl}"></div>
             <div class="card-info">
                 <div class="card-title">${game.title}</div>
-                <div class="card-tag">${game.tag}</div>
+                <div class="card-tag">${gameTag}</div>
             </div>
         `;
         grid.appendChild(card);
@@ -1053,17 +1219,23 @@ function showGameDetails(game, skipPush = false) {
     }
 
     const g = GAMES.find(x => x.id === game);
-    if (g && hubBg) hubBg.style.backgroundImage = `url(${g.poster})`;
+    if (g && hubBg) hubBg.style.backgroundImage = `url(${resolveGamePoster(g)})`;
 
-    const snake = document.getElementById('hub-snake');
-    const basketball = document.getElementById('hub-basketball');
-    const pinball = document.getElementById('hub-pinball');
-    const calc = document.getElementById('hub-calc');
+    Object.entries(STATIC_HUB_IDS).forEach(([id, hubId]) => {
+        const hub = document.getElementById(hubId);
+        if (hub) hub.style.display = (game === id) ? 'block' : 'none';
+    });
 
-    if (snake) snake.style.display = (game === 'snake') ? 'block' : 'none';
-    if (basketball) basketball.style.display = (game === 'basketball') ? 'block' : 'none';
-    if (pinball) pinball.style.display = (game === 'pinball') ? 'block' : 'none';
-    if (calc) calc.style.display = (game === 'calc') ? 'block' : 'none';
+    const dynamicHub = document.getElementById('hub-dynamic');
+    if (dynamicHub) {
+        const hasStaticHub = Object.prototype.hasOwnProperty.call(STATIC_HUB_IDS, game);
+        if (hasStaticHub) {
+            dynamicHub.style.display = 'none';
+            dynamicHub.innerHTML = '';
+        } else {
+            renderDynamicHub(g);
+        }
+    }
 
     resetShellScrollPosition('smooth');
 
