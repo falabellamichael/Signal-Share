@@ -99,8 +99,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         'qwen2.5-coder', 
         'Qwen2.5-Coder-7B-Instruct-GGUF',
         'gemma-4-e4b',
-        'google/gemma-2-2b', 
-        'gemma2', 
+        'gemma-4-e2b',
         'llama3', 
         'mistral'
     ];
