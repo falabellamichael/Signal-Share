@@ -499,6 +499,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
     ];
 
     const hasPinnedModel = Boolean(preferredModel && preferredModel !== "auto");
+    const normalizedPinnedModel = `${preferredModel || ""}`.trim();
     let lmStudioPreparedForPinnedModel = false;
     let autoSelectedLmStudioModel = "";
     if (!hasPinnedModel) {
@@ -519,9 +520,10 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
             : models;
         let endpointModels = endpointFallbackModels;
 
-        if (hasPinnedModel && endpoint.provider === "lmstudio") {
-            endpointModels = endpointFallbackModels.slice(0, 1);
-        } else if (!hasPinnedModel) {
+        if (hasPinnedModel) {
+            const resolvedPinned = findBestMatchingModel(normalizedPinnedModel, endpointFallbackModels);
+            endpointModels = [resolvedPinned || normalizedPinnedModel].filter(Boolean);
+        } else {
             if (endpoint.provider === "lmstudio") {
                 if (autoSelectedLmStudioModel) {
                     const resolvedAuto = findBestMatchingModel(autoSelectedLmStudioModel, endpointFallbackModels) || autoSelectedLmStudioModel;
@@ -535,7 +537,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         }
 
         if (hasPinnedModel && endpoint.provider === "lmstudio" && !lmStudioPreparedForPinnedModel) {
-            const pinnedLmStudioModel = endpointModels[0] || preferredModel;
+            const pinnedLmStudioModel = endpointModels[0] || normalizedPinnedModel;
             await ensureLmStudioExclusiveModel(pinnedLmStudioModel);
             lmStudioPreparedForPinnedModel = true;
         }
@@ -577,6 +579,9 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                     : data?.message?.content;
                 if (!messageText || !`${messageText}`.trim()) continue;
 
+                if (endpoint.provider === "lmstudio" && (hasPinnedModel || AUTO_UNLOAD_OTHER_LM_STUDIO_MODELS)) {
+                    await ensureLmStudioExclusiveModel(model);
+                }
                 lmResponse = `${messageText}`.trim();
                 lastSuccessfulModelByProvider[endpoint.provider] = `${model}`.trim();
                 success = true;
