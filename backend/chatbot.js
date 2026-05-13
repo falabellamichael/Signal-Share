@@ -1,7 +1,52 @@
-/**
- * Chatbot Intelligence Module for Signal Share Arcade
- * Handles local LLM orchestration and fallback logic.
  */
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, ".env") });
+
+const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
+
+/**
+ * Validates if a URL is safe to fetch or open.
+ * Prevents access to internal networks, private IPs, and malicious protocols.
+ */
+function isUrlSafe(urlStr) {
+    try {
+        const url = new URL(urlStr);
+        // Only allow standard web protocols
+        if (!['http:', 'https:'].includes(url.protocol)) return false;
+
+        const hostname = url.hostname.toLowerCase();
+        
+        // Allow localhost for the internal bridge only
+        if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') {
+            // Only allow the bridge port (3000) or standard web ports
+            return url.port === '3000' || url.port === '' || url.port === '80' || url.port === '443';
+        }
+
+        // Block private IP ranges (LAN access)
+        const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+        if (isIp) {
+            const parts = hostname.split('.').map(Number);
+            if (parts[0] === 10) return false; // 10.0.0.0/8
+            if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false; // 172.16.0.0/12
+            if (parts[0] === 192 && parts[1] === 168) return false; // 192.168.0.0/16
+            if (parts[0] === 169 && parts[1] === 254) return false; // 169.254.0.0/16 (Link-local)
+            if (parts[0] === 127) return false; // 127.0.0.0/8 (except localhost check above)
+        }
+
+        // Block common sensitive hostnames
+        const blockedHosts = ['metadata.google.internal', '169.254.169.254', 'instance-data'];
+        if (blockedHosts.some(h => hostname.includes(h))) return false;
+
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
 
 const SYSTEM_PROMPT = `
 You are the Signal Share Arcade Companion, a professional, high-performance, and arcade-themed AI built into the Signal Share Super Suite.
@@ -26,6 +71,20 @@ WEB & SYSTEM TOOLS (USE THESE EXACTLY):
 9. [LIST_TABS] -> List open browser tabs. Use this if the user asks "what tabs are open".
 10. [LIST_APPS] -> List running desktop applications. Use this if the user asks "what apps are running" or "what's open on my pc".
 
+CODING & FILE SYSTEM TOOLS (FOR PROJECT MAINTENANCE):
+11. [LIST_FILES: path] -> List files in a directory (relative to project root).
+12. [READ_FILE: path] -> Read the content of a project file.
+13. [WRITE_FILE: {"path": "...", "content": "..."}] -> Create or overwrite a project file with new code.
+14. [PATCH_SUGGESTION] -> Use this to wrap a code block when suggesting a change.
+    Example: [PATCH_SUGGESTION]...your code...[/PATCH_SUGGESTION]
+
+CODING GUIDELINES:
+- Write clean, modular, and well-documented JavaScript/CSS/HTML.
+- Follow existing project patterns (e.g., using bridgeFetch, handleChatSubmit, etc.).
+- ALWAYS verify file content with [READ_FILE] before suggesting a [WRITE_FILE] or [PATCH_SUGGESTION].
+- Be precise. If you are fixing a bug, explain the cause before providing the fix.
+- Use ES modules where appropriate.
+
 ARCADE SYSTEM TOOLS (USE THESE FOR INTERNAL NAVIGATION):
 6. [ARCADE: <action_id>] -> Trigger internal arcade functions.
    - Games: pinball, snake, hoops, basketball, calc, calculator, library, shop, store, leaderboards.
@@ -40,6 +99,7 @@ ARCADE SYSTEM TOOLS (USE THESE FOR INTERNAL NAVIGATION):
    - System: keyboard_shortcuts, help_guide, view_terms, view_privacy, view_logs, refresh_page, logout, clear_cache.
    - Navigation: scroll_to_player, scroll_to_feed, jump_to_top, jump_to_bottom, next_post, prev_post.
    - Media: mute_audio, unmute_audio, reset_player, clear_notifications, mark_all_read.
+   - Easter Eggs: barrel_roll, joke, konami_code, meaning_of_life.
 
 CORE PERSONALITY:
 - Friendly, encouraging, and slightly retro-themed.
@@ -472,10 +532,8 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 : `data:image/png;base64,${imageBase64}`;
             attachmentNote = "\n\n[SYSTEM: An image was attached. Analyze visible details only. Do not use placeholder text or fake certainty.]";
         } else if (attachment.type === 'video') {
-            // For now, we just inform the AI about the video attachment
             attachmentNote = `\n\n[SYSTEM: A video file named "${attachment.name}" was attached to this message. You cannot "watch" it directly yet, but you should acknowledge its presence.]`;
         } else {
-            // It's a non-image/non-video file (js, html, txt, etc.)
             try {
                 const base64Data = attachment.data.split(',')[1] || attachment.data;
                 const decoded = Buffer.from(base64Data, 'base64').toString('utf-8');
@@ -487,8 +545,6 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         }
     }
 
-    // Attempt local inference (LM Studio/Ollama)
-    // Vision models list for local inference
     const visionModels = ['qwen3-vl-4b', 'llava', 'llava:7b', 'moondream', 'bakllava', 'minicpm-v'];
     const standardModels = [
         'qwen3.5-9b', 
@@ -504,28 +560,19 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         'mistral'
     ];
     
-    // Build the list of models to try. If the user picked a specific one, put it first.
     let models = [];
     if (preferredModel && preferredModel !== 'auto') {
         models.push(preferredModel);
     }
-    
-    // Add vision models if there's an image
     if (imageBase64) {
         models = [...models, ...visionModels];
     }
-    
-    // Add standard models as fallbacks
     models = [...models, ...standardModels];
-    
-    // Deduplicate
     models = [...new Set(models)];
 
     let success = false;
-
     const conversation = [...history];
     if (iteration === 0) {
-        // Combine message with file content and the system note about multimedia
         const combinedContent = (message || "") + fileContentBlock + attachmentNote;
         conversation.push({ role: "user", content: combinedContent.trim() || "[No text message provided]" });
     }
@@ -625,7 +672,6 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                         messages: messages,
                         stream: false
                     };
-                    // Attach image to Ollama request if using a vision model or if we have one
                     if (imageBase64 && iteration === 0) {
                         body.images = [imageBase64];
                     }
@@ -669,7 +715,6 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         return `🧠 [Model Status]: Using ${activeRuntimeModel} via ${activeRuntimeProvider} (${mode} mode).`;
     }
 
-    // 3. Handle Web Intelligence & Media Commands
     if (lmResponse) {
         const hasTools = lmResponse.includes('[SEARCH:') || 
                          lmResponse.includes('[FETCH:') || 
@@ -677,9 +722,11 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                          lmResponse.includes('[PLAY:') ||
                          lmResponse.includes('[SCREENSHOT]') ||
                          lmResponse.includes('[LIST_TABS]') ||
-                         lmResponse.includes('[LIST_APPS]');
+                         lmResponse.includes('[LIST_APPS]') ||
+                         lmResponse.includes('[LIST_FILES:') ||
+                         lmResponse.includes('[READ_FILE:') ||
+                         lmResponse.includes('[WRITE_FILE:');
 
-        // AUTO-CORRECTION: If the AI says it is searching but misses the tag, force a tool call
         const isClaimingToSearch = lmResponse.toLowerCase().includes('search') || 
                                    lmResponse.toLowerCase().includes('pulling up') ||
                                    lmResponse.toLowerCase().includes('checking');
@@ -697,18 +744,26 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
             console.log(`[Chatbot] Tool detected (Iteration ${iteration + 1}). Executing...`);
             const toolResult = await executeWebTools(lmResponse);
             
-            // If the tool was a screenshot, we might want to attach it to the next call
-            let nextAttachment = null;
+            let nextAttachment = attachment;
             if (toolResult.includes('[SYSTEM_IMAGE_ATTACHED]')) {
-                const marker = "[SYSTEM_IMAGE_ATTACHED]: A screenshot was successfully captured. Base64 data follows:\n";
-                const base64Data = toolResult.substring(toolResult.indexOf(marker) + marker.length).split('...')[0]; // This is just a hint in the text, real data should be passed better but for now we follow the existing pattern
-                // Since executeWebTools is async and returns text, we'll have to handle the image re-injection here if possible, 
-                // but usually the bridge handles the vision call if we pass it right.
-                // For now, we'll just let the AI know it has the screenshot and it should use its vision capability.
+                try {
+                    const bridgeUrl = `http://127.0.0.1:3000/api/system/screenshot`;
+                    const response = await fetch(bridgeUrl);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.image) {
+                            nextAttachment = {
+                                type: 'image',
+                                data: data.image,
+                                name: 'system-screenshot.png'
+                            };
+                        }
+                    }
+                } catch (e) {
+                    console.warn("[Chatbot] Failed to auto-attach screenshot for vision analysis:", e.message);
+                }
             }
 
-            // Use 'user' role for tool results to be compatible with picky local LLMs 
-            // that don't support 'system' messages in the middle of a chat.
             return getChatResponse(null, [
                 ...conversation,
                 { role: "assistant", content: lmResponse },
@@ -718,8 +773,6 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
     }
 
     if (!lmResponse && iteration === 0) return getOfflineResponse(message);
-    
-    // Fallback if the model returned nothing during a tool-call iteration
     if (!lmResponse && iteration > 0) {
         return "I've processed your request but my logic core returned an empty result. Please try again or rephrase!";
     }
@@ -738,7 +791,6 @@ async function executeWebTools(text) {
     if (searchMatch) {
         const query = searchMatch[1].trim();
         try {
-            // Using DuckDuckGo Lite (minimalist, low-bandwidth, and better for scraping)
             const searchUrl = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`;
             const resp = await fetch(searchUrl, {
                 headers: { 
@@ -747,30 +799,23 @@ async function executeWebTools(text) {
                 }
             });
             const html = await resp.text();
-            
-            // Robust regex for DDG Lite: matches the result-link and the following snippet
             const resultsList = [];
-            // DDG Lite uses <td> for results. We look for the link and the snippet text.
             const resultRegex = /<a class='result-link' href='([^']+)'>([\s\S]*?)<\/a>[\s\S]*?<td class='result-snippet'>([\s\S]*?)<\/td>/g;
-            
             let match;
             let count = 0;
             while ((match = resultRegex.exec(html)) !== null && count < 4) {
                 const title = match[2].replace(/<[^>]*>/g, '').trim();
                 const snippet = match[3].replace(/<[^>]*>/g, '').trim();
                 const link = match[1];
-                
                 if (title && snippet) {
                     resultsList.push(`- ${title} (${link})\n  ${snippet}`);
                     count++;
                 }
             }
-            
             if (resultsList.length > 0) {
                 resultsList.push(`\nFull search results: ${searchUrl}`);
                 results.push(`WEB SEARCH RESULTS FOR "${query}":\n${resultsList.join('\n\n')}`);
             } else {
-                // Fallback: Just return the URL if scraping fails
                 results.push(`SEARCH TRIGGERED FOR "${query}":\nNo direct snippets parsed. See full results here: ${searchUrl}`);
             }
         } catch (e) {
@@ -782,12 +827,16 @@ async function executeWebTools(text) {
     const fetchMatch = text.match(/\[FETCH:\s*([^\]]+)\]/);
     if (fetchMatch) {
         const url = fetchMatch[1].trim();
-        try {
-            const resp = await fetch(url);
-            const content = await resp.text();
-            results.push(`CONTENT FROM ${url}:\n${content.substring(0, 2000)}...`);
-        } catch (e) {
-            results.push(`FAILED TO FETCH ${url}: ${e.message}`);
+        if (!isUrlSafe(url)) {
+            results.push(`SECURITY ERROR: Access to ${url} is restricted. I am not allowed to access internal networks or other people's computers.`);
+        } else {
+            try {
+                const resp = await fetch(url);
+                const content = await resp.text();
+                results.push(`CONTENT FROM ${url}:\n${content.substring(0, 2000)}...`);
+            } catch (e) {
+                results.push(`FAILED TO FETCH ${url}: ${e.message}`);
+            }
         }
     }
 
@@ -795,23 +844,27 @@ async function executeWebTools(text) {
     const openMatch = text.match(/\[OPEN:\s*([^\]]+)\]/);
     if (openMatch) {
         const url = openMatch[1].trim();
-        try {
-            // Call our own bridge API to open the URI
-            const bridgeUrl = `http://127.0.0.1:3000/api/system-media/action`;
-            const response = await fetch(bridgeUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'open_uri', uri: url })
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(`Server error: ${response.status} - ${errorData.error || response.statusText}`);
+        if (!isUrlSafe(url) && !url.startsWith('spotify:') && !url.startsWith('https://www.youtube.com')) {
+             results.push(`SECURITY ERROR: Opening ${url} is restricted to protect your network privacy.`);
+        } else {
+            try {
+                const bridgeUrl = `http://127.0.0.1:3000/api/system-media/action`;
+                const response = await fetch(bridgeUrl, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Bridge-Secret': BRIDGE_SECRET
+                    },
+                    body: JSON.stringify({ action: 'open_uri', uri: url })
+                });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`Server error: ${response.status} - ${errorData.error || response.statusText}`);
+                }
+                results.push(`SUCCESSFULLY OPENED SYSTEM LINK: ${url}`);
+            } catch (e) {
+                results.push(`FAILED TO OPEN SYSTEM LINK ${url}: ${e.message}`);
             }
-            
-            results.push(`SUCCESSFULLY OPENED SYSTEM LINK: ${url}`);
-        } catch (e) {
-            results.push(`FAILED TO OPEN SYSTEM LINK ${url}: ${e.message}`);
         }
     }
 
@@ -823,15 +876,16 @@ async function executeWebTools(text) {
             const bridgeUrl = `http://localhost:3000/api/system-media/action`;
             const response = await fetch(bridgeUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Bridge-Secret': BRIDGE_SECRET
+                },
                 body: JSON.stringify({ action: action })
             });
-            
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(`Server error: ${response.status} - ${errorData.error || response.statusText}`);
             }
-            
             results.push(`MEDIA ACTION EXECUTED: ${action}`);
         } catch (e) {
             results.push(`MEDIA ACTION FAILED: ${e.message}`);
@@ -842,7 +896,9 @@ async function executeWebTools(text) {
     if (text.includes('[SCREENSHOT]')) {
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/screenshot`;
-            const response = await fetch(bridgeUrl);
+            const response = await fetch(bridgeUrl, {
+                headers: { 'X-Bridge-Secret': BRIDGE_SECRET }
+            });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
             if (data.image) {
@@ -859,7 +915,9 @@ async function executeWebTools(text) {
     if (text.includes('[LIST_TABS]')) {
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/tabs`;
-            const response = await fetch(bridgeUrl);
+            const response = await fetch(bridgeUrl, {
+                headers: { 'X-Bridge-Secret': BRIDGE_SECRET }
+            });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
             results.push(`OPEN BROWSER TABS:\n${JSON.stringify(data.tabs, null, 2)}`);
@@ -872,12 +930,70 @@ async function executeWebTools(text) {
     if (text.includes('[LIST_APPS]')) {
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/apps`;
-            const response = await fetch(bridgeUrl);
+            const response = await fetch(bridgeUrl, {
+                headers: { 'X-Bridge-Secret': BRIDGE_SECRET }
+            });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
             results.push(`RUNNING APPLICATIONS:\n${JSON.stringify(data.apps, null, 2)}`);
         } catch (e) {
             results.push(`LIST_APPS FAILED: ${e.message}`);
+        }
+    }
+
+    // Handle [LIST_FILES: path]
+    const listFilesMatch = text.match(/\[LIST_FILES:\s*([^\]]+)\]/);
+    if (listFilesMatch) {
+        const path = listFilesMatch[1].trim();
+        try {
+            const bridgeUrl = `http://127.0.0.1:3000/api/system/files/list?path=${encodeURIComponent(path)}`;
+            const response = await fetch(bridgeUrl, {
+                headers: { 'X-Bridge-Secret': BRIDGE_SECRET }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            results.push(`FILES IN ${path}:\n${JSON.stringify(data.files, null, 2)}`);
+        } catch (e) {
+            results.push(`LIST_FILES FAILED for ${path}: ${e.message}`);
+        }
+    }
+
+    // Handle [READ_FILE: path]
+    const readFileMatch = text.match(/\[READ_FILE:\s*([^\]]+)\]/);
+    if (readFileMatch) {
+        const path = readFileMatch[1].trim();
+        try {
+            const bridgeUrl = `http://127.0.0.1:3000/api/system/files/read?path=${encodeURIComponent(path)}`;
+            const response = await fetch(bridgeUrl, {
+                headers: { 'X-Bridge-Secret': BRIDGE_SECRET }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            results.push(`CONTENT OF ${path}:\n\`\`\`\n${data.content}\n\`\`\``);
+        } catch (e) {
+            results.push(`READ_FILE FAILED for ${path}: ${e.message}`);
+        }
+    }
+
+    // Handle [WRITE_FILE: data]
+    const writeFileMatch = text.match(/\[WRITE_FILE:\s*({.+?})\]/);
+    if (writeFileMatch) {
+        try {
+            const data = JSON.parse(writeFileMatch[1]);
+            const bridgeUrl = `http://127.0.0.1:3000/api/system/files/write`;
+            const response = await fetch(bridgeUrl, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Bridge-Secret': BRIDGE_SECRET
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const resData = await response.json();
+            results.push(`WRITE_FILE SUCCESS: ${resData.message}`);
+        } catch (e) {
+            results.push(`WRITE_FILE FAILED: ${e.message}`);
         }
     }
 
@@ -889,15 +1005,16 @@ async function executeWebTools(text) {
             const bridgeUrl = `http://localhost:3000/api/system/launch`;
             const response = await fetch(bridgeUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Bridge-Secret': BRIDGE_SECRET
+                },
                 body: JSON.stringify({ appId: appId })
             });
-            
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(`Server error: ${response.status} - ${errorData.error || response.statusText}`);
             }
-            
             results.push(`SYSTEM COMMAND EXECUTED: Successfully launched ${appId} on your PC.`);
         } catch (e) {
             results.push(`SYSTEM COMMAND FAILED: Could not launch ${appId}. Error: ${e.message}`);
@@ -931,22 +1048,17 @@ async function executeWebTools(text) {
  */
 function getOfflineResponse(message) {
     const input = message.toLowerCase();
-    
     if (input.includes("pinball")) {
         return "🕹️ [Arcade Protocol]: In Neon Pinball, try hitting the top bumpers to trigger the 'Gravity Shift' multiplier. Keep those flippers sharp!";
     }
-    
     if (input.includes("basketball") || input.includes("hoops")) {
         return "🏀 [Arcade Protocol]: For Neon Hoops, the release angle is everything. Aim for the top of the rim's arc for maximum 'Perfect' shot consistency.";
     }
-
     if (input.includes("snake")) {
         return "🐍 [Arcade Protocol]: In Neon Snake, the board wraps around. Use the edges to your advantage to trap high-value powerups!";
     }
-
     if (input.includes("code") || input.includes("js") || input.includes("javascript")) {
         return "💻 [Arcade Protocol]: I'm currently in lightweight offline mode. Connect my logic core (LM Studio or Ollama) to generate full code architectures!";
     }
-
     return "🎮 I'm operating in lightweight mode. Connect a local inference server (LM Studio/Ollama) to unlock my full tactical intelligence!";
 }

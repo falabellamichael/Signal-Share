@@ -106,10 +106,13 @@ app.use((req, res, next) => {
     return res.status(200).end();
   }
 
-  // Content-Type Enforcement for POST
-  if (req.method === "POST" && !req.is("application/json") && req.path.startsWith("/api/")) {
-    // If it's a browser fetch, it might not have the header set correctly if it's empty
-    // But we expect JSON.
+  // Security Check: Enforce Bridge Secret if configured
+  const incomingSecret = req.headers["x-bridge-secret"] || req.headers["X-Bridge-Secret"];
+  const isSensitive = req.path.startsWith('/api/system/') || req.path.startsWith('/api/system-media/action');
+  
+  if (BRIDGE_SECRET && isSensitive && incomingSecret !== BRIDGE_SECRET) {
+    console.warn(`[Bridge] Blocked unauthorized access attempt from ${req.ip} to ${req.path}`);
+    return res.status(401).json({ error: "Unauthorized: Invalid or missing X-Bridge-Secret." });
   }
 
   next();
@@ -221,6 +224,64 @@ app.get('/api/system/screenshot', async (req, res) => {
         res.status(500).json({ error: "Screenshot failed: empty output" });
       }
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// File System Management Endpoints (Advanced Coding Abilities)
+app.get('/api/system/files/list', async (req, res) => {
+  const targetPath = req.query.path || '.';
+  const fullPath = path.resolve(projectRoot, targetPath);
+  
+  if (!fullPath.startsWith(projectRoot)) {
+    return res.status(403).json({ error: "Access denied: Path outside project root." });
+  }
+
+  try {
+    const files = await fs.readdir(fullPath, { withFileTypes: true });
+    const result = files.map(f => ({
+      name: f.name,
+      isDirectory: f.isDirectory(),
+      extension: path.extname(f.name)
+    }));
+    res.json({ path: targetPath, files: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/system/files/read', async (req, res) => {
+  const targetPath = req.query.path;
+  if (!targetPath) return res.status(400).json({ error: "Missing path parameter" });
+  
+  const fullPath = path.resolve(projectRoot, targetPath);
+  if (!fullPath.startsWith(projectRoot)) {
+    return res.status(403).json({ error: "Access denied: Path outside project root." });
+  }
+
+  try {
+    const content = await fs.readFile(fullPath, 'utf8');
+    res.json({ path: targetPath, content });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/system/files/write', async (req, res) => {
+  const { path: targetPath, content } = req.body;
+  if (!targetPath || content === undefined) return res.status(400).json({ error: "Missing path or content" });
+
+  const fullPath = path.resolve(projectRoot, targetPath);
+  if (!fullPath.startsWith(projectRoot)) {
+    return res.status(403).json({ error: "Access denied: Path outside project root." });
+  }
+
+  try {
+    // Create directory if it doesn't exist
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, content, 'utf8');
+    res.json({ ok: true, message: `Successfully wrote ${targetPath}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1186,8 +1247,8 @@ function subscribeToMediaActions() {
   }).subscribe();
 }
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`[Bridge] Server listening on all interfaces at port ${port}`);
+app.listen(port, "127.0.0.1", () => {
+  console.log(`[Bridge] Server secured. Listening ONLY on localhost (127.0.0.1) at port ${port}`);
   if (isWindows && enableRemoteMediaSync && userId) {
     console.log(`[Bridge] Remote media sync enabled for ${userId}.`);
     setInterval(syncToSupabase, SUPABASE_SYNC_INTERVAL_MS);

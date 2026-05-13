@@ -41,7 +41,10 @@
         PATCH_SUGGESTION: "[PATCH_SUGGESTION]...[/PATCH_SUGGESTION]",
         SCREENSHOT: "[SCREENSHOT]",
         LIST_TABS: "[LIST_TABS]",
-        LIST_APPS: "[LIST_APPS]"
+        LIST_APPS: "[LIST_APPS]",
+        LIST_FILES: "[LIST_FILES: path]",
+        READ_FILE: "[READ_FILE: path]",
+        WRITE_FILE: "[WRITE_FILE: { \"path\": \"...\", \"content\": \"...\" }]"
     });
     const ARCADE_ACTION_PLAYBOOK = Object.freeze({
         games: [
