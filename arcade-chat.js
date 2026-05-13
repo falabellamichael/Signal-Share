@@ -840,6 +840,23 @@ window.toggleChat = function() {
     localStorage.setItem('arcade-chat-collapsed', isCollapsed);
 };
 
+function isChatOpen() {
+    const sidebar = document.querySelector('.steam-chat-sidebar');
+    if (!sidebar) return false;
+    return !sidebar.classList.contains('collapsed');
+}
+
+window.closeArcadeChat = function(options = {}) {
+    const { restoreFocus = true } = options;
+    if (!isChatOpen()) return false;
+    window.toggleChat();
+    if (restoreFocus) {
+        const toggleBtn = document.querySelector('.chat-toggle-btn');
+        if (toggleBtn instanceof HTMLElement) toggleBtn.focus();
+    }
+    return true;
+};
+
 
 function setupToggle() {
     // Create toggle button regardless of mode, CSS will handle visibility
@@ -860,6 +877,35 @@ function setupToggle() {
     }
 }
 
+function setupCloseParityHandlers() {
+    const isMiniGamesPage = window.location.pathname.toLowerCase().includes('mini-games');
+    if (!isMiniGamesPage) return;
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        if (!isChatOpen()) return;
+        window.closeArcadeChat({ restoreFocus: true });
+    });
+
+    document.addEventListener('pointerdown', (event) => {
+        if (!isChatOpen()) return;
+
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) return;
+
+        const sidebar = document.querySelector('.steam-chat-sidebar');
+        const toggleBtn = document.querySelector('.chat-toggle-btn');
+        if (!sidebar) return;
+        if (sidebar.contains(target)) return;
+        if (toggleBtn && toggleBtn.contains(target)) return;
+
+        const isOverlayMode = window.matchMedia('(max-width: 768px)').matches || document.documentElement.classList.contains('platform-android');
+        if (!isOverlayMode) return;
+
+        window.closeArcadeChat({ restoreFocus: false });
+    });
+}
+
 // Initialization - Runs after all functions are defined
 (function initChat() {
     cleanupOldChats();
@@ -871,11 +917,14 @@ function setupToggle() {
     }
     setupResizing();
     setupToggle();
+    setupCloseParityHandlers();
     startDesktopBridgePolling();
     updateChatStatus('idle');
     
     // Restore collapsed state
     const isSteamShell = document.querySelector('.steam-shell') || document.documentElement.classList.contains('is-steam-shell');
+    const isMiniGamesPage = window.location.pathname.toLowerCase().includes('mini-games');
+    const isAndroidPlatform = document.documentElement.classList.contains('platform-android');
     let wasCollapsed = localStorage.getItem('arcade-chat-collapsed');
     
     // Default to collapsed (tab mode) on the games page if no preference exists
@@ -883,6 +932,11 @@ function setupToggle() {
         wasCollapsed = 'true';
     } else {
         wasCollapsed = wasCollapsed === 'true';
+    }
+
+    // Keep Android mini-games in tab-open mode by default so content always fits.
+    if (isMiniGamesPage && isAndroidPlatform) {
+        wasCollapsed = true;
     }
 
     if (wasCollapsed) {

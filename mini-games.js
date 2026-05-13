@@ -14,6 +14,7 @@ const GAMES = [
 let currentCategory = 'all';
 let currentUser = JSON.parse(localStorage.getItem('ss-user') || 'null');
 let isNavigatingHistory = false;
+const isAndroidPlatform = /Android/i.test(navigator.userAgent) || (window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android');
 
 function vibrate(ms) {
     if (navigator.vibrate) navigator.vibrate(ms);
@@ -24,6 +25,37 @@ let uploadedFiles = [];
 
 // Detection
 const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+
+function syncCurrentCategoryGlobal() {
+    window.currentCategory = currentCategory;
+}
+
+function resetShellScrollPosition(behavior = 'auto') {
+    const content = document.querySelector('.steam-content');
+    if (content) {
+        content.scrollTo({ top: 0, left: 0, behavior });
+    } else {
+        window.scrollTo({ top: 0, left: 0, behavior });
+    }
+}
+
+function updateAndroidMiniViewportHeight() {
+    if (!isAndroidPlatform) return;
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    if (!viewportHeight) return;
+    document.documentElement.style.setProperty('--mini-vh', `${Math.round(viewportHeight)}px`);
+}
+
+function initAndroidMiniShell() {
+    if (!isAndroidPlatform) return;
+    updateAndroidMiniViewportHeight();
+    window.addEventListener('resize', updateAndroidMiniViewportHeight, { passive: true });
+    window.addEventListener('orientationchange', updateAndroidMiniViewportHeight, { passive: true });
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateAndroidMiniViewportHeight, { passive: true });
+        window.visualViewport.addEventListener('scroll', updateAndroidMiniViewportHeight, { passive: true });
+    }
+}
 
 // Supabase Auth Integration
 let supabase = null;
@@ -56,6 +88,9 @@ if (window.supabase) {
  * Initialize the Library and Workshop state.
  */
 async function init() {
+    initAndroidMiniShell();
+    syncCurrentCategoryGlobal();
+
     // Initial sync if supabase already has a session
     if (supabase) {
         const { data: { session } } = await supabase.auth.getSession();
@@ -431,6 +466,7 @@ function updateAuthUI() {
 function setCategory(cat, skipPush = false) {
     vibrate(5);
     currentCategory = cat;
+    syncCurrentCategoryGlobal();
 
 
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -501,6 +537,7 @@ function setCategory(cat, skipPush = false) {
         history.pushState({ type: 'category', cat: cat }, '');
     }
 
+    resetShellScrollPosition();
     renderLibrary();
 }
 
@@ -790,7 +827,7 @@ function showGameDetails(game, skipPush = false) {
     if (pinball) pinball.style.display = (game === 'pinball') ? 'block' : 'none';
     if (calc) calc.style.display = (game === 'calc') ? 'block' : 'none';
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    resetShellScrollPosition('smooth');
 
     if (!skipPush && !isNavigatingHistory) {
         history.pushState({ type: 'detail', game: game }, '');
@@ -806,6 +843,7 @@ function showLibrary() {
         setTimeout(() => {
             detail.style.display = 'none';
             if (library) library.style.display = 'block';
+            resetShellScrollPosition();
             renderLibrary();
         }, 300);
     }
