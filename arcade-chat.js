@@ -13,6 +13,42 @@ if (!localStorage.getItem('signal-share-bridge-url')) {
     }
 }
 
+function parseBridgeBoolean(value) {
+    const normalized = `${value ?? ''}`.trim().toLowerCase();
+    if (!normalized) return null;
+    if (['1', 'true', 'yes', 'on', 'enabled'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off', 'disabled'].includes(normalized)) return false;
+    return null;
+}
+
+function isLoopbackSiteOrigin() {
+    const protocol = `${window.location?.protocol || ''}`.toLowerCase();
+    const host = `${window.location?.hostname || ''}`.trim().toLowerCase();
+    if (protocol === 'file:') return true;
+    return !host || host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]' || host.endsWith('.localhost');
+}
+
+function isBridgeFeatureEnabled() {
+    const explicitFlag = parseBridgeBoolean(
+        localStorage.getItem('ss_bridge_enabled')
+        ?? localStorage.getItem('signal-share-bridge-enabled')
+    );
+    if (explicitFlag !== null) return explicitFlag;
+
+    const customBridgeUrl = `${localStorage.getItem('signal-share-bridge-url') || ''}`.trim();
+    if (customBridgeUrl) return true;
+
+    const bridgeSecret = `${localStorage.getItem('signal-share-bridge-secret') || ''}`.trim()
+        || `${localStorage.getItem('ss_bridge_secret') || ''}`.trim();
+    if (bridgeSecret) return true;
+
+    if (window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() !== 'web') {
+        return false;
+    }
+
+    return isLoopbackSiteOrigin();
+}
+
 function getBridgeTargetAddressSpace(baseUrl = "") {
     try {
         const parsed = new URL(baseUrl, window.location.href);
@@ -33,10 +69,18 @@ function getBridgeTargetAddressSpace(baseUrl = "") {
 }
 
 function getBridgeSecret() {
-    return localStorage.getItem("signal-share-bridge-secret") || "";
+    return localStorage.getItem("signal-share-bridge-secret")
+        || localStorage.getItem("ss_bridge_secret")
+        || "";
 }
 
 async function bridgeFetch(path, options = {}) {
+    if (!isBridgeFeatureEnabled()) {
+        const error = new Error("Bridge requests disabled");
+        error.name = "BridgeDisabledError";
+        throw error;
+    }
+
     const method = options.method || "GET";
     const headers = {
         ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
@@ -89,6 +133,11 @@ let bridgeEnabled = false;
  * Starts background polling for the desktop bridge state.
  */
 function startDesktopBridgePolling() {
+    if (!isBridgeFeatureEnabled()) {
+        bridgeEnabled = false;
+        updateEngineStatus(false);
+        return;
+    }
     // Background polling removed to avoid duplicate intervals and reduce lag.
     // The bridge will be polled on-demand when chat is opened or a message is sent.
     bridgeEnabled = true;
@@ -823,8 +872,13 @@ window.sendChatMessage = async function() {
                 lastError = `Bridge returned ${response.status}`;
             }
         } catch (err) {
-            lastError = err.message || "Connection refused or blocked by browser";
-            console.warn(`[Arcade Chat] Bridge request failed:`, err);
+            const bridgeDisabled = err?.name === 'BridgeDisabledError';
+            lastError = bridgeDisabled
+                ? 'Bridge disabled'
+                : (err?.message || "Connection refused or blocked by browser");
+            if (!bridgeDisabled) {
+                console.warn(`[Arcade Chat] Bridge request failed:`, err);
+            }
         } finally {
             removeTypingIndicator(typingId);
         }
@@ -838,7 +892,9 @@ window.sendChatMessage = async function() {
             // Execute any tags in the reply
             executeArcadeChatActions(reply);
         } else {
-            console.warn(`[Arcade Chat] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
+            if (lastError !== 'Bridge disabled') {
+                console.warn(`[Arcade Chat] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
+            }
             const offlineReply = getArcadeProtocolOfflineResponse(text);
             addChatMessage('ai', offlineReply);
             
@@ -1274,4 +1330,3 @@ function getArcadeProtocolOfflineResponse(message) {
 
     return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
-

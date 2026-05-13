@@ -68,7 +68,62 @@ let currentCategory = 'all';
 let currentUser = normalizeUserRecord(safeParseJson(localStorage.getItem('ss-user'), null));
 let isNavigatingHistory = false;
 const isAndroidPlatform = /Android/i.test(navigator.userAgent) || (window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android');
+function parseBridgeBoolean(value) {
+    const normalized = `${value ?? ''}`.trim().toLowerCase();
+    if (!normalized) return null;
+    if (['1', 'true', 'yes', 'on', 'enabled'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off', 'disabled'].includes(normalized)) return false;
+    return null;
+}
+
+function isLoopbackSiteOrigin() {
+    const protocol = `${window.location?.protocol || ''}`.toLowerCase();
+    const host = `${window.location?.hostname || ''}`.trim().toLowerCase();
+    if (protocol === 'file:') return true;
+    return !host || host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]' || host.endsWith('.localhost');
+}
+
+function isPrivateSiteOrigin() {
+    const host = `${window.location?.hostname || ''}`.trim().toLowerCase();
+    if (!host || host === 'localhost' || host.endsWith('.localhost')) return false;
+    if (host === '::1' || host === '[::1]') return false;
+    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) {
+        const octets = host.split('.').map((value) => Number.parseInt(value, 10));
+        if (octets.some((value) => Number.isNaN(value) || value < 0 || value > 255)) return false;
+        const [a, b] = octets;
+        if (a === 10) return true;
+        if (a === 172 && b >= 16 && b <= 31) return true;
+        if (a === 192 && b === 168) return true;
+        if (a === 169 && b === 254) return true;
+    }
+    return host.endsWith('.local');
+}
+
+function isBridgeFeatureEnabled() {
+    const explicitFlag = parseBridgeBoolean(
+        localStorage.getItem('ss_bridge_enabled')
+        ?? localStorage.getItem('signal-share-bridge-enabled')
+    );
+    if (explicitFlag !== null) return explicitFlag;
+
+    const customBridgeUrl = `${localStorage.getItem('signal-share-bridge-url') || ''}`.trim();
+    if (customBridgeUrl) return true;
+
+    const bridgeSecret = `${localStorage.getItem('ss_bridge_secret') || ''}`.trim()
+        || `${localStorage.getItem('signal-share-bridge-secret') || ''}`.trim();
+    if (bridgeSecret) return true;
+
+    return false;
+}
+
+function shouldAttemptBridgeRequests() {
+    if (isNative) return isBridgeFeatureEnabled();
+    if (isLoopbackSiteOrigin() || isPrivateSiteOrigin()) return true;
+    return isBridgeFeatureEnabled();
+}
+
 function getLocalNetworkPermissionProbeUrls() {
+    if (!shouldAttemptBridgeRequests()) return [];
     const urls = [
         'http://localhost:3000/api/llm/chat',
         'http://127.0.0.1:3000/api/llm/chat'
@@ -163,7 +218,9 @@ function requestMiniGamesPermissions({ fromUserGesture = false } = {}) {
     if (fromUserGesture && 'Notification' in window && window.isSecureContext && Notification.permission === 'default') {
         void Notification.requestPermission().catch(() => { });
     }
-    void probeLocalNetworkPermission().catch(() => { });
+    if (shouldAttemptBridgeRequests()) {
+        void probeLocalNetworkPermission().catch(() => { });
+    }
 }
 
 function bindPermissionPromptHandlers() {

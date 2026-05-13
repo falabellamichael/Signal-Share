@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=1.3";
 import { createPreviewCard, createActivePlayerStage, createActivePlayerDescriptor, resolveAppPreviewArtwork, resolveYouTubePreviewId } from "./hero-media-player-preview.js";
 import { EMOJI_PACK, EMOJI_CATEGORIES } from "./emojis.js";
 
@@ -473,7 +473,13 @@ export function createAppUi(context) {
     if (elements.bridgeSecretInput) {
       elements.bridgeSecretInput.value = localStorage.getItem("ss_bridge_secret") || "";
       elements.bridgeSecretInput.addEventListener("input", (event) => {
-        localStorage.setItem("ss_bridge_secret", event.target.value.trim());
+        const secret = event.target.value.trim();
+        localStorage.setItem("ss_bridge_secret", secret);
+        if (secret) {
+          localStorage.setItem("ss_bridge_enabled", "1");
+        } else {
+          localStorage.removeItem("ss_bridge_enabled");
+        }
       });
     }
 

@@ -1,5 +1,5 @@
 import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js';
-import { createAppUi } from './app-v3-ui.js';
+import { createAppUi } from './app-v3-ui.js?v=1.1';
 import {
   getMessageAttachmentKind, isPlayablePost, formatTimestamp, 
   formatFileSize, formatKind, formatProviderName,
@@ -273,6 +273,7 @@ let permissionBootstrapBound = false;
 let localNetworkPermissionProbePromise = null;
 const externalPreviewCache = new Map();
 function getLocalNetworkPermissionProbeUrls() {
+  if (!shouldAttemptBridgeRequests()) return [];
   const urls = [
     "http://localhost:3000/api/llm/chat",
     "http://127.0.0.1:3000/api/llm/chat",
@@ -402,6 +403,66 @@ function isNativeCapacitorApp() {
   return false;
 }
 
+function parseBridgeBoolean(value) {
+  const normalized = `${value ?? ""}`.trim().toLowerCase();
+  if (!normalized) return null;
+  if (["1", "true", "yes", "on", "enabled"].includes(normalized)) return true;
+  if (["0", "false", "no", "off", "disabled"].includes(normalized)) return false;
+  return null;
+}
+
+function isLoopbackSiteOrigin() {
+  const protocol = `${window.location?.protocol || ""}`.toLowerCase();
+  const host = `${window.location?.hostname || ""}`.trim().toLowerCase();
+  if (protocol === "file:") return true;
+  return !host || host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]" || host.endsWith(".localhost");
+}
+
+function isPrivateSiteOrigin() {
+  const host = `${window.location?.hostname || ""}`.trim().toLowerCase();
+  if (!host || host === "localhost" || host.endsWith(".localhost")) return false;
+  if (host === "::1" || host === "[::1]") return false;
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) {
+    const octets = host.split(".").map((value) => Number.parseInt(value, 10));
+    if (octets.some((value) => Number.isNaN(value) || value < 0 || value > 255)) return false;
+    const [a, b] = octets;
+    if (a === 10) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+  }
+  return host.endsWith(".local");
+}
+
+function isBridgeFeatureEnabled() {
+  const explicitFlag = parseBridgeBoolean(
+    localStorage.getItem("ss_bridge_enabled")
+    ?? localStorage.getItem("signal-share-bridge-enabled")
+  );
+  if (explicitFlag !== null) return explicitFlag;
+
+  const customBridgeUrl = `${localStorage.getItem("signal-share-bridge-url") || ""}`.trim();
+  if (customBridgeUrl) return true;
+
+  const bridgeSecret = `${localStorage.getItem("ss_bridge_secret") || ""}`.trim()
+    || `${localStorage.getItem("signal-share-bridge-secret") || ""}`.trim();
+  if (bridgeSecret) return true;
+
+  const configuredSystemEndpoint = typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT === "string"
+    && window.SIGNAL_SHARE_SYSTEM_MEDIA_ENDPOINT.trim();
+  const configuredSystemBaseUrl = typeof window.SIGNAL_SHARE_SYSTEM_MEDIA_BASE_URL === "string"
+    && window.SIGNAL_SHARE_SYSTEM_MEDIA_BASE_URL.trim();
+  if (configuredSystemEndpoint || configuredSystemBaseUrl) return true;
+
+  return false;
+}
+
+function shouldAttemptBridgeRequests() {
+  if (isNativeCapacitorApp()) return isBridgeFeatureEnabled();
+  if (isLoopbackSiteOrigin() || isPrivateSiteOrigin()) return true;
+  return isBridgeFeatureEnabled();
+}
+
 function registerSiteServiceWorker() {
   if (!("serviceWorker" in navigator) || !window.isSecureContext || isNativeCapacitorApp()) {
     return;
@@ -524,7 +585,9 @@ function requestSiteAndAppPermissions({ fromUserGesture = false } = {}) {
     void Notification.requestPermission().catch(() => { });
   }
 
-  void probeLocalNetworkPermission().catch(() => { });
+  if (shouldAttemptBridgeRequests()) {
+    void probeLocalNetworkPermission().catch(() => { });
+  }
 }
 
 function bindPermissionBootstrapHandlers() {
@@ -1977,16 +2040,37 @@ async function handleMessageSubmit(event) {
 }
 
 async function callLocalAI(text, history = [], pageContext = "", attachment = null) {
-  // Prioritize direct local bridge access
-  const candidates = [
-    'http://localhost:3000/api/llm/chat',
-    'http://127.0.0.1:3000/api/llm/chat',
-    window.location.origin + '/api/llm/chat',
-    '/api/llm/chat'
-  ];
-  const isSecureHostedPage = window.location.protocol === "https:";
-  if (!isSecureHostedPage || isNativeCapacitorApp()) {
-    candidates.push('http://10.0.2.2:3000/api/llm/chat');
+  const bridgeRequestsEnabled = shouldAttemptBridgeRequests();
+  const isLocalOrigin = isLoopbackSiteOrigin() || isPrivateSiteOrigin();
+  const configuredLlmEndpoint = typeof window.SIGNAL_SHARE_LLM_ENDPOINT === "string"
+    ? window.SIGNAL_SHARE_LLM_ENDPOINT.trim()
+    : "";
+  const candidates = [];
+
+  if (configuredLlmEndpoint) {
+    candidates.push(configuredLlmEndpoint);
+  }
+
+  if (bridgeRequestsEnabled) {
+    candidates.push(
+      "http://localhost:3000/api/llm/chat",
+      "http://127.0.0.1:3000/api/llm/chat"
+    );
+    const isSecureHostedPage = window.location.protocol === "https:";
+    if (!isSecureHostedPage || isNativeCapacitorApp()) {
+      candidates.push("http://10.0.2.2:3000/api/llm/chat");
+    }
+  }
+
+  if (bridgeRequestsEnabled || isLocalOrigin || configuredLlmEndpoint) {
+    candidates.push(
+      window.location.origin + "/api/llm/chat",
+      "/api/llm/chat"
+    );
+  }
+
+  if (candidates.length === 0) {
+    return getGlobalProtocolOfflineResponse(text);
   }
 
   let abortController = null;
@@ -2036,7 +2120,7 @@ async function callLocalAI(text, history = [], pageContext = "", attachment = nu
         return data.reply || "I'm having trouble thinking right now.";
       }
     } catch (err) {
-      console.warn(`[AI Messenger] Endpoint failed ${url}:`, err);
+      console.debug(`[AI Messenger] Endpoint failed ${url}:`, err);
     }
   }
 

@@ -780,6 +780,31 @@ The companion bridge is designed with several security layers to keep your PC sa
     return false;
   }
 
+  function parseBridgeBoolean(value) {
+    const normalized = `${value ?? ""}`.trim().toLowerCase();
+    if (!normalized) return null;
+    if (["1", "true", "yes", "on", "enabled"].includes(normalized)) return true;
+    if (["0", "false", "no", "off", "disabled"].includes(normalized)) return false;
+    return null;
+  }
+
+  function isDesktopBridgeFeatureEnabled() {
+    const explicitFlag = parseBridgeBoolean(
+      localStorage.getItem("ss_bridge_enabled")
+      ?? localStorage.getItem("signal-share-bridge-enabled")
+    );
+    if (explicitFlag !== null) return explicitFlag;
+
+    const customBridgeUrl = `${localStorage.getItem("signal-share-bridge-url") || ""}`.trim();
+    if (customBridgeUrl) return true;
+
+    const bridgeSecret = `${localStorage.getItem("ss_bridge_secret") || ""}`.trim()
+      || `${localStorage.getItem("signal-share-bridge-secret") || ""}`.trim();
+    if (bridgeSecret) return true;
+
+    return false;
+  }
+
   function canUseDesktopBridge() {
     if (hasNativeSnapshotBridge()) return false;
     if (typeof window.fetch !== "function") return false;
@@ -791,7 +816,27 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     const protocol = `${window.location.protocol || ""}`.toLowerCase();
     if (protocol === "file:") return true;
-    return protocol === "http:" || protocol === "https:";
+    if (protocol !== "http:" && protocol !== "https:") return false;
+
+    const host = `${window.location.hostname || ""}`.trim().toLowerCase();
+    const originAddressSpace = getTargetAddressSpaceForHostname(host);
+    const isLoopbackOrigin = !host
+      || host === "localhost"
+      || host.endsWith(".localhost")
+      || host === "127.0.0.1"
+      || host === "::1"
+      || host === "[::1]";
+    const isLocalOrigin = isLoopbackOrigin
+      || originAddressSpace === "private"
+      || originAddressSpace === "local"
+      || originAddressSpace === "loopback";
+
+    if (isNativeCapacitorApp && isNativeCapacitorApp()) {
+      return isDesktopBridgeFeatureEnabled();
+    }
+
+    if (isLocalOrigin) return true;
+    return isDesktopBridgeFeatureEnabled();
   }
 
   function pushDesktopEndpointCandidate(candidates, candidate, seen) {
