@@ -297,12 +297,12 @@ body:not(.chat-collapsed) .messenger-section {
    so we only focus on the messenger launcher for now. */
 
 .chat-header {
-    padding: 10px 15px;
+    padding: 12px 16px;
     background: var(--arc-header-bg);
     border-bottom: 1px solid var(--arc-line);
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    align-items: flex-start;
+    justify-content: flex-start;
     gap: 8px;
     flex-wrap: wrap;
 }
@@ -310,10 +310,6 @@ body:not(.chat-collapsed) .messenger-section {
 .chat-header > div:first-child {
     min-width: 120px;
     flex: 1 1 auto;
-}
-
-.chat-header > div:last-child {
-    flex: 0 0 auto;
 }
 
 #chat-model-select {
