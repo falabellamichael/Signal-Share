@@ -93,17 +93,17 @@ function collapseCompanionByDefaultOnAndroid() {
 }
 
 // Supabase Auth Integration
-let supabase = null;
+let supabaseClient = null;
 if (window.supabase) {
     try {
         const config = window.SIGNAL_SHARE_CONFIG || {
             supabaseUrl: "https://gswptxeikjmihdjxoiar.supabase.co",
             supabaseAnonKey: "sb_publishable_gIwGxzf1C4cD55l9XS16wg_Qn-LuYqT"
         };
-        supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+        supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
         
         // Listen for auth changes to stay in sync with the main page
-        supabase.auth.onAuthStateChange((event, session) => {
+        supabaseClient.auth.onAuthStateChange((event, session) => {
             console.log(`[Mini-Games] Auth event: ${event}`);
             if (session?.user) {
                 currentUser = {
@@ -120,7 +120,7 @@ if (window.supabase) {
         });
     } catch (error) {
         console.warn('[Mini-Games] Supabase initialization failed, running without live auth sync:', error);
-        supabase = null;
+        supabaseClient = null;
     }
 }
 
@@ -133,9 +133,9 @@ async function init() {
     syncCurrentCategoryGlobal();
 
     // Initial sync if supabase already has a session
-    if (supabase) {
+    if (supabaseClient) {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await supabaseClient.auth.getSession();
             if (session?.user) {
                 currentUser = {
                     id: session.user.id,
@@ -431,8 +431,8 @@ function deleteCustomGame(gameId) {
 async function toggleAuth() {
     if (currentUser) {
         if (confirm('Do you want to sign out?')) {
-            if (supabase) {
-                await supabase.auth.signOut();
+            if (supabaseClient) {
+                await supabaseClient.auth.signOut();
             } else {
                 currentUser = null;
                 localStorage.removeItem('ss-user');
@@ -462,11 +462,11 @@ async function performLogin() {
         return;
     }
 
-    if (supabase) {
+    if (supabaseClient) {
         try {
             // Support both email and potential username-to-email mapping if desired
             // For now, we assume email as per app-v3 standard
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
             if (error) throw error;
             
             hideAuth();
