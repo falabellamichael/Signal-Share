@@ -21,7 +21,17 @@ function vibrate(ms) {
 
 const W = 400;
 const H = 700;
-const DPR_LIMIT = 2.5;
+
+// Signal Share Android Optimization Suite - Engine Hardening
+const isAndroid = /Android/i.test(navigator.userAgent) || (!!window.Capacitor && window.Capacitor.getPlatform() !== 'web');
+const PERF = {
+    isAndroid,
+    dprLimit: isAndroid ? 1.5 : 2.5,
+    substeps: isAndroid ? 8 : 14,
+    shadows: !isAndroid, // Shadows are extremely expensive on mobile GPUs
+    particleLimit: isAndroid ? 25 : 80
+};
+const DPR_LIMIT = PERF.dprLimit;
 
 const ui = {
     score: document.getElementById('score'),
@@ -58,7 +68,7 @@ const CFG = {
     flipperSnap: 0.48, // Snappier flippers for the heavier ball
     tableTilt: 0.018, // Slightly more pronounced tilt
     collisionSlop: 0.04,
-    substepsMin: 14, // Increased substeps for better stability at higher gravity
+    substepsMin: PERF.substeps, // Throttled for Android performance
     slingshotForce: 13.5,
     wallFriction: 0.08,
     flipperFriction: 0.25,
@@ -425,6 +435,7 @@ function nudge(direction = 0) {
 
 function explode(x, y, color, count = 20) {
     for (let i = 0; i < count; i += 1) {
+        if (particles.length > PERF.particleLimit) return;
         const a = Math.random() * Math.PI * 2;
         const speed = 2.0 + Math.random() * 6.0;
         particles.push({
@@ -986,7 +997,9 @@ function draw() {
     drawPlungerMeter();
 
     ctx.restore();
-    drawParticles(shakeX, shakeY);
+    if (!PERF.isAndroid || Math.random() > 0.5) {
+        drawParticles(shakeX, shakeY);
+    }
 }
 
 function checkTriRollover(t) {
@@ -1263,8 +1276,10 @@ function drawBumpers() {
         ctx.fillStyle = COLORS.bgLight;
         ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
 
+    if (PERF.shadows) {
+        ctx.shadowBlur = pulse * 20;
         ctx.shadowColor = b.color;
-        ctx.shadowBlur = 15 + pulse * 20;
+    }
         ctx.shadowOffsetY = 0;
         ctx.strokeStyle = b.color;
         ctx.lineWidth = 4 + pulse * 3;

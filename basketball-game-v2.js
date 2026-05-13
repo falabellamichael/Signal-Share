@@ -57,6 +57,15 @@ const SPIN_DRAG_PER_SECOND = 0.985;
 const FLOOR_BOUNCE = 0.52;
 const RIM_RESTITUTION = 0.68;
 const BACKBOARD_RESTITUTION = 0.62;
+const isAndroid = /Android/i.test(navigator.userAgent) || (!!window.Capacitor && window.Capacitor.getPlatform() !== 'web');
+const PERF = {
+    isAndroid,
+    dprLimit: isAndroid ? 1.5 : 2.5,
+    shadows: !isAndroid,
+    netThrottle: isAndroid ? 2 : 1, // Update net physics every N frames on mobile
+    particleLimit: isAndroid ? 25 : 80
+};
+let frameCount = 0;
 
 const hoop = {
     x: 0,
@@ -109,11 +118,12 @@ function getBallRadius() {
 function resize() {
     width = window.innerWidth;
     height = window.innerHeight;
-    canvas.width = Math.floor(width * window.devicePixelRatio);
-    canvas.height = Math.floor(height * window.devicePixelRatio);
+    const dpr = Math.min(PERF.dprLimit, window.devicePixelRatio || 1);
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
-    ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     hoop.baseX = width / 2;
     hoop.baseY = height * 0.285;
@@ -160,8 +170,10 @@ function showMessage(text, x, y, color = '#fff') {
     messages.push({ text, x, y, life: 1, color, vy: -66 });
 }
 
-function createParticles(x, y, color, amount = 24) {
-    for (let i = 0; i < amount; i++) {
+    const limit = PERF.particleLimit;
+    const finalAmount = Math.min(amount, limit - particles.length);
+    if (finalAmount <= 0) return;
+    for (let i = 0; i < finalAmount; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = 90 + Math.random() * 430;
         particles.push({
@@ -559,8 +571,9 @@ function updateHoop(dt) {
 }
 
 function update(dt) {
+    frameCount++;
     if (!isPlaying) {
-        updateNet(dt);
+        if (frameCount % PERF.netThrottle === 0) updateNet(dt * PERF.netThrottle);
         updateParticles(dt);
         updateMessages(dt);
         return;
@@ -569,7 +582,7 @@ function update(dt) {
     updateIdle(dt);
     updateHoop(dt);
     updateBall(dt);
-    updateNet(dt);
+    if (frameCount % PERF.netThrottle === 0) updateNet(dt * PERF.netThrottle);
     updateParticles(dt);
     updateMessages(dt);
 }
@@ -649,8 +662,10 @@ function drawBackboard() {
     ctx.fillStyle = 'rgba(255,255,255,0.055)';
     ctx.strokeStyle = '#00d2ff';
     ctx.lineWidth = 3;
-    ctx.shadowColor = '#00d2ff';
-    ctx.shadowBlur = 12;
+    if (PERF.shadows) {
+        ctx.shadowColor = '#00d2ff';
+        ctx.shadowBlur = 12;
+    }
     ctx.fillRect(x, y, hoop.boardWidth, hoop.boardHeight);
     ctx.strokeRect(x, y, hoop.boardWidth, hoop.boardHeight);
 
@@ -672,8 +687,10 @@ function drawHoopRimBack() {
     ctx.strokeStyle = 'rgba(255, 62, 62, 0.55)';
     ctx.lineWidth = 7;
     ctx.lineCap = 'round';
-    ctx.shadowColor = '#ff3e3e';
-    ctx.shadowBlur = 10;
+    if (PERF.shadows) {
+        ctx.shadowColor = '#ff3e3e';
+        ctx.shadowBlur = 10;
+    }
     ctx.beginPath();
     ctx.ellipse(hoop.x, hoop.y, hoop.radius, hoop.radius * 0.41, 0, Math.PI, Math.PI * 2);
     ctx.stroke();
@@ -685,8 +702,10 @@ function drawHoopRimFront() {
     ctx.strokeStyle = '#ff3e3e';
     ctx.lineWidth = 7;
     ctx.lineCap = 'round';
-    ctx.shadowColor = '#ff3e3e';
-    ctx.shadowBlur = 16;
+    if (PERF.shadows) {
+        ctx.shadowColor = '#ff3e3e';
+        ctx.shadowBlur = 16;
+    }
     ctx.beginPath();
     ctx.ellipse(hoop.x, hoop.y, hoop.radius, hoop.radius * 0.41, 0, 0, Math.PI);
     ctx.stroke();
@@ -755,9 +774,10 @@ function drawBall() {
     ctx.save();
     ctx.translate(ball.x, ball.y);
     ctx.rotate(ball.rotation);
-
-    ctx.shadowColor = ball.isOnFire ? '#ff4400' : '#ff7700';
-    ctx.shadowBlur = ball.isOnFire ? 42 : 22;
+    if (PERF.shadows) {
+        ctx.shadowColor = ball.isOnFire ? '#ff4400' : '#ff7700';
+        ctx.shadowBlur = ball.isOnFire ? 42 : 22;
+    }
     const grad = ctx.createRadialGradient(-radius * 0.35, -radius * 0.42, radius * 0.08, 0, 0, radius);
     if (ball.isOnFire) {
         grad.addColorStop(0, '#fff2a0');
