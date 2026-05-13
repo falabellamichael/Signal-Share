@@ -709,6 +709,8 @@ function setupResizing() {
     }, { passive: true });
 
     function handleResize(clientX) {
+        if (!clientX || clientX <= 0) return;
+
         const isFixed = window.getComputedStyle(sidebar).position === 'fixed';
         let newWidth;
         
@@ -719,14 +721,24 @@ function setupResizing() {
             newWidth = shellRect.right - clientX;
         }
 
-        if (newWidth > initialMax) newWidth = initialMax;
-        if (newWidth < 280) newWidth = 280;
+        // Clamp width between 280px and 60% of screen
+        const minWidth = 280;
+        const maxWidth = window.innerWidth * 0.6;
+        newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
         
-        if (!isFixed && shell.classList.contains('steam-shell')) {
-            // In integrated mode, we resize the TILES section (column 2) 
-            // and the chat (column 4) fills the rest.
-            const tilesWidth = clientX - 240; // 240 is the fixed left sidebar
-            const clampedTilesWidth = Math.max(300, Math.min(tilesWidth, window.innerWidth - 600));
+        if (!isFixed && shell && shell.classList.contains('steam-shell')) {
+            // In integrated mode, we resize the center section (column 2)
+            // The handle sits between column 2 and column 4 (with a 6px divider)
+            const shellRect = shell.getBoundingClientRect();
+            const absoluteHandlePos = clientX - shellRect.left;
+            
+            // 240px is the fixed left sidebar width
+            const newTilesWidth = absoluteHandlePos - 240; 
+            
+            // Clamp the center content to ensure chat has at least minWidth
+            const maxTilesWidth = shellRect.width - 240 - 6 - minWidth;
+            const clampedTilesWidth = Math.max(300, Math.min(newTilesWidth, maxTilesWidth));
+            
             shell.style.gridTemplateColumns = `240px ${clampedTilesWidth}px 6px 1fr`;
         } else {
             sidebar.style.width = `${newWidth}px`;
