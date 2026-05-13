@@ -1425,6 +1425,13 @@ function mergeActiveMessage(message) {
   if (message.threadId !== state.activeThreadId) return; 
   const existingIdx = state.activeMessages.findIndex((item) => item.id === message.id);
   if (existingIdx >= 0) {
+    const existingMessage = state.activeMessages[existingIdx];
+    if (
+      isBlobUrl(existingMessage?.attachmentUrl) &&
+      existingMessage.attachmentUrl !== message.attachmentUrl
+    ) {
+      revokeBlobUrl(existingMessage.attachmentUrl);
+    }
     state.activeMessages[existingIdx] = { ...state.activeMessages[existingIdx], ...message };
   } else {
     state.activeMessages = [...state.activeMessages, message].sort((l, r) => new Date(l.createdAt).getTime() - new Date(r.createdAt).getTime()); 
@@ -1506,6 +1513,61 @@ async function loadDirectThreadsFromSupabase() { const userId = state.currentUse
 async function loadMessagesFromSupabase(threadId) { const { data, error } = await state.supabase.from("messages").select("*").eq("thread_id", threadId).order("created_at", { ascending: true }); if (error) throw error; return data.map(normalizeMessage); }
 async function loadThreadAttachmentPaths(threadId) { const { data, error } = await state.supabase.from("messages").select("attachment_file_path").eq("thread_id", threadId).not("attachment_file_path", "is", null); if (error) throw error; return data.map((row) => row.attachment_file_path).filter((path) => typeof path === "string" && path.trim()); }
 
+function getAiMessagesStorageKey() {
+  if (!state.currentUser?.id) return "";
+  return `ai-messages-${state.currentUser.id}`;
+}
+
+function sanitizeAiMessageForStorage(message) {
+  if (!message || typeof message !== "object") return null;
+  const next = { ...message };
+  if (next.isThinking) return null;
+  if (typeof next.attachmentUrl === "string" && /^blob:/i.test(next.attachmentUrl.trim())) {
+    next.attachmentUrl = "";
+  }
+  if (next.attachmentUrl === null) next.attachmentUrl = "";
+  if (!next.createdAt) next.createdAt = new Date().toISOString();
+  return next;
+}
+
+function sanitizeAiMessagesForStorage(messages) {
+  if (!Array.isArray(messages)) return [];
+  return messages
+    .map(sanitizeAiMessageForStorage)
+    .filter((entry) => entry && typeof entry === "object");
+}
+
+function isBlobUrl(value) {
+  return typeof value === "string" && /^blob:/i.test(value.trim());
+}
+
+function revokeBlobUrl(value) {
+  if (!isBlobUrl(value)) return;
+  try {
+    URL.revokeObjectURL(value);
+  } catch (_error) { }
+}
+
+function loadAiMessagesLocally() {
+  const storageKey = getAiMessagesStorageKey();
+  if (!storageKey) return [];
+  const raw = localStorage.getItem(storageKey);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    const sanitized = sanitizeAiMessagesForStorage(parsed);
+    const normalizedRaw = JSON.stringify(sanitized);
+    if (normalizedRaw !== raw) {
+      localStorage.setItem(storageKey, normalizedRaw);
+    }
+    return sanitized;
+  } catch (error) {
+    console.warn("AI local message cache was invalid and has been reset.", error);
+    localStorage.removeItem(storageKey);
+    return [];
+  }
+}
+
 async function refreshMessengerState(options = {}) {
   const { preserveActiveThread = true, force = false } = options;
   if (!isMessagingEnabled(state)) { clearMessengerState(); renderMessenger(); return; }
@@ -1520,10 +1582,10 @@ async function refreshMessengerState(options = {}) {
     state.profileRecord = ownProfile; state.blockingAvailable = blockingAvailable; state.banningAvailable = banningAvailable; state.blockedUserIds = blocks.map((b) => b.blockedId); state.bannedUserIds = bans.map((b) => b.bannedId); state.availableProfiles = profilesResult.value.filter((p) => p.id !== state.currentUser.id); 
     
     // Inject AI thread if it has history
-    const aiHistory = localStorage.getItem(`ai-messages-${state.currentUser.id}`);
+    const aiHistory = loadAiMessagesLocally();
     let threads = threadsResult.value.filter((t) => !isThreadBlocked(t));
-    if (aiHistory && JSON.parse(aiHistory).length > 0) {
-      const lastMsg = JSON.parse(aiHistory).slice(-1)[0];
+    if (aiHistory.length > 0) {
+      const lastMsg = aiHistory.slice(-1)[0];
       threads.push({
         id: "thread-ai-companion",
         userOneId: state.currentUser.id,
@@ -1539,8 +1601,7 @@ async function refreshMessengerState(options = {}) {
     if (!preserveActiveThread || !state.directThreads.some((t) => t.id === state.activeThreadId)) state.activeThreadId = state.directThreads[0]?.id ?? null;
     if (state.activeThreadId) {
       if (state.activeThreadId === "thread-ai-companion") {
-        const localAiMessages = localStorage.getItem(`ai-messages-${state.currentUser.id}`);
-        state.activeMessages = localAiMessages ? JSON.parse(localAiMessages) : [];
+        state.activeMessages = loadAiMessagesLocally();
       } else {
         state.activeMessages = await loadMessagesFromSupabase(state.activeThreadId);
       }
@@ -1679,8 +1740,7 @@ async function openExistingThread(threadId) {
   }
 
   if (threadId === "thread-ai-companion") {
-    const savedMessages = localStorage.getItem(`ai-messages-${state.currentUser.id}`);
-    state.activeMessages = savedMessages ? JSON.parse(savedMessages) : [];
+    state.activeMessages = loadAiMessagesLocally();
     clearMessageAttachmentSelection({ preserveFeedback: true });
     renderMessenger();
     return;
@@ -1713,7 +1773,8 @@ async function deleteConversation(threadId) {
     renderMessenger();
 
     if (threadId === "thread-ai-companion") {
-      localStorage.removeItem(`ai-messages-${state.currentUser.id}`);
+      const storageKey = getAiMessagesStorageKey();
+      if (storageKey) localStorage.removeItem(storageKey);
       state.pendingDeleteThreadId = "";
       if (deletedWasActive) {
         state.activeThreadId = null;
@@ -1779,8 +1840,7 @@ async function openOrCreateThread(partnerId) {
       state.activeThreadId = aiThread.id;
       
       // Load from localStorage for persistence
-      const savedMessages = localStorage.getItem(`ai-messages-${state.currentUser.id}`);
-      state.activeMessages = savedMessages ? JSON.parse(savedMessages) : [];
+      state.activeMessages = loadAiMessagesLocally();
       
       clearMessageAttachmentSelection({ preserveFeedback: true });
       showMessengerFeedback("");
@@ -1889,8 +1949,11 @@ async function handleMessageSubmit(event) {
         senderId: state.currentUser.id,
         body,
         createdAt: new Date().toISOString(),
-        attachmentUrl: state.messageAttachmentPreviewUrl || null,
+        attachmentUrl: null,
         attachmentKind: attachmentFile ? getMessageAttachmentKind(attachmentFile.type) : null,
+        attachmentName: attachmentFile ? attachmentFile.name : null,
+        attachmentType: attachmentFile ? attachmentFile.type : null,
+        attachmentSize: attachmentFile ? attachmentFile.size : 0,
       };
 
       const directSteamTarget = window.SignalShareAiCore?.parseDirectSteamCommand?.(body) || "";
@@ -1950,6 +2013,9 @@ async function handleMessageSubmit(event) {
             type: getMessageAttachmentKind(attachmentFile.type),
             name: attachmentFile.name
           };
+          if (aiAttachment?.data) {
+            userMessage.attachmentUrl = aiAttachment.data;
+          }
         } catch (err) {
           console.error("Failed to read AI attachment", err);
         }
@@ -2069,6 +2135,14 @@ async function handleMessageSubmit(event) {
 
   try {
     const messageId = crypto.randomUUID();
+    const optimisticAttachmentUrl = (() => {
+      if (!attachmentFile) return null;
+      try {
+        return URL.createObjectURL(attachmentFile);
+      } catch (_error) {
+        return state.messageAttachmentPreviewUrl || null;
+      }
+    })();
 
     const optimisticMessage = {
       id: messageId,
@@ -2080,7 +2154,7 @@ async function handleMessageSubmit(event) {
       attachmentName: attachmentFile ? attachmentFile.name : null,
       attachmentType: attachmentFile ? attachmentFile.type : null,
       attachmentSize: attachmentFile ? attachmentFile.size : 0,
-      attachmentUrl: state.messageAttachmentPreviewUrl || null,
+      attachmentUrl: optimisticAttachmentUrl,
     };
     mergeActiveMessage(optimisticMessage);
     renderMessenger();
@@ -2319,8 +2393,20 @@ function getGlobalProtocolOfflineResponse(text) {
 }
 
 function saveAiMessagesLocally() {
-  if (!state.currentUser?.id) return;
-  localStorage.setItem(`ai-messages-${state.currentUser.id}`, JSON.stringify(state.activeMessages));
+  const storageKey = getAiMessagesStorageKey();
+  if (!storageKey) return;
+  const sanitized = sanitizeAiMessagesForStorage(state.activeMessages);
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(sanitized));
+  } catch (error) {
+    console.warn("AI local message cache exceeded limits; retrying without attachment payloads.", error);
+    try {
+      const fallback = sanitized.map((message) => ({ ...message, attachmentUrl: "" }));
+      localStorage.setItem(storageKey, JSON.stringify(fallback));
+    } catch (finalError) {
+      console.warn("AI local message cache could not be saved.", finalError);
+    }
+  }
 }
 
 function formatMessageTimestamp(isoString) { return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(isoString)); }
