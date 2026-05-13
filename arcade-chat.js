@@ -776,13 +776,17 @@ window.sendChatMessage = async function() {
             const intentReply = window.ArcadeChatbotEngine.processIntent(text);
             if (intentReply) {
                 const typingId = addTypingIndicator();
-                setTimeout(() => {
-                    removeTypingIndicator(typingId);
-                    addChatMessage('ai', intentReply);
-                    arcadeChatHistory.push({ role: 'assistant', content: intentReply });
-                    saveCurrentChat();
-                    updateChatStatus('idle');
-                }, 600);
+                
+                // Handle both sync strings and async Promises from the engine
+                Promise.resolve(intentReply).then(resolvedReply => {
+                    setTimeout(() => {
+                        removeTypingIndicator(typingId);
+                        addChatMessage('ai', resolvedReply);
+                        arcadeChatHistory.push({ role: 'assistant', content: resolvedReply });
+                        saveCurrentChat();
+                        updateChatStatus('idle');
+                    }, 600);
+                });
                 
                 input.value = '';
                 clearChatAttachment();
