@@ -1,4 +1,4 @@
-﻿import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js";
+import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js";
 import {
   handleOpenMediaAction, handleOpenPhoneAction,
   handlePlayPauseAction, handleNextAction, handlePreviousAction,
@@ -2370,16 +2370,33 @@ The companion bridge is designed with several security layers to keep your PC sa
     setHeroControlSource: (source) => { syncHeroControlSourceChange(source); },
     refreshDesktopSnapshot,
     refreshNativeSnapshot,
-    openNowPlayingMediaApp: (packageName, uri) => {
+    openNowPlayingMediaApp: async (packageName, uri) => {
       if (hasNativeActionBridge()) {
-        try { getNativeBridge().openNowPlayingMediaApp(packageName, uri, true); return true; } catch { return false; }
+        try { 
+          const bridge = getNativeBridge();
+          if (bridge && typeof bridge.openNowPlayingMediaApp === "function") {
+            bridge.openNowPlayingMediaApp(packageName, uri, true); 
+            return true; 
+          }
+        } catch (e) {
+          console.error("[Hero] Native app open failed:", e);
+        }
       }
+
       if (canUseDesktopBridge()) {
-        return performDesktopAction("open_uri", { uri });
+        const success = await performDesktopAction("open_uri", { uri });
+        if (success) return true;
+        console.warn("[Hero] Desktop bridge app open failed, trying browser fallback...");
       }
+
+      // Browser fallback (works for spotify: and https: links)
       if (uri) {
-        window.open(uri, "_blank");
-        return true;
+        try {
+          window.open(uri, "_blank");
+          return true;
+        } catch (e) {
+          console.error("[Hero] Browser fallback failed:", e);
+        }
       }
       return false;
     },
