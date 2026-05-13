@@ -25,10 +25,50 @@ let uploadedFiles = [];
 // Detection
 const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
 
+// Supabase Auth Integration
+let supabase = null;
+if (window.supabase) {
+    const config = window.SIGNAL_SHARE_CONFIG || {
+        supabaseUrl: "https://gswptxeikjmihdjxoiar.supabase.co",
+        supabaseAnonKey: "sb_publishable_gIwGxzf1C4cD55l9XS16wg_Qn-LuYqT"
+    };
+    supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+    
+    // Listen for auth changes to stay in sync with the main page
+    supabase.auth.onAuthStateChange((event, session) => {
+        console.log(`[Mini-Games] Auth event: ${event}`);
+        if (session?.user) {
+            currentUser = {
+                id: session.user.id,
+                name: session.user.user_metadata?.display_name || session.user.email.split('@')[0],
+                email: session.user.email
+            };
+            localStorage.setItem('ss-user', JSON.stringify(currentUser));
+        } else {
+            currentUser = null;
+            localStorage.removeItem('ss-user');
+        }
+        updateAuthUI();
+    });
+}
+
 /**
  * Initialize the Library and Workshop state.
  */
-function init() {
+async function init() {
+    // Initial sync if supabase already has a session
+    if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+            currentUser = {
+                id: session.user.id,
+                name: session.user.user_metadata?.display_name || session.user.email.split('@')[0],
+                email: session.user.email
+            };
+            localStorage.setItem('ss-user', JSON.stringify(currentUser));
+        }
+    }
+
     loadCustomGames();
     setupFileUpload();
     updateAuthUI();
@@ -308,12 +348,16 @@ function deleteCustomGame(gameId) {
     renderPublishedGames();
 }
 
-function toggleAuth() {
+async function toggleAuth() {
     if (currentUser) {
         if (confirm('Do you want to sign out?')) {
-            currentUser = null;
-            localStorage.removeItem('ss-user');
-            updateAuthUI();
+            if (supabase) {
+                await supabase.auth.signOut();
+            } else {
+                currentUser = null;
+                localStorage.removeItem('ss-user');
+                updateAuthUI();
+            }
             setCategory('all');
         }
     } else {
@@ -329,12 +373,34 @@ function hideAuth() {
     document.getElementById('auth-overlay').style.display = 'none';
 }
 
-function performLogin() {
-    const user = document.getElementById('login-user').value || 'Developer';
-    currentUser = { name: user, id: 'ID-' + Math.floor(Math.random() * 1000) };
-    localStorage.setItem('ss-user', JSON.stringify(currentUser));
-    updateAuthUI();
-    hideAuth();
+async function performLogin() {
+    const email = document.getElementById('login-user').value;
+    const password = document.getElementById('login-pass').value;
+
+    if (!email || !password) {
+        alert("Please enter both email/username and password.");
+        return;
+    }
+
+    if (supabase) {
+        try {
+            // Support both email and potential username-to-email mapping if desired
+            // For now, we assume email as per app-v3 standard
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+            
+            hideAuth();
+        } catch (err) {
+            console.error('[Mini-Games] Auth Error:', err);
+            alert(`Authentication failed: ${err.message}`);
+        }
+    } else {
+        // Fallback for offline mode
+        currentUser = { name: email || 'Developer', id: 'ID-' + Math.floor(Math.random() * 1000) };
+        localStorage.setItem('ss-user', JSON.stringify(currentUser));
+        updateAuthUI();
+        hideAuth();
+    }
 
     if (currentCategory === 'store') setCategory('store');
 }
