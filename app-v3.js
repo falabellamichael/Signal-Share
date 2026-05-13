@@ -483,6 +483,23 @@ function resolvePreferredBridgeModel() {
   return lightweight || "";
 }
 
+function normalizeBridgeBaseUrl(value = "") {
+  const raw = `${value || ""}`.trim();
+  if (!raw) return "";
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+  try {
+    const parsed = new URL(withProtocol, window.location.href);
+    const normalized = `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, "");
+    return normalized
+      .replace(/\/api\/llm\/chat$/i, "")
+      .replace(/\/api\/llm\/models$/i, "")
+      .replace(/\/api\/system-media\/current$/i, "")
+      .replace(/\/api\/system-media\/action$/i, "");
+  } catch {
+    return "";
+  }
+}
+
 function shouldAttemptBridgeRequests() {
   if (isNativeCapacitorApp()) return isBridgeFeatureEnabled();
   if (isLoopbackSiteOrigin() || isPrivateSiteOrigin()) return true;
@@ -1895,8 +1912,10 @@ async function handleMessageSubmit(event) {
         .filter(m => !m.isThinking && m.id !== userMessage.id)
         .map(m => ({
           role: m.senderId === AI_COMPANION_ID ? "assistant" : "user",
-          content: m.body
-        }));
+          content: `${m.body || ""}`.trim().slice(0, 900)
+        }))
+        .filter((row) => row.content.length > 0)
+        .slice(-18);
 
       mergeActiveMessage(userMessage);
       saveAiMessagesLocally();
@@ -1934,7 +1953,7 @@ async function handleMessageSubmit(event) {
 
       // Call LLM
       const pageContext = document.title || 'Signal Share';
-      const pageText = document.body.innerText.substring(0, 1000);
+      const pageText = document.body.innerText.substring(0, 600);
       const fullContext = `${pageContext} (Visible text: ${pageText})`;
       if (!shouldAttemptBridgeRequests()) {
         // User explicitly requested an AI response. Enable bridge attempts for this browser profile.
@@ -2091,7 +2110,17 @@ async function callLocalAI(text, history = [], pageContext = "", attachment = nu
     candidates.push(trimmed);
   };
 
+  const configuredBridgeBase = normalizeBridgeBaseUrl(localStorage.getItem("signal-share-bridge-url") || "");
+  const lastWorkingBridgeBase = normalizeBridgeBaseUrl(localStorage.getItem("ss_bridge_last_working_base") || "");
+  const pushBridgeBaseCandidate = (baseUrl) => {
+    const normalizedBase = normalizeBridgeBaseUrl(baseUrl);
+    if (!normalizedBase) return;
+    pushCandidate(`${normalizedBase}/api/llm/chat`);
+  };
+
   pushCandidate(configuredLlmEndpoint);
+  pushBridgeBaseCandidate(lastWorkingBridgeBase);
+  pushBridgeBaseCandidate(configuredBridgeBase);
 
   if (bridgeRequestsEnabled || isLocalOrigin || configuredLlmEndpoint) {
     if (isLocalOrigin && protocol !== "file:") {
@@ -2152,7 +2181,7 @@ async function callLocalAI(text, history = [], pageContext = "", attachment = nu
       abortController = new AbortController();
       const timeoutId = setTimeout(() => {
         if (abortController) abortController.abort();
-      }, 45000);
+      }, 90000);
       
       const headers = { 
         "Content-Type": "application/json"
