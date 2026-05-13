@@ -1924,6 +1924,7 @@ async function handleMessageSubmit(event) {
     showMessengerFeedback,
     playIncomingMessageSound,
     shouldAttemptBridgeRequests,
+    probeLocalNetworkPermission,
     resolveBridgeBaseCandidates,
     getBridgeSecretValue,
     resolvePreferredBridgeModel,

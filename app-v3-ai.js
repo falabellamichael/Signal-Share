@@ -165,6 +165,7 @@ export async function handleAiThreadMessageSubmit({
   showMessengerFeedback,
   playIncomingMessageSound,
   shouldAttemptBridgeRequests,
+  probeLocalNetworkPermission,
   resolveBridgeBaseCandidates,
   getBridgeSecretValue,
   resolvePreferredBridgeModel,
@@ -310,10 +311,7 @@ export async function handleAiThreadMessageSubmit({
         })
       : "";
     const fullContext = `${pageContext} (Visible text: ${pageText})${sharedAiContext ? `\n\n${sharedAiContext}` : ""}`;
-
-    if (!shouldAttemptBridgeRequests()) {
-      localStorage.setItem("ss_bridge_enabled", "1");
-    }
+    await activateBridgeForPrompt({ shouldAttemptBridgeRequests, probeLocalNetworkPermission });
 
     let aiResponse;
     try {
@@ -323,6 +321,7 @@ export async function handleAiThreadMessageSubmit({
         pageContext: fullContext,
         attachment: aiAttachment,
         shouldAttemptBridgeRequests,
+        probeLocalNetworkPermission,
         resolveBridgeBaseCandidates,
         getBridgeSecretValue,
         resolvePreferredBridgeModel,
@@ -373,14 +372,13 @@ async function callLocalAI({
   pageContext = "",
   attachment = null,
   shouldAttemptBridgeRequests,
+  probeLocalNetworkPermission,
   resolveBridgeBaseCandidates,
   getBridgeSecretValue,
   resolvePreferredBridgeModel,
   getBridgeTargetAddressSpace
 }) {
-  if (!shouldAttemptBridgeRequests()) {
-    localStorage.setItem("ss_bridge_enabled", "1");
-  }
+  await activateBridgeForPrompt({ shouldAttemptBridgeRequests, probeLocalNetworkPermission });
 
   const bridgeBaseCandidates = resolveBridgeBaseCandidates();
   if (bridgeBaseCandidates.length === 0) return getGlobalProtocolOfflineResponse(text);
@@ -490,6 +488,21 @@ async function callLocalAI({
 
   console.log("[AI Messenger] All endpoints failed. Switching to Global Protocol Offline mode.");
   return getGlobalProtocolOfflineResponse(text);
+}
+
+async function activateBridgeForPrompt({ shouldAttemptBridgeRequests, probeLocalNetworkPermission }) {
+  localStorage.setItem("ss_bridge_enabled", "1");
+  localStorage.setItem("signal-share-bridge-enabled", "1");
+
+  if (typeof shouldAttemptBridgeRequests === "function" && shouldAttemptBridgeRequests()) {
+    if (typeof probeLocalNetworkPermission === "function") {
+      try {
+        await probeLocalNetworkPermission();
+      } catch (_error) {
+        // Probe failures should not block the AI request path.
+      }
+    }
+  }
 }
 
 function getGlobalProtocolOfflineResponse(text) {
