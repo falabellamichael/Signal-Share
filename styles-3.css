@@ -1225,7 +1225,7 @@
       gap: 8px;
       max-height: 180px;
       overflow-y: auto;
-      padding-right: 4px;
+      padding: 4px 4px 0 0;
       scrollbar-width: thin;
     }
 
@@ -1859,7 +1859,7 @@
         gap: 8px;
         max-height: 180px;
         overflow-y: auto;
-        padding-right: 4px;
+        padding: 4px 4px 0 0;
         scrollbar-width: thin;
       }
 

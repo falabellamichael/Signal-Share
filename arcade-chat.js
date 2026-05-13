@@ -890,28 +890,6 @@ function addChatMessage(role, content) {
         }
     }
 
-    // Process [ARCADE: action] tags
-    const arcadeMatch = content.match(/\[ARCADE:\s*([^\]]+)\]/);
-    if (arcadeMatch) {
-        const action = arcadeMatch[1].trim().toLowerCase();
-        executeArcadeAction(action);
-    }
-
-    // Process [COMPOSE: text] tags
-    const composeMatch = content.match(/\[COMPOSE:\s*([^\]]+)\]/);
-    if (composeMatch) {
-        const composeText = composeMatch[1].trim();
-        const msgInput = document.getElementById('messageInput');
-        if (msgInput) {
-            msgInput.value = composeText;
-            msgInput.focus();
-            // Automatically expand messenger if closed
-            if (typeof openMessengerDock === 'function' && !window.state?.messengerOpen) {
-                openMessengerDock({ expanded: true });
-            }
-        }
-    }
-
     container.appendChild(msgDiv);
     container.scrollTop = container.scrollHeight;
 }
