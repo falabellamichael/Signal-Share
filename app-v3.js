@@ -457,6 +457,32 @@ function isBridgeFeatureEnabled() {
   return false;
 }
 
+function getBridgeSecretValue() {
+  const primary = `${localStorage.getItem("ss_bridge_secret") || ""}`.trim();
+  if (primary) return primary;
+  return `${localStorage.getItem("signal-share-bridge-secret") || ""}`.trim();
+}
+
+function resolvePreferredBridgeModel() {
+  const saved = `${localStorage.getItem("arcade-chat-model") || ""}`.trim();
+  if (saved && saved.toLowerCase() !== "auto") return saved;
+
+  const modelSelect = document.getElementById("chat-model-select");
+  if (!modelSelect) return "";
+
+  const values = Array.from(modelSelect.options || [])
+    .map((option) => `${option.value || ""}`.trim())
+    .filter(Boolean);
+
+  const lightweight = values.find((value) => {
+    const normalized = value.toLowerCase();
+    if (normalized === "auto" || normalized.includes("embedding")) return false;
+    return normalized.includes("1.5b") || normalized.includes("e2b");
+  });
+
+  return lightweight || "";
+}
+
 function shouldAttemptBridgeRequests() {
   if (isNativeCapacitorApp()) return isBridgeFeatureEnabled();
   if (isLoopbackSiteOrigin() || isPrivateSiteOrigin()) return true;
@@ -1910,6 +1936,10 @@ async function handleMessageSubmit(event) {
       const pageContext = document.title || 'Signal Share';
       const pageText = document.body.innerText.substring(0, 1000);
       const fullContext = `${pageContext} (Visible text: ${pageText})`;
+      if (!shouldAttemptBridgeRequests()) {
+        // User explicitly requested an AI response. Enable bridge attempts for this browser profile.
+        localStorage.setItem("ss_bridge_enabled", "1");
+      }
 
       let aiResponse;
       try {
@@ -2045,28 +2075,48 @@ async function callLocalAI(text, history = [], pageContext = "", attachment = nu
   const configuredLlmEndpoint = typeof window.SIGNAL_SHARE_LLM_ENDPOINT === "string"
     ? window.SIGNAL_SHARE_LLM_ENDPOINT.trim()
     : "";
+  const host = `${window.location.hostname || ""}`.trim().toLowerCase();
+  const protocol = `${window.location.protocol || ""}`.toLowerCase();
+  const isSecureHostedPage = protocol === "https:";
+  const isGithubPagesOrigin = host.includes("github.io");
   const candidates = [];
+  const seen = new Set();
+  const pushCandidate = (candidate) => {
+    if (typeof candidate !== "string") return;
+    const trimmed = candidate.trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(trimmed);
+  };
 
-  if (configuredLlmEndpoint) {
-    candidates.push(configuredLlmEndpoint);
-  }
+  pushCandidate(configuredLlmEndpoint);
 
-  if (bridgeRequestsEnabled) {
-    candidates.push(
-      "http://localhost:3000/api/llm/chat",
-      "http://127.0.0.1:3000/api/llm/chat"
-    );
-    const isSecureHostedPage = window.location.protocol === "https:";
-    if (!isSecureHostedPage || isNativeCapacitorApp()) {
-      candidates.push("http://10.0.2.2:3000/api/llm/chat");
+  if (bridgeRequestsEnabled || isLocalOrigin || configuredLlmEndpoint) {
+    if (isLocalOrigin && protocol !== "file:") {
+      try {
+        pushCandidate(new URL("/api/llm/chat", window.location.href).toString());
+      } catch {
+        pushCandidate("/api/llm/chat");
+      }
+    } else if (!isGithubPagesOrigin) {
+      pushCandidate(window.location.origin + "/api/llm/chat");
+      pushCandidate("/api/llm/chat");
     }
   }
 
-  if (bridgeRequestsEnabled || isLocalOrigin || configuredLlmEndpoint) {
-    candidates.push(
-      window.location.origin + "/api/llm/chat",
-      "/api/llm/chat"
-    );
+  if (bridgeRequestsEnabled) {
+    if (host === "127.0.0.1") {
+      pushCandidate("http://127.0.0.1:3000/api/llm/chat");
+      pushCandidate("http://localhost:3000/api/llm/chat");
+    } else {
+      pushCandidate("http://localhost:3000/api/llm/chat");
+      pushCandidate("http://127.0.0.1:3000/api/llm/chat");
+    }
+    if (!isSecureHostedPage || isNativeCapacitorApp()) {
+      pushCandidate("http://10.0.2.2:3000/api/llm/chat");
+    }
   }
 
   if (candidates.length === 0) {
@@ -2074,52 +2124,70 @@ async function callLocalAI(text, history = [], pageContext = "", attachment = nu
   }
 
   let abortController = null;
+  let stopRequested = false;
   window.stopMessengerAi = () => {
+    stopRequested = true;
     if (abortController) {
       abortController.abort();
       abortController = null;
     }
   };
 
-  const secret = localStorage.getItem("ss_bridge_secret");
+  const secret = getBridgeSecretValue();
+  const preferredModel = resolvePreferredBridgeModel();
 
   for (const url of candidates) {
     try {
       const targetAddressSpace = getBridgeTargetAddressSpace(url);
-      const isRelative = url.startsWith('/') || !url.startsWith('http');
+      const isRelative = url.startsWith("/") || !/^https?:\/\//i.test(url);
       
       // Skip relative paths on GitHub Pages as they will always 404/405
-      if (isRelative && window.location.hostname.includes('github.io')) {
+      if (isRelative && isGithubPagesOrigin) {
           continue;
+      }
+      if (isGithubPagesOrigin && /^https?:\/\/[^/]*github\.io\/api\/llm\/chat/i.test(url)) {
+        continue;
       }
 
       abortController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        if (abortController) abortController.abort();
+      }, 45000);
       
       const headers = { 
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json"
       };
       if (secret) headers["X-Bridge-Secret"] = secret;
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: headers,
-        ...(targetAddressSpace ? { targetAddressSpace } : {}),
-        signal: abortController.signal,
-        cache: 'no-store',
-        credentials: 'omit',
-        body: JSON.stringify({ 
-          message: text, 
-          history: history,
-          pageContext: pageContext || 'Signal Share',
-          attachment: attachment // Pass through the attachment for multimodal support
-        })
-      });
+      let response;
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: headers,
+          ...(targetAddressSpace ? { targetAddressSpace } : {}),
+          signal: abortController.signal,
+          cache: "no-store",
+          credentials: "omit",
+          body: JSON.stringify({ 
+            message: text, 
+            ...(preferredModel ? { model: preferredModel } : {}),
+            history: history,
+            pageContext: pageContext || "Signal Share",
+            attachment: attachment // Pass through the attachment for multimodal support
+          })
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       
       if (response.ok) {
         const data = await response.json();
         return data.reply || "I'm having trouble thinking right now.";
       }
     } catch (err) {
+      if (stopRequested) {
+        return "🛑 [Signal Protocol] AI request stopped.";
+      }
       console.debug(`[AI Messenger] Endpoint failed ${url}:`, err);
     }
   }

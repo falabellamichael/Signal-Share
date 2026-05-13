@@ -3,15 +3,83 @@
  * Shared component for cross-page companion interactions.
  */
 
-let BRIDGE_BASE_URL = localStorage.getItem('signal-share-bridge-url') || "http://127.0.0.1:3000";
+let BRIDGE_BASE_URL = "";
+const BRIDGE_LAST_WORKING_BASE_KEY = "ss_bridge_last_working_base";
 const CHAT_MODEL_PREFERENCE_KEY = 'arcade-chat-model';
 
-// Dynamically resolve bridge URL for mobile/android if no custom URL is set
-if (!localStorage.getItem('signal-share-bridge-url')) {
-    if (document.documentElement.classList.contains('platform-android') || (window.Capacitor && window.Capacitor.getPlatform() === 'android')) {
-        // 10.0.2.2 is the default bridge for Android emulators to reach the host PC
-        BRIDGE_BASE_URL = "http://10.0.2.2:3000";
+function normalizeBridgeBaseUrl(baseUrl = "") {
+    const raw = `${baseUrl || ""}`.trim();
+    if (!raw) return "";
+    const withProtocol = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+    try {
+        const parsed = new URL(withProtocol, window.location.href);
+        const normalized = `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, "");
+        return normalized
+            .replace(/\/api\/llm\/chat$/i, "")
+            .replace(/\/api\/llm\/models$/i, "")
+            .replace(/\/api\/system-media\/current$/i, "")
+            .replace(/\/api\/system-media\/action$/i, "");
+    } catch (_error) {
+        return "";
     }
+}
+
+function isAndroidRuntime() {
+    return document.documentElement.classList.contains('platform-android')
+        || (window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android');
+}
+
+function pushBridgeBaseCandidate(candidates, seen, candidate) {
+    const normalized = normalizeBridgeBaseUrl(candidate);
+    if (!normalized) return;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(normalized);
+}
+
+function resolveBridgeBaseCandidates() {
+    const candidates = [];
+    const seen = new Set();
+    const host = `${window.location.hostname || ""}`.trim().toLowerCase();
+    const protocol = `${window.location.protocol || ""}`.toLowerCase();
+
+    const configured = normalizeBridgeBaseUrl(localStorage.getItem('signal-share-bridge-url') || "");
+    const lastWorking = normalizeBridgeBaseUrl(localStorage.getItem(BRIDGE_LAST_WORKING_BASE_KEY) || "");
+    pushBridgeBaseCandidate(candidates, seen, lastWorking);
+    pushBridgeBaseCandidate(candidates, seen, configured);
+
+    const isLoopbackOrigin = protocol === 'file:'
+        || !host
+        || host === 'localhost'
+        || host.endsWith('.localhost')
+        || host === '127.0.0.1'
+        || host === '::1'
+        || host === '[::1]';
+
+    if (isLoopbackOrigin && protocol !== 'file:') {
+        pushBridgeBaseCandidate(candidates, seen, window.location.origin);
+    }
+
+    if (host === '127.0.0.1') {
+        pushBridgeBaseCandidate(candidates, seen, "http://127.0.0.1:3000");
+        pushBridgeBaseCandidate(candidates, seen, "http://localhost:3000");
+    } else {
+        pushBridgeBaseCandidate(candidates, seen, "http://localhost:3000");
+        pushBridgeBaseCandidate(candidates, seen, "http://127.0.0.1:3000");
+    }
+
+    if (isAndroidRuntime()) {
+        pushBridgeBaseCandidate(candidates, seen, "http://10.0.2.2:3000");
+    } else if (configured && configured.includes("10.0.2.2")) {
+        // Keep custom candidate if explicitly configured, but add desktop loopback fallbacks above.
+    }
+
+    if (candidates.length > 0) {
+        BRIDGE_BASE_URL = candidates[0];
+    }
+
+    return candidates;
 }
 
 function parseBridgeBoolean(value) {
@@ -133,6 +201,27 @@ function setupChatModelSelect() {
     void hydrateChatModelSelect();
 }
 
+function resolveChatRequestModel(selectedValue = "auto") {
+    const normalizedSelected = `${selectedValue || ""}`.trim();
+    if (normalizedSelected && normalizedSelected.toLowerCase() !== "auto") {
+        return normalizedSelected;
+    }
+
+    const select = document.getElementById("chat-model-select");
+    if (!select) return "auto";
+    const values = Array.from(select.options)
+        .map((option) => `${option.value || ""}`.trim())
+        .filter(Boolean);
+
+    const preferred = values.find((value) => {
+        const lower = value.toLowerCase();
+        if (lower === "auto" || lower.includes("embedding")) return false;
+        return lower.includes("1.5b") || lower.includes("e2b");
+    });
+
+    return preferred || "auto";
+}
+
 function getBridgeTargetAddressSpace(baseUrl = "") {
     try {
         const parsed = new URL(baseUrl, window.location.href);
@@ -165,31 +254,83 @@ async function bridgeFetch(path, options = {}) {
         throw error;
     }
 
-    const method = options.method || "GET";
+    const {
+        timeoutMs,
+        signal: externalSignal,
+        headers: optionHeaders,
+        method: optionMethod,
+        ...fetchRest
+    } = options || {};
+
+    const method = optionMethod || "GET";
     const headers = {
         ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
         ...(getBridgeSecret() ? { "X-Bridge-Secret": getBridgeSecret() } : {}),
-        ...(options.headers || {}),
+        ...(optionHeaders || {}),
     };
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 1500);
-    const targetAddressSpace = getBridgeTargetAddressSpace(BRIDGE_BASE_URL);
-
-    try {
-        return await fetch(`${BRIDGE_BASE_URL}${path}`, {
-            method,
-            mode: "cors",
-            cache: "no-store",
-            credentials: "omit",
-            ...options,
-            headers,
-            signal: options.signal || controller.signal,
-            ...(targetAddressSpace ? { targetAddressSpace } : {})
-        });
-    } finally {
-        clearTimeout(timeout);
+    const candidates = resolveBridgeBaseCandidates();
+    if (candidates.length === 0) {
+        throw new Error("No bridge endpoint candidates available");
     }
+
+    let lastNetworkError = null;
+    let lastHttpResponse = null;
+
+    for (const baseUrl of candidates) {
+        const endpoint = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+        const requestController = new AbortController();
+        const timeoutDuration = Number.isFinite(timeoutMs)
+            ? Math.max(250, Number(timeoutMs))
+            : (method === "POST" ? 45000 : 3500);
+        const timeout = setTimeout(() => requestController.abort(), timeoutDuration);
+        const targetAddressSpace = getBridgeTargetAddressSpace(baseUrl);
+        const handleExternalAbort = () => requestController.abort();
+
+        if (externalSignal) {
+            if (externalSignal.aborted) {
+                requestController.abort();
+            } else {
+                externalSignal.addEventListener("abort", handleExternalAbort, { once: true });
+            }
+        }
+
+        try {
+            const response = await fetch(endpoint, {
+                method,
+                mode: "cors",
+                cache: "no-store",
+                credentials: "omit",
+                ...fetchRest,
+                headers,
+                signal: requestController.signal,
+                ...(targetAddressSpace ? { targetAddressSpace } : {})
+            });
+
+            if (response.ok) {
+                BRIDGE_BASE_URL = baseUrl;
+                localStorage.setItem(BRIDGE_LAST_WORKING_BASE_KEY, baseUrl);
+                return response;
+            }
+
+            if (response.status === 401 || response.status === 403 || response.status === 422) {
+                BRIDGE_BASE_URL = baseUrl;
+                lastHttpResponse = response;
+                break;
+            }
+
+            lastHttpResponse = response;
+        } catch (error) {
+            lastNetworkError = error;
+        } finally {
+            clearTimeout(timeout);
+            if (externalSignal) {
+                externalSignal.removeEventListener("abort", handleExternalAbort);
+            }
+        }
+    }
+
+    if (lastHttpResponse) return lastHttpResponse;
+    throw lastNetworkError || new Error("Bridge request failed");
 }
 
 async function getDesktopBridgeSnapshot() {
@@ -944,13 +1085,18 @@ window.sendChatMessage = async function() {
         try {
             const modelSelect = document.getElementById('chat-model-select');
             const selectedModel = modelSelect ? modelSelect.value : 'auto';
+            const requestModel = resolveChatRequestModel(selectedModel);
+            if (!isBridgeFeatureEnabled()) {
+                // User explicitly asked the companion for an AI reply, so enable bridge attempts.
+                localStorage.setItem('ss_bridge_enabled', '1');
+            }
 
             const response = await bridgeFetch('/api/llm/chat', {
                 method: 'POST',
                 signal,
                 body: JSON.stringify({ 
                     message: text,
-                    model: selectedModel,
+                    model: requestModel,
                     attachment: arcadeChatHistory[arcadeChatHistory.length - 1].attachment,
                     history: arcadeChatHistory.map(m => ({ role: m.role, content: m.content })),
                     pageContext: `${pageContext} (Visible text: ${pageText})`
