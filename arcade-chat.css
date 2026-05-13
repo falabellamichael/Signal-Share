@@ -641,18 +641,16 @@ body:not(.chat-collapsed) .messenger-section {
     right: 6px;
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid var(--arc-border);
-    border-radius: 4px;
+    border-radius: 6px;
     color: var(--arc-msg-ai-text);
-    padding: 3px 8px;
-    font-size: 0.6rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 5px;
-    opacity: 0.6;
+    justify-content: center;
+    opacity: 0;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 10;
     backdrop-filter: blur(4px);
@@ -666,7 +664,11 @@ body:not(.chat-collapsed) .messenger-section {
     background: var(--arc-accent);
     color: var(--arc-msg-user-text);
     border-color: var(--arc-accent);
-    opacity: 1;
+    transform: scale(1.05);
+}
+
+.copy-code-btn:active {
+    transform: scale(0.95);
 }
 
 .copy-code-btn svg {
