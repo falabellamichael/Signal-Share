@@ -297,17 +297,18 @@ body:not(.chat-collapsed) .messenger-section {
    so we only focus on the messenger launcher for now. */
 
 .chat-header {
-    padding: 20px;
+    padding: 10px 15px;
     background: var(--arc-header-bg);
     border-bottom: 1px solid var(--arc-line);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .chat-header > div:first-child {
-    min-width: 0;
+    min-width: 120px;
     flex: 1 1 auto;
 }
 
