@@ -596,9 +596,6 @@ body:not(.chat-collapsed) .messenger-section {
 }
 
 /* Code Blocks */
-    position: relative;
-}
-
 .code-block-wrapper {
     position: relative;
     margin: 10px 0;
