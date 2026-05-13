@@ -497,6 +497,10 @@
       .conversation-list {
         margin-top: 8px;
         gap: 14px;
+        max-height: 180px;
+        overflow-y: auto;
+        padding-right: 4px;
+        scrollbar-width: thin;
       }
 
       .person-row,
@@ -663,6 +667,10 @@
     .conversation-list {
       display: grid;
       gap: 12px;
+      max-height: 180px;
+      overflow-y: auto;
+      padding-right: 4px;
+      scrollbar-width: thin;
     }
 
     .person-item,

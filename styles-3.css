@@ -1223,9 +1223,10 @@
     .people-list,
     .conversation-list {
       gap: 8px;
-      max-height: min(18vh, 180px);
-      overflow: auto;
-      padding-right: 2px;
+      max-height: 180px;
+      overflow-y: auto;
+      padding-right: 4px;
+      scrollbar-width: thin;
     }
 
     .messenger-list-search {
@@ -1856,8 +1857,10 @@
       .people-list,
       .conversation-list {
         gap: 8px;
-        max-height: none;
-        min-height: 0;
+        max-height: 180px;
+        overflow-y: auto;
+        padding-right: 4px;
+        scrollbar-width: thin;
       }
 
       .messenger-list-search {
