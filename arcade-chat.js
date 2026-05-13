@@ -1160,9 +1160,36 @@ function removeTypingIndicator(id) {
 }
 
 let isSendingChatMessage = false;
+const SEND_BUTTON_SEND_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>';
+const SEND_BUTTON_STOP_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>';
+
+function getChatSendButton() {
+    return document.querySelector('.chat-input-wrapper .chat-send-btn') || document.querySelector('.chat-send-btn');
+}
+
+function setChatSendButtonMode(mode = 'send') {
+    const button = getChatSendButton();
+    if (!button) return;
+
+    if (mode === 'stop') {
+        button.classList.add('is-stop');
+        button.innerHTML = SEND_BUTTON_STOP_ICON;
+        button.setAttribute('aria-label', 'Stop response');
+        button.title = 'Stop response';
+        return;
+    }
+
+    button.classList.remove('is-stop');
+    button.innerHTML = SEND_BUTTON_SEND_ICON;
+    button.setAttribute('aria-label', 'Send message');
+    button.title = 'Send message';
+}
 
 window.sendChatMessage = async function() {
-    if (isSendingChatMessage) return;
+    if (isSendingChatMessage) {
+        if (typeof window.stopArcadeAi === 'function') window.stopArcadeAi();
+        return;
+    }
     isSendingChatMessage = true;
     
     const input = document.getElementById('arc-chat-input');
@@ -1258,6 +1285,7 @@ window.sendChatMessage = async function() {
         const typingId = addTypingIndicator();
         let activeAiAbortController = new AbortController();
         const { signal } = activeAiAbortController;
+        setChatSendButtonMode('stop');
 
         window.stopArcadeAi = function() {
             if (activeAiAbortController) {
@@ -1265,6 +1293,8 @@ window.sendChatMessage = async function() {
                 activeAiAbortController = null;
                 removeTypingIndicator(typingId);
                 addChatMessage('assistant', '🕹️ [Arcade Protocol]: Intelligence process terminated by user.');
+                updateChatStatus('idle');
+                setChatSendButtonMode('send');
             }
         };
 
@@ -1374,6 +1404,8 @@ window.sendChatMessage = async function() {
         console.error("[Arcade Chat] Error in sendChatMessage:", e);
     } finally {
         isSendingChatMessage = false;
+        setChatSendButtonMode('send');
+        window.stopArcadeAi = null;
     }
 }
 
@@ -1755,6 +1787,7 @@ function setupCloseParityHandlers() {
 
     // Ensure Enter key sends the message
     const arcInput = document.getElementById('arc-chat-input');
+    setChatSendButtonMode('send');
     if (arcInput) {
         arcInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {

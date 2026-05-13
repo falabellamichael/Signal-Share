@@ -513,6 +513,15 @@ body:not(.chat-collapsed) .messenger-section {
     height: 20px;
 }
 
+.chat-send-btn.is-stop {
+    color: #ff6b57;
+    opacity: 1;
+}
+
+.chat-send-btn.is-stop:hover {
+    transform: scale(1.05);
+}
+
 .history-btn {
     background: var(--arc-line);
     border: 1px solid var(--arc-border);
