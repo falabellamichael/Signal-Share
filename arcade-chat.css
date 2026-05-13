@@ -105,6 +105,11 @@ body.main-page[data-theme="ember"] {
     height: 100%; /* Fill the grid area */
 }
 
+.steam-chat-sidebar:not(.collapsed) {
+    pointer-events: auto;
+    visibility: visible;
+}
+
 /* Ensure the sidebar fills the grid area in integrated mode */
 .steam-shell .steam-chat-sidebar {
     width: 100%;
@@ -122,6 +127,8 @@ body > .steam-chat-sidebar {
 
 body > .steam-chat-sidebar.collapsed {
     transform: translateX(100%);
+    pointer-events: none;
+    visibility: hidden;
 }
 
 body > .chat-resize-handle {
@@ -309,10 +316,50 @@ body:not(.chat-collapsed) .messenger-section {
     
     .steam-chat-sidebar.collapsed {
         transform: translateX(100%);
+        pointer-events: none;
+        visibility: hidden;
     }
     
     body:not(.chat-collapsed) #app-runner {
         right: 0 !important; /* Don't shrink the game on mobile when chat is open since it's an overlay */
+    }
+}
+
+/* Android mini-games custom companion tab */
+@media (max-width: 768px) {
+    html.platform-android .chat-toggle-btn.chat-tab-mode {
+        top: 50% !important;
+        right: 0 !important;
+        bottom: auto !important;
+        transform: translateY(-50%) !important;
+        width: 24px !important;
+        height: 112px !important;
+        padding: 8px 0 !important;
+        border-radius: 10px 0 0 10px !important;
+        border-width: 1px !important;
+        box-shadow: -6px 0 16px rgba(0, 0, 0, 0.38) !important;
+        background: rgba(16, 24, 34, 0.96) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    html.platform-android .chat-toggle-btn.chat-tab-mode .tab-label {
+        font-size: 0.5rem !important;
+        letter-spacing: 1.7px !important;
+        color: var(--arc-accent) !important;
+    }
+
+    html.platform-android .chat-toggle-btn.chat-tab-mode svg {
+        width: 12px !important;
+        height: 12px !important;
+        margin-top: 5px !important;
+        color: var(--arc-accent) !important;
+        filter: none !important;
+    }
+
+    html.platform-android body.chat-collapsed .chat-toggle-btn.chat-tab-mode {
+        display: flex !important;
     }
 }
 .close-chat-btn {

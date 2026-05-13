@@ -57,6 +57,18 @@ function initAndroidMiniShell() {
     }
 }
 
+function collapseCompanionByDefaultOnAndroid() {
+    if (!isAndroidPlatform) return;
+    const shell = document.querySelector('.steam-shell');
+    if (!shell) return;
+
+    const sidebar = document.querySelector('.steam-chat-sidebar');
+    const handle = document.querySelector('.chat-resize-handle');
+    if (sidebar) sidebar.classList.add('collapsed');
+    if (handle) handle.classList.add('collapsed');
+    document.body.classList.add('chat-collapsed');
+}
+
 // Supabase Auth Integration
 let supabase = null;
 if (window.supabase) {
@@ -89,6 +101,7 @@ if (window.supabase) {
  */
 async function init() {
     initAndroidMiniShell();
+    collapseCompanionByDefaultOnAndroid();
     syncCurrentCategoryGlobal();
 
     // Initial sync if supabase already has a session

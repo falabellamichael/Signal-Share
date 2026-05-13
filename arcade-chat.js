@@ -923,19 +923,18 @@ function setupCloseParityHandlers() {
     
     // Restore collapsed state
     const isSteamShell = document.querySelector('.steam-shell') || document.documentElement.classList.contains('is-steam-shell');
-    const isMiniGamesPage = window.location.pathname.toLowerCase().includes('mini-games');
     const isAndroidPlatform = document.documentElement.classList.contains('platform-android');
     let wasCollapsed = localStorage.getItem('arcade-chat-collapsed');
     
-    // Default to collapsed (tab mode) on the games page if no preference exists
+    // Default to collapsed (tab mode) on steam-shell pages if no preference exists
     if (wasCollapsed === null && isSteamShell) {
         wasCollapsed = 'true';
     } else {
         wasCollapsed = wasCollapsed === 'true';
     }
 
-    // Keep Android mini-games in tab-open mode by default so content always fits.
-    if (isMiniGamesPage && isAndroidPlatform) {
+    // Keep Android steam-shell pages in tab-open mode by default so content always fits.
+    if (isSteamShell && isAndroidPlatform) {
         wasCollapsed = true;
     }
 
