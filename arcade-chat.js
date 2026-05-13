@@ -279,6 +279,14 @@ function parseDuckDuckGoCommand(text = "") {
     return getAiCore()?.parseDuckDuckGoCommand?.(text) || "";
 }
 
+function isComposeDraftIntent(message = "") {
+    const text = `${message || ""}`.trim().toLowerCase();
+    if (!text) return false;
+    const hasMessagingTarget = /\b(dm|direct message|message|messenger|inbox|text|reply|respond)\b/.test(text);
+    const hasComposeVerb = /\b(compose|draft|write|rewrite|polish|improve|prepare|send)\b/.test(text);
+    return hasMessagingTarget && hasComposeVerb;
+}
+
 function getBridgeTargetAddressSpace(baseUrl = "") {
     try {
         const parsed = new URL(baseUrl, window.location.href);
@@ -859,9 +867,13 @@ function addChatMessage(role, content) {
         });
     } else {
         // Strip internal protocol tags from display
-        const cleanContent = content.replace(/\[ARCADE:\s*[^\]]+\]/g, "").trim();
+        const cleanContent = content
+            .replace(/\[COMPOSE:\s*([\s\S]*?)\]/gi, "$1")
+            .replace(/\[(?:ARCADE|DUCKDUCKGO|OPEN):\s*[^\]]+\]/gi, "")
+            .replace(/\[PUBLISH:\s*({[\s\S]*?})\]/gi, "")
+            .trim();
         msgDiv.textContent = cleanContent;
-        if (!cleanContent && content.includes("[ARCADE:")) {
+        if (!cleanContent && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE):/i.test(content)) {
             msgDiv.style.display = 'none';
         }
     }
@@ -1381,7 +1393,7 @@ window.sendChatMessage = async function() {
             updateChatStatus('active');
             
             // Execute any tags in the reply
-            executeArcadeChatActions(reply);
+            executeArcadeChatActions(reply, { userPrompt: text });
         } else {
             if (lastError !== 'Bridge disabled') {
                 console.warn(`[Arcade Chat] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
@@ -1406,7 +1418,7 @@ window.sendChatMessage = async function() {
  * Executes AI-generated tags in the chat reply.
  * Handles [PUBLISH], [COMPOSE], [ARCADE], [DUCKDUCKGO], [OPEN].
  */
-async function executeArcadeChatActions(text) {
+async function executeArcadeChatActions(text, options = {}) {
     if (!text) return;
 
     // 1. [PUBLISH: {json}]
@@ -1491,7 +1503,7 @@ async function executeArcadeChatActions(text) {
 
     // 2. [COMPOSE: text]
     const composeMatch = text.match(/\[COMPOSE:\s*(.+?)\]/);
-    if (composeMatch) {
+    if (composeMatch && isComposeDraftIntent(options.userPrompt || "")) {
         const composeText = composeMatch[1].trim();
         const messengerInput = document.getElementById('messageInput');
         if (messengerInput) {

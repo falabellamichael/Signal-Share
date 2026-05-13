@@ -1369,8 +1369,12 @@ export function createAppUi(context) {
     if (!text) { container.hidden = true; container.innerHTML = ""; return; }
     
     // Strip internal protocol tags from display
-    const cleanText = text.replace(/\[ARCADE:\s*[^\]]+\]/g, "").trim();
-    if (!cleanText && text.includes("[ARCADE:")) {
+    const cleanText = text
+      .replace(/\[COMPOSE:\s*([\s\S]*?)\]/gi, "$1")
+      .replace(/\[(?:ARCADE|DUCKDUCKGO|OPEN):\s*[^\]]+\]/gi, "")
+      .replace(/\[PUBLISH:\s*({[\s\S]*?})\]/gi, "")
+      .trim();
+    if (!cleanText && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE):/i.test(text)) {
         container.hidden = true; 
         container.innerHTML = ""; 
         return; 

@@ -377,6 +377,8 @@
             hardRules: [
                 "Never claim an action executed unless a tag/action is emitted.",
                 "Never output secrets or private credentials.",
+                "Use [COMPOSE:<text>] only when the user explicitly asks to draft/prefill a DM or message.",
+                "Never use [COMPOSE:<text>] for coding requests, debugging, or general Q&A.",
                 "Prefer [PATCH_SUGGESTION] for risky edits spanning many files.",
                 "Ask for explicit user confirmation before destructive operations."
             ],
