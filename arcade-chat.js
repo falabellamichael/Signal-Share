@@ -847,40 +847,6 @@ function setupResizing() {
         }
         
         if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets();
-
-
-
-        
-
-
-
-
-
-            
-
-
-                
-                // Dynamically limit messenger width if it's expanded to prevent screen cutoff
-                if (messengerSection.classList.contains('is-expanded')) {
-                    const availableWidth = window.innerWidth - gapWidth - 20; // 20px left margin
-                    messengerSection.style.maxWidth = `${availableWidth}px`;
-                    // Also trigger a minor width recalculation if it's currently larger than available
-                    if (messengerSection.offsetWidth > availableWidth) {
-                        messengerSection.style.width = `${availableWidth}px`;
-                    }
-                } else {
-                    messengerSection.style.maxWidth = '';
-                    messengerSection.style.width = '';
-                }
-            }
-            if (appRunner) appRunner.style.right = `${newWidth}px`;
-
-
-
-                messengerSection.style.maxWidth = '';
-
-            }
-        }
     }
 }
 
