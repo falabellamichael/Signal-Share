@@ -20,7 +20,7 @@ body[data-theme="sunset"] {
     --arc-input-area-bg: rgba(0, 0, 0, 0.03);
     --arc-input-wrapper-bg: #ffffff;
     --arc-msg-ai-bg: #e9e2d5;
-    --arc-msg-ai-text: #000000;
+    --arc-msg-ai-text: #13212b;
     --arc-msg-user-bg: #ee6c4d;
     --arc-msg-user-text: #ffffff;
     --arc-accent: #ee6c4d;
@@ -46,7 +46,7 @@ body[data-theme="gallery"] {
     --arc-input-area-bg: rgba(0, 0, 0, 0.03);
     --arc-input-wrapper-bg: #fffdf7;
     --arc-msg-ai-bg: #e2ddd3;
-    --arc-msg-ai-text: #000000;
+    --arc-msg-ai-text: #1a2128;
     --arc-msg-user-bg: #0f6fa7;
     --arc-msg-user-text: #ffffff;
     --arc-accent: #0f6fa7;
@@ -59,7 +59,7 @@ body[data-theme="aurora"] {
     --arc-input-area-bg: rgba(0, 0, 0, 0.02);
     --arc-input-wrapper-bg: #f5fcfb;
     --arc-msg-ai-bg: #d9e6e4;
-    --arc-msg-ai-text: #000000;
+    --arc-msg-ai-text: #10242b;
     --arc-msg-user-bg: #007c91;
     --arc-msg-user-text: #ffffff;
     --arc-accent: #007c91;
@@ -337,6 +337,13 @@ body:not(.chat-collapsed) .messenger-section {
 #chat-model-select option {
     background: var(--arc-input-wrapper-bg);
     color: var(--arc-msg-ai-text);
+}
+
+/* Specific overrides for light themes to ensure black text on the model selector */
+body[data-theme="sunset"] #chat-model-select,
+body[data-theme="gallery"] #chat-model-select,
+body[data-theme="aurora"] #chat-model-select {
+    color: #000000 !important;
 }
 
 @media (max-width: 768px) {

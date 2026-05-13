@@ -160,6 +160,7 @@ async function hydrateChatModelSelect({ forceRefresh = false } = {}) {
             timeoutMs: 2200
         });
         if (!response.ok) return;
+        updateEngineStatus(true);
 
         const payload = await response.json().catch(() => null);
         const rows = Array.isArray(payload?.models) ? payload.models : [];
@@ -411,6 +412,18 @@ async function getDesktopBridgeSnapshot() {
     return res.json();
 }
 
+async function checkBridgeConnectivity() {
+    try {
+        const res = await bridgeFetch("/api/llm/chat", {
+            method: "GET",
+            timeoutMs: 1800
+        });
+        return Boolean(res?.ok);
+    } catch (_error) {
+        return false;
+    }
+}
+
 async function sendDesktopBridgeAction(action, appPackage = "") {
     const res = await bridgeFetch("/api/system-media/action", {
         method: "POST",
@@ -439,11 +452,11 @@ function startDesktopBridgePolling() {
     bridgeEnabled = true;
     pollDesktopBridge();
     
-    // Background polling re-enabled with a conservative interval to keep status live
+    // Lightweight live refresh for bridge status.
     if (bridgePollTimer) clearInterval(bridgePollTimer);
     bridgePollTimer = setInterval(() => {
         pollDesktopBridge();
-    }, 15000); // 15 seconds is a good balance
+    }, 4000);
 }
 
 /**
@@ -475,10 +488,12 @@ async function pollDesktopBridge() {
             }
             updateEngineStatus(true);
         } else {
-            updateEngineStatus(false);
+            const online = await checkBridgeConnectivity();
+            updateEngineStatus(online);
         }
     } catch (_error) {
-        updateEngineStatus(false);
+        const online = await checkBridgeConnectivity();
+        updateEngineStatus(online);
     } finally {
         bridgePollInFlight = false;
     }
@@ -1827,8 +1842,6 @@ function setupCloseParityHandlers() {
             }
         });
     }
-    // Start background polling if enabled
-    startDesktopBridgePolling();
 })();
 
 /**
