@@ -6,6 +6,8 @@
 let BRIDGE_BASE_URL = "";
 const BRIDGE_LAST_WORKING_BASE_KEY = "ss_bridge_last_working_base";
 const CHAT_MODEL_PREFERENCE_KEY = 'arcade-chat-model';
+let lastResolvedBridgeCandidatesSignature = "";
+let lastResolvedBridgePrimary = "";
 
 function normalizeBridgeBaseUrl(baseUrl = "") {
     const raw = `${baseUrl || ""}`.trim();
@@ -77,7 +79,12 @@ function resolveBridgeBaseCandidates() {
 
     if (candidates.length > 0) {
         BRIDGE_BASE_URL = candidates[0];
-        console.log(`[Arcade Chat] Resolved bridge candidates: ${candidates.join(", ")}. Using: ${BRIDGE_BASE_URL}`);
+        const signature = candidates.join("|");
+        if (signature !== lastResolvedBridgeCandidatesSignature || BRIDGE_BASE_URL !== lastResolvedBridgePrimary) {
+            console.log(`[Arcade Chat] Resolved bridge candidates: ${candidates.join(", ")}. Using: ${BRIDGE_BASE_URL}`);
+            lastResolvedBridgeCandidatesSignature = signature;
+            lastResolvedBridgePrimary = BRIDGE_BASE_URL;
+        }
     } else {
         console.warn("[Arcade Chat] No bridge candidates resolved. AI features may be unavailable.");
     }
@@ -323,6 +330,7 @@ async function bridgeFetch(path, options = {}) {
         signal: externalSignal,
         headers: optionHeaders,
         method: optionMethod,
+        suppressNetworkErrors = false,
         ...fetchRest
     } = options || {};
 
@@ -339,6 +347,7 @@ async function bridgeFetch(path, options = {}) {
 
     let lastNetworkError = null;
     let lastHttpResponse = null;
+    const networkFailures = [];
 
     for (const baseUrl of candidates) {
         const endpoint = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
@@ -384,8 +393,9 @@ async function bridgeFetch(path, options = {}) {
 
             lastHttpResponse = response;
         } catch (error) {
-            console.warn(`[Arcade Chat] Bridge candidate failed: ${baseUrl} - ${error.message}`);
+            networkFailures.push({ baseUrl, error });
             lastNetworkError = error;
+            if (externalSignal?.aborted) break;
         } finally {
             clearTimeout(timeout);
             if (externalSignal) {
@@ -395,6 +405,20 @@ async function bridgeFetch(path, options = {}) {
     }
 
     if (lastHttpResponse) return lastHttpResponse;
+    if (!suppressNetworkErrors && networkFailures.length > 0) {
+        const hasNonAbortFailure = networkFailures.some(({ error }) => {
+            const name = `${error?.name || ""}`.toLowerCase();
+            const message = `${error?.message || ""}`.toLowerCase();
+            return name !== "aborterror" && !message.includes("aborted");
+        });
+
+        if (hasNonAbortFailure) {
+            const summary = networkFailures
+                .map(({ baseUrl, error }) => `${baseUrl} - ${error?.message || "Failed to fetch"}`)
+                .join(" | ");
+            console.warn(`[Arcade Chat] Bridge request failed across candidates: ${summary}`);
+        }
+    }
     throw lastNetworkError || new Error("Bridge request failed");
 }
 
@@ -406,8 +430,10 @@ if (typeof window !== "undefined") {
     window.isBridgeFeatureEnabled = isBridgeFeatureEnabled;
 }
 
-async function getDesktopBridgeSnapshot() {
-    const res = await bridgeFetch("/api/system-media/current");
+async function getDesktopBridgeSnapshot({ suppressNetworkErrors = false } = {}) {
+    const res = await bridgeFetch("/api/system-media/current", {
+        suppressNetworkErrors
+    });
     if (!res.ok) return null;
     return res.json();
 }
@@ -416,7 +442,8 @@ async function checkBridgeConnectivity() {
     try {
         const res = await bridgeFetch("/api/llm/chat", {
             method: "GET",
-            timeoutMs: 1800
+            timeoutMs: 1800,
+            suppressNetworkErrors: true
         });
         return Boolean(res?.ok);
     } catch (_error) {
@@ -438,6 +465,8 @@ async function sendDesktopBridgeAction(action, appPackage = "") {
 let bridgePollTimer = null;
 let bridgePollInFlight = false;
 let bridgeEnabled = false;
+let bridgePollFailureCount = 0;
+let bridgePollNextAllowedAt = 0;
 
 /**
  * Starts background polling for the desktop bridge state.
@@ -473,27 +502,38 @@ function stopDesktopBridgePolling() {
  */
 async function pollDesktopBridge() {
     if (!bridgeEnabled || bridgePollInFlight) return;
+    const now = Date.now();
+    if (now < bridgePollNextAllowedAt) return;
 
     bridgePollInFlight = true;
     try {
-        const snapshot = await getDesktopBridgeSnapshot();
-        if (snapshot) {
-            // Update global state if available
-            if (window.state) {
-                window.state.desktopSnapshot = snapshot;
-            }
-            // Notify hero player controller if available
-            if (window.heroMediaPlayerController && typeof window.heroMediaPlayerController.render === 'function') {
-                window.heroMediaPlayerController.render();
-            }
-            updateEngineStatus(true);
-        } else {
-            const online = await checkBridgeConnectivity();
-            updateEngineStatus(online);
-        }
-    } catch (_error) {
+        // Engine status should be based on LLM endpoint connectivity, not media endpoint health.
         const online = await checkBridgeConnectivity();
         updateEngineStatus(online);
+
+        if (!online) {
+            bridgePollFailureCount += 1;
+            const delayMs = Math.min(30000, Math.round(4000 * Math.pow(1.5, Math.min(8, bridgePollFailureCount))));
+            bridgePollNextAllowedAt = Date.now() + delayMs;
+            return;
+        }
+
+        bridgePollFailureCount = 0;
+        bridgePollNextAllowedAt = 0;
+
+        const snapshot = await getDesktopBridgeSnapshot({ suppressNetworkErrors: true }).catch(() => null);
+        if (snapshot && window.state) {
+            window.state.desktopSnapshot = snapshot;
+        }
+
+        if (snapshot && window.heroMediaPlayerController && typeof window.heroMediaPlayerController.render === 'function') {
+            window.heroMediaPlayerController.render();
+        }
+    } catch (_error) {
+        bridgePollFailureCount += 1;
+        const delayMs = Math.min(30000, Math.round(4000 * Math.pow(1.5, Math.min(8, bridgePollFailureCount))));
+        bridgePollNextAllowedAt = Date.now() + delayMs;
+        updateEngineStatus(false);
     } finally {
         bridgePollInFlight = false;
     }
