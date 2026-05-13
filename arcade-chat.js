@@ -162,6 +162,15 @@ let currentChatAttachment = null;
 let currentChatAttachmentType = null;
 let currentChatAttachmentName = null;
 
+function readArcadeChats() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem('arcade-chats') || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+        return [];
+    }
+}
+
 /**
  * Handles image, video, or file selection for the chat.
  */
@@ -252,7 +261,7 @@ function updateChatStatus(status) {
 
 
 function cleanupOldChats() {
-    const chats = JSON.parse(localStorage.getItem('arcade-chats') || '[]');
+    const chats = readArcadeChats();
     const now = Date.now();
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     
@@ -338,7 +347,7 @@ function startNewChat() {
 function saveCurrentChat() {
     if (!currentChatId) return;
     
-    const chats = JSON.parse(localStorage.getItem('arcade-chats') || '[]');
+    const chats = readArcadeChats();
     const existingIdx = chats.findIndex(c => c.id === currentChatId);
     
     const chatObj = {
@@ -359,7 +368,7 @@ function saveCurrentChat() {
 }
 
 function loadChat(id) {
-    const chats = JSON.parse(localStorage.getItem('arcade-chats') || '[]');
+    const chats = readArcadeChats();
     const chat = chats.find(c => c.id === id);
     if (chat) {
         currentChatId = chat.id;
@@ -426,7 +435,7 @@ function showChatView() {
 
 function renderHistoryList() {
     const container = document.getElementById('chat-history');
-    const chats = JSON.parse(localStorage.getItem('arcade-chats') || '[]');
+    const chats = readArcadeChats();
     if (!container) return;
     
     if (chats.length === 0) {

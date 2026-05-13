@@ -11,8 +11,61 @@ const GAMES = [
     { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility', trackedStats: [] }
 ];
 
+function safeParseJson(rawValue, fallbackValue) {
+    if (typeof rawValue !== 'string' || !rawValue.trim()) return fallbackValue;
+    try {
+        const parsed = JSON.parse(rawValue);
+        return parsed ?? fallbackValue;
+    } catch (_error) {
+        return fallbackValue;
+    }
+}
+
+function readStoredArray(key) {
+    const parsed = safeParseJson(localStorage.getItem(key), []);
+    return Array.isArray(parsed) ? parsed : [];
+}
+
+function normalizeUserRecord(rawUser) {
+    if (!rawUser || typeof rawUser !== 'object') return null;
+
+    const email = typeof rawUser.email === 'string' ? rawUser.email.trim() : '';
+    const fallbackName = email.includes('@') ? email.split('@')[0] : '';
+    const displayName = [
+        rawUser.name,
+        rawUser.display_name,
+        rawUser.displayName,
+        rawUser.username,
+        rawUser.user_metadata?.display_name,
+        fallbackName
+    ].find((value) => typeof value === 'string' && value.trim());
+    const id = [
+        rawUser.id,
+        rawUser.user_id,
+        rawUser.uid,
+        email
+    ].find((value) => typeof value === 'string' && value.trim());
+
+    if (!displayName && !id && !email) return null;
+
+    return {
+        id: id || 'LOCAL-USER',
+        name: displayName || 'Guest',
+        email: email || null
+    };
+}
+
+function syncStoredUser(user) {
+    currentUser = normalizeUserRecord(user);
+    if (currentUser) {
+        localStorage.setItem('ss-user', JSON.stringify(currentUser));
+    } else {
+        localStorage.removeItem('ss-user');
+    }
+}
+
 let currentCategory = 'all';
-let currentUser = JSON.parse(localStorage.getItem('ss-user') || 'null');
+let currentUser = normalizeUserRecord(safeParseJson(localStorage.getItem('ss-user'), null));
 let isNavigatingHistory = false;
 const isAndroidPlatform = /Android/i.test(navigator.userAgent) || (window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android');
 
@@ -20,7 +73,7 @@ function vibrate(ms) {
     if (navigator.vibrate) navigator.vibrate(ms);
 }
 
-let customGames = JSON.parse(localStorage.getItem('ss-custom-games') || '[]');
+let customGames = readStoredArray('ss-custom-games');
 let uploadedFiles = [];
 
 // Detection
@@ -100,21 +153,21 @@ if (window.supabase) {
             supabaseUrl: "https://gswptxeikjmihdjxoiar.supabase.co",
             supabaseAnonKey: "sb_publishable_gIwGxzf1C4cD55l9XS16wg_Qn-LuYqT"
         };
-        supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+        supabaseClient = window.arcadeSupabaseClient
+            || window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+        window.arcadeSupabaseClient = supabaseClient;
         
         // Listen for auth changes to stay in sync with the main page
         supabaseClient.auth.onAuthStateChange((event, session) => {
             console.log(`[Mini-Games] Auth event: ${event}`);
             if (session?.user) {
-                currentUser = {
+                syncStoredUser({
                     id: session.user.id,
-                    name: session.user.user_metadata?.display_name || session.user.email.split('@')[0],
+                    name: session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'User',
                     email: session.user.email
-                };
-                localStorage.setItem('ss-user', JSON.stringify(currentUser));
+                });
             } else {
-                currentUser = null;
-                localStorage.removeItem('ss-user');
+                syncStoredUser(null);
             }
             updateAuthUI();
         });
@@ -137,12 +190,11 @@ async function init() {
         try {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (session?.user) {
-                currentUser = {
+                syncStoredUser({
                     id: session.user.id,
-                    name: session.user.user_metadata?.display_name || session.user.email.split('@')[0],
+                    name: session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'User',
                     email: session.user.email
-                };
-                localStorage.setItem('ss-user', JSON.stringify(currentUser));
+                });
             }
         } catch (error) {
             console.warn('[Mini-Games] Failed initial auth session sync:', error);
@@ -434,8 +486,7 @@ async function toggleAuth() {
             if (supabaseClient) {
                 await supabaseClient.auth.signOut();
             } else {
-                currentUser = null;
-                localStorage.removeItem('ss-user');
+                syncStoredUser(null);
                 updateAuthUI();
             }
             setCategory('all');
@@ -476,8 +527,7 @@ async function performLogin() {
         }
     } else {
         // Fallback for offline mode
-        currentUser = { name: email || 'Developer', id: 'ID-' + Math.floor(Math.random() * 1000) };
-        localStorage.setItem('ss-user', JSON.stringify(currentUser));
+        syncStoredUser({ name: email || 'Developer', id: 'ID-' + Math.floor(Math.random() * 1000), email });
         updateAuthUI();
         hideAuth();
     }
@@ -492,9 +542,12 @@ function updateAuthUI() {
     const leaderNav = document.getElementById('nav-leaderboard');
 
     if (currentUser) {
-        nameEl.textContent = currentUser.name.toUpperCase();
-        avatarEl.textContent = currentUser.name.charAt(0).toUpperCase();
-        avatarEl.style.background = '#a4d007';
+        const displayName = currentUser.name || currentUser.email || 'User';
+        if (nameEl) nameEl.textContent = displayName.toUpperCase();
+        if (avatarEl) {
+            avatarEl.textContent = displayName.charAt(0).toUpperCase();
+            avatarEl.style.background = '#a4d007';
+        }
         if (storeNav) storeNav.classList.remove('locked');
         if (leaderNav) leaderNav.classList.remove('locked');
     } else {
@@ -597,7 +650,7 @@ function renderLibrary() {
     else if (currentCategory === 'games') filtered = GAMES.filter(g => g.type === 'game');
     else if (currentCategory === 'utilities') filtered = GAMES.filter(g => g.type === 'utility');
     else if (currentCategory === 'recent') {
-        const history = JSON.parse(localStorage.getItem('launch-history') || '[]');
+        const history = readStoredArray('launch-history');
         filtered = history.map(id => GAMES.find(g => g.id === id)).filter(Boolean);
     }
 
@@ -832,7 +885,7 @@ async function renderLeaderboard() {
 }
 
 function recordLaunch(id) {
-    let historyData = JSON.parse(localStorage.getItem('launch-history') || '[]');
+    let historyData = readStoredArray('launch-history');
     historyData = historyData.filter(item => item !== id);
     historyData.unshift(id);
     if (historyData.length > 8) historyData.pop();

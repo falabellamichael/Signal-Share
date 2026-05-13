@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Mini Games and Tools | Signal Share</title>
     <link rel="stylesheet" href="./questions-guide.css?v=1.5">
-    <link rel="stylesheet" href="./android-optimizations.css?v=1.4">
-    <link rel="stylesheet" href="arcade-chat.css?v=1.8">
+    <link rel="stylesheet" href="./android-optimizations.css?v=1.5">
+    <link rel="stylesheet" href="arcade-chat.css?v=1.10">
     <script>
         // Signal Share Android Optimization Suite - Detection
         (function() {
@@ -1355,8 +1355,10 @@
             supabaseAnonKey: "sb_publishable_gIwGxzf1C4cD55l9XS16wg_Qn-LuYqT"
         };
         
-        const supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
-        ArcadeAPI.initArcadeApi({ supabase });
+        const supabaseClient = window.arcadeSupabaseClient
+            || window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+        window.arcadeSupabaseClient = supabaseClient;
+        ArcadeAPI.initArcadeApi({ supabase: supabaseClient });
 
         // Global exposing for use in other functions
         window.renderGlobalLeaderboards = async () => {
@@ -1420,8 +1422,8 @@
             }
         });
     </script>
-    <script src="mini-games.js?v=1.8"></script>
-    <script src="arcade-chat.js?v=1.9" defer></script>
+    <script src="mini-games.js?v=2.0"></script>
+    <script src="arcade-chat.js?v=1.10" defer></script>
     <script>
         window.resetArcadeChat = window.startNewChat;
     </script>
