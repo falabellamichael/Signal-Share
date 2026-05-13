@@ -6,6 +6,12 @@
 let BRIDGE_BASE_URL = "";
 const BRIDGE_LAST_WORKING_BASE_KEY = "ss_bridge_last_working_base";
 const CHAT_MODEL_PREFERENCE_KEY = 'arcade-chat-model';
+const ARCADE_CHAT_SIDEBAR_WIDTH_KEY = 'arcade-chat-sidebar-width';
+const STEAM_SHELL_LEFT_NAV_WIDTH = 240;
+const STEAM_SHELL_DIVIDER_WIDTH = 6;
+const DEFAULT_SIDEBAR_WIDTH = 380;
+const MIN_SIDEBAR_WIDTH = 280;
+const MIN_GAME_PANEL_WIDTH = 320;
 let lastResolvedBridgeCandidatesSignature = "";
 let lastResolvedBridgePrimary = "";
 
@@ -710,6 +716,47 @@ function cleanupOldChats() {
         localStorage.setItem('arcade-chats', JSON.stringify(filteredChats));
         console.log(`[Arcade Chat] Cleaned up ${chats.length - filteredChats.length} old chats.`);
     }
+}
+
+function isDesktopCompanionLayout() {
+    return !window.matchMedia('(max-width: 768px)').matches;
+}
+
+function getSteamShellBounds(shellElement = null) {
+    const shell = shellElement || document.querySelector('.steam-shell');
+    if (!shell) return null;
+    const shellRect = shell.getBoundingClientRect();
+    if (!shellRect || shellRect.width <= 0) return null;
+    return shellRect;
+}
+
+function clampSteamSidebarWidth(requestedWidth, shellElement = null) {
+    const shellRect = getSteamShellBounds(shellElement);
+    const shellWidth = shellRect?.width || window.innerWidth;
+    const maxWidth = Math.max(
+        MIN_SIDEBAR_WIDTH,
+        shellWidth - STEAM_SHELL_LEFT_NAV_WIDTH - STEAM_SHELL_DIVIDER_WIDTH - MIN_GAME_PANEL_WIDTH
+    );
+    const numeric = Number(requestedWidth);
+    const candidate = Number.isFinite(numeric) ? numeric : DEFAULT_SIDEBAR_WIDTH;
+    return Math.max(MIN_SIDEBAR_WIDTH, Math.min(candidate, maxWidth));
+}
+
+function getStoredSteamSidebarWidth(shellElement = null) {
+    const raw = `${localStorage.getItem(ARCADE_CHAT_SIDEBAR_WIDTH_KEY) || ''}`.trim();
+    const parsed = Number(raw);
+    return clampSteamSidebarWidth(Number.isFinite(parsed) ? parsed : DEFAULT_SIDEBAR_WIDTH, shellElement);
+}
+
+function applySteamShellOpenColumns(shellElement, sidebarWidth) {
+    if (!shellElement || !isDesktopCompanionLayout()) return;
+    const clampedSidebarWidth = clampSteamSidebarWidth(sidebarWidth, shellElement);
+    shellElement.style.gridTemplateColumns = `${STEAM_SHELL_LEFT_NAV_WIDTH}px 1fr ${STEAM_SHELL_DIVIDER_WIDTH}px ${Math.round(clampedSidebarWidth)}px`;
+}
+
+function applySteamShellCollapsedColumns(shellElement) {
+    if (!shellElement || !isDesktopCompanionLayout()) return;
+    shellElement.style.gridTemplateColumns = `${STEAM_SHELL_LEFT_NAV_WIDTH}px 1fr 0px 0px`;
 }
 
 /**
@@ -1650,7 +1697,6 @@ function setupResizing() {
     const sidebar = document.querySelector('.steam-chat-sidebar');
     const shell = document.querySelector('.steam-shell') || document.querySelector('.page-shell');
     let isResizing = false;
-    let initialMax = 0;
 
     if (!handle || !sidebar || !shell) return;
 
@@ -1676,7 +1722,6 @@ function setupResizing() {
 
     handle.addEventListener('mousedown', (e) => {
         isResizing = true;
-        initialMax = sidebar.offsetWidth;
         handle.classList.add('active');
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
@@ -1687,7 +1732,6 @@ function setupResizing() {
 
     handle.addEventListener('touchstart', (e) => {
         isResizing = true;
-        initialMax = sidebar.offsetWidth;
         handle.classList.add('active');
         document.body.style.userSelect = 'none';
         
@@ -1699,43 +1743,35 @@ function setupResizing() {
         if (!clientX || clientX <= 0) return;
 
         const isFixed = window.getComputedStyle(sidebar).position === 'fixed';
-        let newWidth;
-        
-        if (isFixed) {
-            newWidth = window.innerWidth - clientX;
-        } else {
-            const shellRect = shell.getBoundingClientRect();
-            newWidth = shellRect.right - clientX;
-        }
 
-        // Clamp width between 280px and 60% of screen
-        const minWidth = 280;
-        const maxWidth = window.innerWidth * 0.6;
-        newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
-        
-        if (!isFixed && shell && shell.classList.contains('steam-shell')) {
-            // In integrated mode, we resize the center section (column 2)
-            // The handle sits between column 2 and column 4 (with a 6px divider)
+        if (!isFixed && shell && shell.classList.contains('steam-shell') && isDesktopCompanionLayout()) {
             const shellRect = shell.getBoundingClientRect();
-            const absoluteHandlePos = clientX - shellRect.left;
-            
-            // 240px is the fixed left sidebar width
-            const newTilesWidth = absoluteHandlePos - 240; 
-            
-            // Clamp the center content to ensure chat has at least minWidth
-            const maxTilesWidth = shellRect.width - 240 - 6 - minWidth;
-            const clampedTilesWidth = Math.max(300, Math.min(newTilesWidth, maxTilesWidth));
-            
-            shell.style.gridTemplateColumns = `240px ${clampedTilesWidth}px 6px 1fr`;
+            const requestedSidebarWidth = shellRect.right - clientX;
+            const clampedSidebarWidth = clampSteamSidebarWidth(requestedSidebarWidth, shell);
+
+            applySteamShellOpenColumns(shell, clampedSidebarWidth);
+            localStorage.setItem(ARCADE_CHAT_SIDEBAR_WIDTH_KEY, `${Math.round(clampedSidebarWidth)}`);
         } else {
+            let newWidth = window.innerWidth - clientX;
+            // Fixed/floating layout clamp: at most 60% of viewport to keep content usable.
+            newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(newWidth, Math.round(window.innerWidth * 0.6)));
             sidebar.style.width = `${newWidth}px`;
             if (isFixed && handle) {
                 handle.style.right = `${newWidth}px`;
             }
+            localStorage.setItem(ARCADE_CHAT_SIDEBAR_WIDTH_KEY, `${Math.round(newWidth)}`);
         }
         
         if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets();
     }
+
+    handle.addEventListener('dblclick', () => {
+        if (!shell || !shell.classList.contains('steam-shell') || !isDesktopCompanionLayout()) return;
+        const resetWidth = clampSteamSidebarWidth(DEFAULT_SIDEBAR_WIDTH, shell);
+        applySteamShellOpenColumns(shell, resetWidth);
+        localStorage.setItem(ARCADE_CHAT_SIDEBAR_WIDTH_KEY, `${Math.round(resetWidth)}`);
+        if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets();
+    });
 }
 
 
@@ -1757,12 +1793,12 @@ window.toggleChat = function() {
         }
     }
     
-    // Update grid if in integrated mode
-    if (shell) {
+    // Update grid if in integrated desktop mode
+    if (shell && isDesktopCompanionLayout()) {
         if (isCollapsed) {
-            shell.style.gridTemplateColumns = '240px 1fr 0px 0px';
+            applySteamShellCollapsedColumns(shell);
         } else {
-            shell.style.gridTemplateColumns = '240px 1fr 6px 380px';
+            applySteamShellOpenColumns(shell, getStoredSteamSidebarWidth(shell));
         }
     }
     
@@ -1887,12 +1923,29 @@ function setupCloseParityHandlers() {
         if (handle) handle.classList.add('collapsed');
         document.body.classList.add('chat-collapsed');
         
-        if (shell) {
-            shell.style.gridTemplateColumns = '240px 1fr 0px 0px';
+        if (shell && isDesktopCompanionLayout()) {
+            applySteamShellCollapsedColumns(shell);
         }
     } else {
+        const shell = document.querySelector('.steam-shell');
+        if (shell && isDesktopCompanionLayout()) {
+            applySteamShellOpenColumns(shell, getStoredSteamSidebarWidth(shell));
+            if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets();
+        }
         updateChatPlaceholder();
     }
+
+    window.addEventListener('resize', () => {
+        const shell = document.querySelector('.steam-shell');
+        const sidebar = document.querySelector('.steam-chat-sidebar');
+        if (!shell || !sidebar || !shell.classList.contains('steam-shell')) return;
+        if (!isDesktopCompanionLayout()) return;
+        if (sidebar.classList.contains('collapsed')) return;
+
+        const width = getStoredSteamSidebarWidth(shell);
+        applySteamShellOpenColumns(shell, width);
+        if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets();
+    }, { passive: true });
 
     // Ensure Enter key sends the message
     const arcInput = document.getElementById('arc-chat-input');
