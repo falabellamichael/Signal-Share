@@ -489,56 +489,88 @@ function addChatMessage(role, content) {
 window.executeArcadeAction = function(action) {
     console.log(`[Arcade Chat] Executing Protocol Action: ${action}`);
     
+    const triggerClick = (sel) => document.querySelector(sel)?.click();
+    const navigate = (hash, fallback) => {
+        if (hash.startsWith('#')) {
+            const el = document.querySelector(hash);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+                const link = document.querySelector(`a[href="${hash}"], [id="${hash.substring(1)}NavLink"]`);
+                if (link) link.click();
+            } else if (fallback) window.location.href = fallback + hash;
+        } else window.location.href = hash;
+    };
+    const navigateToGames = (cat) => {
+        if (typeof window.setCategory === 'function') window.setCategory(cat);
+        else window.location.href = 'mini-games.html#' + cat;
+    };
+    const launchGame = (gid) => {
+        const fn = { pinball: 'launchPinball', snake: 'launchSnake', basketball: 'launchBasketball', hoops: 'launchBasketball', calc: 'launchCalc' }[gid];
+        if (fn && typeof window[fn] === 'function') window[fn]();
+        else if (typeof window.showGameDetails === 'function') window.showGameDetails(gid);
+        else window.location.href = `mini-games.html#${gid}`;
+    };
+    const setTheme = (tid) => {
+        const btn = document.querySelector(`[data-theme-option="${tid}"]`);
+        if (btn) btn.click();
+        else if (typeof window.updateTheme === 'function') window.updateTheme(tid);
+    };
+
     // Most actions are available as global functions in mini-games.js
     try {
-        switch (action) {
-            case 'pinball':
-                if (typeof window.launchPinball === 'function') window.launchPinball();
-                else if (typeof window.showGameDetails === 'function') window.showGameDetails('pinball');
-                else window.location.href = 'mini-games.html#pinball';
-                break;
-            case 'snake':
-                if (typeof window.launchSnake === 'function') window.launchSnake();
-                else if (typeof window.showGameDetails === 'function') window.showGameDetails('snake');
-                else window.location.href = 'mini-games.html#snake';
-                break;
-            case 'hoops':
-            case 'basketball':
-                if (typeof window.launchBasketball === 'function') window.launchBasketball();
-                else if (typeof window.showGameDetails === 'function') window.showGameDetails('basketball');
-                else window.location.href = 'mini-games.html#basketball';
-                break;
-            case 'calc':
-            case 'calculator':
-                if (typeof window.launchCalc === 'function') window.launchCalc();
-                else if (typeof window.showGameDetails === 'function') window.showGameDetails('calc');
-                else window.location.href = 'mini-games.html#calc';
-                break;
-            case 'leaderboards':
-            case 'leaderboard':
-                if (typeof window.setCategory === 'function') window.setCategory('leaderboard');
-                else window.location.href = 'mini-games.html#leaderboard';
-                break;
-            case 'shop':
-            case 'store':
-                if (typeof window.setCategory === 'function') window.setCategory('store');
-                else window.location.href = 'mini-games.html#store';
-                break;
-            case 'library':
-            case 'games':
-                if (typeof window.setCategory === 'function') window.setCategory('all');
-                else window.location.href = 'mini-games.html';
-                break;
-            case 'home':
-                if (typeof window.setCategory === 'function') window.setCategory('all');
-                else window.location.href = 'index.html';
-                break;
-            case 'action':
-                // AI hallucination of the template placeholder [ARCADE: <action>]
-                console.log('[Arcade Chat] Received generic action placeholder. No-op.');
-                break;
-            default:
-                console.warn(`[Arcade Chat] Unknown protocol action: ${action}`);
+                switch (action) {
+            case 'pinball': launchGame('pinball'); break;
+            case 'snake': launchGame('snake'); break;
+            case 'hoops': case 'basketball': launchGame('basketball'); break;
+            case 'calc': case 'calculator': launchGame('calc'); break;
+            case 'library': case 'games': navigateToGames('all'); break;
+            case 'shop': case 'store': navigateToGames('store'); break;
+            case 'leaderboards': case 'leaderboard': navigateToGames('leaderboard'); break;
+            case 'home': navigate('#top', 'index.html'); break;
+            case 'feed': navigate('#feed'); break;
+            case 'messages': case 'messenger': navigate('#messages'); break;
+            case 'profile': case 'view_my_profile': navigate('#profileView'); break;
+            case 'account': navigate('#account'); break;
+            case 'settings': triggerClick('#settingsToggleButton'); break;
+            case 'upload': case 'compose': navigate('#compose'); break;
+            case 'notifications': case 'notifications_panel': triggerClick('#notificationBell'); break;
+            case 'admin_panel': case 'moderation': triggerClick('#adminBanLauncherButton'); break;
+            case 'ban_list': triggerClick('#adminBanLauncherButton'); break;
+            case 'toggle_sidebar': case 'toggle_chat': triggerClick('.chat-toggle-btn'); break;
+            case 'toggle_messenger': triggerClick('#messengerLauncherButton'); break;
+            case 'toggle_player': case 'toggle_mini_player': triggerClick('.mini-player-head'); break;
+            case 'expand_viewer': triggerClick('#messengerExpandButton'); break;
+            case 'close_viewer': triggerClick('#viewerCloseButton'); break;
+            case 'collapse_viewer': triggerClick('#viewerCollapseButton'); break;
+            case 'theme_sunset': setTheme('sunset'); break;
+            case 'theme_midnight': setTheme('midnight'); break;
+            case 'theme_paper': setTheme('paper'); break;
+            case 'theme_ember': setTheme('ember'); break;
+            case 'theme_forest': setTheme('forest'); break;
+            case 'theme_ocean': setTheme('ocean'); break;
+            case 'settings_theme': triggerClick('#settingsToggleButton'); break;
+            case 'settings_account': navigate('#account'); break;
+            case 'settings_bridge': triggerClick('#settingsToggleButton'); setTimeout(() => navigate('#bridgeSecretInput'), 100); break;
+            case 'edit_profile': navigate('#profileView'); break;
+            case 'sync_profile': triggerClick('#saveProfileButton'); break;
+            case 'new_message': navigate('#messages'); setTimeout(() => triggerClick('#messageInput'), 200); break;
+            case 'search_contacts': navigate('#messages'); setTimeout(() => triggerClick('#peopleSearchInput'), 200); break;
+            case 'keyboard_shortcuts': triggerClick('#keyboardShortcutsButton'); break;
+            case 'help_guide': navigate('./how-to-guide.html'); break;
+            case 'view_terms': navigate('./security.html#terms'); break;
+            case 'view_privacy': navigate('./security.html#privacy'); break;
+            case 'refresh_page': window.location.reload(); break;
+            case 'logout': triggerClick('#signOutButton'); break;
+            case 'jump_to_top': case 'scroll_to_top': window.scrollTo({ top: 0, behavior: 'smooth' }); break;
+            case 'jump_to_bottom': case 'scroll_to_bottom': window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); break;
+            case 'scroll_to_feed': document.getElementById('feed')?.scrollIntoView({ behavior: 'smooth' }); break;
+            case 'scroll_to_player': document.querySelector('.mini-player')?.scrollIntoView({ behavior: 'smooth' }); break;
+            case 'view_liked': case 'feed_liked': if (typeof window.setFilter === 'function') window.setFilter('liked'); break;
+            case 'view_saved': case 'feed_saved': if (typeof window.setFilter === 'function') window.setFilter('saved'); break;
+            case 'clear_notifications': triggerClick('#clearNotificationsButton'); break;
+            case 'action': console.log('[Arcade Chat] Received generic action placeholder. No-op.'); break;
+            default: console.warn(`[Arcade Chat] Unknown protocol action: ${action}`);
+        }`);
         }
     } catch (err) {
         console.error(`[Arcade Chat] Failed to execute ${action}:`, err);

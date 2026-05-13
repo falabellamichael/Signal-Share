@@ -1,0 +1,58 @@
+window.executeArcadeAction = function(action) {
+    console.log(`[Arcade Chat] Executing Protocol Action: ${action}`);
+    
+    const triggerClick = (sel) => document.querySelector(sel)?.click();
+    const navigate = (hash, fallback) => {
+        if (hash.startsWith('#')) {
+            const el = document.querySelector(hash);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+                const link = document.querySelector(`a[href="${hash}"], [id="${hash.substring(1)}NavLink"]`);
+                if (link) link.click();
+            } else if (fallback) window.location.href = fallback + hash;
+        } else window.location.href = hash;
+    };
+    const navigateToGames = (cat) => {
+        if (typeof window.setCategory === 'function') window.setCategory(cat);
+        else window.location.href = 'mini-games.html#' + cat;
+    };
+    const launchGame = (gid) => {
+        const fn = { pinball: 'launchPinball', snake: 'launchSnake', basketball: 'launchBasketball', hoops: 'launchBasketball', calc: 'launchCalc' }[gid];
+        if (fn && typeof window[fn] === 'function') window[fn]();
+        else if (typeof window.showGameDetails === 'function') window.showGameDetails(gid);
+        else window.location.href = `mini-games.html#${gid}`;
+    };
+    const setTheme = (tid) => {
+        const btn = document.querySelector(`[data-theme-option="${tid}"]`);
+        if (btn) btn.click();
+        else if (typeof window.updateTheme === 'function') window.updateTheme(tid);
+    };
+
+    // Most actions are available as global functions in mini-games.js
+    try {
+        switch (action) {
+            case 'pinball':
+                if (typeof window.launchPinball === 'function') window.launchPinball();
+                else if (typeof window.showGameDetails === 'function') window.showGameDetails('pinball');
+                else window.location.href = 'mini-games.html#pinball';
+                break;
+            case 'snake':
+                if (typeof window.launchSnake === 'function') window.launchSnake();
+                else if (typeof window.showGameDetails === 'function') window.showGameDetails('snake');
+                else window.location.href = 'mini-games.html#snake';
+                break;
+            case 'hoops':
+            case 'basketball':
+                if (typeof window.launchBasketball === 'function') window.launchBasketball();
+                else if (typeof window.showGameDetails === 'function') window.showGameDetails('basketball');
+                else window.location.href = 'mini-games.html#basketball';
+                break;
+            case 'calc':
+            case 'calculator':
+                if (typeof window.launchCalc === 'function') window.launchCalc();
+                else if (typeof window.showGameDetails === 'function') window.showGameDetails('calc');
+                else window.location.href = 'mini-games.html#calc';
+                break;
+            case 'leaderboards':
+            case 'leaderboard':
+                if (typeof window.setCategory === 'function') window.setCategory('leaderboard');
