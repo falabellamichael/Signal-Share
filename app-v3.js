@@ -5,7 +5,7 @@ import {
   formatFileSize, formatKind, formatProviderName,
   formatPostBadge, formatPostMeta,
   clampNumber, parseTags, getMediaKind, compareByNewest,
-  getLatestPostedPostId
+  getLatestPostedPostId, readFileAsDataURL
 } from './shared-utils.js';
 
 // Ban Helper Functions
@@ -1660,8 +1660,24 @@ async function handleMessageSubmit(event) {
         threadId: state.activeThreadId,
         senderId: state.currentUser.id,
         body,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        attachmentUrl: state.messageAttachmentPreviewUrl || null,
+        attachmentKind: attachmentFile ? getMessageAttachmentKind(attachmentFile.type) : null,
       };
+
+      // Prepare attachment for LLM if present
+      let aiAttachment = null;
+      if (attachmentFile) {
+        try {
+          aiAttachment = {
+            data: await readFileAsDataURL(attachmentFile),
+            type: getMessageAttachmentKind(attachmentFile.type),
+            name: attachmentFile.name
+          };
+        } catch (err) {
+          console.error("Failed to read AI attachment", err);
+        }
+      }
 
       // Prepare history for LLM (excluding current message)
       const history = state.activeMessages
@@ -1673,6 +1689,11 @@ async function handleMessageSubmit(event) {
 
       mergeActiveMessage(userMessage);
       saveAiMessagesLocally();
+      
+      // Clear attachment state since it's now in the message
+      state.messageAttachmentFile = null;
+      state.messageAttachmentPreviewUrl = "";
+      
       renderMessenger();
 
       // Add thinking indicator
@@ -1695,7 +1716,7 @@ async function handleMessageSubmit(event) {
 
       let aiResponse;
       try {
-        aiResponse = await callLocalAI(body, history, fullContext);
+        aiResponse = await callLocalAI(body, history, fullContext, aiAttachment);
       } finally {
         // ALWAYS remove thinking indicator before rendering the response or error
         state.activeMessages = state.activeMessages.filter(m => m.id !== thinkingId);
@@ -1710,6 +1731,16 @@ async function handleMessageSubmit(event) {
       };
       mergeActiveMessage(aiMessage);
       saveAiMessagesLocally();
+
+      // Process Arcade Protocol actions if present in response
+      if (aiResponse && aiResponse.includes('[ARCADE:')) {
+        const arcadeMatch = aiResponse.match(/\[ARCADE:\s*([^\]]+)\]/);
+        if (arcadeMatch && typeof window.executeArcadeAction === 'function') {
+            const action = arcadeMatch[1].trim().toLowerCase();
+            window.executeArcadeAction(action);
+        }
+      }
+
       renderMessenger();
       playIncomingMessageSound();
       
@@ -1811,7 +1842,7 @@ async function handleMessageSubmit(event) {
   }
 }
 
-async function callLocalAI(text, history = [], pageContext = "") {
+async function callLocalAI(text, history = [], pageContext = "", attachment = null) {
   // Prioritize direct local bridge access
   const candidates = [
     'http://localhost:3000/api/llm/chat',
@@ -1858,8 +1889,9 @@ async function callLocalAI(text, history = [], pageContext = "") {
         credentials: 'omit',
         body: JSON.stringify({ 
           message: text, 
-          history,
-          pageContext: pageContext || 'Signal Share'
+          history: history,
+          pageContext: pageContext || 'Signal Share',
+          attachment: attachment // Pass through the attachment for multimodal support
         })
       });
       

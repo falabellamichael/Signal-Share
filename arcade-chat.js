@@ -428,7 +428,12 @@ function addChatMessage(role, content) {
             }
         });
     } else {
-        msgDiv.textContent = content;
+        // Strip internal protocol tags from display
+        const cleanContent = content.replace(/\[ARCADE:\s*[^\]]+\]/g, "").trim();
+        msgDiv.textContent = cleanContent;
+        if (!cleanContent && content.includes("[ARCADE:")) {
+            msgDiv.style.display = 'none';
+        }
     }
 
     // Handle multimedia attachments if present
@@ -481,7 +486,7 @@ function addChatMessage(role, content) {
     container.scrollTop = container.scrollHeight;
 }
 
-function executeArcadeAction(action) {
+window.executeArcadeAction = function(action) {
     console.log(`[Arcade Chat] Executing Protocol Action: ${action}`);
     
     // Most actions are available as global functions in mini-games.js
@@ -490,35 +495,43 @@ function executeArcadeAction(action) {
             case 'pinball':
                 if (typeof window.launchPinball === 'function') window.launchPinball();
                 else if (typeof window.showGameDetails === 'function') window.showGameDetails('pinball');
+                else window.location.href = 'mini-games.html#pinball';
                 break;
             case 'snake':
                 if (typeof window.launchSnake === 'function') window.launchSnake();
                 else if (typeof window.showGameDetails === 'function') window.showGameDetails('snake');
+                else window.location.href = 'mini-games.html#snake';
                 break;
             case 'hoops':
             case 'basketball':
                 if (typeof window.launchBasketball === 'function') window.launchBasketball();
                 else if (typeof window.showGameDetails === 'function') window.showGameDetails('basketball');
+                else window.location.href = 'mini-games.html#basketball';
                 break;
             case 'calc':
             case 'calculator':
                 if (typeof window.launchCalc === 'function') window.launchCalc();
                 else if (typeof window.showGameDetails === 'function') window.showGameDetails('calc');
+                else window.location.href = 'mini-games.html#calc';
                 break;
             case 'leaderboards':
             case 'leaderboard':
                 if (typeof window.setCategory === 'function') window.setCategory('leaderboard');
+                else window.location.href = 'mini-games.html#leaderboard';
                 break;
             case 'shop':
             case 'store':
                 if (typeof window.setCategory === 'function') window.setCategory('store');
+                else window.location.href = 'mini-games.html#store';
                 break;
             case 'library':
             case 'games':
                 if (typeof window.setCategory === 'function') window.setCategory('all');
+                else window.location.href = 'mini-games.html';
                 break;
             case 'home':
                 if (typeof window.setCategory === 'function') window.setCategory('all');
+                else window.location.href = 'index.html';
                 break;
             default:
                 console.warn(`[Arcade Chat] Unknown protocol action: ${action}`);

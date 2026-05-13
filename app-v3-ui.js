@@ -1156,7 +1156,11 @@ export function createAppUi(context) {
 
       const body = document.createElement("div");
       body.className = "message-body";
-      renderMessageBody(body, message.body);
+      if (message.isThinking) {
+        body.innerHTML = '<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>';
+      } else {
+        renderMessageBody(body, message.body);
+      }
 
       const meta = document.createElement("span");
       meta.textContent = `${senderLabel} / ${formatMessageTimestamp(message.createdAt)}`;
@@ -1330,10 +1334,19 @@ export function createAppUi(context) {
 
   function renderMessageBody(container, text) {
     if (!text) { container.hidden = true; container.innerHTML = ""; return; }
+    
+    // Strip internal protocol tags from display
+    const cleanText = text.replace(/\[ARCADE:\s*[^\]]+\]/g, "").trim();
+    if (!cleanText && text.includes("[ARCADE:")) {
+        container.hidden = true; 
+        container.innerHTML = ""; 
+        return; 
+    }
+
     container.hidden = false;
     
     // Simple Markdown-lite parser for code blocks
-    const parts = text.split(/```/g);
+    const parts = cleanText.split(/```/g);
     container.innerHTML = "";
     
     parts.forEach((part, index) => {

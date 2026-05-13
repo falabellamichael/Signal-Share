@@ -226,6 +226,20 @@ export function debounce(actionName, ttl = 0) {
 }
 
 /**
+ * Reads a file as a data URL (base64).
+ * @param {File} file 
+ * @returns {Promise<string>}
+ */
+export function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
  * Checks if the app is running in a native Capacitor environment.
  */
 export function isNative() {
