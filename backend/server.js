@@ -988,6 +988,50 @@ app.post("/api/activity/report", async (req, res) => {
     return res.status(500).json({ ok: false });
   }
 });
+// System Automation - Launching Apps
+app.post("/api/system/launch", (req, res) => {
+  const appId = `${req.body?.appId || ""}`.trim().toLowerCase();
+  if (!appId) return res.status(400).json({ ok: false, error: "No appId provided" });
+
+  if (!ALLOW_OPEN_URI) {
+    return res.status(403).json({ ok: false, error: "System automation is disabled in bridge config." });
+  }
+
+  // Security Whitelist for System Apps
+  const whitelist = {
+    "taskmgr": "taskmgr.exe",
+    "task manager": "taskmgr.exe",
+    "calc": "calc.exe",
+    "calculator": "calc.exe",
+    "notepad": "notepad.exe",
+    "control": "control.exe",
+    "control panel": "control.exe",
+    "explorer": "explorer.exe",
+    "terminal": "wt.exe",
+    "cmd": "cmd.exe",
+    "spotify": "spotify:",
+    "chrome": "chrome.exe",
+    "edge": "msedge.exe",
+    "browser": "https://www.google.com"
+  };
+
+  const command = whitelist[appId];
+  if (!command) {
+    console.warn(`[Security] Blocked unauthorized launch request: ${appId}`);
+    return res.status(403).json({ ok: false, error: "Application not in security whitelist." });
+  }
+
+  console.log(`[Bridge] Launching application: ${command}`);
+  
+  try {
+    const psProcess = spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${command}"`], { windowsHide: true });
+    psProcess.on('error', (err) => console.error(`[Bridge] Launch failed: ${err.message}`));
+    return res.json({ ok: true, launched: appId });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // Remaining API routes
 
 app.get("/security", (req, res) => res.sendFile(path.join(projectRoot, "security.html")));

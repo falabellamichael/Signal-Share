@@ -19,6 +19,7 @@ WEB & SYSTEM TOOLS (USE THESE EXACTLY):
 3. [OPEN: url] -> Open a browser link OR a system app.
 4. [PLAY: action] -> System media control (play_pause, next, previous).
 5. [COMPOSE: text] -> Pre-fill the messenger input with the specified text.
+6. [LAUNCH: app_id] -> Open a whitelisted system application (taskmgr, calculator, notepad, explorer, spotify, chrome, edge).
 
 ARCADE SYSTEM TOOLS (USE THESE FOR INTERNAL NAVIGATION):
 6. [ARCADE: <action_id>] -> Trigger internal arcade functions.
@@ -299,6 +300,29 @@ async function executeWebTools(text) {
             results.push(`MEDIA ACTION EXECUTED: ${action}`);
         } catch (e) {
             results.push(`MEDIA ACTION FAILED: ${e.message}`);
+        }
+    }
+
+    // Handle [LAUNCH: app_id]
+    const launchMatch = text.match(/\[LAUNCH:\s*([^\]]+)\]/);
+    if (launchMatch) {
+        const appId = launchMatch[1].trim().toLowerCase();
+        try {
+            const bridgeUrl = `http://localhost:3000/api/system/launch`;
+            const response = await fetch(bridgeUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ appId: appId })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`Server error: ${response.status} - ${errorData.error || response.statusText}`);
+            }
+            
+            results.push(`SYSTEM COMMAND EXECUTED: Successfully launched ${appId} on your PC.`);
+        } catch (e) {
+            results.push(`SYSTEM COMMAND FAILED: Could not launch ${appId}. Error: ${e.message}`);
         }
     }
 
