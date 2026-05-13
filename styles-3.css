@@ -1022,7 +1022,7 @@
     }
 
     .admin-ban-list {
-      max-height: min(44vh, 360px);
+      max-height: min(44dvh, 360px);
     }
 
     .messenger-section.is-expanded {
@@ -1267,12 +1267,12 @@
 
     .message-list {
       min-height: 84px;
-      max-height: min(24vh, 220px);
+      max-height: min(24dvh, 220px);
       padding-right: 0;
     }
 
     .messenger-section.is-expanded .message-list {
-      max-height: min(30vh, 280px);
+      max-height: min(30dvh, 280px);
     }
 
     .message-bubble {
@@ -1301,7 +1301,7 @@
     .message-form textarea {
       height: 46px;
       min-height: 46px;
-      max-height: 18vh;
+      max-height: 18dvh;
       padding: 12px 14px;
       line-height: 1.35;
       resize: none;
@@ -1320,7 +1320,7 @@
     .message-form textarea {
       height: 46px;
       min-height: 46px;
-      max-height: 18vh;
+      max-height: 18dvh;
       padding: 12px 14px;
       line-height: 1.35;
       resize: none;
