@@ -1201,7 +1201,15 @@ function isThreadBlocked(thread) { if (!thread) return false; const partnerId = 
 function getActiveThread() { return state.directThreads.find((thread) => thread.id === state.activeThreadId) ?? null; }
 function sortThreads(threads) { return [...threads].sort((l, r) => new Date(r.updatedAt).getTime() - new Date(l.updatedAt).getTime()); }
 function mergeThread(thread) { if (isThreadBlocked(thread)) return; const others = state.directThreads.filter((item) => item.id !== thread.id); state.directThreads = sortThreads([thread, ...others]); }
-function mergeActiveMessage(message) { if (message.threadId !== state.activeThreadId) return; if (state.activeMessages.some((item) => item.id === message.id)) return; state.activeMessages = [...state.activeMessages, message].sort((l, r) => new Date(l.createdAt).getTime() - new Date(r.createdAt).getTime()); }
+function mergeActiveMessage(message) { 
+  if (message.threadId !== state.activeThreadId) return; 
+  const existingIdx = state.activeMessages.findIndex((item) => item.id === message.id);
+  if (existingIdx >= 0) {
+    state.activeMessages[existingIdx] = { ...state.activeMessages[existingIdx], ...message };
+  } else {
+    state.activeMessages = [...state.activeMessages, message].sort((l, r) => new Date(l.createdAt).getTime() - new Date(r.createdAt).getTime()); 
+  }
+}
 function canonicalizeThreadPair(l, r) { return [l, r].sort((a, b) => a.localeCompare(b)); }
 
 async function syncCurrentProfileToSupabase(displayNameOverride = "") {

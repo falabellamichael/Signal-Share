@@ -190,7 +190,7 @@ window.MessengerRealtime = class MessengerRealtime {
       createdAt: row.created_at,
       attachmentKind: row.attachment_kind,
       attachmentName: row.attachment_name,
-      attachmentUrl: row.attachment_file_path
+      attachmentUrl: row.attachment_url
     };
   }
 };
