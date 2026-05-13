@@ -1925,13 +1925,7 @@ async function handleMessageSubmit(event) {
     mergeActiveMessage,
     renderMessenger,
     showMessengerFeedback,
-    playIncomingMessageSound,
-    shouldAttemptBridgeRequests,
-    probeLocalNetworkPermission,
-    resolveBridgeBaseCandidates,
-    getBridgeSecretValue,
-    resolvePreferredBridgeModel,
-    getBridgeTargetAddressSpace
+    playIncomingMessageSound
   });
   if (aiHandled) return;
 

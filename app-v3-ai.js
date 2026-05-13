@@ -163,13 +163,7 @@ export async function handleAiThreadMessageSubmit({
   mergeActiveMessage,
   renderMessenger,
   showMessengerFeedback,
-  playIncomingMessageSound,
-  shouldAttemptBridgeRequests,
-  probeLocalNetworkPermission,
-  resolveBridgeBaseCandidates,
-  getBridgeSecretValue,
-  resolvePreferredBridgeModel,
-  getBridgeTargetAddressSpace
+  playIncomingMessageSound
 }) {
   const activeThread = getActiveThread();
   if (!activeThread?.isAi) return false;
@@ -311,7 +305,6 @@ export async function handleAiThreadMessageSubmit({
         })
       : "";
     const fullContext = `${pageContext} (Visible text: ${pageText})${sharedAiContext ? `\n\n${sharedAiContext}` : ""}`;
-    await activateBridgeForPrompt({ shouldAttemptBridgeRequests, probeLocalNetworkPermission });
 
     let aiResponse;
     try {
@@ -319,13 +312,7 @@ export async function handleAiThreadMessageSubmit({
         text: body,
         history,
         pageContext: fullContext,
-        attachment: aiAttachment,
-        shouldAttemptBridgeRequests,
-        probeLocalNetworkPermission,
-        resolveBridgeBaseCandidates,
-        getBridgeSecretValue,
-        resolvePreferredBridgeModel,
-        getBridgeTargetAddressSpace
+        attachment: aiAttachment
       });
     } finally {
       state.activeMessages = state.activeMessages.filter((message) => message.id !== thinkingId);
@@ -370,20 +357,9 @@ async function callLocalAI({
   text,
   history = [],
   pageContext = "",
-  attachment = null,
-  shouldAttemptBridgeRequests,
-  probeLocalNetworkPermission,
-  resolveBridgeBaseCandidates,
-  getBridgeSecretValue,
-  resolvePreferredBridgeModel,
-  getBridgeTargetAddressSpace
+  attachment = null
 }) {
-  await activateBridgeForPrompt({ shouldAttemptBridgeRequests, probeLocalNetworkPermission });
-
-  const bridgeBaseCandidates = resolveBridgeBaseCandidates();
-  if (bridgeBaseCandidates.length === 0) return getGlobalProtocolOfflineResponse(text);
-
-  let abortController = null;
+  let abortController = new AbortController();
   let stopRequested = false;
   window.stopMessengerAi = () => {
     stopRequested = true;
@@ -393,116 +369,64 @@ async function callLocalAI({
     }
   };
 
-  const secret = getBridgeSecretValue();
-  const preferredModel = resolvePreferredBridgeModel() || "auto";
-  const payload = JSON.stringify({
-    message: text,
-    model: preferredModel,
-    history: Array.isArray(history) ? history : [],
-    pageContext: pageContext || "Signal Share",
-    attachment
-  });
+  let reply = null;
+  let lastError = null;
 
-  if (typeof window.bridgeFetch === "function") {
+  const modelSelect = document.getElementById("chat-model-select");
+  const selectedModel = modelSelect ? modelSelect.value : "auto";
+  const requestModel = typeof window.resolveChatRequestModel === "function"
+    ? window.resolveChatRequestModel(selectedModel)
+    : (`${selectedModel || "auto"}`.trim() || "auto");
+
+  if (typeof window.isBridgeFeatureEnabled === "function" && !window.isBridgeFeatureEnabled()) {
+    localStorage.setItem("ss_bridge_enabled", "1");
+  }
+
+  if (typeof window.bridgeFetch !== "function") {
+    lastError = "Bridge fetch unavailable";
+  } else {
     try {
-      abortController = new AbortController();
       const response = await window.bridgeFetch("/api/llm/chat", {
         method: "POST",
         signal: abortController.signal,
         timeoutMs: 45000,
-        body: payload
+        body: JSON.stringify({
+          message: text,
+          model: requestModel,
+          attachment,
+          history: Array.isArray(history) ? history : [],
+          pageContext: pageContext || "Signal Share"
+        })
       });
-      if (response?.ok) {
-        const data = await response.json().catch(() => ({}));
-        return data.reply || "I'm having trouble thinking right now.";
-      }
-      console.debug(
-        `[AI Messenger] Shared bridgeFetch returned status ${response?.status ?? "unknown"}; falling back to internal resolver.`
-      );
-    } catch (error) {
-      if (stopRequested) {
-        return "🛑 [Signal Protocol] AI request stopped.";
-      }
-      console.debug("[AI Messenger] Shared bridgeFetch path failed:", error);
-    }
-  }
-
-  let lastNetworkError = null;
-  let lastHttpResponse = null;
-
-  for (const baseUrl of bridgeBaseCandidates) {
-    const endpoint = `${baseUrl}/api/llm/chat`;
-    try {
-      abortController = new AbortController();
-      const requestController = abortController;
-      const timeoutId = setTimeout(() => {
-        requestController.abort();
-      }, 45000);
-
-      const targetAddressSpace = getBridgeTargetAddressSpace(baseUrl);
-      const headers = { "Content-Type": "application/json" };
-      if (secret) headers["X-Bridge-Secret"] = secret;
-
-      let response;
-      try {
-        response = await fetch(endpoint, {
-          method: "POST",
-          mode: "cors",
-          cache: "no-store",
-          credentials: "omit",
-          headers,
-          ...(targetAddressSpace ? { targetAddressSpace } : {}),
-          signal: requestController.signal,
-          body: payload
-        });
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
       if (response.ok) {
-        localStorage.setItem("ss_bridge_last_working_base", baseUrl);
-        const data = await response.json();
-        return data.reply || "I'm having trouble thinking right now.";
+        const data = await response.json().catch(() => ({}));
+        reply = data.reply;
+      } else {
+        lastError = `Bridge returned ${response.status}`;
       }
-
-      if (response.status === 401 || response.status === 403 || response.status === 422) {
-        lastHttpResponse = response;
-        break;
-      }
-
-      lastHttpResponse = response;
     } catch (error) {
       if (stopRequested) {
         return "🛑 [Signal Protocol] AI request stopped.";
       }
-      lastNetworkError = error;
-      console.debug(`[AI Messenger] Endpoint failed ${endpoint}:`, error);
-    }
-  }
-
-  if (lastHttpResponse) {
-    console.debug(`[AI Messenger] Bridge returned status ${lastHttpResponse.status}.`);
-  } else if (lastNetworkError) {
-    console.debug("[AI Messenger] Bridge network error:", lastNetworkError);
-  }
-
-  console.log("[AI Messenger] All endpoints failed. Switching to Global Protocol Offline mode.");
-  return getGlobalProtocolOfflineResponse(text);
-}
-
-async function activateBridgeForPrompt({ shouldAttemptBridgeRequests, probeLocalNetworkPermission }) {
-  localStorage.setItem("ss_bridge_enabled", "1");
-  localStorage.setItem("signal-share-bridge-enabled", "1");
-
-  if (typeof shouldAttemptBridgeRequests === "function" && shouldAttemptBridgeRequests()) {
-    if (typeof probeLocalNetworkPermission === "function") {
-      try {
-        await probeLocalNetworkPermission();
-      } catch (_error) {
-        // Probe failures should not block the AI request path.
+      const bridgeDisabled = error?.name === "BridgeDisabledError";
+      lastError = bridgeDisabled
+        ? "Bridge disabled"
+        : (error?.message || "Connection refused or blocked by browser");
+      if (!bridgeDisabled) {
+        console.warn("[AI Messenger] Bridge request failed:", error);
       }
     }
   }
+
+  if (reply !== null) {
+    return reply || "...";
+  }
+
+  if (lastError && lastError !== "Bridge disabled") {
+    console.warn(`[AI Messenger] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
+  }
+
+  return getGlobalProtocolOfflineResponse(text);
 }
 
 function getGlobalProtocolOfflineResponse(text) {

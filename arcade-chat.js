@@ -370,6 +370,14 @@ async function bridgeFetch(path, options = {}) {
     throw lastNetworkError || new Error("Bridge request failed");
 }
 
+// Expose arcade bridge fetch globally so main-page AI can use the exact
+// same bridge request logic/path as mini-games.
+if (typeof window !== "undefined") {
+    window.bridgeFetch = bridgeFetch;
+    window.resolveChatRequestModel = resolveChatRequestModel;
+    window.isBridgeFeatureEnabled = isBridgeFeatureEnabled;
+}
+
 async function getDesktopBridgeSnapshot() {
     const res = await bridgeFetch("/api/system-media/current");
     if (!res.ok) return null;
