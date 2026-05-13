@@ -757,8 +757,30 @@ function setupResizing() {
             const appRunner = document.getElementById('app-runner');
             if (toggleBtn) toggleBtn.style.right = `${gapWidth}px`;
             if (messengerBtn) messengerBtn.style.setProperty('right', `${gapWidth}px`, 'important');
-            if (messengerSection) messengerSection.style.setProperty('right', `${gapWidth}px`, 'important');
+            
+            if (messengerSection) {
+                messengerSection.style.setProperty('right', `${gapWidth}px`, 'important');
+                
+                // Dynamically limit messenger width if it's expanded to prevent screen cutoff
+                if (messengerSection.classList.contains('is-expanded')) {
+                    const availableWidth = window.innerWidth - gapWidth - 20; // 20px left margin
+                    messengerSection.style.maxWidth = `${availableWidth}px`;
+                    // Also trigger a minor width recalculation if it's currently larger than available
+                    if (messengerSection.offsetWidth > availableWidth) {
+                        messengerSection.style.width = `${availableWidth}px`;
+                    }
+                } else {
+                    messengerSection.style.maxWidth = '';
+                    messengerSection.style.width = '';
+                }
+            }
             if (appRunner) appRunner.style.right = `${newWidth}px`;
+        } else {
+            // Reset messenger constraints when chat is collapsed
+            if (messengerSection) {
+                messengerSection.style.maxWidth = '';
+                messengerSection.style.width = '';
+            }
         }
     }
 }
