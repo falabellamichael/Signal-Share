@@ -862,12 +862,20 @@ async function initialize() {
     console.error("Platform class injection failed", error);
   }
 
-  // DEBUG OVERLAY
-  const debugOverlay = document.createElement("div");
-  debugOverlay.id = "debug-overlay";
-  debugOverlay.style.cssText = "position:fixed;top:0;left:0;z-index:999999;background:rgba(255,0,0,0.8);color:white;font-size:12px;padding:4px;pointer-events:none;font-family:monospace;line-height:1.2;white-space:pre;";
-  document.body.appendChild(debugOverlay);
-  window.updateDebugOverlay = (text) => { debugOverlay.textContent = text; };
+  // DEBUG OVERLAY REMOVED - Fixed "Little Red Spot" bug
+  window.updateDebugOverlay = (text) => { 
+    let dot = document.getElementById("debug-overlay");
+    if (!dot && text) {
+        dot = document.createElement("div");
+        dot.id = "debug-overlay";
+        dot.style.cssText = "position:fixed;top:0;left:0;z-index:999999;background:rgba(255,0,0,0.8);color:white;font-size:12px;padding:4px;pointer-events:none;font-family:monospace;line-height:1.2;white-space:pre;";
+        document.body.appendChild(dot);
+    }
+    if (dot) {
+        dot.textContent = text;
+        dot.style.display = text ? 'block' : 'none';
+    }
+  };
 
   applySiteSettings(state.siteSettings);
   applyUserPreferences(state.preferences);
