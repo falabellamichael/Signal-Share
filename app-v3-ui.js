@@ -485,7 +485,12 @@ export function createAppUi(context) {
     elements.peopleSearchInput.addEventListener("input", (event) => { state.peopleSearch = normalizeMessengerListSearch(event.target.value); renderMessenger(); });
     elements.conversationSearchInput.addEventListener("input", (event) => { state.conversationSearch = normalizeMessengerListSearch(event.target.value); renderMessenger(); });
     elements.messageForm.addEventListener("submit", handleMessageSubmit);
-    elements.messageInput.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { handleMessageSubmit(event); } });
+    elements.messageInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        handleMessageSubmit(event);
+      }
+    });
     elements.messageEmojiButton.addEventListener("click", toggleMessageEmojiPicker);
     elements.messageEmojiPanel.addEventListener("click", handleMessageEmojiPanelClick);
     elements.messageAttachButton.addEventListener("click", () => { closeMessageEmojiPicker(); elements.messageAttachmentInput.click(); });

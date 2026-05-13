@@ -900,6 +900,17 @@ function setupToggle() {
     } else {
         updateChatPlaceholder();
     }
+
+    // Ensure Enter key sends the message
+    const arcInput = document.getElementById('arc-chat-input');
+    if (arcInput) {
+        arcInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendChatMessage();
+            }
+        });
+    }
 })();
 
 /**
