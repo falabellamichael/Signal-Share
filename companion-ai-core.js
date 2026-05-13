@@ -97,7 +97,11 @@
             "theme_ocean",
             "scroll_to_top",
             "scroll_to_bottom",
-            "refresh_page"
+            "refresh_page",
+            "barrel_roll",
+            "joke",
+            "konami_code",
+            "meaning_of_life"
         ]
     });
     const SUPPORTED_ATTACHMENT_TYPES = Object.freeze([

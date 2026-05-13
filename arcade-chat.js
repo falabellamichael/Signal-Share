@@ -1284,6 +1284,26 @@ window.executeArcadeAction = function(action) {
             case 'reset_player': if (typeof window.resetPlayerDockPosition === 'function') window.resetPlayerDockPosition(); break;
             case 'clear_notifications': triggerClick('#clearNotificationsButton'); break;
             case 'mark_all_read': triggerClick('#markAllReadButton'); break;
+            case 'barrel_roll':
+                document.body.style.transition = "transform 1s";
+                document.body.style.transform = "rotate(360deg)";
+                setTimeout(() => document.body.style.transform = "", 1000);
+                break;
+            case 'joke':
+                const jokes = [
+                    "Why did the gamer stay in bed? Because he had 'lag'.",
+                    "I asked the A.I. to make me a sandwich. It said: 'SUDO make sandwich'.",
+                    "How many programmers does it take to change a lightbulb? None, that's a hardware problem.",
+                    "What's a gamer's favorite snack? Micro-chips."
+                ];
+                addChatMessage('ai', "🤖 [Humor Protocol]: " + jokes[Math.floor(Math.random() * jokes.length)]);
+                break;
+            case 'konami_code':
+                addChatMessage('ai', "🕹️ [Easter Egg]: ↑ ↑ ↓ ↓ ← → ← → B A. 30 Lives added! (Metaphorically speaking).");
+                break;
+            case 'meaning_of_life':
+                addChatMessage('ai', "👾 [Deep Protocol]: 42. And also, achieving a new high score in the arcade.");
+                break;
             case 'action': console.log('[Arcade Chat] Received generic action placeholder. No-op.'); break;
             default: console.warn(`[Arcade Chat] Unknown protocol action: ${action}`);
         }
