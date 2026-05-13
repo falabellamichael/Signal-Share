@@ -451,10 +451,13 @@ function getBridgeSecretValue() {
 
 function resolvePreferredBridgeModel() {
   const saved = `${localStorage.getItem("arcade-chat-model") || ""}`.trim();
-  if (saved && saved.toLowerCase() !== "auto") return saved;
+  if (saved) return saved;
 
   const modelSelect = document.getElementById("chat-model-select");
-  if (!modelSelect) return "";
+  if (!modelSelect) return "auto";
+
+  const selectedValue = `${modelSelect.value || ""}`.trim();
+  if (selectedValue && selectedValue.toLowerCase() !== "auto") return selectedValue;
 
   const values = Array.from(modelSelect.options || [])
     .map((option) => `${option.value || ""}`.trim())
@@ -466,7 +469,7 @@ function resolvePreferredBridgeModel() {
     return normalized.includes("1.5b") || normalized.includes("e2b");
   });
 
-  return lightweight || "";
+  return lightweight || "auto";
 }
 
 function normalizeBridgeBaseUrl(value = "") {

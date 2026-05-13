@@ -394,10 +394,10 @@ async function callLocalAI({
   };
 
   const secret = getBridgeSecretValue();
-  const preferredModel = resolvePreferredBridgeModel();
+  const preferredModel = resolvePreferredBridgeModel() || "auto";
   const payload = JSON.stringify({
     message: text,
-    ...(preferredModel ? { model: preferredModel } : {}),
+    model: preferredModel,
     history: Array.isArray(history) ? history : [],
     pageContext: pageContext || "Signal Share",
     attachment
