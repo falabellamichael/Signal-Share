@@ -858,11 +858,32 @@ function addChatMessage(role, content) {
                 const lines = part.split('\n');
                 const lang = lines[0].trim();
                 const code = lines.slice(1).join('\n').trim();
+                
+                const codeWrapper = document.createElement('div');
+                codeWrapper.className = 'code-block-wrapper';
+                
                 const pre = document.createElement('pre');
                 pre.className = 'chat-code-block';
                 pre.setAttribute('data-lang', lang || 'code');
                 pre.textContent = code;
-                msgDiv.appendChild(pre);
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-code-btn';
+                copyBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span>Copy</span>';
+                copyBtn.onclick = () => {
+                    navigator.clipboard.writeText(code).then(() => {
+                        copyBtn.classList.add('copied');
+                        copyBtn.querySelector('span').textContent = 'Copied!';
+                        setTimeout(() => {
+                            copyBtn.classList.remove('copied');
+                            copyBtn.querySelector('span').textContent = 'Copy';
+                        }, 2000);
+                    });
+                };
+                
+                codeWrapper.appendChild(pre);
+                codeWrapper.appendChild(copyBtn);
+                msgDiv.appendChild(codeWrapper);
             }
         });
     } else {
