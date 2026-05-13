@@ -5,7 +5,7 @@ import {
   formatFileSize, formatKind, formatProviderName,
   formatPostBadge, formatPostMeta,
   clampNumber, parseTags, getMediaKind, compareByNewest,
-  getLatestPostedPostId, readFileAsDataURL
+  getLatestPostedPostId
 } from './shared-utils.js';
 
 // Ban Helper Functions
@@ -18,6 +18,21 @@ const AI_COMPANION_PROFILE = Object.freeze({
   isAi: true,
   createdAt: new Date("2026-05-01").toISOString()
 });
+
+/**
+ * Reads a File as a data URL.
+ * Kept local to avoid hard dependency on a specific shared-utils export set.
+ * @param {File} file
+ * @returns {Promise<string>}
+ */
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 /**
  * Check if current user is banned
@@ -1388,7 +1403,7 @@ async function subscribeMessagingChannels(options = {}) {
         const like = payload.new;
         if (like.user_id === state.currentUser.id) return;
         const likedPost = state.userPosts.find((p) => p.id === like.post_id);
-        const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
+        const isMobile = !!window.Capacitor && typeof window.Capacitor.getPlatform === "function" && window.Capacitor.getPlatform() !== "web";
         if (likedPost && likedPost.authorId === state.currentUser.id && window.notifications) {
           const notificationId = `like-${like.post_id}-${like.user_id}`;
           const message = `Someone liked your post: ${likedPost.title || "Untitled"}`;

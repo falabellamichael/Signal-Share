@@ -110,6 +110,11 @@ body.main-page[data-theme="ember"] {
     visibility: visible;
 }
 
+.steam-chat-sidebar.collapsed {
+    pointer-events: none;
+    visibility: hidden;
+}
+
 /* Ensure the sidebar fills the grid area in integrated mode */
 .steam-shell .steam-chat-sidebar {
     width: 100%;
@@ -121,6 +126,7 @@ body > .steam-chat-sidebar {
     top: 0;
     right: 0;
     height: 100vh;
+    height: 100dvh;
     box-shadow: -10px 0 30px var(--arc-shadow);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
 }
@@ -136,6 +142,7 @@ body > .chat-resize-handle {
     top: 0;
     right: 380px;
     height: 100vh;
+    height: 100dvh;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -301,6 +308,7 @@ body:not(.chat-collapsed) .messenger-section {
         top: 0;
         right: 0;
         height: 100vh;
+        height: 100dvh;
         width: 100% !important;
         z-index: 10002;
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;

@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Mini Games and Tools | Signal Share</title>
     <link rel="stylesheet" href="./questions-guide.css?v=1.5">
-    <link rel="stylesheet" href="./android-optimizations.css?v=1.0">
-    <link rel="stylesheet" href="arcade-chat.css?v=1.7">
+    <link rel="stylesheet" href="./android-optimizations.css?v=1.4">
+    <link rel="stylesheet" href="arcade-chat.css?v=1.8">
     <script>
         // Signal Share Android Optimization Suite - Detection
         (function() {
-            const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+            const isNative = !!window.Capacitor
+                && typeof window.Capacitor.getPlatform === 'function'
+                && window.Capacitor.getPlatform() !== 'web';
             if (isNative || /Android/i.test(navigator.userAgent)) {
                 document.documentElement.classList.add('platform-android');
                 document.documentElement.classList.add('is-steam-shell');
@@ -1332,7 +1334,10 @@
         
         // Detect platform for CSS optimizations
         const isAndroid = /Android/i.test(navigator.userAgent);
-        if (isAndroid || (window.Capacitor && window.Capacitor.getPlatform() === 'android')) {
+        const isCapacitorAndroid = !!window.Capacitor
+            && typeof window.Capacitor.getPlatform === 'function'
+            && window.Capacitor.getPlatform() === 'android';
+        if (isAndroid || isCapacitorAndroid) {
             document.documentElement.classList.add('platform-android');
 
             // Disable native pull-to-refresh for the mini-games shell to allow internal scrolling
@@ -1415,8 +1420,8 @@
             }
         });
     </script>
-    <script src="mini-games.js?v=1.6"></script>
-    <script src="arcade-chat.js?v=1.7" defer></script>
+    <script src="mini-games.js?v=1.7"></script>
+    <script src="arcade-chat.js?v=1.8" defer></script>
     <script>
         window.resetArcadeChat = window.startNewChat;
     </script>

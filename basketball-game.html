@@ -8,7 +8,7 @@
     <script>
         // Signal Share Android Optimization Suite - Detection
         (function() {
-            const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+            const isNative = !!window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() !== 'web';
             if (isNative || /Android/i.test(navigator.userAgent)) {
                 document.documentElement.classList.add('platform-android');
                 document.documentElement.classList.add('is-signal-app');
@@ -248,7 +248,7 @@
     <script>
         // Signal Share Android Optimization Suite - Detection
         (function() {
-            const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+            const isNative = !!window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() !== 'web';
             if (isNative || /Android/i.test(navigator.userAgent)) {
                 document.documentElement.classList.add('platform-android');
             }

@@ -52,7 +52,7 @@ html.platform-android {
     overscroll-behavior-y: auto !important;
 }
 
-html.platform-android body {
+html.platform-android body:not(.questions-page) {
     height: auto !important;
     min-height: 100% !important;
     overflow-y: visible !important;
@@ -72,6 +72,7 @@ html.platform-android.is-steam-shell,
 html.platform-android.is-steam-shell body,
 html.platform-android.is-signal-app,
 html.platform-android.is-signal-app body {
+    height: 100vh !important;
     height: 100dvh !important;
     overflow: hidden !important;
     overscroll-behavior-y: none !important;
@@ -91,8 +92,8 @@ html.platform-android[data-theme="contrast"], html.platform-android body[data-th
 html.platform-android[data-theme="ember"],    html.platform-android body[data-theme="ember"]    { --bg-android: #140302; }
 
 /* Kill fixed-position blobs that cause "messed up background" (Shader failures) */
-html.platform-android body::before,
-html.platform-android body::after,
+html.platform-android body:not(.questions-page)::before,
+html.platform-android body:not(.questions-page)::after,
 html.platform-android #top::before,
 html.platform-android #top::after {
     display: none !important;
@@ -107,6 +108,7 @@ html.platform-android body.viewer-open {
 
 /* Ensure the main container grows and allows natural scrolling */
 html.platform-android .page-shell {
+    min-height: 100vh;
     min-height: 100dvh;
     display: block !important;
     padding-top: max(var(--container-padding), var(--safe-area-top)) !important;

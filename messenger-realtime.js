@@ -131,7 +131,7 @@ window.MessengerRealtime = class MessengerRealtime {
     if (state.preferences?.notificationHideBody) messageBody = "New message";
 
     // 1. Try main notification system
-    const isMobile = !!window.Capacitor && window.Capacitor.getPlatform() !== "web";
+    const isMobile = !!window.Capacitor && typeof window.Capacitor.getPlatform === "function" && window.Capacitor.getPlatform() !== "web";
 
     console.log("[Realtime] Notification System Status:", window.notifications ? "Ready" : "Missing", "Mobile:", isMobile, "Active:", isActiveThread);
     

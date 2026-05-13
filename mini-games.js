@@ -24,7 +24,7 @@ let customGames = JSON.parse(localStorage.getItem('ss-custom-games') || '[]');
 let uploadedFiles = [];
 
 // Detection
-const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+const isNative = !!window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() !== 'web';
 
 function syncCurrentCategoryGlobal() {
     window.currentCategory = currentCategory;
@@ -32,10 +32,33 @@ function syncCurrentCategoryGlobal() {
 
 function resetShellScrollPosition(behavior = 'auto') {
     const content = document.querySelector('.steam-content');
+    const supportsSmooth = typeof document !== 'undefined' && document.documentElement && 'scrollBehavior' in document.documentElement.style;
+    const canSmooth = behavior === 'smooth' && supportsSmooth;
     if (content) {
-        content.scrollTo({ top: 0, left: 0, behavior });
-    } else {
-        window.scrollTo({ top: 0, left: 0, behavior });
+        try {
+            if (canSmooth && typeof content.scrollTo === 'function') {
+                content.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+            } else if (typeof content.scrollTo === 'function') {
+                content.scrollTo(0, 0);
+            } else {
+                content.scrollTop = 0;
+                content.scrollLeft = 0;
+            }
+        } catch (_error) {
+            content.scrollTop = 0;
+            content.scrollLeft = 0;
+        }
+        return;
+    }
+
+    try {
+        if (canSmooth && typeof window.scrollTo === 'function') {
+            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+        } else if (typeof window.scrollTo === 'function') {
+            window.scrollTo(0, 0);
+        }
+    } catch (_error) {
+        if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
     }
 }
 
@@ -72,28 +95,33 @@ function collapseCompanionByDefaultOnAndroid() {
 // Supabase Auth Integration
 let supabase = null;
 if (window.supabase) {
-    const config = window.SIGNAL_SHARE_CONFIG || {
-        supabaseUrl: "https://gswptxeikjmihdjxoiar.supabase.co",
-        supabaseAnonKey: "sb_publishable_gIwGxzf1C4cD55l9XS16wg_Qn-LuYqT"
-    };
-    supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
-    
-    // Listen for auth changes to stay in sync with the main page
-    supabase.auth.onAuthStateChange((event, session) => {
-        console.log(`[Mini-Games] Auth event: ${event}`);
-        if (session?.user) {
-            currentUser = {
-                id: session.user.id,
-                name: session.user.user_metadata?.display_name || session.user.email.split('@')[0],
-                email: session.user.email
-            };
-            localStorage.setItem('ss-user', JSON.stringify(currentUser));
-        } else {
-            currentUser = null;
-            localStorage.removeItem('ss-user');
-        }
-        updateAuthUI();
-    });
+    try {
+        const config = window.SIGNAL_SHARE_CONFIG || {
+            supabaseUrl: "https://gswptxeikjmihdjxoiar.supabase.co",
+            supabaseAnonKey: "sb_publishable_gIwGxzf1C4cD55l9XS16wg_Qn-LuYqT"
+        };
+        supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+        
+        // Listen for auth changes to stay in sync with the main page
+        supabase.auth.onAuthStateChange((event, session) => {
+            console.log(`[Mini-Games] Auth event: ${event}`);
+            if (session?.user) {
+                currentUser = {
+                    id: session.user.id,
+                    name: session.user.user_metadata?.display_name || session.user.email.split('@')[0],
+                    email: session.user.email
+                };
+                localStorage.setItem('ss-user', JSON.stringify(currentUser));
+            } else {
+                currentUser = null;
+                localStorage.removeItem('ss-user');
+            }
+            updateAuthUI();
+        });
+    } catch (error) {
+        console.warn('[Mini-Games] Supabase initialization failed, running without live auth sync:', error);
+        supabase = null;
+    }
 }
 
 /**
@@ -106,14 +134,18 @@ async function init() {
 
     // Initial sync if supabase already has a session
     if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-            currentUser = {
-                id: session.user.id,
-                name: session.user.user_metadata?.display_name || session.user.email.split('@')[0],
-                email: session.user.email
-            };
-            localStorage.setItem('ss-user', JSON.stringify(currentUser));
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                currentUser = {
+                    id: session.user.id,
+                    name: session.user.user_metadata?.display_name || session.user.email.split('@')[0],
+                    email: session.user.email
+                };
+                localStorage.setItem('ss-user', JSON.stringify(currentUser));
+            }
+        } catch (error) {
+            console.warn('[Mini-Games] Failed initial auth session sync:', error);
         }
     }
 
@@ -908,7 +940,10 @@ function openApp(url, title, icon, appId, skipPush = false) {
     if (iconEl) iconEl.src = icon;
 
     // Detect if we are on Android
-    const isAndroid = /Android/i.test(navigator.userAgent) || (window.Capacitor && window.Capacitor.getPlatform() === 'android');
+    const isAndroid = /Android/i.test(navigator.userAgent)
+        || (window.Capacitor
+            && typeof window.Capacitor.getPlatform === 'function'
+            && window.Capacitor.getPlatform() === 'android');
 
     if (url.startsWith('data:') || url.startsWith('<!DOCTYPE') || url.startsWith('<html')) {
         const blob = new Blob([url], { type: 'text/html' });

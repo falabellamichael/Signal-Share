@@ -1709,7 +1709,7 @@ export function createAppUi(context) {
 
   function handleViewportResize() { updateViewportMetrics(); syncMobileHeaderVisibility(); syncMobileMessengerMode(); if (!state.playerPostId || !state.playerPosition) return; applyMiniPlayerPosition(); }
 
-  function isMobileHeaderViewport() { const isAndroid = /Android/i.test(navigator.userAgent) || (window.Capacitor && window.Capacitor.getPlatform() === 'android'); return isAndroid || isTouchCompactViewport(); }
+  function isMobileHeaderViewport() { const isAndroid = /Android/i.test(navigator.userAgent) || (window.Capacitor && typeof window.Capacitor.getPlatform === "function" && window.Capacitor.getPlatform() === "android"); return isAndroid || isTouchCompactViewport(); }
 
   function isMobileMessengerViewport() { return isTouchCompactViewport(); }
 

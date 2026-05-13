@@ -6,11 +6,13 @@
     <title>Local AI Deep Dive | On-Device Intelligence</title>
     <!-- Linking the existing stylesheet -->
     <link rel="stylesheet" href="./questions-guide.css?v=1.5"> 
-    <link rel="stylesheet" href="./android-optimizations.css?v=1.0">
+    <link rel="stylesheet" href="./android-optimizations.css?v=1.4">
     <script>
         // Signal Share Android Optimization Suite - Detection
         (function() {
-            const isNative = !!window.Capacitor && window.Capacitor.getPlatform() !== 'web';
+            const isNative = !!window.Capacitor
+                && typeof window.Capacitor.getPlatform === 'function'
+                && window.Capacitor.getPlatform() !== 'web';
             if (isNative || /Android/i.test(navigator.userAgent)) {
                 document.documentElement.classList.add('platform-android');
             }
