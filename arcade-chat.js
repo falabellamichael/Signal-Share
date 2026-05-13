@@ -132,20 +132,8 @@ function updateChatPlaceholder() {
     const input = document.getElementById('arc-chat-input');
     if (!input) return;
 
-    const suggestions = [
-        "Ask to play Spotify...",
-        "Ask to open YouTube...",
-        "Ask to play a game...",
-        "How can I help you today?",
-        "Ask for gaming advice...",
-        "Ask to open the library...",
-        "Say 'Play some music'...",
-        "Say 'Open Pinball'...",
-        "Ask to see the leaderboard...",
-        "Ask to open the shop...",
-        "Ask for gameplay tips...",
-        "Ask to see your high scores..."
-    ];
+    const suggestions = window.arcadeChatSuggestions || ["Ask for gaming advice..."];
+
 
     const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)];
     input.placeholder = randomSuggestion;
@@ -1081,3 +1069,4 @@ function getArcadeProtocolOfflineResponse(message) {
 
     return "📶 [Arcade Protocol]: My advanced logic core is currently out of range, but my tactical database is active. I can still give you tips for the arcade games—just name one!";
 }
+
