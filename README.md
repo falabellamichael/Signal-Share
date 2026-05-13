@@ -204,6 +204,28 @@ The web app includes a real-time Direct Messenger with support for:
 - Background push notifications via FCM (Android) or Web Push (Browser)
 - Supabase-powered message sync and delivery status
 
+## Arcade Companion A.I.
+
+Signal Share features a deeply integrated, "stacked" AI assistant called the **Arcade Companion**. This AI is not just a chatbot; it is a system-aware agent capable of analyzing your performance and controlling the platform.
+
+### Capabilities
+
+- **Deep Telemetry Analysis**: The AI has real-time access to your gaming performance, including high scores, total playtime, and global ranks across the mini-game suite.
+- **Rich Context Awareness**: It monitors the current state of the application, including the active media playing in the Hero Player, user account status, and UI configuration (e.g., if the messenger is open).
+- **Programmatic Control**: Through the **Arcade Action Protocol**, the AI can execute system-level commands based on your natural language:
+    - **Feed Automation**: Filter and sort the media feed (e.g., "Show me the most popular videos from today").
+    - **Navigation**: Instantly jump to specific sections (e.g., "Take me to the global leaderboards").
+    - **System Styling**: Change themes and UI states (e.g., "Switch to Midnight theme").
+    - **Messenger Integration**: Use the `[COMPOSE]` tool to draft messages and focus the communication dock.
+- **Multimodal Support**: Attach images, videos, or documents to your chat for the AI to analyze and discuss using vision-capable local models.
+
+### Local LLM Integration
+
+The Arcade Companion utilizes a local bridge to communicate with your private AI infrastructure:
+
+1. **Bridge Connectivity**: It connects to the Signal Share Bridge (`backend/server.js`) to process complex requests without exposing your data to third-party clouds.
+2. **Offline Protocol**: If the local bridge is unreachable, the companion automatically switches to a tactical "Offline Protocol," providing game tips and advice from its internal database.
+
 ## Remote Media & PC Bridge
 
 Signal Share can control playback on your local PC or Android device through dedicated media bridges.
