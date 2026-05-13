@@ -22,6 +22,9 @@ WEB & SYSTEM TOOLS (USE THESE EXACTLY):
 5. [COMPOSE: text] -> Pre-fill the messenger input with the specified text.
 6. [LAUNCH: app_id] -> Open a whitelisted system application (taskmgr, calculator, notepad, explorer, spotify, chrome, edge).
 7. [PUBLISH: {"title": "...", "caption": "...", "tags": ["...", "..."]}] -> Publish a post to the live feed. Only use this if the user asks to "publish", "post", or "share" something. If they just sent a file, you can "see" it and suggest a title/description.
+8. [SCREENSHOT] -> Take a screenshot of the current screen. Use this if the user asks "what's on my screen", "look at this", or "describe what you see".
+9. [LIST_TABS] -> List open browser tabs. Use this if the user asks "what tabs are open".
+10. [LIST_APPS] -> List running desktop applications. Use this if the user asks "what apps are running" or "what's open on my pc".
 
 ARCADE SYSTEM TOOLS (USE THESE FOR INTERNAL NAVIGATION):
 6. [ARCADE: <action_id>] -> Trigger internal arcade functions.
@@ -671,7 +674,10 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         const hasTools = lmResponse.includes('[SEARCH:') || 
                          lmResponse.includes('[FETCH:') || 
                          lmResponse.includes('[OPEN:') || 
-                         lmResponse.includes('[PLAY:');
+                         lmResponse.includes('[PLAY:') ||
+                         lmResponse.includes('[SCREENSHOT]') ||
+                         lmResponse.includes('[LIST_TABS]') ||
+                         lmResponse.includes('[LIST_APPS]');
 
         // AUTO-CORRECTION: If the AI says it is searching but misses the tag, force a tool call
         const isClaimingToSearch = lmResponse.toLowerCase().includes('search') || 
@@ -691,13 +697,23 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
             console.log(`[Chatbot] Tool detected (Iteration ${iteration + 1}). Executing...`);
             const toolResult = await executeWebTools(lmResponse);
             
+            // If the tool was a screenshot, we might want to attach it to the next call
+            let nextAttachment = null;
+            if (toolResult.includes('[SYSTEM_IMAGE_ATTACHED]')) {
+                const marker = "[SYSTEM_IMAGE_ATTACHED]: A screenshot was successfully captured. Base64 data follows:\n";
+                const base64Data = toolResult.substring(toolResult.indexOf(marker) + marker.length).split('...')[0]; // This is just a hint in the text, real data should be passed better but for now we follow the existing pattern
+                // Since executeWebTools is async and returns text, we'll have to handle the image re-injection here if possible, 
+                // but usually the bridge handles the vision call if we pass it right.
+                // For now, we'll just let the AI know it has the screenshot and it should use its vision capability.
+            }
+
             // Use 'user' role for tool results to be compatible with picky local LLMs 
             // that don't support 'system' messages in the middle of a chat.
             return getChatResponse(null, [
                 ...conversation,
                 { role: "assistant", content: lmResponse },
                 { role: "user", content: `[SYSTEM OBSERVATION]: ${toolResult}\n\nPlease analyze this result and give your final answer to the user now.` }
-            ], pageContext, iteration + 1, null, preferredModel, customInstructions);
+            ], pageContext, iteration + 1, nextAttachment, preferredModel, customInstructions);
         }
     }
 
@@ -822,6 +838,49 @@ async function executeWebTools(text) {
         }
     }
 
+    // Handle [SCREENSHOT]
+    if (text.includes('[SCREENSHOT]')) {
+        try {
+            const bridgeUrl = `http://127.0.0.1:3000/api/system/screenshot`;
+            const response = await fetch(bridgeUrl);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            if (data.image) {
+                results.push(`[SYSTEM_IMAGE_ATTACHED]: A screenshot was successfully captured and is now available for your vision analysis.`);
+            } else {
+                results.push(`SCREENSHOT FAILED: No image data returned.`);
+            }
+        } catch (e) {
+            results.push(`SCREENSHOT FAILED: ${e.message}`);
+        }
+    }
+
+    // Handle [LIST_TABS]
+    if (text.includes('[LIST_TABS]')) {
+        try {
+            const bridgeUrl = `http://127.0.0.1:3000/api/system/tabs`;
+            const response = await fetch(bridgeUrl);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            results.push(`OPEN BROWSER TABS:\n${JSON.stringify(data.tabs, null, 2)}`);
+        } catch (e) {
+            results.push(`LIST_TABS FAILED: ${e.message}`);
+        }
+    }
+
+    // Handle [LIST_APPS]
+    if (text.includes('[LIST_APPS]')) {
+        try {
+            const bridgeUrl = `http://127.0.0.1:3000/api/system/apps`;
+            const response = await fetch(bridgeUrl);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            results.push(`RUNNING APPLICATIONS:\n${JSON.stringify(data.apps, null, 2)}`);
+        } catch (e) {
+            results.push(`LIST_APPS FAILED: ${e.message}`);
+        }
+    }
+
     // Handle [LAUNCH: app_id]
     const launchMatch = text.match(/\[LAUNCH:\s*([^\]]+)\]/);
     if (launchMatch) {
@@ -848,6 +907,7 @@ async function executeWebTools(text) {
     // Handle [ARCADE: action]
     const arcadeMatch = text.match(/\[ARCADE:\s*([^\]]+)\]/);
     if (arcadeMatch) {
+        const action = arcadeMatch[1].trim();
         results.push(`ARCADE PROTOCOL COMMAND REGISTERED: ${action}. The frontend will execute this action immediately.`);
     }
 

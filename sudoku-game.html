@@ -178,8 +178,14 @@
 
         .cell.selected {
             background: var(--neon-blue) !important;
-            color: #000;
-            box-shadow: inset 0 0 15px rgba(0,0,0,0.3);
+            color: #000 !important;
+            font-weight: 900;
+            box-shadow: 
+                inset 0 0 15px rgba(0,0,0,0.3),
+                0 0 20px rgba(0, 210, 255, 0.4);
+            transform: scale(1.05);
+            z-index: 5;
+            text-shadow: none !important;
         }
 
         .cell.highlighted {

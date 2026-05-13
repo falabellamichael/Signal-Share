@@ -38,7 +38,10 @@
         COMPOSE: "[COMPOSE:<text>]",
         PUBLISH: "[PUBLISH:{json}]",
         FILE_REWRITE: "[FILE_REWRITE]...[/FILE_REWRITE]",
-        PATCH_SUGGESTION: "[PATCH_SUGGESTION]...[/PATCH_SUGGESTION]"
+        PATCH_SUGGESTION: "[PATCH_SUGGESTION]...[/PATCH_SUGGESTION]",
+        SCREENSHOT: "[SCREENSHOT]",
+        LIST_TABS: "[LIST_TABS]",
+        LIST_APPS: "[LIST_APPS]"
     });
     const ARCADE_ACTION_PLAYBOOK = Object.freeze({
         games: [
@@ -377,7 +380,10 @@
                 { user: "Pause YouTube", action: "[ARCADE:pause_youtube]" },
                 { user: "Search DDG for LM Studio bridge", action: "[DUCKDUCKGO:LM Studio local bridge troubleshooting]" },
                 { user: "Take me to settings", action: "[ARCADE:settings]" },
-                { user: "Draft a DM for this post", action: "[COMPOSE:Hey, this looks great. Can we collaborate?]" }
+                { user: "Draft a DM for this post", action: "[COMPOSE:Hey, this looks great. Can we collaborate?]" },
+                { user: "What's on my screen?", action: "[SCREENSHOT]" },
+                { user: "What tabs do I have open?", action: "[LIST_TABS]" },
+                { user: "What apps are running?", action: "[LIST_APPS]" }
             ],
             categories: ARCADE_ACTION_PLAYBOOK
         };
@@ -477,7 +483,9 @@
                 pcAndMediaControl: [
                     "Control media playback using actionable tags for play/pause/next/previous.",
                     "Open Spotify and YouTube via supported bridge/player actions when available.",
-                    "Launch Steam games using [ARCADE:steam <game>] with app-id mapping and fallback search."
+                    "Launch Steam games using [ARCADE:steam <game>] with app-id mapping and fallback search.",
+                    "Capture and analyze the current screen with [SCREENSHOT].",
+                    "Identify open browser tabs and running desktop applications with [LIST_TABS] and [LIST_APPS]."
                 ],
                 webResearch: [
                     "Route search intents to DuckDuckGo with [DUCKDUCKGO:<query>].",

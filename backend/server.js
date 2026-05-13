@@ -165,6 +165,67 @@ app.get('/api/llm/chat', (req, res) => {
   res.json({ ok: true, status: 'AI Chat Bridge is active and awaiting POST requests.' });
 });
 
+// System inspection endpoints
+app.get('/api/system/apps', async (req, res) => {
+  if (!isWindows) return res.status(400).json({ error: "Only available on Windows" });
+  try {
+    const ps = spawn("powershell", ["-Command", "Get-Process | Where-Object { $_.MainWindowTitle } | Select-Object ProcessName, MainWindowTitle | ConvertTo-Json"]);
+    let data = "";
+    ps.stdout.on("data", (chunk) => { data += chunk; });
+    ps.on("close", () => {
+      try {
+        const apps = JSON.parse(data);
+        res.json({ apps: Array.isArray(apps) ? apps : [apps] });
+      } catch (e) {
+        res.status(500).json({ error: "Failed to parse app list", details: data });
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/system/tabs', async (req, res) => {
+  if (!isWindows) return res.status(400).json({ error: "Only available on Windows" });
+  try {
+    // Browsers often have the active tab in the window title. 
+    // We look for common browser processes.
+    const ps = spawn("powershell", ["-Command", "Get-Process | Where-Object { $_.MainWindowTitle -and ($_.ProcessName -match 'chrome|msedge|firefox|opera|browser') } | Select-Object ProcessName, MainWindowTitle | ConvertTo-Json"]);
+    let data = "";
+    ps.stdout.on("data", (chunk) => { data += chunk; });
+    ps.on("close", () => {
+      try {
+        const tabs = JSON.parse(data);
+        res.json({ tabs: Array.isArray(tabs) ? tabs : [tabs] });
+      } catch (e) {
+        res.status(500).json({ error: "Failed to parse tab list", details: data });
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/system/screenshot', async (req, res) => {
+  if (!isWindows) return res.status(400).json({ error: "Only available on Windows" });
+  try {
+    const scriptPath = path.join(projectRoot, "scratch", "screenshot.ps1");
+    const ps = spawn("powershell", ["-ExecutionPolicy", "Bypass", "-File", scriptPath]);
+    let data = "";
+    ps.stdout.on("data", (chunk) => { data += chunk; });
+    ps.on("close", () => {
+      const base64 = data.trim();
+      if (base64) {
+        res.json({ image: `data:image/png;base64,${base64}` });
+      } else {
+        res.status(500).json({ error: "Screenshot failed: empty output" });
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Catch-all for /api/llm/chat with wrong method
 app.all('/api/llm/chat', (req, res) => {
   console.warn(`[Chatbot] 405 Error: Received ${req.method} request for /api/llm/chat from ${req.ip}`);
