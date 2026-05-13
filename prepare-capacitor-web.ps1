@@ -48,6 +48,8 @@ $files = @(
   "hero-player-deepdive.html",
   "llm-deepdive.html",
   "llm-deepdive-2.html",
+  "llm-integration-bridge.html",
+  "llm-tools-context.html",
   "mini-games.html",
   "mini-games.js",
   "leaderboard-metrics.js",
