@@ -11,6 +11,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
+const DEVICE_ID = process.env.SIGNAL_SHARE_DEVICE_ID || "";
 
 /**
  * Validates if a URL is safe to fetch or open.
@@ -734,7 +735,12 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
             if (toolResult.includes('[SYSTEM_IMAGE_ATTACHED]')) {
                 try {
                     const bridgeUrl = `http://127.0.0.1:3000/api/system/screenshot`;
-                    const response = await fetch(bridgeUrl, { headers: { 'X-Bridge-Secret': BRIDGE_SECRET } });
+                    const response = await fetch(bridgeUrl, { 
+                        headers: { 
+                            'X-Bridge-Secret': BRIDGE_SECRET,
+                            'X-Device-Id': DEVICE_ID
+                        } 
+                    });
                     if (response.ok) {
                         const data = await response.json();
                         if (data.image) {
@@ -840,7 +846,8 @@ async function executeWebTools(text) {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-Bridge-Secret': BRIDGE_SECRET
+                        'X-Bridge-Secret': BRIDGE_SECRET,
+                        'X-Device-Id': DEVICE_ID
                     },
                     body: JSON.stringify({ action: 'open_uri', uri: url })
                 });
@@ -865,7 +872,8 @@ async function executeWebTools(text) {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'X-Bridge-Secret': BRIDGE_SECRET
+                    'X-Bridge-Secret': BRIDGE_SECRET,
+                    'X-Device-Id': DEVICE_ID
                 },
                 body: JSON.stringify({ action: action })
             });
@@ -883,8 +891,11 @@ async function executeWebTools(text) {
     if (text.includes('[SCREENSHOT]')) {
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/screenshot`;
-            const response = await fetch(bridgeUrl, {
-                headers: { 'X-Bridge-Secret': BRIDGE_SECRET }
+            const response = await fetch(bridgeUrl, { 
+                headers: { 
+                    'X-Bridge-Secret': BRIDGE_SECRET,
+                    'X-Device-Id': DEVICE_ID
+                } 
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
@@ -902,8 +913,11 @@ async function executeWebTools(text) {
     if (text.includes('[LIST_TABS]')) {
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/tabs`;
-            const response = await fetch(bridgeUrl, {
-                headers: { 'X-Bridge-Secret': BRIDGE_SECRET }
+            const response = await fetch(bridgeUrl, { 
+                headers: { 
+                    'X-Bridge-Secret': BRIDGE_SECRET,
+                    'X-Device-Id': DEVICE_ID
+                } 
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
@@ -917,8 +931,11 @@ async function executeWebTools(text) {
     if (text.includes('[LIST_APPS]')) {
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/apps`;
-            const response = await fetch(bridgeUrl, {
-                headers: { 'X-Bridge-Secret': BRIDGE_SECRET }
+            const response = await fetch(bridgeUrl, { 
+                headers: { 
+                    'X-Bridge-Secret': BRIDGE_SECRET,
+                    'X-Device-Id': DEVICE_ID
+                } 
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
@@ -934,8 +951,11 @@ async function executeWebTools(text) {
         const path = listFilesMatch[1].trim();
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/files/list?path=${encodeURIComponent(path)}`;
-            const response = await fetch(bridgeUrl, {
-                headers: { 'X-Bridge-Secret': BRIDGE_SECRET }
+            const response = await fetch(bridgeUrl, { 
+                headers: { 
+                    'X-Bridge-Secret': BRIDGE_SECRET,
+                    'X-Device-Id': DEVICE_ID
+                } 
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
@@ -951,8 +971,11 @@ async function executeWebTools(text) {
         const path = readFileMatch[1].trim();
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/files/read?path=${encodeURIComponent(path)}`;
-            const response = await fetch(bridgeUrl, {
-                headers: { 'X-Bridge-Secret': BRIDGE_SECRET }
+            const response = await fetch(bridgeUrl, { 
+                headers: { 
+                    'X-Bridge-Secret': BRIDGE_SECRET,
+                    'X-Device-Id': DEVICE_ID
+                } 
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
@@ -972,7 +995,8 @@ async function executeWebTools(text) {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'X-Bridge-Secret': BRIDGE_SECRET
+                    'X-Bridge-Secret': BRIDGE_SECRET,
+                    'X-Device-Id': DEVICE_ID
                 },
                 body: JSON.stringify(data)
             });
@@ -994,7 +1018,8 @@ async function executeWebTools(text) {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'X-Bridge-Secret': BRIDGE_SECRET
+                    'X-Bridge-Secret': BRIDGE_SECRET,
+                    'X-Device-Id': DEVICE_ID
                 },
                 body: JSON.stringify({ appId: appId })
             });
@@ -1018,7 +1043,8 @@ async function executeWebTools(text) {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'X-Bridge-Secret': BRIDGE_SECRET
+                    'X-Bridge-Secret': BRIDGE_SECRET,
+                    'X-Device-Id': DEVICE_ID
                 },
                 body: JSON.stringify({ appId: appId })
             });

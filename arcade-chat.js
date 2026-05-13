@@ -319,8 +319,16 @@ function getBridgeTargetAddressSpace(baseUrl = "") {
 }
 
 function getBridgeSecret() {
-    return localStorage.getItem("signal-share-bridge-secret")
+    return localStorage.getItem("SIGNAL_SHARE_BRIDGE_SECRET")
+        || localStorage.getItem("signal-share-bridge-secret")
         || localStorage.getItem("ss_bridge_secret")
+        || "";
+}
+
+function getDeviceId() {
+    return localStorage.getItem("SIGNAL_SHARE_DEVICE_ID")
+        || localStorage.getItem("signal-share-device-id")
+        || localStorage.getItem("ss_device_id")
         || "";
 }
 
@@ -344,6 +352,7 @@ async function bridgeFetch(path, options = {}) {
     const headers = {
         ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
         ...(getBridgeSecret() ? { "X-Bridge-Secret": getBridgeSecret() } : {}),
+        ...(getDeviceId() ? { "X-Device-Id": getDeviceId() } : {}),
         ...(optionHeaders || {}),
     };
     const candidates = resolveBridgeBaseCandidates();
@@ -597,6 +606,127 @@ function updateEngineStatus(online) {
         statusText.dataset.bridgeStatus = statusKey;
     }
 }
+
+/**
+ * Toggles the Security Dashboard view in the sidebar.
+ */
+window.toggleChatSecurity = function() {
+    const messages = document.getElementById('chat-messages');
+    const history = document.getElementById('chat-history');
+    const security = document.getElementById('chat-security');
+    const inputArea = document.querySelector('.chat-input-area');
+    
+    if (!security) return;
+
+    const isShowing = security.style.display !== 'none';
+    
+    // Hide others
+    if (messages) messages.style.display = isShowing ? 'flex' : 'none';
+    if (history) history.style.display = 'none';
+    if (inputArea) inputArea.style.display = isShowing ? 'flex' : 'none';
+    
+    // Toggle security
+    security.style.display = isShowing ? 'none' : 'flex';
+    
+    // Update button visual state if possible
+    const secBtn = document.querySelector('button[onclick="toggleChatSecurity()"]');
+    if (secBtn) {
+        secBtn.style.background = isShowing ? '' : 'rgba(103, 193, 245, 0.1)';
+    }
+
+    if (!isShowing) {
+        // Load current values
+        const secretInput = document.getElementById('sidebar-bridge-secret');
+        const deviceInput = document.getElementById('sidebar-device-id');
+        
+        if (secretInput) secretInput.value = getBridgeSecret();
+        if (deviceInput) deviceInput.value = getDeviceId();
+        
+        // Refresh IP bans
+        refreshBannedIps();
+    }
+};
+
+/**
+ * Saves the security settings to localStorage.
+ */
+window.saveSecurityDashboard = function() {
+    const secretInput = document.getElementById('sidebar-bridge-secret');
+    const deviceInput = document.getElementById('sidebar-device-id');
+    const status = document.getElementById('security-save-status');
+    
+    if (!secretInput || !deviceInput) return;
+    
+    const secret = secretInput.value.trim();
+    const deviceId = deviceInput.value.trim();
+    
+    localStorage.setItem('SIGNAL_SHARE_BRIDGE_SECRET', secret);
+    localStorage.setItem('SIGNAL_SHARE_DEVICE_ID', deviceId);
+    
+    if (status) {
+        status.textContent = '✅ Security settings saved!';
+        status.style.color = '#75b022';
+        setTimeout(() => { status.textContent = ''; }, 3000);
+    }
+    
+    // Notify user via AI if open
+    console.log('[Security] Keys updated. Bridge handshake will now use these credentials.');
+};
+
+/**
+ * Generates a persistent fingerprint for this browser/device.
+ */
+window.lockToThisDevice = function() {
+    const deviceInput = document.getElementById('sidebar-device-id');
+    if (!deviceInput) return;
+    
+    let existingId = localStorage.getItem('SIGNAL_SHARE_DEVICE_ID');
+    if (!existingId || existingId.length < 8) {
+        // Generate a new random ID if none exists
+        existingId = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    }
+    
+    deviceInput.value = existingId;
+    deviceInput.style.color = '#67c1f5';
+};
+
+/**
+ * Fetches the current list of banned IPs from the bridge.
+ */
+window.refreshBannedIps = async function() {
+    const list = document.getElementById('banned-ips-list');
+    if (!list) return;
+    
+    list.innerHTML = '<span style="color: rgba(255,255,255,0.3)">Refreshing...</span>';
+    
+    try {
+        const res = await bridgeFetch('/api/security/audit', { 
+            method: 'GET',
+            timeoutMs: 3000 
+        });
+        
+        if (!res.ok) {
+            list.innerHTML = '<span style="color: #ff5555">Failed to fetch audit log.</span>';
+            return;
+        }
+        
+        const data = await res.json();
+        const bans = data.bannedIps || [];
+        
+        if (bans.length === 0) {
+            list.innerHTML = '<span style="color: #75b022">No IPs currently banned.</span>';
+        } else {
+            list.innerHTML = bans.map(ip => `
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid rgba(255,0,0,0.1); padding: 4px 0;">
+                    <span style="font-family: monospace;">${ip}</span>
+                    <span style="font-size: 0.6rem; color: #ff5555; text-transform: uppercase; font-weight: 800;">BANNED</span>
+                </div>
+            `).join('');
+        }
+    } catch (err) {
+        list.innerHTML = '<span style="color: #ff5555">Bridge unreachable.</span>';
+    }
+};
 
 let arcadeChatHistory = [];
 let currentChatId = null;

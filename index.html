@@ -1528,6 +1528,10 @@
                     </div>
                 </div>
             <div style="display: flex; gap: 8px; align-items: center;">
+                                <button class="history-btn" onclick="toggleChatSecurity()" title="Security Dashboard" style="border-color: #67c1f5; color: #67c1f5;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    Security
+                </button>
                 <button class="history-btn" onclick="toggleChatHistory()" title="View History">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     History
@@ -1541,6 +1545,47 @@
             </div>
         </div>
 
+                <div id="chat-security" class="chat-security-view" style="display: none; flex: 1; flex-direction: column; padding: 15px; overflow-y: auto; background: rgba(0,0,0,0.85); color: #fff; font-family: 'Space Grotesk', sans-serif;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#67c1f5" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                <h3 style="margin: 0; font-size: 1.1rem; color: #67c1f5;">Security Dashboard</h3>
+            </div>
+
+            <div style="margin-bottom: 20px; padding: 12px; background: rgba(103, 193, 245, 0.1); border-radius: 8px; border: 1px solid rgba(103, 193, 245, 0.2);">
+                <p style="margin: 0; font-size: 0.8rem; line-height: 1.4; color: #ccc;">
+                    Manage your bridge handshake and lock this PC to your specific device. Settings are saved only in this browser.
+                </p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Bridge Handshake Secret</label>
+                    <input type="password" id="sidebar-bridge-secret" placeholder="Optional secret key" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Device ID (Hardware Lock)</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="sidebar-device-id" placeholder="Optional device token" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none; font-size: 0.75rem;">
+                        <button onclick="lockToThisDevice()" style="padding: 0 12px; background: #333; border: none; border-radius: 6px; color: #67c1f5; font-size: 0.7rem; font-weight: 700; cursor: pointer;">This PC</button>
+                    </div>
+                </div>
+
+                <button onclick="saveSecurityDashboard()" style="width: 100%; padding: 12px; background: #67c1f5; border: none; border-radius: 6px; color: #000; font-weight: 800; text-transform: uppercase; margin-top: 10px; cursor: pointer;">Save Security Settings</button>
+                
+                <div id="security-save-status" style="text-align: center; font-size: 0.75rem; height: 1.2rem;"></div>
+
+                <hr style="border: 0; border-top: 1px solid #222; margin: 15px 0;">
+
+                <div id="banned-ips-section">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Active IP Bans</label>
+                    <div id="banned-ips-list" style="margin-top: 10px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 0.75rem; color: #ff5555; border: 1px solid #440000; min-height: 40px; display: flex; align-items: center; justify-content: center;">
+                        No IPs currently banned.
+                    </div>
+                    <button onclick="refreshBannedIps()" style="width: 100%; margin-top: 10px; padding: 8px; background: transparent; border: 1px solid #333; border-radius: 6px; color: rgba(255,255,255,0.5); font-size: 0.7rem; cursor: pointer;">Refresh Ban List</button>
+                </div>
+            </div>
+        </div>
         <div id="chat-messages" class="chat-messages">
             <!-- Messages injected here -->
         </div>

@@ -6,6 +6,7 @@ import { SMTCMonitor, PlaybackStatus } from "@coooookies/windows-smtc-monitor";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import { getChatResponse, getLocalModelCatalog } from "./chatbot.js";
+import { SecurityEngine } from "./security-v3.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,8 +49,12 @@ const SUPABASE_SYNC_INTERVAL_MS = Number(process.env.SIGNAL_SHARE_SYNC_INTERVAL_
 const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true" || process.env.SIGNAL_SHARE_REMOTE_MEDIA === "true";
 const ALLOW_OPEN_URI = process.env.SIGNAL_SHARE_ALLOW_OPEN_URI === "true";
 const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
-const MEDIA_ACTION_COOLDOWN_MS = 220;
-console.log(`[Bridge] Security configuration loaded. Bridge Secret: ${BRIDGE_SECRET ? "CONFIGURED" : "DISABLED"}`);
+const DEVICE_ID = process.env.SIGNAL_SHARE_DEVICE_ID || "";
+
+const security = new SecurityEngine(BRIDGE_SECRET, DEVICE_ID);
+console.log(`[Bridge] Security Core v3 initialized.`);
+console.log(`[Bridge] Device Locking: ${DEVICE_ID ? "ENABLED" : "DISABLED"}`);
+
 const lastMediaActionAtByKey = new Map();
 
 // Rate limiting for system actions
@@ -106,13 +111,37 @@ app.use((req, res, next) => {
     return res.status(200).end();
   }
 
-  // Security Check: Enforce Bridge Secret if configured
+  // 1. IP Ban Check (STRICT)
+  if (security.isBanned(req.ip)) {
+    return res.status(403).json({ error: "Access denied: Your IP has been permanently banned for suspicious activity." });
+  }
+
   const incomingSecret = req.headers["x-bridge-secret"] || req.headers["X-Bridge-Secret"];
-  const isSensitive = req.path.startsWith('/api/system/') || req.path.startsWith('/api/system-media/action');
+  const incomingDevice = req.headers["x-device-id"] || req.headers["X-Device-Id"];
+  const isSensitive = req.path.startsWith('/api/system/') || req.path.startsWith('/api/system-media/action') || req.path.startsWith('/api/security/');
   
-  if (BRIDGE_SECRET && isSensitive && incomingSecret !== BRIDGE_SECRET) {
-    console.warn(`[Bridge] Blocked unauthorized access attempt from ${req.ip} to ${req.path}`);
+  // 2. Device ID Validation (Hardware-bound)
+  if (isSensitive && !security.validateDevice(incomingDevice)) {
+    console.warn(`[Bridge] Blocked unauthorized device attempt from ${req.ip}`);
+    security.logSecurely('UNAUTHORIZED_DEVICE', { ip: req.ip, path: req.path });
+    return res.status(403).json({ error: "Access denied: Unauthorized hardware device." });
+  }
+
+  // 3. Secret Validation
+  if (isSensitive && !security.validateSecret(incomingSecret, BRIDGE_SECRET)) {
+    console.warn(`[Bridge] Unauthorized access attempt from ${req.ip} to ${req.path}`);
+    
+    // Check if we should ban this IP after multiple failures
+    if (security.shouldBan(req.ip, 'secret_mismatch')) {
+       return res.status(403).json({ error: "Access denied: Permanent IP ban applied." });
+    }
+    
     return res.status(401).json({ error: "Unauthorized: Invalid or missing X-Bridge-Secret." });
+  }
+
+  // 4. Rate Limiting Check
+  if (!security.checkRateLimit(req.ip, MAX_ACTIONS_PER_MINUTE)) {
+    return res.status(429).json({ error: "Too many requests. Please wait a minute." });
   }
 
   next();
@@ -234,7 +263,8 @@ app.get('/api/system/files/list', async (req, res) => {
   const targetPath = req.query.path || '.';
   const fullPath = path.resolve(projectRoot, targetPath);
   
-  if (!fullPath.startsWith(projectRoot)) {
+  if (!security.isPathSafe(targetPath, projectRoot)) {
+    security.shouldBan(req.ip, 'malicious_traversal');
     return res.status(403).json({ error: "Access denied: Path outside project root." });
   }
 
@@ -256,7 +286,7 @@ app.get('/api/system/files/read', async (req, res) => {
   if (!targetPath) return res.status(400).json({ error: "Missing path parameter" });
   
   const fullPath = path.resolve(projectRoot, targetPath);
-  if (!fullPath.startsWith(projectRoot)) {
+  if (!security.isPathSafe(targetPath, projectRoot)) {
     return res.status(403).json({ error: "Access denied: Path outside project root." });
   }
 
@@ -273,7 +303,7 @@ app.post('/api/system/files/write', async (req, res) => {
   if (!targetPath || content === undefined) return res.status(400).json({ error: "Missing path or content" });
 
   const fullPath = path.resolve(projectRoot, targetPath);
-  if (!fullPath.startsWith(projectRoot)) {
+  if (!security.isPathSafe(targetPath, projectRoot)) {
     return res.status(403).json({ error: "Access denied: Path outside project root." });
   }
 
@@ -318,6 +348,12 @@ app.post('/api/system/launch', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// Security Dashboard Endpoints
+app.get('/api/security/audit', (req, res) => {
+  // Only accessible via bridge (which already checks secrets in the middleware)
+  res.json(security.getAuditReport());
 });
 
 app.post('/api/system/close', async (req, res) => {
