@@ -1339,6 +1339,7 @@ function openApp(url, title, icon, appId, skipPush = false) {
     };
 
     if (runner) runner.style.display = 'flex';
+    document.body.classList.add('runner-open');
     document.body.style.overflow = 'hidden';
 
     // Synchronize offsets to ensure runner respects the companion sidebar
@@ -1372,6 +1373,7 @@ function closeApp(skipPush = false) {
 
     runner.style.display = 'none';
     frame.src = '';
+    document.body.classList.remove('runner-open');
     document.body.style.overflow = 'auto';
 
     // Reset offsets when closing the runner
