@@ -63,7 +63,11 @@ const MODEL_CATALOG_TTL_MS = 15000;
 const LM_STUDIO_REST_BASE_URL = "http://localhost:1234/api/v1";
 const LM_STUDIO_API_TOKEN = `${process.env.LM_API_TOKEN || ""}`.trim();
 const LM_STUDIO_SWITCH_TIMEOUT_MS = Number(process.env.SIGNAL_SHARE_LM_MODEL_SWITCH_TIMEOUT_MS || 8000);
+const MAX_AUTO_MODELS_PER_PROVIDER = Math.max(1, Number(process.env.SIGNAL_SHARE_AUTO_MODEL_MAX_TRIES || 1));
+const AUTO_SELECT_PREFERS_LOADED_LM_STUDIO = process.env.SIGNAL_SHARE_AUTO_SELECT_LOADED_LMSTUDIO !== "false";
+const AUTO_UNLOAD_OTHER_LM_STUDIO_MODELS = process.env.SIGNAL_SHARE_AUTO_UNLOAD_OTHERS !== "false";
 let modelCatalogCache = { at: 0, data: null };
+let lastSuccessfulModelByProvider = { lmstudio: "", ollama: "" };
 
 function normalizeModelKey(value = "") {
     return `${value || ""}`.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -219,6 +223,23 @@ function matchesModelTarget(candidate = "", target = "") {
     return scoreModelMatch(left, right) >= 45 || scoreModelMatch(right, left) >= 45;
 }
 
+function findBestMatchingModel(candidate, options = []) {
+    const requested = `${candidate || ""}`.trim();
+    if (!requested || !Array.isArray(options) || options.length === 0) return "";
+    let best = "";
+    let bestScore = 0;
+    for (const option of options) {
+        const value = `${option || ""}`.trim();
+        if (!value) continue;
+        const score = Math.max(scoreModelMatch(requested, value), scoreModelMatch(value, requested));
+        if (score > bestScore) {
+            bestScore = score;
+            best = value;
+        }
+    }
+    return bestScore >= 45 ? best : "";
+}
+
 function getLoadedLmStudioInstances(modelRows) {
     const rows = Array.isArray(modelRows) ? modelRows : [];
     const loaded = [];
@@ -282,6 +303,46 @@ async function ensureLmStudioExclusiveModel(targetModel) {
         }
     } catch (error) {
         console.warn(`[Chatbot] LM Studio model switch skipped: ${error.message}`);
+    }
+}
+
+async function getAutoSelectedLmStudioModel({ fallbackModels = [] } = {}) {
+    const fallback = Array.isArray(fallbackModels) ? fallbackModels : [];
+    const preferredRecent = `${lastSuccessfulModelByProvider.lmstudio || ""}`.trim();
+
+    if (!AUTO_SELECT_PREFERS_LOADED_LM_STUDIO) {
+        if (preferredRecent) {
+            return findBestMatchingModel(preferredRecent, fallback) || preferredRecent;
+        }
+        return "";
+    }
+
+    try {
+        const payload = await fetchLmStudioJson("/models", { timeoutMs: 3000 });
+        const rows = parseLmStudioModelRows(payload);
+        const loaded = getLoadedLmStudioInstances(rows);
+        if (!loaded.length) {
+            if (preferredRecent) {
+                return findBestMatchingModel(preferredRecent, fallback) || preferredRecent;
+            }
+            return "";
+        }
+
+        if (preferredRecent) {
+            const recentLoaded = loaded.find((instance) =>
+                matchesModelTarget(instance.key, preferredRecent) || matchesModelTarget(instance.id, preferredRecent)
+            );
+            if (recentLoaded) return recentLoaded.key || recentLoaded.id;
+        }
+
+        const firstLoaded = loaded[0];
+        return firstLoaded.key || firstLoaded.id || "";
+    } catch (error) {
+        console.warn(`[Chatbot] Auto-select could not inspect LM Studio loaded models: ${error.message}`);
+        if (preferredRecent) {
+            return findBestMatchingModel(preferredRecent, fallback) || preferredRecent;
+        }
+        return "";
     }
 }
 
@@ -439,15 +500,39 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
 
     const hasPinnedModel = Boolean(preferredModel && preferredModel !== "auto");
     let lmStudioPreparedForPinnedModel = false;
+    let autoSelectedLmStudioModel = "";
+    if (!hasPinnedModel) {
+        const lmStudioDefaultPool = endpointConfigs.find((endpoint) => endpoint.provider === "lmstudio")?.models || models;
+        autoSelectedLmStudioModel = await getAutoSelectedLmStudioModel({ fallbackModels: lmStudioDefaultPool });
+        if (autoSelectedLmStudioModel) {
+            console.log(`[Chatbot] Auto-select using LM Studio loaded model: ${autoSelectedLmStudioModel}`);
+            if (AUTO_UNLOAD_OTHER_LM_STUDIO_MODELS) {
+                await ensureLmStudioExclusiveModel(autoSelectedLmStudioModel);
+            }
+        }
+    }
 
     for (const endpoint of endpointConfigs) {
         if (success) break;
         const endpointFallbackModels = endpoint.models && endpoint.models.length > 0
             ? endpoint.models
             : models;
-        const endpointModels = (hasPinnedModel && endpoint.provider === "lmstudio")
-            ? endpointFallbackModels.slice(0, 1)
-            : endpointFallbackModels;
+        let endpointModels = endpointFallbackModels;
+
+        if (hasPinnedModel && endpoint.provider === "lmstudio") {
+            endpointModels = endpointFallbackModels.slice(0, 1);
+        } else if (!hasPinnedModel) {
+            if (endpoint.provider === "lmstudio") {
+                if (autoSelectedLmStudioModel) {
+                    const resolvedAuto = findBestMatchingModel(autoSelectedLmStudioModel, endpointFallbackModels) || autoSelectedLmStudioModel;
+                    endpointModels = [resolvedAuto];
+                } else if (endpointFallbackModels.length > MAX_AUTO_MODELS_PER_PROVIDER) {
+                    endpointModels = endpointFallbackModels.slice(0, MAX_AUTO_MODELS_PER_PROVIDER);
+                }
+            } else if (endpointFallbackModels.length > MAX_AUTO_MODELS_PER_PROVIDER) {
+                endpointModels = endpointFallbackModels.slice(0, MAX_AUTO_MODELS_PER_PROVIDER);
+            }
+        }
 
         if (hasPinnedModel && endpoint.provider === "lmstudio" && !lmStudioPreparedForPinnedModel) {
             const pinnedLmStudioModel = endpointModels[0] || preferredModel;
@@ -493,6 +578,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 if (!messageText || !`${messageText}`.trim()) continue;
 
                 lmResponse = `${messageText}`.trim();
+                lastSuccessfulModelByProvider[endpoint.provider] = `${model}`.trim();
                 success = true;
                 break;
             } catch (_error) {

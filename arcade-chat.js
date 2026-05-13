@@ -435,10 +435,15 @@ function startDesktopBridgePolling() {
         updateEngineStatus(false);
         return;
     }
-    // Background polling removed to avoid duplicate intervals and reduce lag.
-    // The bridge will be polled on-demand when chat is opened or a message is sent.
+    
     bridgeEnabled = true;
     pollDesktopBridge();
+    
+    // Background polling re-enabled with a conservative interval to keep status live
+    if (bridgePollTimer) clearInterval(bridgePollTimer);
+    bridgePollTimer = setInterval(() => {
+        pollDesktopBridge();
+    }, 15000); // 15 seconds is a good balance
 }
 
 /**
@@ -1822,6 +1827,8 @@ function setupCloseParityHandlers() {
             }
         });
     }
+    // Start background polling if enabled
+    startDesktopBridgePolling();
 })();
 
 /**
