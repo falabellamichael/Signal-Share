@@ -7,32 +7,18 @@ import {
   clampNumber, parseTags, getMediaKind, compareByNewest,
   getLatestPostedPostId
 } from './shared-utils.js';
+import {
+  AI_COMPANION_ID,
+  AI_COMPANION_PROFILE,
+  isAiThreadId,
+  loadAiMessagesLocally,
+  clearAiMessagesLocally,
+  appendAiThreadFromLocalHistory,
+  handleAiOpenOrCreateThread,
+  handleAiThreadMessageSubmit
+} from "./app-v3-ai.js";
 
 // Ban Helper Functions
-
-const AI_COMPANION_ID = "ai-companion";
-const AI_COMPANION_PROFILE = Object.freeze({
-  id: AI_COMPANION_ID,
-  email: "ai@signal.share",
-  displayName: "AI Companion",
-  isAi: true,
-  createdAt: new Date("2026-05-01").toISOString()
-});
-
-/**
- * Reads a File as a data URL.
- * Kept local to avoid hard dependency on a specific shared-utils export set.
- * @param {File} file
- * @returns {Promise<string>}
- */
-function readFileAsDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 /**
  * Check if current user is banned
@@ -1573,30 +1559,6 @@ async function loadDirectThreadsFromSupabase() { const userId = state.currentUse
 async function loadMessagesFromSupabase(threadId) { const { data, error } = await state.supabase.from("messages").select("*").eq("thread_id", threadId).order("created_at", { ascending: true }); if (error) throw error; return data.map(normalizeMessage); }
 async function loadThreadAttachmentPaths(threadId) { const { data, error } = await state.supabase.from("messages").select("attachment_file_path").eq("thread_id", threadId).not("attachment_file_path", "is", null); if (error) throw error; return data.map((row) => row.attachment_file_path).filter((path) => typeof path === "string" && path.trim()); }
 
-function getAiMessagesStorageKey() {
-  if (!state.currentUser?.id) return "";
-  return `ai-messages-${state.currentUser.id}`;
-}
-
-function sanitizeAiMessageForStorage(message) {
-  if (!message || typeof message !== "object") return null;
-  const next = { ...message };
-  if (next.isThinking) return null;
-  if (typeof next.attachmentUrl === "string" && /^blob:/i.test(next.attachmentUrl.trim())) {
-    next.attachmentUrl = "";
-  }
-  if (next.attachmentUrl === null) next.attachmentUrl = "";
-  if (!next.createdAt) next.createdAt = new Date().toISOString();
-  return next;
-}
-
-function sanitizeAiMessagesForStorage(messages) {
-  if (!Array.isArray(messages)) return [];
-  return messages
-    .map(sanitizeAiMessageForStorage)
-    .filter((entry) => entry && typeof entry === "object");
-}
-
 function isBlobUrl(value) {
   return typeof value === "string" && /^blob:/i.test(value.trim());
 }
@@ -1606,26 +1568,6 @@ function revokeBlobUrl(value) {
   try {
     URL.revokeObjectURL(value);
   } catch (_error) { }
-}
-
-function loadAiMessagesLocally() {
-  const storageKey = getAiMessagesStorageKey();
-  if (!storageKey) return [];
-  const raw = localStorage.getItem(storageKey);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    const sanitized = sanitizeAiMessagesForStorage(parsed);
-    const normalizedRaw = JSON.stringify(sanitized);
-    if (normalizedRaw !== raw) {
-      localStorage.setItem(storageKey, normalizedRaw);
-    }
-    return sanitized;
-  } catch (error) {
-    console.warn("AI local message cache was invalid and has been reset.", error);
-    localStorage.removeItem(storageKey);
-    return [];
-  }
 }
 
 async function refreshMessengerState(options = {}) {
@@ -1641,27 +1583,14 @@ async function refreshMessengerState(options = {}) {
     let bans = [], banningAvailable = true; if (bansResult.status === "fulfilled") bans = bansResult.value; else if (isBanningBackendUnavailable(bansResult.reason)) banningAvailable = false; else throw bansResult.reason;
     state.profileRecord = ownProfile; state.blockingAvailable = blockingAvailable; state.banningAvailable = banningAvailable; state.blockedUserIds = blocks.map((b) => b.blockedId); state.bannedUserIds = bans.map((b) => b.bannedId); state.availableProfiles = profilesResult.value.filter((p) => p.id !== state.currentUser.id); 
     
-    // Inject AI thread if it has history
-    const aiHistory = loadAiMessagesLocally();
-    let threads = threadsResult.value.filter((t) => !isThreadBlocked(t));
-    if (aiHistory.length > 0) {
-      const lastMsg = aiHistory.slice(-1)[0];
-      threads.push({
-        id: "thread-ai-companion",
-        userOneId: state.currentUser.id,
-        userTwoId: AI_COMPANION_ID,
-        createdAt: new Date("2026-05-01").toISOString(),
-        updatedAt: lastMsg.createdAt || new Date().toISOString(),
-        isAi: true,
-        lastMessageBody: lastMsg.body
-      });
-    }
+    const baseThreads = threadsResult.value.filter((thread) => !isThreadBlocked(thread));
+    const { threads } = appendAiThreadFromLocalHistory({ state, threads: baseThreads });
     state.directThreads = sortThreads(threads);
     
     if (!preserveActiveThread || !state.directThreads.some((t) => t.id === state.activeThreadId)) state.activeThreadId = state.directThreads[0]?.id ?? null;
     if (state.activeThreadId) {
-      if (state.activeThreadId === "thread-ai-companion") {
-        state.activeMessages = loadAiMessagesLocally();
+      if (isAiThreadId(state.activeThreadId)) {
+        state.activeMessages = loadAiMessagesLocally(state);
       } else {
         state.activeMessages = await loadMessagesFromSupabase(state.activeThreadId);
       }
@@ -1799,8 +1728,8 @@ async function openExistingThread(threadId) {
     window.notifications.markThreadAsRead(threadId);
   }
 
-  if (threadId === "thread-ai-companion") {
-    state.activeMessages = loadAiMessagesLocally();
+  if (isAiThreadId(threadId)) {
+    state.activeMessages = loadAiMessagesLocally(state);
     clearMessageAttachmentSelection({ preserveFeedback: true });
     renderMessenger();
     return;
@@ -1832,9 +1761,8 @@ async function deleteConversation(threadId) {
     state.messengerBusy++;
     renderMessenger();
 
-    if (threadId === "thread-ai-companion") {
-      const storageKey = getAiMessagesStorageKey();
-      if (storageKey) localStorage.removeItem(storageKey);
+    if (isAiThreadId(threadId)) {
+      clearAiMessagesLocally(state);
       state.pendingDeleteThreadId = "";
       if (deletedWasActive) {
         state.activeThreadId = null;
@@ -1878,32 +1806,17 @@ async function openOrCreateThread(partnerId) {
     return;
   }
 
-  // AI Companion Interception
   if (partnerId === AI_COMPANION_ID) {
     state.messengerBusy++;
     renderMessenger();
     try {
-      const aiThread = {
-        id: "thread-ai-companion",
-        userOneId: state.currentUser.id,
-        userTwoId: AI_COMPANION_ID,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        isAi: true
-      };
-      
-      // Check if we already have it in state
-      if (!state.directThreads.some(t => t.id === aiThread.id)) {
-        state.directThreads = sortThreads([aiThread, ...state.directThreads]);
-      }
-      
-      state.activeThreadId = aiThread.id;
-      
-      // Load from localStorage for persistence
-      state.activeMessages = loadAiMessagesLocally();
-      
-      clearMessageAttachmentSelection({ preserveFeedback: true });
-      showMessengerFeedback("");
+      handleAiOpenOrCreateThread({
+        partnerId,
+        state,
+        sortThreads,
+        clearMessageAttachmentSelection,
+        showMessengerFeedback
+      });
     } finally {
       state.messengerBusy = Math.max(0, state.messengerBusy - 1);
       renderMessenger();
@@ -1999,199 +1912,24 @@ async function handleMessageSubmit(event) {
     return;
   }
 
-  // AI Interception
-  const activeThread = getActiveThread();
-  if (activeThread?.isAi) {
-    try {
-      const userMessage = {
-        id: crypto.randomUUID(),
-        threadId: state.activeThreadId,
-        senderId: state.currentUser.id,
-        body,
-        createdAt: new Date().toISOString(),
-        attachmentUrl: null,
-        attachmentKind: attachmentFile ? getMessageAttachmentKind(attachmentFile.type) : null,
-        attachmentName: attachmentFile ? attachmentFile.name : null,
-        attachmentType: attachmentFile ? attachmentFile.type : null,
-        attachmentSize: attachmentFile ? attachmentFile.size : 0,
-      };
-
-      const directSteamTarget = window.SignalShareAiCore?.parseDirectSteamCommand?.(body) || "";
-      const directDuckDuckGoQuery = window.SignalShareAiCore?.parseDuckDuckGoCommand?.(body) || "";
-
-      if (directSteamTarget || directDuckDuckGoQuery) {
-        mergeActiveMessage(userMessage);
-        saveAiMessagesLocally();
-
-        state.messageAttachmentFile = null;
-        state.messageAttachmentPreviewUrl = "";
-        renderMessenger();
-
-        let aiReply = "";
-        if (directSteamTarget) {
-          const steamPlan = window.SignalShareAiCore?.buildSteamLaunchPlan?.(directSteamTarget) || null;
-          if (steamPlan?.type === "run" && steamPlan.uri) {
-            window.location.href = steamPlan.uri;
-            aiReply = `🎮 [Steam Protocol]: Launching ${steamPlan.key.toUpperCase()} via Steam now.`;
-          } else {
-            const searchUrl = steamPlan?.searchUrl || `https://store.steampowered.com/search/?term=${encodeURIComponent(directSteamTarget)}`;
-            window.open(searchUrl, "_blank", "noopener,noreferrer");
-            aiReply = `🎮 [Steam Protocol]: I couldn't find a direct app ID for "${directSteamTarget}", so I opened Steam search.`;
-          }
-        } else {
-          const query = directDuckDuckGoQuery.trim();
-          if (query) {
-            const url = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
-            window.open(url, "_blank", "noopener,noreferrer");
-            aiReply = `🔎 [Search Protocol]: Searching DuckDuckGo for "${query}".`;
-          } else {
-            aiReply = "🔎 [Search Protocol]: Tell me what you want to search on DuckDuckGo.";
-          }
-        }
-
-        const directAiMessage = {
-          id: crypto.randomUUID(),
-          threadId: state.activeThreadId,
-          senderId: AI_COMPANION_ID,
-          body: aiReply,
-          createdAt: new Date().toISOString()
-        };
-        mergeActiveMessage(directAiMessage);
-        saveAiMessagesLocally();
-        renderMessenger();
-        playIncomingMessageSound();
-        showMessengerFeedback("");
-        return;
-      }
-
-      // Prepare attachment for LLM if present
-      let aiAttachment = null;
-      if (attachmentFile) {
-        try {
-          aiAttachment = {
-            data: await readFileAsDataURL(attachmentFile),
-            type: getMessageAttachmentKind(attachmentFile.type),
-            name: attachmentFile.name
-          };
-          if (aiAttachment?.data) {
-            userMessage.attachmentUrl = aiAttachment.data;
-          }
-        } catch (err) {
-          console.error("Failed to read AI attachment", err);
-        }
-      }
-
-      // Prepare history for LLM (excluding current message)
-      const history = window.SignalShareAiCore
-        ? window.SignalShareAiCore.normalizeHistory(state.activeMessages, {
-            aiSenderId: AI_COMPANION_ID,
-            currentMessageId: userMessage.id
-          })
-        : state.activeMessages
-            .filter(m => !m.isThinking && m.id !== userMessage.id)
-            .map(m => ({
-              role: m.senderId === AI_COMPANION_ID ? "assistant" : "user",
-              content: `${m.body || ""}`.trim().slice(0, 900)
-            }))
-            .filter((row) => row.content.length > 0)
-            .slice(-18);
-
-      mergeActiveMessage(userMessage);
-      saveAiMessagesLocally();
-      
-      // Clear attachment state since it's now in the message
-      state.messageAttachmentFile = null;
-      state.messageAttachmentPreviewUrl = "";
-      
-      renderMessenger();
-
-      // Add thinking indicator
-      const thinkingId = `thinking-${crypto.randomUUID()}`;
-      const thinkingMsg = {
-        id: thinkingId,
-        threadId: state.activeThreadId,
-        senderId: AI_COMPANION_ID,
-        body: "Thinking...",
-        isThinking: true,
-        createdAt: new Date().toISOString()
-      };
-      state.activeMessages.push(thinkingMsg);
-      renderMessenger();
-      
-      // Refresh media state so AI has latest context from system bridges
-      if (window.heroMediaPlayerController) {
-        try {
-          if (typeof window.heroMediaPlayerController.refreshDesktopSnapshot === 'function') {
-             await window.heroMediaPlayerController.refreshDesktopSnapshot({ force: true, renderAfter: false });
-          }
-          if (typeof window.heroMediaPlayerController.refreshNativeSnapshot === 'function') {
-             await window.heroMediaPlayerController.refreshNativeSnapshot({ renderAfter: false });
-          }
-        } catch (e) { console.warn("Failed to refresh media context for AI", e); }
-      }
-
-      // Call LLM
-      const pageContext = document.title || 'Signal Share';
-      const pageText = document.body.innerText.substring(0, 600);
-      const sharedAiContext = window.SignalShareAiCore
-        ? window.SignalShareAiCore.buildCompanionContext({
-            surface: "main",
-            pageTitle: document.title || "",
-            pageUrl: window.location.href,
-            currentCategory: state.messengerOpen ? "messenger" : "feed",
-            visibleText: pageText,
-            attachment: aiAttachment
-          })
-        : "";
-      const fullContext = `${pageContext} (Visible text: ${pageText})${sharedAiContext ? `\n\n${sharedAiContext}` : ""}`;
-      if (!shouldAttemptBridgeRequests()) {
-        // User explicitly requested an AI response. Enable bridge attempts for this browser profile.
-        localStorage.setItem("ss_bridge_enabled", "1");
-      }
-
-      let aiResponse;
-      try {
-        aiResponse = await callLocalAI(body, history, fullContext, aiAttachment);
-      } finally {
-        // ALWAYS remove thinking indicator before rendering the response or error
-        state.activeMessages = state.activeMessages.filter(m => m.id !== thinkingId);
-      }
-      
-      const aiMessage = {
-        id: crypto.randomUUID(),
-        threadId: state.activeThreadId,
-        senderId: AI_COMPANION_ID,
-        body: aiResponse,
-        createdAt: new Date().toISOString()
-      };
-      mergeActiveMessage(aiMessage);
-      saveAiMessagesLocally();
-
-      // Process Arcade Protocol actions if present in response
-      if (aiResponse && aiResponse.includes('[ARCADE:')) {
-        const arcadeMatch = aiResponse.match(/\[ARCADE:\s*([^\]]+)\]/);
-        if (arcadeMatch && typeof window.executeArcadeAction === 'function') {
-            const action = arcadeMatch[1].trim().toLowerCase();
-            window.executeArcadeAction(action);
-        }
-      }
-
-      renderMessenger();
-      playIncomingMessageSound();
-      
-      showMessengerFeedback("");
-    } catch (error) {
-      console.error("AI response failed", error);
-      showMessengerFeedback("AI Companion is currently offline.", true);
-    } finally {
-      window.__SIGNAL_MESSENGER_SUBMITTING__ = false;
-      state.messengerBusy = Math.max(0, state.messengerBusy - 1);
-      elements.messageInput.disabled = false;
-      elements.sendMessageButton.disabled = false;
-      renderMessenger();
-    }
-    return;
-  }
+  const aiHandled = await handleAiThreadMessageSubmit({
+    state,
+    elements,
+    body,
+    attachmentFile,
+    getMessageAttachmentKind,
+    getActiveThread,
+    mergeActiveMessage,
+    renderMessenger,
+    showMessengerFeedback,
+    playIncomingMessageSound,
+    shouldAttemptBridgeRequests,
+    resolveBridgeBaseCandidates,
+    getBridgeSecretValue,
+    resolvePreferredBridgeModel,
+    getBridgeTargetAddressSpace
+  });
+  if (aiHandled) return;
 
   try {
     const messageId = crypto.randomUUID();
@@ -2282,168 +2020,6 @@ async function handleMessageSubmit(event) {
     window.__SIGNAL_MESSENGER_SUBMITTING__ = false;
     state.messengerBusy = Math.max(0, state.messengerBusy - 1);
     renderMessenger();
-  }
-}
-
-async function callLocalAI(text, history = [], pageContext = "", attachment = null) {
-  if (!shouldAttemptBridgeRequests()) {
-    localStorage.setItem("ss_bridge_enabled", "1");
-  }
-
-  const bridgeBaseCandidates = resolveBridgeBaseCandidates();
-  if (bridgeBaseCandidates.length === 0) return getGlobalProtocolOfflineResponse(text);
-
-  let abortController = null;
-  let stopRequested = false;
-  window.stopMessengerAi = () => {
-    stopRequested = true;
-    if (abortController) {
-      abortController.abort();
-      abortController = null;
-    }
-  };
-
-  const secret = getBridgeSecretValue();
-  const preferredModel = resolvePreferredBridgeModel();
-  const payload = JSON.stringify({
-    message: text,
-    ...(preferredModel ? { model: preferredModel } : {}),
-    history: Array.isArray(history) ? history : [],
-    pageContext: pageContext || "Signal Share",
-    attachment
-  });
-
-  if (typeof window.bridgeFetch === "function") {
-    try {
-      abortController = new AbortController();
-      const response = await window.bridgeFetch("/api/llm/chat", {
-        method: "POST",
-        signal: abortController.signal,
-        timeoutMs: 45000,
-        body: payload
-      });
-      if (response?.ok) {
-        const data = await response.json().catch(() => ({}));
-        return data.reply || "I'm having trouble thinking right now.";
-      }
-      console.debug(
-        `[AI Messenger] Shared bridgeFetch returned status ${response?.status ?? "unknown"}; falling back to internal resolver.`
-      );
-    } catch (err) {
-      if (stopRequested) {
-        return "🛑 [Signal Protocol] AI request stopped.";
-      }
-      console.debug("[AI Messenger] Shared bridgeFetch path failed:", err);
-    }
-  }
-
-  let lastNetworkError = null;
-  let lastHttpResponse = null;
-
-  for (const baseUrl of bridgeBaseCandidates) {
-    const endpoint = `${baseUrl}/api/llm/chat`;
-    try {
-      abortController = new AbortController();
-      const requestController = abortController;
-      const timeoutId = setTimeout(() => {
-        requestController.abort();
-      }, 45000);
-
-      const targetAddressSpace = getBridgeTargetAddressSpace(baseUrl);
-      const headers = { "Content-Type": "application/json" };
-      if (secret) headers["X-Bridge-Secret"] = secret;
-
-      let response;
-      try {
-        response = await fetch(endpoint, {
-          method: "POST",
-          mode: "cors",
-          cache: "no-store",
-          credentials: "omit",
-          headers,
-          ...(targetAddressSpace ? { targetAddressSpace } : {}),
-          signal: requestController.signal,
-          body: payload
-        });
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-      if (response.ok) {
-        localStorage.setItem("ss_bridge_last_working_base", baseUrl);
-        const data = await response.json();
-        return data.reply || "I'm having trouble thinking right now.";
-      }
-
-      if (response.status === 401 || response.status === 403 || response.status === 422) {
-        lastHttpResponse = response;
-        break;
-      }
-
-      lastHttpResponse = response;
-    } catch (err) {
-      if (stopRequested) {
-        return "🛑 [Signal Protocol] AI request stopped.";
-      }
-      lastNetworkError = err;
-      console.debug(`[AI Messenger] Endpoint failed ${endpoint}:`, err);
-    }
-  }
-
-  if (lastHttpResponse) {
-    console.debug(`[AI Messenger] Bridge returned status ${lastHttpResponse.status}.`);
-  } else if (lastNetworkError) {
-    console.debug("[AI Messenger] Bridge network error:", lastNetworkError);
-  }
-
-  // Final Fallback: Internal Global Protocol
-  console.log('[AI Messenger] All endpoints failed. Switching to Global Protocol Offline mode.');
-  return getGlobalProtocolOfflineResponse(text);
-}
-
-/**
- * Lightweight client-side fallback for general site support when offline.
- */
-function getGlobalProtocolOfflineResponse(text) {
-    const query = (text || "").toLowerCase();
-    
-    const responses = {
-        "hello": "Hello! I'm the Signal Share protocol assistant. My primary logic core is currently offline, but I can still help you with site basics.",
-        "hi": "Hi there! I'm running on emergency protocol. How can I help you navigate the platform today?",
-        "help": "I can help you with: \n- **Feed**: How to post and view media.\n- **Messenger**: Sending direct messages.\n- **Account**: Signing in and profile settings.\n- **Media**: Using the Hero Player.\nWhat do you need help with?",
-        "post": "To post media, use the **Publish Post** section in the sidebar. You can drop images, videos, or audio files there. Note: You need to be signed in to publish to the live feed.",
-        "feed": "The live feed shows the latest posts from all members. You can filter by 'All', 'Image', 'Video', or 'Audio' using the sort controls at the top.",
-        "messenger": "You can start a private conversation with any member by clicking 'Message' on their profile. Your conversations sync live across all your devices.",
-        "profile": "Click on your name in the account section to view your profile. You can change your display name and view your own posts there.",
-        "hero": "The Hero Media Player at the top handles all your media playback. It supports YouTube, Spotify, and direct file uploads. You can control it using the floating play bar.",
-        "player": "The Hero Media Player at the top handles all your media playback. It supports YouTube, Spotify, and direct file uploads. You can control it using the floating play bar.",
-        "who": "I am the Signal Share A.I. Companion. I'm currently running in 'Offline Protocol' mode because I can't reach my primary brain.",
-        "error": "If you're seeing errors, make sure you have a stable internet connection. If you're running locally, ensure the Bridge server is active on port 3000.",
-        "offline": "I'm in offline mode because the local bridge server is unreachable. Please check if your backend is running."
-    };
-
-    // Keyword matching
-    for (const key in responses) {
-        if (query.includes(key)) return `📶 [Signal Protocol] ${responses[key]}`;
-    }
-
-    return "📶 [Signal Protocol] I'm currently operating in offline mode and don't have a specific response for that. Try asking about 'help', 'posting', 'messenger', or 'the player'.";
-}
-
-function saveAiMessagesLocally() {
-  const storageKey = getAiMessagesStorageKey();
-  if (!storageKey) return;
-  const sanitized = sanitizeAiMessagesForStorage(state.activeMessages);
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(sanitized));
-  } catch (error) {
-    console.warn("AI local message cache exceeded limits; retrying without attachment payloads.", error);
-    try {
-      const fallback = sanitized.map((message) => ({ ...message, attachmentUrl: "" }));
-      localStorage.setItem(storageKey, JSON.stringify(fallback));
-    } catch (finalError) {
-      console.warn("AI local message cache could not be saved.", finalError);
-    }
   }
 }
 
