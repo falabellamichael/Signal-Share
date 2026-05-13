@@ -319,8 +319,9 @@ export async function handlePlayPauseAction(context, forcePlay) {
   // 3. RESOLVE INTENT (Strictly based on resolved mode)
   let shouldPlay = true;
 
+  let localState = "none";
   if (mode === "app") {
-    const localState = target === "mini" ? state.miniPlayerPlaybackState : state.heroPlayerPlaybackState;
+    localState = target === "mini" ? state.miniPlayerPlaybackState : state.heroPlayerPlaybackState;
     shouldPlay = (typeof forcePlay === "boolean") ? forcePlay : (localState !== "playing");
   } else {
     // System state check with Source Isolation
