@@ -117,9 +117,26 @@ window.ArcadeChatbotEngine = (function() {
             }
         },
         {
-            keywords: ['spotify', 'youtube'],
-            action: () => {
-                return "🎵 [Media Protocol]: I can search for tracks on Spotify and YouTube. Just say 'Play [song name]'.";
+            keywords: ['spotify', 'youtube', 'open spotify', 'open youtube', 'launch spotify', 'launch youtube'],
+            action: (text) => {
+                const query = text.toLowerCase();
+                const isSpotify = query.includes('spotify');
+                const isYouTube = query.includes('youtube');
+
+                if (query.includes('open') || query.includes('launch')) {
+                    if (window.heroMediaPlayerController && typeof window.heroMediaPlayerController.openNowPlayingMediaApp === 'function') {
+                        if (isSpotify) {
+                            window.heroMediaPlayerController.openNowPlayingMediaApp("com.spotify.music", "spotify:");
+                            return "🎵 [Media Protocol]: Opening Spotify...";
+                        }
+                        if (isYouTube) {
+                            window.heroMediaPlayerController.openNowPlayingMediaApp("com.google.android.youtube", "https://www.youtube.com");
+                            return "🎵 [Media Protocol]: Opening YouTube...";
+                        }
+                    }
+                }
+                
+                return `🎵 [Media Protocol]: I can search for tracks on ${isSpotify ? 'Spotify' : 'YouTube'}. Just say 'Play [song name]'.`;
             }
         },
 

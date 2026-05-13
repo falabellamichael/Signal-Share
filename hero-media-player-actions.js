@@ -377,7 +377,15 @@ export async function handlePlayPauseAction(context, forcePlay) {
 
   // C. Bridge Commands
   const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
-  const sendToBridge = (mode === "desktop" || mode === "device") || (!shouldPlay && (desktopSnapshot?.active || nativeSnapshot?.active));
+  
+  // Decide if we actually need to send a command to the bridge.
+  // If we are already in the requested state (e.g. asking to pause while already paused), skip it.
+  const isAlreadyInState = (mode === "app") 
+    ? (shouldPlay === (localState === "playing"))
+    : (shouldPlay === isPlayingOnSystem);
+
+  const sendToBridge = ((mode === "desktop" || mode === "device") && !isAlreadyInState) 
+    || (!shouldPlay && (desktopSnapshot?.active || nativeSnapshot?.active) && !isAlreadyInState);
 
   if (sendToBridge) {
     try {

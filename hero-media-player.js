@@ -2363,12 +2363,8 @@ The companion bridge is designed with several security layers to keep your PC sa
     handleRefresh,
     handleVolumeInput,
     // Standard aliases for easier script/AI interaction
-    play: () => {
-      if (state.playbackState !== "playing") handlePlayPause();
-    },
-    pause: () => {
-      if (state.playbackState === "playing") handlePlayPause();
-    },
+    play: () => handlePlayPause(true),
+    pause: () => handlePlayPause(false),
     next: handleNext,
     previous: handlePrevious,
     setHeroControlSource: (source) => { syncHeroControlSourceChange(source); },
