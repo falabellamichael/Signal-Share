@@ -78,11 +78,30 @@ window.ArcadeChatbotEngine = (function() {
             keywords: ['pause', 'stop', 'hold'],
             action: (text) => {
                 const query = text.toLowerCase();
+                const forceFeed = query.includes('on feed') || query.includes('on signal share') || query.includes('signal');
+                
                 if (window.heroMediaPlayerController) {
-                    if (query.includes('spotify') && typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
-                        window.heroMediaPlayerController.setHeroControlSource('spotify');
-                    } else if (query.includes('youtube') && typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
-                        window.heroMediaPlayerController.setHeroControlSource('youtube');
+                    let targetSource = null;
+                    if (query.includes('spotify')) targetSource = 'spotify';
+                    else if (query.includes('youtube')) targetSource = 'youtube';
+                    
+                    if (targetSource) {
+                        const isSystemActive = typeof window.heroMediaPlayerController.isSourceActiveOnSystem === 'function' && 
+                                              window.heroMediaPlayerController.isSourceActiveOnSystem(targetSource);
+                        
+                        if (isSystemActive && !forceFeed) {
+                            if (typeof window.heroMediaPlayerController.setHeroControlMode === 'function') {
+                                window.heroMediaPlayerController.setHeroControlMode('media');
+                            }
+                        } else {
+                            if (typeof window.heroMediaPlayerController.setHeroControlMode === 'function') {
+                                window.heroMediaPlayerController.setHeroControlMode('feed');
+                            }
+                        }
+                        
+                        if (typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
+                            window.heroMediaPlayerController.setHeroControlSource(targetSource);
+                        }
                     }
                     
                     if (typeof window.heroMediaPlayerController.pause === 'function') {
@@ -96,11 +115,30 @@ window.ArcadeChatbotEngine = (function() {
             keywords: ['play', 'resume', 'start'],
             action: (text) => {
                 const query = text.toLowerCase();
+                const forceFeed = query.includes('on feed') || query.includes('on signal share') || query.includes('signal');
+                
                 if (window.heroMediaPlayerController) {
-                    if (query.includes('spotify') && typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
-                        window.heroMediaPlayerController.setHeroControlSource('spotify');
-                    } else if (query.includes('youtube') && typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
-                        window.heroMediaPlayerController.setHeroControlSource('youtube');
+                    let targetSource = null;
+                    if (query.includes('spotify')) targetSource = 'spotify';
+                    else if (query.includes('youtube')) targetSource = 'youtube';
+                    
+                    if (targetSource) {
+                        const isSystemActive = typeof window.heroMediaPlayerController.isSourceActiveOnSystem === 'function' && 
+                                              window.heroMediaPlayerController.isSourceActiveOnSystem(targetSource);
+                        
+                        if (isSystemActive && !forceFeed) {
+                            if (typeof window.heroMediaPlayerController.setHeroControlMode === 'function') {
+                                window.heroMediaPlayerController.setHeroControlMode('media');
+                            }
+                        } else {
+                            if (typeof window.heroMediaPlayerController.setHeroControlMode === 'function') {
+                                window.heroMediaPlayerController.setHeroControlMode('feed');
+                            }
+                        }
+                        
+                        if (typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
+                            window.heroMediaPlayerController.setHeroControlSource(targetSource);
+                        }
                     }
 
                     if (typeof window.heroMediaPlayerController.play === 'function') {
@@ -114,11 +152,30 @@ window.ArcadeChatbotEngine = (function() {
             keywords: ['next', 'skip'],
             action: (text) => {
                 const query = text.toLowerCase();
+                const forceFeed = query.includes('on feed') || query.includes('on signal share') || query.includes('signal');
+                
                 if (window.heroMediaPlayerController) {
-                    if (query.includes('spotify') && typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
-                        window.heroMediaPlayerController.setHeroControlSource('spotify');
-                    } else if (query.includes('youtube') && typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
-                        window.heroMediaPlayerController.setHeroControlSource('youtube');
+                    let targetSource = null;
+                    if (query.includes('spotify')) targetSource = 'spotify';
+                    else if (query.includes('youtube')) targetSource = 'youtube';
+                    
+                    if (targetSource) {
+                        const isSystemActive = typeof window.heroMediaPlayerController.isSourceActiveOnSystem === 'function' && 
+                                              window.heroMediaPlayerController.isSourceActiveOnSystem(targetSource);
+                        
+                        if (isSystemActive && !forceFeed) {
+                            if (typeof window.heroMediaPlayerController.setHeroControlMode === 'function') {
+                                window.heroMediaPlayerController.setHeroControlMode('media');
+                            }
+                        } else {
+                            if (typeof window.heroMediaPlayerController.setHeroControlMode === 'function') {
+                                window.heroMediaPlayerController.setHeroControlMode('feed');
+                            }
+                        }
+                        
+                        if (typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
+                            window.heroMediaPlayerController.setHeroControlSource(targetSource);
+                        }
                     }
 
                     if (typeof window.heroMediaPlayerController.next === 'function') {
@@ -132,11 +189,30 @@ window.ArcadeChatbotEngine = (function() {
             keywords: ['previous', 'back', 'prev'],
             action: (text) => {
                 const query = text.toLowerCase();
+                const forceFeed = query.includes('on feed') || query.includes('on signal share') || query.includes('signal');
+                
                 if (window.heroMediaPlayerController) {
-                    if (query.includes('spotify') && typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
-                        window.heroMediaPlayerController.setHeroControlSource('spotify');
-                    } else if (query.includes('youtube') && typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
-                        window.heroMediaPlayerController.setHeroControlSource('youtube');
+                    let targetSource = null;
+                    if (query.includes('spotify')) targetSource = 'spotify';
+                    else if (query.includes('youtube')) targetSource = 'youtube';
+                    
+                    if (targetSource) {
+                        const isSystemActive = typeof window.heroMediaPlayerController.isSourceActiveOnSystem === 'function' && 
+                                              window.heroMediaPlayerController.isSourceActiveOnSystem(targetSource);
+                        
+                        if (isSystemActive && !forceFeed) {
+                            if (typeof window.heroMediaPlayerController.setHeroControlMode === 'function') {
+                                window.heroMediaPlayerController.setHeroControlMode('media');
+                            }
+                        } else {
+                            if (typeof window.heroMediaPlayerController.setHeroControlMode === 'function') {
+                                window.heroMediaPlayerController.setHeroControlMode('feed');
+                            }
+                        }
+                        
+                        if (typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
+                            window.heroMediaPlayerController.setHeroControlSource(targetSource);
+                        }
                     }
 
                     if (typeof window.heroMediaPlayerController.previous === 'function') {
@@ -158,21 +234,47 @@ window.ArcadeChatbotEngine = (function() {
                 const query = text.toLowerCase();
                 const isSpotify = query.includes('spotify');
                 const isYouTube = query.includes('youtube');
+                const forceFeed = query.includes('on feed') || query.includes('on signal share') || query.includes('signal');
 
-                if (query.includes('open') || query.includes('launch')) {
-                    if (window.heroMediaPlayerController && typeof window.heroMediaPlayerController.openNowPlayingMediaApp === 'function') {
-                        if (isSpotify) {
-                            await window.heroMediaPlayerController.openNowPlayingMediaApp("com.spotify.music", "spotify:");
-                            return "🎵 [Media Protocol]: Opening Spotify...";
+                if (window.heroMediaPlayerController) {
+                    const targetSource = isSpotify ? 'spotify' : (isYouTube ? 'youtube' : null);
+                    
+                    if (targetSource) {
+                        const isSystemActive = typeof window.heroMediaPlayerController.isSourceActiveOnSystem === 'function' && 
+                                              window.heroMediaPlayerController.isSourceActiveOnSystem(targetSource);
+
+                        if (isSystemActive && !forceFeed) {
+                            if (typeof window.heroMediaPlayerController.setHeroControlMode === 'function') {
+                                window.heroMediaPlayerController.setHeroControlMode('media');
+                            }
+                        } else {
+                            if (typeof window.heroMediaPlayerController.setHeroControlMode === 'function') {
+                                window.heroMediaPlayerController.setHeroControlMode('feed');
+                            }
                         }
-                        if (isYouTube) {
-                            await window.heroMediaPlayerController.openNowPlayingMediaApp("com.google.android.youtube", "https://www.youtube.com");
-                            return "🎵 [Media Protocol]: Opening YouTube...";
+
+                        if (typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
+                            window.heroMediaPlayerController.setHeroControlSource(targetSource);
+                        }
+                    }
+
+                    if (query.includes('open') || query.includes('launch')) {
+                        if (typeof window.heroMediaPlayerController.openNowPlayingMediaApp === 'function') {
+                            if (isSpotify) {
+                                await window.heroMediaPlayerController.openNowPlayingMediaApp("com.spotify.music", "spotify:");
+                                return "🎵 [Media Protocol]: Opening Spotify...";
+                            }
+                            if (isYouTube) {
+                                await window.heroMediaPlayerController.openNowPlayingMediaApp("com.google.android.youtube", "https://www.youtube.com");
+                                return "🎵 [Media Protocol]: Opening YouTube...";
+                            }
                         }
                     }
                 }
                 
-                return `🎵 [Media Protocol]: I can search for tracks on ${isSpotify ? 'Spotify' : 'YouTube'}. Just say 'Play [song name]'.`;
+                if (isSpotify) return "🎵 [Media Protocol]: Switching control to Spotify.";
+                if (isYouTube) return "🎵 [Media Protocol]: Switching control to YouTube.";
+                return "🎵 [Media Protocol]: Media control source updated.";
             }
         },
 

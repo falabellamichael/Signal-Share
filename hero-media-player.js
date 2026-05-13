@@ -2408,6 +2408,23 @@ The companion bridge is designed with several security layers to keep your PC sa
     showCompanionPrompt,
     hideCompanionPrompt,
     handleCompanionResponse,
+    isSourceActiveOnSystem: (source) => {
+      const snapshot = desktopSnapshot || nativeSnapshot;
+      if (!snapshot || !snapshot.active) return false;
+      const appPkg = (snapshot.appPackage || "").toLowerCase();
+      const metaText = (snapshot.meta || "").toLowerCase();
+      const titleText = (snapshot.title || "").toLowerCase();
+      const provider = (snapshot.sourceProvider || "").toLowerCase();
+      const normalizedSource = (source || "").toLowerCase();
+      
+      if (normalizedSource === "spotify") {
+        return provider === "spotify" || appPkg.includes("spotify") || metaText.includes("spotify") || titleText.includes("spotify");
+      }
+      if (normalizedSource === "youtube") {
+        return provider === "youtube" || appPkg.includes("youtube") || appPkg.includes("ytmusic") || metaText.includes("youtube") || titleText.includes("youtube");
+      }
+      return true;
+    },
     performSupabaseDesktopAction,
     downloadCompanion,
     downloadSecurityReadme

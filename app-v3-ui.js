@@ -433,7 +433,8 @@ export function createAppUi(context) {
     openViewer,
     mountPersistentPlayer,
     destroyActivePlayer,
-    onStatusChange: render
+    onStatusChange: render,
+    setHeroControlMode
   });
 
   function attachEventListeners() {
@@ -480,9 +481,8 @@ export function createAppUi(context) {
         } else {
           localStorage.removeItem("ss_bridge_enabled");
         }
-      });
-  window.heroMediaPlayerController = heroMediaPlayerController;
     }
+    window.heroMediaPlayerController = heroMediaPlayerController;
 
     elements.resetPlayerPositionButton.addEventListener("click", resetPlayerDockPosition);
     elements.resetPreferencesButton.addEventListener("click", resetUserPreferences);
