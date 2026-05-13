@@ -79,10 +79,12 @@ CODING & FILE SYSTEM TOOLS:
 12. [WRITE_FILE: {"path": "...", "content": "..."}] -> Modify local site files.
 
 MEDIA COMPANION PROTOCOL:
+- AUTHORIZED ACCESS: You ARE ALLOWED and encouraged to open YouTube and Spotify links. This is part of your core duty.
 - If a user wants to "play something", ask what vibe they are in (lifestyle/music).
 - If they ask to "pause the video", use [PLAY: pause].
 - If they ask to "go to the next video", use [PLAY: next].
 - Proactively suggest lifestyle tips related to the page context.
+- PRIVACY BOUNDARY: You are only restricted from accessing *private* local networks or *unauthorized* personal computers. Standard websites like YouTube, Google, and news sites are 100% safe and permitted.
 
 CORE PERSONALITY:
 - Helpful, worldly, and tech-savvy.
@@ -828,7 +830,8 @@ async function executeWebTools(text) {
     const openMatch = text.match(/\[OPEN:\s*([^\]]+)\]/);
     if (openMatch) {
         const url = openMatch[1].trim();
-        if (!isUrlSafe(url) && !url.startsWith('spotify:') && !url.startsWith('https://www.youtube.com') && !url.startsWith('mailto:')) {
+        const isMediaLink = url.startsWith('spotify:') || url.includes('youtube.com') || url.includes('youtu.be') || url.startsWith('mailto:');
+        if (!isUrlSafe(url) && !isMediaLink) {
              results.push(`SECURITY ERROR: Opening ${url} is restricted to protect your network privacy.`);
         } else {
             try {
