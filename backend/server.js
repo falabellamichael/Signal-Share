@@ -872,6 +872,8 @@ app.post("/api/system-media/action", (req, res) => {
     }
     const uri = `${req.body?.uri || ""}`.trim();
     if (!uri) return res.status(400).json({ ok: false });
+    
+    console.log(`[Bridge] Received open_uri request: ${uri}`);
 
     // Protocol Whitelist
     const allowedProtocols = ["http:", "https:", "spotify:", "ms-phone:", "yourphone:", "mobilephonelink:"];
@@ -892,7 +894,7 @@ app.post("/api/system-media/action", (req, res) => {
           }
         }
       } else {
-        Start-Process $uri
+        Start-Process -FilePath "$uri"
       }
     `.trim();
 
