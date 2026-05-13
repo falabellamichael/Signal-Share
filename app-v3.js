@@ -500,6 +500,66 @@ function normalizeBridgeBaseUrl(value = "") {
   }
 }
 
+function isAndroidRuntime() {
+  return document.documentElement.classList.contains("platform-android")
+    || (window.Capacitor && typeof window.Capacitor.getPlatform === "function" && window.Capacitor.getPlatform() === "android");
+}
+
+function pushBridgeBaseCandidate(candidates, seen, candidate) {
+  const normalized = normalizeBridgeBaseUrl(candidate);
+  if (!normalized) return;
+  const key = normalized.toLowerCase();
+  if (seen.has(key)) return;
+  seen.add(key);
+  candidates.push(normalized);
+}
+
+function resolveBridgeBaseCandidates() {
+  const candidates = [];
+  const seen = new Set();
+  const host = `${window.location.hostname || ""}`.trim().toLowerCase();
+  const protocol = `${window.location.protocol || ""}`.toLowerCase();
+
+  const configured = normalizeBridgeBaseUrl(localStorage.getItem("signal-share-bridge-url") || "");
+  const lastWorking = normalizeBridgeBaseUrl(localStorage.getItem("ss_bridge_last_working_base") || "");
+  const configuredLlmEndpoint = normalizeBridgeBaseUrl(
+    typeof window.SIGNAL_SHARE_LLM_ENDPOINT === "string" ? window.SIGNAL_SHARE_LLM_ENDPOINT : ""
+  );
+
+  pushBridgeBaseCandidate(candidates, seen, lastWorking);
+  pushBridgeBaseCandidate(candidates, seen, configured);
+  pushBridgeBaseCandidate(candidates, seen, configuredLlmEndpoint);
+
+  const isLoopbackOrigin = protocol === "file:"
+    || !host
+    || host === "localhost"
+    || host.endsWith(".localhost")
+    || host === "127.0.0.1"
+    || host === "::1"
+    || host === "[::1]";
+
+  if (isLoopbackOrigin && protocol !== "file:") {
+    pushBridgeBaseCandidate(candidates, seen, window.location.origin);
+  }
+
+  if (host === "127.0.0.1") {
+    pushBridgeBaseCandidate(candidates, seen, "http://127.0.0.1:3000");
+    pushBridgeBaseCandidate(candidates, seen, "http://localhost:3000");
+  } else {
+    pushBridgeBaseCandidate(candidates, seen, "http://localhost:3000");
+    pushBridgeBaseCandidate(candidates, seen, "http://127.0.0.1:3000");
+  }
+
+  if (isAndroidRuntime()) {
+    pushBridgeBaseCandidate(candidates, seen, "http://10.0.2.2:3000");
+  } else if (configured && configured.includes("10.0.2.2")) {
+    // Keep explicit 10.0.2.2 from user config only as fallback.
+    pushBridgeBaseCandidate(candidates, seen, configured);
+  }
+
+  return candidates;
+}
+
 function shouldAttemptBridgeRequests() {
   if (isNativeCapacitorApp()) return isBridgeFeatureEnabled();
   if (isLoopbackSiteOrigin() || isPrivateSiteOrigin()) return true;
@@ -2226,68 +2286,12 @@ async function handleMessageSubmit(event) {
 }
 
 async function callLocalAI(text, history = [], pageContext = "", attachment = null) {
-  const bridgeRequestsEnabled = shouldAttemptBridgeRequests();
-  const isLocalOrigin = isLoopbackSiteOrigin() || isPrivateSiteOrigin();
-  const configuredLlmEndpoint = typeof window.SIGNAL_SHARE_LLM_ENDPOINT === "string"
-    ? window.SIGNAL_SHARE_LLM_ENDPOINT.trim()
-    : "";
-  const host = `${window.location.hostname || ""}`.trim().toLowerCase();
-  const protocol = `${window.location.protocol || ""}`.toLowerCase();
-  const isSecureHostedPage = protocol === "https:";
-  const isGithubPagesOrigin = host.includes("github.io");
-  const candidates = [];
-  const seen = new Set();
-  const pushCandidate = (candidate) => {
-    if (typeof candidate !== "string") return;
-    const trimmed = candidate.trim();
-    if (!trimmed) return;
-    const key = trimmed.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    candidates.push(trimmed);
-  };
-
-  const configuredBridgeBase = normalizeBridgeBaseUrl(localStorage.getItem("signal-share-bridge-url") || "");
-  const lastWorkingBridgeBase = normalizeBridgeBaseUrl(localStorage.getItem("ss_bridge_last_working_base") || "");
-  const pushBridgeBaseCandidate = (baseUrl) => {
-    const normalizedBase = normalizeBridgeBaseUrl(baseUrl);
-    if (!normalizedBase) return;
-    pushCandidate(`${normalizedBase}/api/llm/chat`);
-  };
-
-  pushCandidate(configuredLlmEndpoint);
-  pushBridgeBaseCandidate(lastWorkingBridgeBase);
-  pushBridgeBaseCandidate(configuredBridgeBase);
-
-  if (bridgeRequestsEnabled || isLocalOrigin || configuredLlmEndpoint) {
-    if (isLocalOrigin && protocol !== "file:") {
-      try {
-        pushCandidate(new URL("/api/llm/chat", window.location.href).toString());
-      } catch {
-        pushCandidate("/api/llm/chat");
-      }
-    } else if (!isGithubPagesOrigin) {
-      pushCandidate(window.location.origin + "/api/llm/chat");
-      pushCandidate("/api/llm/chat");
-    }
+  if (!shouldAttemptBridgeRequests()) {
+    localStorage.setItem("ss_bridge_enabled", "1");
   }
 
-  if (bridgeRequestsEnabled) {
-    if (host === "127.0.0.1") {
-      pushCandidate("http://127.0.0.1:3000/api/llm/chat");
-      pushCandidate("http://localhost:3000/api/llm/chat");
-    } else {
-      pushCandidate("http://localhost:3000/api/llm/chat");
-      pushCandidate("http://127.0.0.1:3000/api/llm/chat");
-    }
-    if (!isSecureHostedPage || isNativeCapacitorApp()) {
-      pushCandidate("http://10.0.2.2:3000/api/llm/chat");
-    }
-  }
-
-  if (candidates.length === 0) {
-    return getGlobalProtocolOfflineResponse(text);
-  }
+  const bridgeBaseCandidates = resolveBridgeBaseCandidates();
+  if (bridgeBaseCandidates.length === 0) return getGlobalProtocolOfflineResponse(text);
 
   let abortController = null;
   let stopRequested = false;
@@ -2301,61 +2305,71 @@ async function callLocalAI(text, history = [], pageContext = "", attachment = nu
 
   const secret = getBridgeSecretValue();
   const preferredModel = resolvePreferredBridgeModel();
+  const payload = JSON.stringify({
+    message: text,
+    ...(preferredModel ? { model: preferredModel } : {}),
+    history: Array.isArray(history) ? history : [],
+    pageContext: pageContext || "Signal Share",
+    attachment
+  });
 
-  for (const url of candidates) {
+  let lastNetworkError = null;
+  let lastHttpResponse = null;
+
+  for (const baseUrl of bridgeBaseCandidates) {
+    const endpoint = `${baseUrl}/api/llm/chat`;
     try {
-      const targetAddressSpace = getBridgeTargetAddressSpace(url);
-      const isRelative = url.startsWith("/") || !/^https?:\/\//i.test(url);
-      
-      // Skip relative paths on GitHub Pages as they will always 404/405
-      if (isRelative && isGithubPagesOrigin) {
-          continue;
-      }
-      if (isGithubPagesOrigin && /^https?:\/\/[^/]*github\.io\/api\/llm\/chat/i.test(url)) {
-        continue;
-      }
-
       abortController = new AbortController();
+      const requestController = abortController;
       const timeoutId = setTimeout(() => {
-        if (abortController) abortController.abort();
-      }, 90000);
-      
-      const headers = { 
-        "Content-Type": "application/json"
-      };
+        requestController.abort();
+      }, 45000);
+
+      const targetAddressSpace = getBridgeTargetAddressSpace(baseUrl);
+      const headers = { "Content-Type": "application/json" };
       if (secret) headers["X-Bridge-Secret"] = secret;
 
       let response;
       try {
-        response = await fetch(url, {
+        response = await fetch(endpoint, {
           method: "POST",
-          headers: headers,
-          ...(targetAddressSpace ? { targetAddressSpace } : {}),
-          signal: abortController.signal,
+          mode: "cors",
           cache: "no-store",
           credentials: "omit",
-          body: JSON.stringify({ 
-            message: text, 
-            ...(preferredModel ? { model: preferredModel } : {}),
-            history: history,
-            pageContext: pageContext || "Signal Share",
-            attachment: attachment // Pass through the attachment for multimodal support
-          })
+          headers,
+          ...(targetAddressSpace ? { targetAddressSpace } : {}),
+          signal: requestController.signal,
+          body: payload
         });
       } finally {
         clearTimeout(timeoutId);
       }
-      
+
       if (response.ok) {
+        localStorage.setItem("ss_bridge_last_working_base", baseUrl);
         const data = await response.json();
         return data.reply || "I'm having trouble thinking right now.";
       }
+
+      if (response.status === 401 || response.status === 403 || response.status === 422) {
+        lastHttpResponse = response;
+        break;
+      }
+
+      lastHttpResponse = response;
     } catch (err) {
       if (stopRequested) {
         return "🛑 [Signal Protocol] AI request stopped.";
       }
-      console.debug(`[AI Messenger] Endpoint failed ${url}:`, err);
+      lastNetworkError = err;
+      console.debug(`[AI Messenger] Endpoint failed ${endpoint}:`, err);
     }
+  }
+
+  if (lastHttpResponse) {
+    console.debug(`[AI Messenger] Bridge returned status ${lastHttpResponse.status}.`);
+  } else if (lastNetworkError) {
+    console.debug("[AI Messenger] Bridge network error:", lastNetworkError);
   }
 
   // Final Fallback: Internal Global Protocol
