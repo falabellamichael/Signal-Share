@@ -269,7 +269,14 @@ let messengerLifecycleListenersAttached = false;
 let messengerCatchUpPromise = null;
 let lastMessengerCatchUpAt = 0;
 let nativeBackHandlerAttached = false;
+let permissionBootstrapBound = false;
+let localNetworkPermissionProbePromise = null;
 const externalPreviewCache = new Map();
+const LOCAL_NETWORK_PERMISSION_PROBE_URLS = Object.freeze([
+  "http://localhost:3000/api/llm/chat",
+  "http://127.0.0.1:3000/api/llm/chat",
+  "http://10.0.2.2:3000/api/llm/chat"
+]);
 
 // Ensure state is shared across multiple instances of app.js (e.g. if loaded with/without query strings)
 const globalStateKey = "__SIGNAL_SHARE_STATE__";
@@ -434,6 +441,74 @@ function trimNotificationText(value, maxLength = 120) {
 function maybeRequestMessageNotificationPermission() {
   if (!canUseBrowserNotifications() || Notification.permission !== "default") return;
   void Notification.requestPermission().catch(() => { });
+}
+
+function shouldPromptForPushNotifications() {
+  if (supportsNativePushNotifications()) return true;
+  return canUseBrowserNotifications() && Notification.permission === "default";
+}
+
+function isLoopbackBridgeUrl(url) {
+  try {
+    const parsed = new URL(url, window.location.href);
+    return parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.hostname === "::1" || parsed.hostname === "[::1]";
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function probeLocalNetworkPermission() {
+  if (!window.isSecureContext) return false;
+  if (localNetworkPermissionProbePromise) return localNetworkPermissionProbePromise;
+
+  localNetworkPermissionProbePromise = (async () => {
+    for (const url of LOCAL_NETWORK_PERMISSION_PROBE_URLS) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1800);
+      const loopback = isLoopbackBridgeUrl(url);
+      try {
+        await fetch(url, {
+          method: "GET",
+          mode: "cors",
+          cache: "no-store",
+          credentials: "omit",
+          signal: controller.signal,
+          ...(loopback ? {} : { targetAddressSpace: "private" })
+        });
+        return true;
+      } catch (_error) {
+        // Ignore individual probe failures; we only need to trigger permission checks.
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+    return false;
+  })();
+
+  try {
+    return await localNetworkPermissionProbePromise;
+  } finally {
+    localNetworkPermissionProbePromise = null;
+  }
+}
+
+function requestSiteAndAppPermissions({ fromUserGesture = false } = {}) {
+  if (state.currentUser && isMessagingEnabled(state)) {
+    void safelyEnsurePushNotificationRegistration({ prompt: fromUserGesture || shouldPromptForPushNotifications() });
+  } else if (fromUserGesture && canUseBrowserNotifications() && Notification.permission === "default") {
+    void Notification.requestPermission().catch(() => { });
+  }
+
+  void probeLocalNetworkPermission().catch(() => { });
+}
+
+function bindPermissionBootstrapHandlers() {
+  if (permissionBootstrapBound) return;
+  permissionBootstrapBound = true;
+
+  const promptFromGesture = () => requestSiteAndAppPermissions({ fromUserGesture: true });
+  window.addEventListener("pointerdown", promptFromGesture, { passive: true, once: true });
+  window.addEventListener("keydown", promptFromGesture, { once: true });
 }
 
 function base64UrlToUint8Array(value) {
@@ -880,6 +955,8 @@ async function initialize() {
   applySiteSettings(state.siteSettings);
   applyUserPreferences(state.preferences);
   updateViewportMetrics();
+  bindPermissionBootstrapHandlers();
+  requestSiteAndAppPermissions({ fromUserGesture: false });
 
   if (isHostedPostingEnabled()) {
     try {
@@ -934,7 +1011,7 @@ async function initialize() {
   void safelyInitializeMessengerLifecycleSync();
   void safelyInitializeNativeBackHandling();
   void safelyInitializeNativePushNotifications();
-  if (state.currentUser && isMessagingEnabled(state)) void safelyEnsurePushNotificationRegistration({ prompt: shouldPromptForPushNotificationsOnNativeApp() });
+  if (state.currentUser && isMessagingEnabled(state)) void safelyEnsurePushNotificationRegistration({ prompt: shouldPromptForPushNotifications() });
   state.lastScrollY = window.scrollY;
   syncMobileHeaderVisibility();
   updateActiveFilterChip();
@@ -980,7 +1057,7 @@ async function handleAuthStateChange(event, session) {
   if (isMessagingEnabled(state)) {
     await refreshMessengerState({ preserveActiveThread: event !== "SIGNED_OUT" });
     await flushPendingNotificationThread();
-    void safelyEnsurePushNotificationRegistration({ prompt: shouldPromptForPushNotificationsOnNativeApp() });
+    void safelyEnsurePushNotificationRegistration({ prompt: shouldPromptForPushNotifications() });
   } else { clearMessengerState(); }
   render();
 }

@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends BridgeActivity {
     private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 1001;
+    private static final int BLUETOOTH_CONNECT_PERMISSION_REQUEST_CODE = 1002;
     private static final String NATIVE_BRIDGE_OBJECT = "NativeBridge";
     private static final String NATIVE_BRIDGE_READY_EVENT_JS =
             "window.dispatchEvent(new Event('signal:nativeBridgeReady'));";
@@ -100,6 +101,7 @@ public class MainActivity extends BridgeActivity {
 
         PhoneNowPlayingHelper.pushSnapshotToConnectedNodes(this);
         requestNotificationPermission();
+        requestBluetoothConnectPermission();
         handleIntent(getIntent());
     }
 
@@ -211,6 +213,14 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    private void requestBluetoothConnectPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                androidx.core.app.ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.BLUETOOTH_CONNECT}, BLUETOOTH_CONNECT_PERMISSION_REQUEST_CODE);
+            }
+        }
+    }
+
     private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
 
     @Override
@@ -223,6 +233,11 @@ public class MainActivity extends BridgeActivity {
                     getBridge().getWebView().evaluateJavascript("if (typeof safelyEnsurePushNotificationRegistration === 'function') safelyEnsurePushNotificationRegistration({ prompt: false });", null);
                 }
             }
+            return;
+        }
+
+        if (requestCode == BLUETOOTH_CONNECT_PERMISSION_REQUEST_CODE) {
+            // No-op: permission is optional for richer now-playing integrations.
         }
     }
 

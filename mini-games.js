@@ -68,6 +68,13 @@ let currentCategory = 'all';
 let currentUser = normalizeUserRecord(safeParseJson(localStorage.getItem('ss-user'), null));
 let isNavigatingHistory = false;
 const isAndroidPlatform = /Android/i.test(navigator.userAgent) || (window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android');
+const LOCAL_NETWORK_PERMISSION_PROBE_URLS = Object.freeze([
+    'http://localhost:3000/api/llm/chat',
+    'http://127.0.0.1:3000/api/llm/chat',
+    'http://10.0.2.2:3000/api/llm/chat'
+]);
+let localNetworkPermissionProbePromise = null;
+let permissionPromptHandlersBound = false;
 
 function vibrate(ms) {
     if (navigator.vibrate) navigator.vibrate(ms);
@@ -81,6 +88,66 @@ const isNative = !!window.Capacitor && typeof window.Capacitor.getPlatform === '
 
 function syncCurrentCategoryGlobal() {
     window.currentCategory = currentCategory;
+}
+
+function isLoopbackBridgeUrl(url) {
+    try {
+        const parsed = new URL(url, window.location.href);
+        return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1' || parsed.hostname === '[::1]';
+    } catch (_error) {
+        return false;
+    }
+}
+
+async function probeLocalNetworkPermission() {
+    if (!window.isSecureContext) return false;
+    if (localNetworkPermissionProbePromise) return localNetworkPermissionProbePromise;
+
+    localNetworkPermissionProbePromise = (async () => {
+        for (const url of LOCAL_NETWORK_PERMISSION_PROBE_URLS) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 1800);
+            const isLoopback = isLoopbackBridgeUrl(url);
+            try {
+                await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors',
+                    cache: 'no-store',
+                    credentials: 'omit',
+                    signal: controller.signal,
+                    ...(isLoopback ? {} : { targetAddressSpace: 'private' })
+                });
+                return true;
+            } catch (_error) {
+                // Keep probing candidates; any attempt can trigger browser permission handling.
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+        return false;
+    })();
+
+    try {
+        return await localNetworkPermissionProbePromise;
+    } finally {
+        localNetworkPermissionProbePromise = null;
+    }
+}
+
+function requestMiniGamesPermissions({ fromUserGesture = false } = {}) {
+    if (fromUserGesture && 'Notification' in window && window.isSecureContext && Notification.permission === 'default') {
+        void Notification.requestPermission().catch(() => { });
+    }
+    void probeLocalNetworkPermission().catch(() => { });
+}
+
+function bindPermissionPromptHandlers() {
+    if (permissionPromptHandlersBound) return;
+    permissionPromptHandlersBound = true;
+
+    const onGesture = () => requestMiniGamesPermissions({ fromUserGesture: true });
+    window.addEventListener('pointerdown', onGesture, { passive: true, once: true });
+    window.addEventListener('keydown', onGesture, { once: true });
 }
 
 function resetShellScrollPosition(behavior = 'auto') {
@@ -184,6 +251,8 @@ async function init() {
     initAndroidMiniShell();
     collapseCompanionByDefaultOnAndroid();
     syncCurrentCategoryGlobal();
+    bindPermissionPromptHandlers();
+    requestMiniGamesPermissions({ fromUserGesture: false });
 
     // Initial sync if supabase already has a session
     if (supabaseClient) {
