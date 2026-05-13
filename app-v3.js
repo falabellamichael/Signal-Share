@@ -2484,8 +2484,18 @@ export const {
   getAppConfig, updatePostLikeCount, createDemoGraphic,
 });
 
-window.renderActiveThread = renderActiveThread;
+// Expose core functions and state for AI Companion integration
+window.state = state;
+window.render = render;
+window.setFilter = (filter) => { state.filter = filter; render(); };
+window.setSort = (sort) => { state.sort = sort; render(); };
+window.openMessengerDock = openMessengerDock;
+window.closeMessengerDock = closeMessengerDock;
+window.triggerSearch = (query) => { state.search = query; render(); };
+window.clearSearch = () => { state.search = ""; render(); };
+window.navigateToGames = (cat) => { window.location.href = 'mini-games.html#' + cat; };
 
+window.renderActiveThread = renderActiveThread;
 window.heroMediaPlayerController = heroMediaPlayerController;
 
 if (!window.__SIGNAL_SHARE_INITIALIZED__) {

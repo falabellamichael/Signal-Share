@@ -701,18 +701,6 @@ function setCategory(cat, skipPush = false) {
         if (content) content.style.display = currentUser ? 'block' : 'none';
         if (currentUser) renderPublishedGames();
     } else if (cat === 'leaderboard') {
-        if (leader) leader.style.display = 'block';
-        const msg = document.getElementById('leader-locked-msg');
-        const content = document.getElementById('leader-content');
-        if (msg) msg.style.display = currentUser ? 'none' : 'block';
-        if (content) content.style.display = currentUser ? 'block' : 'none';
-        if (currentUser) {
-            renderLeaderboard();
-            if (typeof window.renderGlobalLeaderboards === 'function') {
-                window.renderGlobalLeaderboards();
-            }
-        }
-    } else {
         if (library) library.style.display = 'block';
         if (hero) hero.style.display = (cat === 'all') ? 'flex' : 'none';
 
@@ -1184,6 +1172,22 @@ window.removeUploadedFile = removeUploadedFile;
 window.publishCustomGame = publishCustomGame;
 window.clearRecent = clearRecent;
 window.toggleObstCount = toggleObstCount;
+
+/**
+ * Gathers stats for all games in the suite.
+ * Used by the AI Companion to provide performance analysis.
+ */
+window.getAllGameStats = function() {
+    if (typeof GAMES === 'undefined' || typeof discoverStats !== 'function') return {};
+    const allStats = {};
+    GAMES.forEach(game => {
+        allStats[game.id] = {
+            title: game.title,
+            stats: discoverStats(game)
+        };
+    });
+    return allStats;
+};
 
 // Start the engine
 document.addEventListener('DOMContentLoaded', init);
