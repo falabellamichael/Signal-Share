@@ -267,6 +267,57 @@ function cleanupOldChats() {
     }
 }
 
+/**
+ * Synchronizes the position of external UI elements (Messenger, Toggle, Runner)
+ * based on the current sidebar width and state.
+ */
+window.syncArcadeSidebarOffsets = function() {
+    const sidebar = document.querySelector('.steam-chat-sidebar');
+    if (!sidebar) return;
+
+    const toggleBtn = document.querySelector('.chat-toggle-btn');
+    const messengerBtn = document.querySelector('.messenger-launcher');
+    const messengerSection = document.querySelector('.messenger-section');
+    const appRunner = document.getElementById('app-runner');
+    const isCollapsed = sidebar.classList.contains('collapsed');
+
+    if (!isCollapsed) {
+        // Use offsetWidth for current real-time geometry, fallback to style width, then default 380
+        const currentWidth = sidebar.offsetWidth || parseInt(sidebar.style.width) || 380;
+        const gapWidth = currentWidth + 20;
+
+        if (toggleBtn) toggleBtn.style.right = `${gapWidth}px`;
+        if (messengerBtn) messengerBtn.style.setProperty('right', `${gapWidth}px`, 'important');
+        
+        if (messengerSection) {
+            messengerSection.style.setProperty('right', `${gapWidth}px`, 'important');
+            
+            // Dynamically limit messenger width if it's expanded to prevent screen cutoff
+            if (messengerSection.classList.contains('is-expanded')) {
+                const availableWidth = window.innerWidth - gapWidth - 20; // 20px left margin
+                messengerSection.style.maxWidth = `${availableWidth}px`;
+                if (messengerSection.offsetWidth > availableWidth) {
+                    messengerSection.style.width = `${availableWidth}px`;
+                }
+            } else {
+                messengerSection.style.maxWidth = '';
+                messengerSection.style.width = '';
+            }
+        }
+        if (appRunner) appRunner.style.right = `${currentWidth}px`;
+    } else {
+        // Clear inline overrides so CSS defaults take over for collapsed state
+        if (toggleBtn) toggleBtn.style.right = '';
+        if (messengerBtn) messengerBtn.style.setProperty('right', '', '');
+        if (messengerSection) {
+            messengerSection.style.setProperty('right', '', '');
+            messengerSection.style.maxWidth = '';
+            messengerSection.style.width = '';
+        }
+        if (appRunner) appRunner.style.right = '';
+    }
+};
+
 function startNewChat() {
     currentChatId = 'chat_' + Date.now();
     arcadeChatHistory = [];
@@ -795,19 +846,19 @@ function setupResizing() {
             }
         }
         
-        // Dynamic toggle button and messenger elements position
-        const toggleBtn = document.querySelector('.chat-toggle-btn');
-        const messengerBtn = document.querySelector('.messenger-launcher');
-        const messengerSection = document.querySelector('.messenger-section');
+        if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets();
+
+
+
         
-        if (!sidebar.classList.contains('collapsed')) {
-            const gapWidth = newWidth + 20;
-            const appRunner = document.getElementById('app-runner');
-            if (toggleBtn) toggleBtn.style.right = `${gapWidth}px`;
-            if (messengerBtn) messengerBtn.style.setProperty('right', `${gapWidth}px`, 'important');
+
+
+
+
+
             
-            if (messengerSection) {
-                messengerSection.style.setProperty('right', `${gapWidth}px`, 'important');
+
+
                 
                 // Dynamically limit messenger width if it's expanded to prevent screen cutoff
                 if (messengerSection.classList.contains('is-expanded')) {
@@ -823,11 +874,11 @@ function setupResizing() {
                 }
             }
             if (appRunner) appRunner.style.right = `${newWidth}px`;
-        } else {
-            // Reset messenger constraints when chat is collapsed
-            if (messengerSection) {
+
+
+
                 messengerSection.style.maxWidth = '';
-                messengerSection.style.width = '';
+
             }
         }
     }
@@ -863,7 +914,7 @@ window.toggleChat = function() {
     const messengerSection = document.querySelector('.messenger-section');
     
     if (toggleBtn) toggleBtn.style.right = '';
-    if (messengerBtn) messengerBtn.style.setProperty('right', '', '');
+    if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets();
     if (messengerSection) messengerSection.style.setProperty('right', '', '');
     
     if (handle) handle.classList.toggle('collapsed', isCollapsed);

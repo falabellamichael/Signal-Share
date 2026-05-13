@@ -262,12 +262,15 @@ body:not(.chat-collapsed) .chat-toggle-btn {
     display: none !important;
 }
 
-/* Move the Direct Messenger launcher, OPENED window, AI toggle, and APP RUNNER with the sidebar when NOT collapsed */
+/* When NOT collapsed, move external elements to accommodate the sidebar + 20px gutter */
 body:not(.chat-collapsed) .messenger-launcher,
 body:not(.chat-collapsed) .chat-toggle-btn,
 body:not(.chat-collapsed) .messenger-section,
-body:not(.chat-collapsed) #app-runner {
-    right: 380px !important; /* sidebar width (380) */
+body:not(.chat-collapsed) #app-runner:not(.is-steam-shell) {
+    right: 400px !important; /* Default sidebar width (380) + 20px gutter */
+}
+body:not(.chat-collapsed) #app-runner:not(.is-steam-shell) {
+    right: 380px !important; /* Runner touches the edge, but buttons need the gutter */
 }
 
 /* When collapsed, we have TWO floating buttons. Offset messenger to the left of the chat toggle. */
