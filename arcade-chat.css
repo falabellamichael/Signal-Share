@@ -303,6 +303,35 @@ body:not(.chat-collapsed) .messenger-section {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
+}
+
+.chat-header > div:first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.chat-header > div:last-child {
+    flex: 0 0 auto;
+}
+
+#chat-model-select {
+    width: 132px !important;
+    max-width: 40vw;
+    min-width: 92px;
+    font-size: 0.55rem !important;
+    letter-spacing: 0.45px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+@media (max-width: 768px) {
+    #chat-model-select {
+        width: 108px !important;
+        max-width: 34vw;
+        font-size: 0.52rem !important;
+    }
 }
 /* Mobile responsive sidebar handling */
 @media (max-width: 768px) {
