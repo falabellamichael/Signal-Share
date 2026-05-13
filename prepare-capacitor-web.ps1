@@ -40,6 +40,7 @@ $files = @(
   "arcade-chat.css",
   "arcade-chatbot-engine.js",
   "arcade-chat-prompts.js",
+  "companion-ai-core.js",
   "mini-games.html",
   "mini-games.js",
   "leaderboard-metrics.js",

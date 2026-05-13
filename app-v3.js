@@ -1893,6 +1893,54 @@ async function handleMessageSubmit(event) {
         attachmentKind: attachmentFile ? getMessageAttachmentKind(attachmentFile.type) : null,
       };
 
+      const directSteamTarget = window.SignalShareAiCore?.parseDirectSteamCommand?.(body) || "";
+      const directDuckDuckGoQuery = window.SignalShareAiCore?.parseDuckDuckGoCommand?.(body) || "";
+
+      if (directSteamTarget || directDuckDuckGoQuery) {
+        mergeActiveMessage(userMessage);
+        saveAiMessagesLocally();
+
+        state.messageAttachmentFile = null;
+        state.messageAttachmentPreviewUrl = "";
+        renderMessenger();
+
+        let aiReply = "";
+        if (directSteamTarget) {
+          const steamPlan = window.SignalShareAiCore?.buildSteamLaunchPlan?.(directSteamTarget) || null;
+          if (steamPlan?.type === "run" && steamPlan.uri) {
+            window.location.href = steamPlan.uri;
+            aiReply = `🎮 [Steam Protocol]: Launching ${steamPlan.key.toUpperCase()} via Steam now.`;
+          } else {
+            const searchUrl = steamPlan?.searchUrl || `https://store.steampowered.com/search/?term=${encodeURIComponent(directSteamTarget)}`;
+            window.open(searchUrl, "_blank", "noopener,noreferrer");
+            aiReply = `🎮 [Steam Protocol]: I couldn't find a direct app ID for "${directSteamTarget}", so I opened Steam search.`;
+          }
+        } else {
+          const query = directDuckDuckGoQuery.trim();
+          if (query) {
+            const url = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
+            window.open(url, "_blank", "noopener,noreferrer");
+            aiReply = `🔎 [Search Protocol]: Searching DuckDuckGo for "${query}".`;
+          } else {
+            aiReply = "🔎 [Search Protocol]: Tell me what you want to search on DuckDuckGo.";
+          }
+        }
+
+        const directAiMessage = {
+          id: crypto.randomUUID(),
+          threadId: state.activeThreadId,
+          senderId: AI_COMPANION_ID,
+          body: aiReply,
+          createdAt: new Date().toISOString()
+        };
+        mergeActiveMessage(directAiMessage);
+        saveAiMessagesLocally();
+        renderMessenger();
+        playIncomingMessageSound();
+        showMessengerFeedback("");
+        return;
+      }
+
       // Prepare attachment for LLM if present
       let aiAttachment = null;
       if (attachmentFile) {
@@ -1908,14 +1956,19 @@ async function handleMessageSubmit(event) {
       }
 
       // Prepare history for LLM (excluding current message)
-      const history = state.activeMessages
-        .filter(m => !m.isThinking && m.id !== userMessage.id)
-        .map(m => ({
-          role: m.senderId === AI_COMPANION_ID ? "assistant" : "user",
-          content: `${m.body || ""}`.trim().slice(0, 900)
-        }))
-        .filter((row) => row.content.length > 0)
-        .slice(-18);
+      const history = window.SignalShareAiCore
+        ? window.SignalShareAiCore.normalizeHistory(state.activeMessages, {
+            aiSenderId: AI_COMPANION_ID,
+            currentMessageId: userMessage.id
+          })
+        : state.activeMessages
+            .filter(m => !m.isThinking && m.id !== userMessage.id)
+            .map(m => ({
+              role: m.senderId === AI_COMPANION_ID ? "assistant" : "user",
+              content: `${m.body || ""}`.trim().slice(0, 900)
+            }))
+            .filter((row) => row.content.length > 0)
+            .slice(-18);
 
       mergeActiveMessage(userMessage);
       saveAiMessagesLocally();
@@ -1954,7 +2007,17 @@ async function handleMessageSubmit(event) {
       // Call LLM
       const pageContext = document.title || 'Signal Share';
       const pageText = document.body.innerText.substring(0, 600);
-      const fullContext = `${pageContext} (Visible text: ${pageText})`;
+      const sharedAiContext = window.SignalShareAiCore
+        ? window.SignalShareAiCore.buildCompanionContext({
+            surface: "main",
+            pageTitle: document.title || "",
+            pageUrl: window.location.href,
+            currentCategory: state.messengerOpen ? "messenger" : "feed",
+            visibleText: pageText,
+            attachment: aiAttachment
+          })
+        : "";
+      const fullContext = `${pageContext} (Visible text: ${pageText})${sharedAiContext ? `\n\n${sharedAiContext}` : ""}`;
       if (!shouldAttemptBridgeRequests()) {
         // User explicitly requested an AI response. Enable bridge attempts for this browser profile.
         localStorage.setItem("ss_bridge_enabled", "1");

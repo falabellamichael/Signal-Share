@@ -222,6 +222,43 @@ function resolveChatRequestModel(selectedValue = "auto") {
     return preferred || "auto";
 }
 
+function getAiCore() {
+    return window.SignalShareAiCore || null;
+}
+
+function openDuckDuckGoSearch(query = "") {
+    const clean = `${query || ""}`.trim();
+    if (!clean) return false;
+    const url = `https://duckduckgo.com/?q=${encodeURIComponent(clean)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    return true;
+}
+
+function openSteamGame(target = "") {
+    const clean = `${target || ""}`.trim();
+    if (!clean) {
+        return "🎮 [Steam Protocol]: Tell me which game to launch, e.g. 'Play Grand Theft Auto V'.";
+    }
+
+    const plan = getAiCore()?.buildSteamLaunchPlan?.(clean) || null;
+    if (plan?.type === "run" && plan.uri) {
+        window.location.href = plan.uri;
+        return `🎮 [Steam Protocol]: Launching ${plan.key.toUpperCase()} via Steam now.`;
+    }
+
+    const searchUrl = plan?.searchUrl || `https://store.steampowered.com/search/?term=${encodeURIComponent(clean)}`;
+    window.open(searchUrl, "_blank", "noopener,noreferrer");
+    return `🎮 [Steam Protocol]: I couldn't find a direct app ID for "${clean}", so I opened Steam search.`;
+}
+
+function parseDirectSteamCommand(text = "") {
+    return getAiCore()?.parseDirectSteamCommand?.(text) || "";
+}
+
+function parseDuckDuckGoCommand(text = "") {
+    return getAiCore()?.parseDuckDuckGoCommand?.(text) || "";
+}
+
 function getBridgeTargetAddressSpace(baseUrl = "") {
     try {
         const parsed = new URL(baseUrl, window.location.href);
@@ -852,6 +889,10 @@ function addChatMessage(role, content) {
 
 window.executeArcadeAction = function(action) {
     console.log(`[Arcade Chat] Executing Protocol Action: ${action}`);
+    const rawAction = `${action || ""}`.trim();
+    const [actionKeyRaw, ...argParts] = rawAction.split(/\s+/);
+    const actionKey = (actionKeyRaw || "").toLowerCase();
+    const actionArg = argParts.join(" ").trim();
     
     const triggerClick = (sel) => document.querySelector(sel)?.click();
     const navigate = (hash, fallback) => {
@@ -879,14 +920,130 @@ window.executeArcadeAction = function(action) {
         if (btn) btn.click();
         else if (typeof window.updateTheme === 'function') window.updateTheme(tid);
     };
+    const setMediaSource = (source) => {
+        if (!window.heroMediaPlayerController) return;
+        if (typeof window.heroMediaPlayerController.setHeroControlMode === 'function') {
+            window.heroMediaPlayerController.setHeroControlMode('media');
+        }
+        if (source && typeof window.heroMediaPlayerController.setHeroControlSource === 'function') {
+            window.heroMediaPlayerController.setHeroControlSource(source);
+        }
+    };
+    const runMediaControl = (command, source = "") => {
+        if (!window.heroMediaPlayerController) return false;
+        const normalizedSource = `${source || ""}`.trim().toLowerCase();
+        if (normalizedSource === "spotify" || normalizedSource === "youtube") {
+            setMediaSource(normalizedSource);
+        }
+        if (command === "play" && typeof window.heroMediaPlayerController.play === "function") {
+            window.heroMediaPlayerController.play();
+            return true;
+        }
+        if (command === "pause" && typeof window.heroMediaPlayerController.pause === "function") {
+            window.heroMediaPlayerController.pause();
+            return true;
+        }
+        if (command === "next" && typeof window.heroMediaPlayerController.next === "function") {
+            window.heroMediaPlayerController.next();
+            return true;
+        }
+        if (command === "previous" && typeof window.heroMediaPlayerController.previous === "function") {
+            window.heroMediaPlayerController.previous();
+            return true;
+        }
+        return false;
+    };
+    const openMediaApp = async (source) => {
+        if (!window.heroMediaPlayerController || typeof window.heroMediaPlayerController.openNowPlayingMediaApp !== "function") return false;
+        const normalizedSource = `${source || ""}`.trim().toLowerCase();
+        if (normalizedSource === "spotify") {
+            setMediaSource("spotify");
+            await window.heroMediaPlayerController.openNowPlayingMediaApp("com.spotify.music", "spotify:");
+            return true;
+        }
+        if (normalizedSource === "youtube") {
+            setMediaSource("youtube");
+            await window.heroMediaPlayerController.openNowPlayingMediaApp("com.google.android.youtube", "https://www.youtube.com");
+            return true;
+        }
+        return false;
+    };
 
     // Most actions are available as global functions in mini-games.js
     try {
-                switch (action) {
+        switch (actionKey) {
             case 'pinball': launchGame('pinball'); break;
             case 'snake': launchGame('snake'); break;
             case 'hoops': case 'basketball': launchGame('basketball'); break;
             case 'calc': case 'calculator': launchGame('calc'); break;
+            case 'play':
+                if (actionArg && !/^(spotify|youtube|music|media)\b/i.test(actionArg)) {
+                    addChatMessage('ai', openSteamGame(actionArg));
+                    break;
+                }
+                runMediaControl('play');
+                break;
+            case 'pause':
+                runMediaControl('pause');
+                break;
+            case 'next':
+                runMediaControl('next');
+                break;
+            case 'previous':
+            case 'prev':
+            case 'back':
+                runMediaControl('previous');
+                break;
+            case 'open_spotify':
+            case 'spotify_open':
+                void openMediaApp('spotify');
+                break;
+            case 'open_youtube':
+            case 'youtube_open':
+                void openMediaApp('youtube');
+                break;
+            case 'play_spotify':
+                runMediaControl('play', 'spotify');
+                break;
+            case 'pause_spotify':
+                runMediaControl('pause', 'spotify');
+                break;
+            case 'next_spotify':
+                runMediaControl('next', 'spotify');
+                break;
+            case 'previous_spotify':
+                runMediaControl('previous', 'spotify');
+                break;
+            case 'play_youtube':
+                runMediaControl('play', 'youtube');
+                break;
+            case 'pause_youtube':
+                runMediaControl('pause', 'youtube');
+                break;
+            case 'next_youtube':
+                runMediaControl('next', 'youtube');
+                break;
+            case 'previous_youtube':
+                runMediaControl('previous', 'youtube');
+                break;
+            case 'steam':
+            case 'steam_play':
+            case 'play_game':
+                addChatMessage('ai', openSteamGame(actionArg));
+                break;
+            case 'steam_search':
+                window.open(
+                    `https://store.steampowered.com/search/?term=${encodeURIComponent(actionArg || "")}`,
+                    '_blank',
+                    'noopener,noreferrer'
+                );
+                break;
+            case 'duckduckgo':
+            case 'ddg':
+            case 'search_web':
+            case 'web_search':
+                if (actionArg) openDuckDuckGoSearch(actionArg);
+                break;
             case 'library': case 'games': navigateToGames('all'); break;
             case 'shop': case 'store': navigateToGames('store'); break;
             case 'leaderboards': case 'leaderboard': navigateToGames('leaderboard'); break;
@@ -948,7 +1105,8 @@ window.executeArcadeAction = function(action) {
             case 'mark_all_read': triggerClick('#markAllReadButton'); break;
             case 'action': console.log('[Arcade Chat] Received generic action placeholder. No-op.'); break;
             default: console.warn(`[Arcade Chat] Unknown protocol action: ${action}`);
-        }    } catch (err) {
+        }
+    } catch (err) {
         console.error(`[Arcade Chat] Failed to execute ${action}:`, err);
     }
 }
@@ -995,6 +1153,35 @@ window.sendChatMessage = async function() {
         const attachmentName = currentChatAttachmentName;
         
         addChatMessage('user', text);
+
+        const directSteamTarget = parseDirectSteamCommand(text);
+        if (directSteamTarget) {
+            const response = openSteamGame(directSteamTarget);
+            addChatMessage('ai', response);
+            arcadeChatHistory.push({ role: 'assistant', content: response });
+            saveCurrentChat();
+            updateChatStatus('active');
+            input.value = '';
+            clearChatAttachment();
+            isSendingChatMessage = false;
+            return;
+        }
+
+        const duckQuery = parseDuckDuckGoCommand(text);
+        if (duckQuery) {
+            const opened = openDuckDuckGoSearch(duckQuery);
+            const response = opened
+                ? `🔎 [Search Protocol]: Searching DuckDuckGo for "${duckQuery}".`
+                : "🔎 [Search Protocol]: Tell me what you want to search on DuckDuckGo.";
+            addChatMessage('ai', response);
+            arcadeChatHistory.push({ role: 'assistant', content: response });
+            saveCurrentChat();
+            updateChatStatus('active');
+            input.value = '';
+            clearChatAttachment();
+            isSendingChatMessage = false;
+            return;
+        }
 
         // Check for local intents/actions via the Chatbot Engine
         if (window.ArcadeChatbotEngine) {
@@ -1081,6 +1268,20 @@ window.sendChatMessage = async function() {
 
         const pageContext = JSON.stringify(richContext);
         const pageText = document.body.innerText.substring(0, 800);
+        const normalizedHistory = window.SignalShareAiCore
+            ? window.SignalShareAiCore.normalizeHistory(arcadeChatHistory, { aiSenderId: 'assistant' })
+            : arcadeChatHistory.map(m => ({ role: m.role, content: m.content }));
+        const sharedAiContext = window.SignalShareAiCore
+            ? window.SignalShareAiCore.buildCompanionContext({
+                surface: 'mini-games',
+                pageTitle: document.title || '',
+                pageUrl: window.location.href,
+                currentCategory: typeof currentCategory !== 'undefined' ? currentCategory : 'unknown',
+                visibleText: pageText,
+                attachment: arcadeChatHistory[arcadeChatHistory.length - 1]?.attachment || null
+            })
+            : '';
+        const fullPageContext = `${pageContext} (Visible text: ${pageText})${sharedAiContext ? `\n\n${sharedAiContext}` : ''}`;
 
         try {
             const modelSelect = document.getElementById('chat-model-select');
@@ -1098,8 +1299,8 @@ window.sendChatMessage = async function() {
                     message: text,
                     model: requestModel,
                     attachment: arcadeChatHistory[arcadeChatHistory.length - 1].attachment,
-                    history: arcadeChatHistory.map(m => ({ role: m.role, content: m.content })),
-                    pageContext: `${pageContext} (Visible text: ${pageText})`
+                    history: normalizedHistory,
+                    pageContext: fullPageContext
                 })
             });
 
@@ -1149,7 +1350,7 @@ window.sendChatMessage = async function() {
 
 /**
  * Executes AI-generated tags in the chat reply.
- * Handles [PUBLISH], [COMPOSE], [ARCADE], [OPEN].
+ * Handles [PUBLISH], [COMPOSE], [ARCADE], [DUCKDUCKGO], [OPEN].
  */
 async function executeArcadeChatActions(text) {
     if (!text) return;
@@ -1255,7 +1456,16 @@ async function executeArcadeChatActions(text) {
         }
     }
 
-    // 4. [OPEN: url]
+    // 4. [DUCKDUCKGO: query]
+    const duckDuckGoMatch = text.match(/\[DUCKDUCKGO:\s*([^\]]+)\]/i);
+    if (duckDuckGoMatch) {
+        const query = duckDuckGoMatch[1].trim();
+        if (query) {
+            openDuckDuckGoSearch(query);
+        }
+    }
+
+    // 5. [OPEN: url]
     const openMatch = text.match(/\[OPEN:\s*([^\]]+)\]/);
     if (openMatch) {
         const url = openMatch[1].trim();
