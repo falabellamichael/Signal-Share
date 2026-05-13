@@ -1,3 +1,6 @@
+/**
+ * Chatbot Intelligence Module for Signal Share Arcade
+ * Handles local LLM orchestration and fallback logic with security firewall.
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
