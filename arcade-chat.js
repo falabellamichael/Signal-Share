@@ -4,6 +4,7 @@
  */
 
 let BRIDGE_BASE_URL = localStorage.getItem('signal-share-bridge-url') || "http://127.0.0.1:3000";
+const CHAT_MODEL_PREFERENCE_KEY = 'arcade-chat-model';
 
 // Dynamically resolve bridge URL for mobile/android if no custom URL is set
 if (!localStorage.getItem('signal-share-bridge-url')) {
@@ -42,11 +43,94 @@ function isBridgeFeatureEnabled() {
         || `${localStorage.getItem('ss_bridge_secret') || ''}`.trim();
     if (bridgeSecret) return true;
 
+    const preferredModel = `${localStorage.getItem(CHAT_MODEL_PREFERENCE_KEY) || ''}`.trim().toLowerCase();
+    if (preferredModel && preferredModel !== 'auto') return true;
+
     if (window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() !== 'web') {
         return false;
     }
 
     return isLoopbackSiteOrigin();
+}
+
+function toModelDisplayName(modelId = '') {
+    const value = `${modelId || ''}`.trim();
+    if (!value) return 'Unknown Model';
+    return value
+        .replace(/[-_]+/g, ' ')
+        .replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+async function hydrateChatModelSelect({ forceRefresh = false } = {}) {
+    const select = document.getElementById('chat-model-select');
+    if (!select) return;
+    if (!isBridgeFeatureEnabled()) return;
+
+    try {
+        const response = await bridgeFetch(`/api/llm/models${forceRefresh ? '?force=true' : ''}`, {
+            method: 'GET',
+            timeoutMs: 2200
+        });
+        if (!response.ok) return;
+
+        const payload = await response.json().catch(() => null);
+        const rows = Array.isArray(payload?.models) ? payload.models : [];
+        if (rows.length === 0) return;
+
+        const selectedBefore = `${localStorage.getItem(CHAT_MODEL_PREFERENCE_KEY) || select.value || 'auto'}`.trim();
+        select.innerHTML = '';
+
+        const autoOption = document.createElement('option');
+        autoOption.value = 'auto';
+        autoOption.textContent = 'Auto-Select';
+        autoOption.style.background = '#1a1a1a';
+        select.appendChild(autoOption);
+
+        const seen = new Set(['auto']);
+        for (const row of rows) {
+            const modelId = `${row?.id || ''}`.trim();
+            if (!modelId) continue;
+            const key = modelId.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            const provider = `${row?.provider || ''}`.trim().toLowerCase();
+            const option = document.createElement('option');
+            option.value = modelId;
+            option.textContent = provider && provider !== 'unknown'
+                ? `${toModelDisplayName(modelId)} (${provider.toUpperCase()})`
+                : toModelDisplayName(modelId);
+            option.style.background = '#1a1a1a';
+            select.appendChild(option);
+        }
+
+        const hasSelected = Array.from(select.options).some((opt) => opt.value === selectedBefore);
+        select.value = hasSelected ? selectedBefore : 'auto';
+    } catch (_error) {
+        // Keep static options on failure.
+    }
+}
+
+function setupChatModelSelect() {
+    const select = document.getElementById('chat-model-select');
+    if (!select) return;
+
+    const savedModel = `${localStorage.getItem(CHAT_MODEL_PREFERENCE_KEY) || ''}`.trim();
+    if (savedModel) {
+        const hasSaved = Array.from(select.options).some((opt) => opt.value === savedModel);
+        select.value = hasSaved ? savedModel : 'auto';
+    }
+
+    select.addEventListener('change', () => {
+        const nextModel = `${select.value || 'auto'}`.trim();
+        localStorage.setItem(CHAT_MODEL_PREFERENCE_KEY, nextModel);
+        if (nextModel && nextModel !== 'auto') {
+            localStorage.setItem('ss_bridge_enabled', '1');
+        }
+        void hydrateChatModelSelect({ forceRefresh: true });
+    });
+
+    void hydrateChatModelSelect();
 }
 
 function getBridgeTargetAddressSpace(baseUrl = "") {
@@ -1244,6 +1328,7 @@ function setupCloseParityHandlers() {
     setupResizing();
     setupToggle();
     setupCloseParityHandlers();
+    setupChatModelSelect();
     startDesktopBridgePolling();
     updateChatStatus('idle');
     

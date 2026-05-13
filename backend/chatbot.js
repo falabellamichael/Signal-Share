@@ -44,6 +44,163 @@ CORE PERSONALITY:
 - IMPORTANT: Use the EXACT action IDs listed above. Never say "[ARCADE: action]".
 `.trim();
 
+const LLM_ENDPOINTS = Object.freeze([
+    {
+        provider: "lmstudio",
+        chatUrl: "http://localhost:1234/v1/chat/completions",
+        modelsUrl: "http://localhost:1234/v1/models",
+        kind: "openai"
+    },
+    {
+        provider: "ollama",
+        chatUrl: "http://localhost:11434/api/chat",
+        modelsUrl: "http://localhost:11434/api/tags",
+        kind: "ollama"
+    }
+]);
+
+const MODEL_CATALOG_TTL_MS = 15000;
+let modelCatalogCache = { at: 0, data: null };
+
+function normalizeModelKey(value = "") {
+    return `${value || ""}`.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function getModelTokenSet(value = "") {
+    return new Set(
+        `${value || ""}`
+            .trim()
+            .toLowerCase()
+            .split(/[^a-z0-9]+/g)
+            .filter(Boolean)
+    );
+}
+
+function scoreModelMatch(requestedModel, availableModel) {
+    if (!requestedModel || !availableModel) return 0;
+    const requestedRaw = `${requestedModel}`.trim().toLowerCase();
+    const availableRaw = `${availableModel}`.trim().toLowerCase();
+    const requestedKey = normalizeModelKey(requestedRaw);
+    const availableKey = normalizeModelKey(availableRaw);
+
+    if (requestedRaw === availableRaw) return 100;
+    if (requestedKey && requestedKey === availableKey) return 95;
+    if (availableRaw.includes(requestedRaw) || requestedRaw.includes(availableRaw)) return 84;
+
+    const requestedTokens = getModelTokenSet(requestedRaw);
+    const availableTokens = getModelTokenSet(availableRaw);
+    if (!requestedTokens.size || !availableTokens.size) return 0;
+
+    let overlap = 0;
+    for (const token of requestedTokens) {
+        if (availableTokens.has(token)) overlap += 1;
+    }
+    const coverage = overlap / requestedTokens.size;
+    return overlap > 0 ? Math.round(coverage * 70) : 0;
+}
+
+function mapRequestedModelsToAvailable(requestedModels = [], availableModels = []) {
+    if (!Array.isArray(availableModels) || availableModels.length === 0) {
+        return Array.isArray(requestedModels) ? [...requestedModels] : [];
+    }
+
+    const resolved = [];
+    const seen = new Set();
+    const pushUnique = (model) => {
+        const value = `${model || ""}`.trim();
+        if (!value) return;
+        const key = value.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        resolved.push(value);
+    };
+
+    for (const requested of requestedModels || []) {
+        let bestModel = "";
+        let bestScore = 0;
+        for (const candidate of availableModels) {
+            const score = scoreModelMatch(requested, candidate);
+            if (score > bestScore) {
+                bestScore = score;
+                bestModel = candidate;
+            }
+        }
+        if (bestModel && bestScore >= 45) {
+            pushUnique(bestModel);
+        }
+    }
+
+    for (const model of availableModels) {
+        pushUnique(model);
+    }
+
+    return resolved;
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 1800) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (_error) {
+        return null;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function parseEndpointModels(kind, payload) {
+    if (!payload || typeof payload !== "object") return [];
+
+    if (kind === "openai") {
+        const rows = Array.isArray(payload.data) ? payload.data : [];
+        return rows
+            .map((entry) => `${entry?.id || ""}`.trim())
+            .filter(Boolean);
+    }
+
+    if (kind === "ollama") {
+        const rows = Array.isArray(payload.models) ? payload.models : [];
+        return rows
+            .map((entry) => `${entry?.name || ""}`.trim())
+            .filter(Boolean);
+    }
+
+    return [];
+}
+
+export async function getLocalModelCatalog({ force = false } = {}) {
+    const now = Date.now();
+    if (!force && modelCatalogCache.data && (now - modelCatalogCache.at) < MODEL_CATALOG_TTL_MS) {
+        return modelCatalogCache.data;
+    }
+
+    const next = {
+        lmstudio: [],
+        ollama: [],
+        all: [],
+        checkedAt: new Date().toISOString()
+    };
+    const allSeen = new Set();
+
+    for (const endpoint of LLM_ENDPOINTS) {
+        const payload = await fetchJsonWithTimeout(endpoint.modelsUrl, 2000);
+        const models = parseEndpointModels(endpoint.kind, payload);
+        next[endpoint.provider] = models;
+        for (const model of models) {
+            const key = model.toLowerCase();
+            if (allSeen.has(key)) continue;
+            allSeen.add(key);
+            next.all.push(model);
+        }
+    }
+
+    modelCatalogCache = { at: now, data: next };
+    return next;
+}
+
 /**
  * Process a chat request using local LLM fallbacks.
  */
@@ -87,8 +244,8 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         }
     }
 
-    // Attempt local inference (Ollama/LM Studio)
-    // Vision models list for Ollama
+    // Attempt local inference (LM Studio/Ollama)
+    // Vision models list for local inference
     const visionModels = ['qwen3-vl-4b', 'llava', 'llava:7b', 'moondream', 'bakllava', 'minicpm-v'];
     const standardModels = [
         'qwen3.5-9b', 
@@ -130,18 +287,34 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         conversation.push({ role: "user", content: combinedContent.trim() || "[No text message provided]" });
     }
 
-    for (const model of models) {
+    const catalog = await getLocalModelCatalog().catch(() => ({ lmstudio: [], ollama: [], all: [] }));
+    const endpointConfigs = [
+        {
+            provider: "lmstudio",
+            chatUrl: "http://localhost:1234/v1/chat/completions",
+            kind: "openai",
+            models: mapRequestedModelsToAvailable(models, catalog?.lmstudio || [])
+        },
+        {
+            provider: "ollama",
+            chatUrl: "http://localhost:11434/api/chat",
+            kind: "ollama",
+            models: mapRequestedModelsToAvailable(models, catalog?.ollama || [])
+        }
+    ];
+
+    for (const endpoint of endpointConfigs) {
         if (success) break;
-        try {
-            // Try LM Studio first (port 1234) then Ollama (port 11434)
-            const ports = [1234, 11434];
-            for (const port of ports) {
-                const endpoint = port === 1234 ? 'http://localhost:1234/v1/chat/completions' : 'http://localhost:11434/api/chat';
-                
+        const endpointModels = endpoint.models && endpoint.models.length > 0
+            ? endpoint.models
+            : models;
+
+        for (const model of endpointModels) {
+            if (success) break;
+            try {
                 const messages = [{ role: "system", content: contextAwarePrompt }, ...conversation];
-                
                 let body;
-                if (port === 1234) {
+                if (endpoint.kind === "openai") {
                     body = {
                         model: model,
                         messages: messages,
@@ -159,20 +332,27 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                     }
                 }
 
-                const response = await fetch(endpoint, {
+                const response = await fetch(endpoint.chatUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    lmResponse = (port === 1234 ? data.choices[0].message.content : data.message.content).trim();
-                    success = true;
-                    break;
-                }
+                if (!response.ok) continue;
+
+                const data = await response.json();
+                const messageText = endpoint.kind === "openai"
+                    ? data?.choices?.[0]?.message?.content
+                    : data?.message?.content;
+                if (!messageText || !`${messageText}`.trim()) continue;
+
+                lmResponse = `${messageText}`.trim();
+                success = true;
+                break;
+            } catch (_error) {
+                // Try the next model/endpoint candidate
             }
-        } catch (e) {}
+        }
     }
 
     // 3. Handle Web Intelligence & Media Commands

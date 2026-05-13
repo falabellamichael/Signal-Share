@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { SMTCMonitor, PlaybackStatus } from "@coooookies/windows-smtc-monitor";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
-import { getChatResponse } from "./chatbot.js";
+import { getChatResponse, getLocalModelCatalog } from "./chatbot.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -127,6 +127,36 @@ app.post('/api/llm/chat', async (req, res) => {
   } catch (err) {
     console.error('[Bridge] LLM chat error:', err);
     res.status(500).json({ error: 'LLM processing failed' });
+  }
+});
+
+app.get('/api/llm/models', async (req, res) => {
+  try {
+    const force = `${req.query?.force || ""}`.trim().toLowerCase() === "true";
+    const catalog = await getLocalModelCatalog({ force });
+    const lmStudioSet = new Set((catalog?.lmstudio || []).map((item) => `${item}`.toLowerCase()));
+    const ollamaSet = new Set((catalog?.ollama || []).map((item) => `${item}`.toLowerCase()));
+
+    const models = (catalog?.all || []).map((id) => {
+      const key = `${id || ""}`.toLowerCase();
+      return {
+        id,
+        provider: lmStudioSet.has(key) ? "lmstudio" : (ollamaSet.has(key) ? "ollama" : "unknown")
+      };
+    });
+
+    res.json({
+      ok: true,
+      models,
+      providers: {
+        lmstudio: catalog?.lmstudio || [],
+        ollama: catalog?.ollama || []
+      },
+      checkedAt: catalog?.checkedAt || new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("[Bridge] /api/llm/models error:", error);
+    res.status(500).json({ ok: false, error: "Failed to read local model catalog." });
   }
 });
 
