@@ -685,6 +685,27 @@ window.sendChatMessage = async function() {
         const attachmentName = currentChatAttachmentName;
         
         addChatMessage('user', text);
+
+        // Check for local intents/actions via the Chatbot Engine
+        if (window.ArcadeChatbotEngine) {
+            const intentReply = window.ArcadeChatbotEngine.processIntent(text);
+            if (intentReply) {
+                const typingId = addTypingIndicator();
+                setTimeout(() => {
+                    removeTypingIndicator(typingId);
+                    addChatMessage('ai', intentReply);
+                    arcadeChatHistory.push({ role: 'assistant', content: intentReply });
+                    saveCurrentChat();
+                    updateChatStatus('idle');
+                }, 600);
+                
+                input.value = '';
+                clearChatAttachment();
+                isSendingChatMessage = false;
+                return;
+            }
+        }
+
         
         // Add to history with attachment if present
         arcadeChatHistory.push({ 
