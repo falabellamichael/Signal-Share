@@ -533,6 +533,10 @@ window.executeArcadeAction = function(action) {
                 if (typeof window.setCategory === 'function') window.setCategory('all');
                 else window.location.href = 'index.html';
                 break;
+            case 'action':
+                // AI hallucination of the template placeholder [ARCADE: <action>]
+                console.log('[Arcade Chat] Received generic action placeholder. No-op.');
+                break;
             default:
                 console.warn(`[Arcade Chat] Unknown protocol action: ${action}`);
         }

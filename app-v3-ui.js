@@ -851,6 +851,15 @@ export function createAppUi(context) {
     window.requestAnimationFrame(() => { if (!state.messengerExpanded) return; elements.messengerSection.scrollTop = 0; elements.messengerSection.scrollLeft = 0; });
   }
 
+  function scrollMessengerToBottom(options = {}) {
+    const { force = true } = options;
+    if (!elements.messageList) return;
+    
+    window.requestAnimationFrame(() => {
+        elements.messageList.scrollTop = elements.messageList.scrollHeight;
+    });
+  }
+
   function renderMessenger() {
     const isLiveMode = state.backendMode === "supabase";
     const isSignedIn = Boolean(state.currentUser);
@@ -1168,10 +1177,10 @@ export function createAppUi(context) {
       bubble.append(body, meta);
       row.appendChild(bubble);
       elements.messageList.appendChild(row);
-
-      // Auto-scroll on new message
-      elements.messageList.scrollTop = elements.messageList.scrollHeight;
     });
+
+    // Auto-scroll on new message / thread load
+    scrollMessengerToBottom({ force: true });
   }
 
   function showProfileFeedback(message, isError = false) { elements.profileFeedback.textContent = message; elements.profileFeedback.classList.toggle("is-error", isError); }
@@ -1292,9 +1301,9 @@ export function createAppUi(context) {
     });
   }
 
-  function toggleMessageEmojiPicker() { if (elements.messageEmojiButton.disabled) return; state.messageEmojiPickerOpen = !state.messageEmojiPickerOpen; renderMessageEmojiPanel(); if (!state.messageEmojiPickerOpen) elements.messageInput.focus(); }
+  function toggleMessageEmojiPicker() { if (elements.messageEmojiButton.disabled) return; state.messageEmojiPickerOpen = !state.messageEmojiPickerOpen; renderMessageEmojiPanel(); scrollMessengerToBottom({ force: true }); if (!state.messageEmojiPickerOpen) elements.messageInput.focus(); }
 
-  function closeMessageEmojiPicker(options = {}) { const { restoreFocus = false } = options; if (!state.messageEmojiPickerOpen) return; state.messageEmojiPickerOpen = false; renderMessageEmojiPanel(); if (restoreFocus && !elements.messageInput.disabled) elements.messageInput.focus(); }
+  function closeMessageEmojiPicker(options = {}) { const { restoreFocus = false } = options; if (!state.messageEmojiPickerOpen) return; state.messageEmojiPickerOpen = false; renderMessageEmojiPanel(); scrollMessengerToBottom({ force: true }); if (restoreFocus && !elements.messageInput.disabled) elements.messageInput.focus(); }
 
   function handleMessageEmojiPanelClick(event) {
     const target = event.target instanceof Element ? event.target : null;
@@ -1313,7 +1322,7 @@ export function createAppUi(context) {
     }
   }
 
-  function insertEmojiIntoMessage(emoji) { if (!emoji || elements.messageInput.disabled) return; const start = elements.messageInput.selectionStart ?? elements.messageInput.value.length; const end = elements.messageInput.selectionEnd ?? start; const currentValue = elements.messageInput.value; elements.messageInput.value = `${currentValue.slice(0, start)}${emoji}${currentValue.slice(end)}`; const caretPosition = start + emoji.length; elements.messageInput.focus(); elements.messageInput.setSelectionRange(caretPosition, caretPosition); closeMessageEmojiPicker(); }
+  function insertEmojiIntoMessage(emoji) { if (!emoji || elements.messageInput.disabled) return; const start = elements.messageInput.selectionStart ?? elements.messageInput.value.length; const end = elements.messageInput.selectionEnd ?? start; const currentValue = elements.messageInput.value; elements.messageInput.value = `${currentValue.slice(0, start)}${emoji}${currentValue.slice(end)}`; const caretPosition = start + emoji.length; elements.messageInput.focus(); elements.messageInput.setSelectionRange(caretPosition, caretPosition); closeMessageEmojiPicker(); scrollMessengerToBottom({ force: true }); }
 
   function handleMessageAttachmentInputChange(event) { const [file] = Array.from(event.target.files ?? []); if (!file) { clearMessageAttachmentSelection(); return; } handleMessageAttachmentSelection(file); }
 
@@ -1326,9 +1335,10 @@ export function createAppUi(context) {
     if (kind !== "file") state.messageAttachmentPreviewUrl = URL.createObjectURL(file);
     showMessengerFeedback(`${file.name} is ready to send.`);
     renderMessageAttachmentPreview();
+    scrollMessengerToBottom({ force: true });
   }
 
-  function clearMessageAttachmentSelection(options = {}) { const { preserveFeedback = false } = options; if (state.messageAttachmentPreviewUrl) { URL.revokeObjectURL(state.messageAttachmentPreviewUrl); state.messageAttachmentPreviewUrl = ""; } state.messageAttachmentFile = null; elements.messageAttachmentInput.value = ""; elements.messageAttachmentPreview.hidden = true; elements.messageAttachmentPreview.replaceChildren(); elements.messageAttachmentClearButton.hidden = true; if (!preserveFeedback && elements.messengerFeedback.textContent.includes("ready to send")) showMessengerFeedback(""); }
+  function clearMessageAttachmentSelection(options = {}) { const { preserveFeedback = false } = options; if (state.messageAttachmentPreviewUrl) { URL.revokeObjectURL(state.messageAttachmentPreviewUrl); state.messageAttachmentPreviewUrl = ""; } state.messageAttachmentFile = null; elements.messageAttachmentInput.value = ""; elements.messageAttachmentPreview.hidden = true; elements.messageAttachmentPreview.replaceChildren(); elements.messageAttachmentClearButton.hidden = true; if (!preserveFeedback && elements.messengerFeedback.textContent.includes("ready to send")) showMessengerFeedback(""); scrollMessengerToBottom({ force: true }); }
 
   function renderMessageAttachmentPreview() { elements.messageAttachmentPreview.replaceChildren(); const file = state.messageAttachmentFile; const hasAttachment = Boolean(file); elements.messageAttachmentPreview.hidden = !hasAttachment; elements.messageAttachmentClearButton.hidden = !hasAttachment; if (!file) return; const card = document.createElement("div"); card.className = "message-attachment-card is-preview"; card.appendChild(createMessageAttachmentPreviewNode(file)); elements.messageAttachmentPreview.appendChild(card); }
 

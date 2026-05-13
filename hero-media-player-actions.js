@@ -394,6 +394,10 @@ export async function handlePlayPauseAction(context, forcePlay) {
           performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
         }
       }
+
+      // Refresh immediately after bridge action to show updated state
+      if (typeof refreshDesktopSnapshot === "function") refreshDesktopSnapshot({ force: true, renderAfter: true });
+      if (typeof refreshNativeSnapshot === "function") refreshNativeSnapshot({ renderAfter: true });
     } catch (error) {
       console.warn("[Hero] Bridge action failed:", error);
     }
@@ -484,6 +488,10 @@ export function handlePreviousAction(context) {
     } else {
       if (mode === "desktop") performDesktopAction(DESKTOP_ACTION_PREVIOUS);
       else if (mode === "device") performNativeAction(NATIVE_ACTION_PREVIOUS);
+
+      // Refresh immediately after bridge action
+      if (typeof refreshDesktopSnapshot === "function") refreshDesktopSnapshot({ force: true, renderAfter: true });
+      if (typeof refreshNativeSnapshot === "function") refreshNativeSnapshot({ renderAfter: true });
     }
   }
 
@@ -564,6 +572,10 @@ export function handleNextAction(context) {
     } else {
       if (mode === "desktop") performDesktopAction(DESKTOP_ACTION_NEXT);
       else if (mode === "device") performNativeAction(NATIVE_ACTION_NEXT);
+
+      // Refresh immediately after bridge action
+      if (typeof refreshDesktopSnapshot === "function") refreshDesktopSnapshot({ force: true, renderAfter: true });
+      if (typeof refreshNativeSnapshot === "function") refreshNativeSnapshot({ renderAfter: true });
     }
   }
 

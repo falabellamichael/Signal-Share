@@ -1708,6 +1708,18 @@ async function handleMessageSubmit(event) {
       };
       state.activeMessages.push(thinkingMsg);
       renderMessenger();
+      
+      // Refresh media state so AI has latest context from system bridges
+      if (window.heroMediaPlayerController) {
+        try {
+          if (typeof window.heroMediaPlayerController.refreshDesktopSnapshot === 'function') {
+             await window.heroMediaPlayerController.refreshDesktopSnapshot({ force: true, renderAfter: false });
+          }
+          if (typeof window.heroMediaPlayerController.refreshNativeSnapshot === 'function') {
+             await window.heroMediaPlayerController.refreshNativeSnapshot({ renderAfter: false });
+          }
+        } catch (e) { console.warn("Failed to refresh media context for AI", e); }
+      }
 
       // Call LLM
       const pageContext = document.title || 'Signal Share';

@@ -740,18 +740,12 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function startNativeSnapshotPolling() {
-    if (nativePollTimerId || !hasNativeSnapshotBridge()) return;
-    refreshNativeSnapshot({ renderAfter: false });
-    nativePollTimerId = window.setInterval(() => {
-      if (document.hidden) return;
-      refreshNativeSnapshot();
-    }, NATIVE_POLL_INTERVAL_MS);
+    // Only perform a single refresh now, as per user request to avoid constant polling.
+    refreshNativeSnapshot({ renderAfter: true });
   }
 
   function stopNativeSnapshotPolling() {
-    if (!nativePollTimerId) return;
-    window.clearInterval(nativePollTimerId);
-    nativePollTimerId = 0;
+    // No-op since polling is disabled
   }
 
   function shouldUseNativeMode(post) {
@@ -1391,24 +1385,12 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function startDesktopSnapshotPolling() {
-    if (desktopPollTimerId) return;
+    // Only perform a single refresh now, as per user request to avoid constant polling.
+    refreshDesktopSnapshot({ renderAfter: true });
+  }
 
-    const poll = async () => {
-      try {
-        await refreshDesktopSnapshot();
-      } finally {
-        const interval = state.heroControlMode === "media" ? 1000 : DESKTOP_POLL_INTERVAL_MS;
-        // If we are suspended, stop the loop entirely. 
-        // It will be restarted by external triggers (focus, refresh button).
-        if (!state.desktopBridgeSuspended) {
-          desktopPollTimerId = window.setTimeout(poll, interval);
-        } else {
-          desktopPollTimerId = 0;
-        }
-      }
-    };
-
-    desktopPollTimerId = window.setTimeout(poll, DESKTOP_POLL_INTERVAL_MS);
+  function stopDesktopSnapshotPolling() {
+    // No-op since polling is disabled
   }
 
   function stopDesktopSnapshotPolling() {
@@ -2341,6 +2323,8 @@ The companion bridge is designed with several security layers to keep your PC sa
     handleRefresh,
     handleVolumeInput,
     setHeroControlSource: (source) => { syncHeroControlSourceChange(source); },
+    refreshDesktopSnapshot,
+    refreshNativeSnapshot,
     openNowPlayingMediaApp: (packageName, uri) => {
       if (hasNativeActionBridge()) {
         try { getNativeBridge().openNowPlayingMediaApp(packageName, uri, true); return true; } catch { return false; }
