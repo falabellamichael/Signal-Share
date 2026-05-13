@@ -506,26 +506,47 @@ async function activateBridgeForPrompt({ shouldAttemptBridgeRequests, probeLocal
 }
 
 function getGlobalProtocolOfflineResponse(text) {
-  const query = (text || "").toLowerCase();
+  const input = (text || "").toLowerCase();
 
-  const responses = {
-    hello: "Hello! I'm the Signal Share protocol assistant. My primary logic core is currently offline, but I can still help you with site basics.",
-    hi: "Hi there! I'm running on emergency protocol. How can I help you navigate the platform today?",
-    help: "I can help you with: \n- **Feed**: How to post and view media.\n- **Messenger**: Sending direct messages.\n- **Account**: Signing in and profile settings.\n- **Media**: Using the Hero Player.\nWhat do you need help with?",
-    post: "To post media, use the **Publish Post** section in the sidebar. You can drop images, videos, or audio files there. Note: You need to be signed in to publish to the live feed.",
-    feed: "The live feed shows the latest posts from all members. You can filter by 'All', 'Image', 'Video', or 'Audio' using the sort controls at the top.",
-    messenger: "You can start a private conversation with any member by clicking 'Message' on their profile. Your conversations sync live across all your devices.",
-    profile: "Click on your name in the account section to view your profile. You can change your display name and view your own posts there.",
-    hero: "The Hero Media Player at the top handles all your media playback. It supports YouTube, Spotify, and direct file uploads. You can control it using the floating play bar.",
-    player: "The Hero Media Player at the top handles all your media playback. It supports YouTube, Spotify, and direct file uploads. You can control it using the floating play bar.",
-    who: "I am the Signal Share A.I. Companion. I'm currently running in 'Offline Protocol' mode because I can't reach my primary brain.",
-    error: "If you're seeing errors, make sure you have a stable internet connection. If you're running locally, ensure the Bridge server is active on port 3000.",
-    offline: "I'm in offline mode because the local bridge server is unreachable. Please check if your backend is running."
-  };
+  const responses = [
+    {
+      keywords: ["pinball", "gravity"],
+      answer: "🕹️ [Arcade Protocol]: In Neon Pinball, keep your eyes on the top bumpers. Hitting them in sequence triggers the 'Gravity Shift' multiplier, which can triple your score in seconds!"
+    },
+    {
+      keywords: ["basketball", "hoops", "shot"],
+      answer: "🏀 [Arcade Protocol]: For Neon Hoops, consistency is key. Try to release the ball at the peak of your swipe for a 'Perfect' shot bonus. The net gets smaller as your streak increases!"
+    },
+    {
+      keywords: ["snake", "wrap", "trap"],
+      answer: "🐍 [Arcade Protocol]: In Neon Snake, the board is edge-wrapped. If you're about to crash, move through the wall to appear on the other side. Use this to surprise high-value fruit!"
+    },
+    {
+      keywords: ["hello", "hi", "hey"],
+      answer: "👋 [Arcade Protocol]: Intelligence core is currently offline, but I am standing by for tactical support. Ask me about the games or how to improve your high score!"
+    },
+    {
+      keywords: ["help", "what can you do"],
+      answer: "🎮 [Arcade Protocol]: I am your tactical game assistant. Even in offline mode, I can provide tips for Pinball, Hoops, and Snake. Just ask about a specific game!"
+    },
+    {
+      keywords: ["thank", "thanks"],
+      answer: "🕹️ [Arcade Protocol]: You're welcome, player. Now get back in there and break that record!"
+    }
+  ];
 
-  for (const key in responses) {
-    if (query.includes(key)) return `📶 [Signal Protocol] ${responses[key]}`;
+  for (const response of responses) {
+    if (response.keywords.some((keyword) => input.includes(keyword))) {
+      return response.answer;
+    }
   }
 
-  return "📶 [Signal Protocol] I'm currently operating in offline mode and don't have a specific response for that. Try asking about 'help', 'posting', 'messenger', or 'the player'.";
+  const fallbacks = [
+    "📶 [Arcade Protocol]: My advanced logic core is currently out of range. Check if your Arcade Companion bridge is running on your PC!",
+    "📡 [Arcade Protocol]: Communication with the main intelligence core is unstable. Ensure the bridge server is active and try again.",
+    "🕹️ [Arcade Protocol]: Sync failed. I'm relying on cached arcade data. If you're on a real device, check your bridge IP settings!",
+    "🎮 [Arcade Protocol]: My logic processors are running local-only. (Bridge unreachable). I can still help with game tips though!"
+  ];
+
+  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
