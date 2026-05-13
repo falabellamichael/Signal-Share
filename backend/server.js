@@ -287,6 +287,56 @@ app.post('/api/system/files/write', async (req, res) => {
   }
 });
 
+
+// App Management Endpoints
+app.post('/api/system/launch', async (req, res) => {
+  const { appId } = req.body;
+  if (!appId) return res.status(400).json({ error: "Missing appId" });
+
+  try {
+    const whitelist = {
+      taskmgr: "taskmgr",
+      calculator: "calc",
+      notepad: "notepad",
+      explorer: "explorer .",
+      spotify: "spotify",
+      chrome: "chrome",
+      edge: "msedge",
+      control: "control"
+    };
+
+    const cmd = whitelist[appId.toLowerCase()] || appId;
+    if (cmd.includes(';') || cmd.includes('|') || cmd.includes('&')) {
+      return res.status(403).json({ error: "Access denied: Invalid characters in command." });
+    }
+
+    const ps = spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${cmd}"`], { windowsHide: true });
+    ps.on("close", (code) => {
+      if (code === 0) res.json({ ok: true, message: `Launched ${appId}` });
+      else res.status(500).json({ error: `Failed to launch ${appId}` });
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/system/close', async (req, res) => {
+  const { appId } = req.body;
+  if (!appId) return res.status(400).json({ error: "Missing appId" });
+
+  try {
+    const target = appId.toLowerCase();
+    const psCommand = `Get-Process | Where-Object { $_.Name -like "*${target}*" -or $_.MainWindowTitle -like "*${target}*" } | Stop-Process -Force`;
+    const ps = spawn("powershell.exe", ["-NoProfile", "-Command", psCommand], { windowsHide: true });
+    
+    ps.on("close", (code) => {
+      res.json({ ok: true, message: `Attempted to close ${appId}` });
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Catch-all for /api/llm/chat with wrong method
 app.all('/api/llm/chat', (req, res) => {
   console.warn(`[Chatbot] 405 Error: Received ${req.method} request for /api/llm/chat from ${req.ip}`);

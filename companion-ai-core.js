@@ -44,7 +44,9 @@
         LIST_APPS: "[LIST_APPS]",
         LIST_FILES: "[LIST_FILES: path]",
         READ_FILE: "[READ_FILE: path]",
-        WRITE_FILE: "[WRITE_FILE: { \"path\": \"...\", \"content\": \"...\" }]"
+        WRITE_FILE: "[WRITE_FILE: { \"path\": \"...\", \"content\": \"...\" }]",
+        LAUNCH: "[LAUNCH: app_id]",
+        CLOSE: "[CLOSE: app_id]"
     });
     const ARCADE_ACTION_PLAYBOOK = Object.freeze({
         games: [
