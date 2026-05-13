@@ -14,20 +14,20 @@
 }
 
 /* Theme Overrides - Only applied on the main page (identified by .main-page class) */
-body.main-page[data-theme="sunset"] {
+body[data-theme="sunset"] {
     --arc-bg: #f6efe3;
     --arc-header-bg: rgba(238, 108, 77, 0.1);
     --arc-input-area-bg: rgba(0, 0, 0, 0.03);
     --arc-input-wrapper-bg: #ffffff;
     --arc-msg-ai-bg: #e9e2d5;
-    --arc-msg-ai-text: #13212b;
+    --arc-msg-ai-text: #000000;
     --arc-msg-user-bg: #ee6c4d;
     --arc-msg-user-text: #ffffff;
     --arc-accent: #ee6c4d;
     --arc-border: rgba(19, 33, 43, 0.1);
 }
 
-body.main-page[data-theme="midnight"] {
+body[data-theme="midnight"] {
     --arc-bg: #0c151d;
     --arc-header-bg: rgba(0, 0, 0, 0.4);
     --arc-input-area-bg: rgba(0, 0, 0, 0.25);
@@ -40,33 +40,33 @@ body.main-page[data-theme="midnight"] {
     --arc-border: rgba(125, 211, 252, 0.15);
 }
 
-body.main-page[data-theme="gallery"] {
+body[data-theme="gallery"] {
     --arc-bg: #f4f0e6;
     --arc-header-bg: rgba(0, 0, 0, 0.05);
     --arc-input-area-bg: rgba(0, 0, 0, 0.03);
     --arc-input-wrapper-bg: #fffdf7;
     --arc-msg-ai-bg: #e2ddd3;
-    --arc-msg-ai-text: #1a2128;
+    --arc-msg-ai-text: #000000;
     --arc-msg-user-bg: #0f6fa7;
     --arc-msg-user-text: #ffffff;
     --arc-accent: #0f6fa7;
     --arc-border: rgba(26, 33, 40, 0.1);
 }
 
-body.main-page[data-theme="aurora"] {
+body[data-theme="aurora"] {
     --arc-bg: #ecf5f3;
     --arc-header-bg: rgba(0, 0, 0, 0.04);
     --arc-input-area-bg: rgba(0, 0, 0, 0.02);
     --arc-input-wrapper-bg: #f5fcfb;
     --arc-msg-ai-bg: #d9e6e4;
-    --arc-msg-ai-text: #10242b;
+    --arc-msg-ai-text: #000000;
     --arc-msg-user-bg: #007c91;
     --arc-msg-user-text: #ffffff;
     --arc-accent: #007c91;
     --arc-border: rgba(16, 36, 43, 0.1);
 }
 
-body.main-page[data-theme="contrast"] {
+body[data-theme="contrast"] {
     --arc-bg: #000000;
     --arc-header-bg: rgba(255, 255, 255, 0.05);
     --arc-input-area-bg: #000000;
@@ -79,7 +79,7 @@ body.main-page[data-theme="contrast"] {
     --arc-border: #ffffff;
 }
 
-body.main-page[data-theme="ember"] {
+body[data-theme="ember"] {
     --arc-bg: #1a0504;
     --arc-header-bg: rgba(0, 0, 0, 0.4);
     --arc-input-area-bg: rgba(0, 0, 0, 0.2);
