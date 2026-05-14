@@ -2545,13 +2545,96 @@ window.saveWorkshopEditPanel = saveWorkshopEditPanel;
 window.getWorkshopGamesForAi = function() {
     return customGames
         .filter((game) => isCurrentUserGameOwner(game))
-        .map((game) => ({
-            id: game.id,
-            title: game.title,
-            category: game.category,
-            tag: game.tag,
-            updatedAt: game.publishedAt
-        }));
+        .map((game) => {
+            const editableFiles = (Array.isArray(game.files) ? game.files : [])
+                .filter(isWorkshopFileEditable)
+                .map(f => ({ name: f.name, type: f.type || inferFileTypeFromName(f.name) }));
+            
+            return {
+                id: game.id,
+                title: game.title,
+                category: game.category,
+                tag: game.tag,
+                updatedAt: game.publishedAt,
+                files: editableFiles
+            };
+        });
+};
+
+/**
+ * Retrieves the decoded text content of a workshop file.
+ * Used by the AI to read existing code before editing.
+ */
+window.getWorkshopFileContent = function(gameId, fileName) {
+    const game = customGames.find(g => g.id === gameId);
+    if (!game || !isCurrentUserGameOwner(game)) return null;
+
+    const file = (Array.isArray(game.files) ? game.files : []).find(f => f.name === fileName);
+    if (!file) return null;
+
+    // Check draft cache first
+    const draftKey = `${gameId}::${fileName}`;
+    const cachedDraft = workshopEditDraftCache.get(draftKey);
+    if (typeof cachedDraft === 'string') return cachedDraft;
+
+    return decodeWorkshopFileContent(file);
+};
+
+/**
+ * Applies a file edit from the AI to the workshop editor state.
+ * Can optionally trigger a save to Supabase.
+ */
+window.applyAiFileEdit = async function(gameId, fileName, content, options = {}) {
+    console.log(`[AI Workshop] Applying edit to ${fileName} for game ${gameId}`);
+    const { save = false, silent = false } = options;
+
+    const games = getWorkshopManageableGames();
+    const game = games.find(g => g.id === gameId);
+    if (!game) {
+        return { ok: false, message: "Game not found or you don't have permission to edit it." };
+    }
+
+    // Update draft cache
+    const draftKey = `${gameId}::${fileName}`;
+    workshopEditDraftCache.set(draftKey, content);
+
+    // If we are currently looking at this game/file in the UI, update the editor directly
+    if (workshopEditActiveGameId === gameId) {
+        if (!workshopEditActiveFileName || workshopEditActiveFileName === fileName) {
+            workshopEditActiveFileName = fileName;
+            const editor = document.getElementById('workshop-edit-file-content');
+            if (editor) {
+                editor.value = content;
+                setWorkshopEditStatus('A.I. updated file content.');
+                queueWorkshopEditorAutosize();
+            }
+        }
+        syncWorkshopEditOverlay();
+    }
+
+    if (!silent && window.showFeedback) {
+        window.showFeedback(`A.I. updated file: ${fileName}`);
+    }
+
+    if (save) {
+        try {
+            await saveWorkshopEditPanel();
+            return { ok: true, message: `Successfully updated and saved ${fileName}.`, saved: true };
+        } catch (err) {
+            return { ok: false, message: `Failed to save ${fileName}: ${err.message}`, saved: false };
+        }
+    }
+
+    return { ok: true, message: `Updated ${fileName} in draft editor.`, saved: false };
+};
+window.getWorkshopEditorState = function() {
+    if (typeof workshopEditActiveGameId === 'undefined') return null;
+    return {
+        activeGameId: workshopEditActiveGameId,
+        activeFileName: workshopEditActiveFileName,
+        activeFileContent: workshopEditActiveGameId && workshopEditActiveFileName ? window.getWorkshopFileContent(workshopEditActiveGameId, workshopEditActiveFileName) : null,
+        isToolsExpanded: !!(typeof workshopEditToolsExpanded !== 'undefined' && workshopEditToolsExpanded)
+    };
 };
 window.clearRecent = clearRecent;
 window.toggleObstCount = toggleObstCount;

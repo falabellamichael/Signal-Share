@@ -1660,6 +1660,7 @@ window.sendChatMessage = async function() {
             } : "Inactive",
             gameStats: (typeof window.getAllGameStats === 'function') ? window.getAllGameStats() : "Unavailable",
             workshop: (typeof window.getWorkshopGamesForAi === 'function') ? window.getWorkshopGamesForAi() : [],
+            workshopEditor: (typeof window.getWorkshopEditorState === 'function') ? window.getWorkshopEditorState() : null,
             ui: {
                 messengerOpen: !!(window.state && window.state.messengerOpen),
                 sidebarOpen: !!document.querySelector('.steam-chat-sidebar.active')
@@ -1681,7 +1682,11 @@ window.sendChatMessage = async function() {
                 attachment: arcadeChatHistory[arcadeChatHistory.length - 1]?.attachment || null
             })
             : '';
-        const fullPageContext = `${pageContext} (Visible text: ${pageText})${sharedAiContext ? `\n\n${sharedAiContext}` : ''}`;
+        let developerCapabilities = '';
+        if (richContext.workshopEditor) {
+            developerCapabilities = '\n\n[DEVELOPER_MODE_ACTIVE]: You can edit workshop files using [FILE_REWRITE: {"gameId": "string", "fileName": "string", "content": "string", "save": boolean}].';
+        }
+        const fullPageContext = `${pageContext} (Visible text: ${pageText})${sharedAiContext ? `\n\n${sharedAiContext}` : ''}${developerCapabilities}`;
 
         try {
             const modelSelect = document.getElementById('chat-model-select');
@@ -2110,6 +2115,20 @@ async function executeArcadeChatActions(text, options = {}) {
     if (openMatch) {
         const url = openMatch[1].trim();
         window.open(url, '_blank');
+    }
+
+    // 6. [FILE_REWRITE: {json}]
+    const fileRewriteMatch = text.match(/\[FILE_REWRITE:\s*({[\s\S]+?})\]/i);
+    if (fileRewriteMatch) {
+        try {
+            const data = JSON.parse(fileRewriteMatch[1]);
+            const { gameId, fileName, content, save } = data;
+            if (typeof window.applyAiFileEdit === 'function') {
+                void window.applyAiFileEdit(gameId, fileName, content, { save: !!save });
+            }
+        } catch (e) {
+            console.error("[Arcade Chat] Failed to execute [FILE_REWRITE] action:", e);
+        }
     }
 }
 
