@@ -2896,68 +2896,9 @@ async function executeArcadeChatActions(text, options = {}) {
 }
 
 async function handleArcadeSlashCommand(text, inputElement) {
-    const cleanText = text.trim();
-    const isSlash = cleanText.startsWith('/');
-    const isBracket = cleanText.startsWith('[') && cleanText.includes(']');
-    
-    if (!isSlash && !isBracket) return false;
-
-    // Normalize command extraction: /edit or [edit]
-    let cmd = "";
-    let args = "";
-
-    if (isSlash) {
-        const parts = cleanText.split(/\s+/);
-        cmd = parts[0].toLowerCase();
-        args = parts.slice(1).join(' ').trim();
-    } else {
-        const match = cleanText.match(/^\[(.*?)\]\s*(.*)$/);
-        if (match) {
-            cmd = '/' + match[1].toLowerCase();
-            args = match[2].trim();
-        }
+    if (typeof window.ArcadeCommandManager !== 'undefined') {
+        return await window.ArcadeCommandManager.handle(text, inputElement);
     }
-
-    if (cmd === '/clear') {
-        arcadeChatHistory = [];
-        saveCurrentChat();
-        renderArcadeChatMessages();
-        inputElement.value = '';
-        return true;
-    }
-
-    if (cmd === '/help') {
-        const helpText = `🛠️ [Command Hub]:
-/edit or [edit] [instructions] - Surgical code modification.
-/publish [title] - Full project upload/publish.
-/fix [error] - Rapid bug fixing protocol.
-/clear - Clear chat history.
-/help - Show this guide.`;
-        addChatMessage('ai', helpText);
-        inputElement.value = '';
-        return true;
-    }
-
-    // Force Protocol Injection for AI-bound commands
-    if (cmd === '/edit' || cmd === '/fix' || cmd === '/publish') {
-        // SMART CONTEXT: If args mention a known game, try to switch to it
-        if (typeof window.getWorkshopManageableGames === 'function') {
-            const games = window.getWorkshopManageableGames();
-            const mentionedGame = games.find(g => args.toLowerCase().includes((g.title || "").toLowerCase()));
-            if (mentionedGame && typeof window.setWorkshopEditActiveGame === 'function') {
-                console.log(`[Command Hub] Auto-switching context to: ${mentionedGame.title}`);
-                window.setWorkshopEditActiveGame(mentionedGame.id);
-            }
-        }
-
-        const promptPrefix = cmd === '/edit' ? "COMMAND: EDIT_SURGERY\nINSTRUCTION: " : 
-                           cmd === '/fix' ? "COMMAND: BUG_FIX\nERROR: " : 
-                           "COMMAND: PUBLISH_NEW\nTITLE: ";
-        
-        window.activeArcadeCommandMode = cmd;
-        return false; // Let normal flow continue
-    }
-
     return false;
 }
 
