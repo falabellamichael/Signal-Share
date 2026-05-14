@@ -391,6 +391,7 @@
                 { user: "Take me to settings", action: "[ARCADE:settings]" },
                 { user: "Draft a DM for this post", action: "[COMPOSE:Hey, this looks great. Can we collaborate?]" },
                 { user: "Publish this generated game to the Arcade workshop", action: "[PUBLISH:{\"target\":\"workshop\",\"title\":\"Reaction Dash\",\"category\":\"GAME\",\"tags\":[\"arcade\",\"reflex\"]}]" },
+                { user: "Improve my existing workshop game", action: "[PUBLISH:{\"target\":\"workshop\",\"mode\":\"update\",\"gameId\":\"custom_abc123\",\"title\":\"Reaction Dash\",\"category\":\"GAME\"}]" },
                 { user: "What's on my screen?", action: "[SCREENSHOT]" },
                 { user: "What tabs do I have open?", action: "[LIST_TABS]" },
                 { user: "What apps are running?", action: "[LIST_APPS]" }
@@ -422,6 +423,7 @@
                 "Use [COMPOSE:<text>] only when the user explicitly asks to draft/prefill a DM or message.",
                 "Never use [COMPOSE:<text>] for coding requests, debugging, or general Q&A.",
                 "For Arcade Library/Workshop publishing, use [PUBLISH:{...}] with target:\"workshop\" and include code/files payload when possible.",
+                "For improving an existing workshop game, set mode:\"update\" and include gameId when available.",
                 "Prefer [PATCH_SUGGESTION] for risky edits spanning many files.",
                 "Ask for explicit user confirmation before destructive operations."
             ],

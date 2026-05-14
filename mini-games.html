@@ -425,6 +425,7 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             border: 1px solid transparent;
             cursor: pointer;
+            position: relative;
         }
 
         .steam-card:hover {
@@ -448,6 +449,36 @@
 
         .steam-card:hover .poster-wrapper img {
             transform: scale(1.1);
+        }
+
+        .tile-delete-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 22px;
+            height: 22px;
+            border: 1px solid rgba(255,255,255,0.22);
+            border-radius: 999px;
+            background: rgba(10, 14, 20, 0.66);
+            color: rgba(255,255,255,0.7);
+            font-size: 0.95rem;
+            font-weight: 700;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            z-index: 15;
+            opacity: 0.72;
+            transition: opacity 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+        }
+
+        .tile-delete-btn:hover {
+            opacity: 1;
+            color: #fff;
+            border-color: rgba(255, 120, 120, 0.55);
+            background: rgba(96, 20, 28, 0.65);
         }
 
         .card-info {

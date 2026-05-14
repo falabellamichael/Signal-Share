@@ -1657,6 +1657,7 @@ window.sendChatMessage = async function() {
                 playback: window.heroMediaPlayerState.playbackState
             } : "Inactive",
             gameStats: (typeof window.getAllGameStats === 'function') ? window.getAllGameStats() : "Unavailable",
+            workshop: (typeof window.getWorkshopGamesForAi === 'function') ? window.getWorkshopGamesForAi() : [],
             ui: {
                 messengerOpen: !!(window.state && window.state.messengerOpen),
                 sidebarOpen: !!document.querySelector('.steam-chat-sidebar.active')
@@ -1961,8 +1962,8 @@ async function executeArcadeChatActions(text, options = {}) {
             const data = JSON.parse(publishMatch[1]);
             const { title, caption, tags } = data;
 
-            const routeToWorkshop = shouldRoutePublishToWorkshop(data, text, options.userPrompt || '');
-            if (routeToWorkshop) {
+        const routeToWorkshop = shouldRoutePublishToWorkshop(data, text, options.userPrompt || '');
+        if (routeToWorkshop) {
                 if (typeof window.publishCustomGameFromAi !== 'function') {
                     if (window.showFeedback) window.showFeedback("Workshop publishing is available from the Arcade Library page.", true);
                     return;
@@ -1982,12 +1983,16 @@ async function executeArcadeChatActions(text, options = {}) {
                     description: data.description || caption || '',
                     thumbnail: data.thumbnail || data.poster || '',
                     tags: Array.isArray(tags) ? tags.join(', ') : (typeof tags === 'string' ? tags : ''),
-                    files: workshopFiles
+                    files: workshopFiles,
+                    mode: data.mode || data.action || data.operation || '',
+                    gameId: data.gameId || data.id || data.updateId || data.existingGameId || '',
+                    updateTitle: data.updateTitle || data.targetTitle || ''
                 });
 
                 if (workshopResult?.ok) {
                     if (window.showFeedback) {
-                        window.showFeedback(`Published "${workshopResult.title}" to Workshop (${workshopResult.assetCount} assets).`);
+                        const actionLabel = workshopResult.updated ? 'Updated' : 'Published';
+                        window.showFeedback(`${actionLabel} "${workshopResult.title}" in Workshop (${workshopResult.assetCount} assets).`);
                     }
                 } else if (window.showFeedback) {
                     window.showFeedback(workshopResult?.message || 'Failed to publish game to Workshop.', true);

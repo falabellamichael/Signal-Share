@@ -1234,12 +1234,16 @@ to authenticated
 using (auth.uid() = author_id)
 with check (auth.uid() = author_id);
 
+drop policy if exists "publishers and master admins can delete workshop games" on public.workshop_games;
 drop policy if exists "master admins can delete workshop games" on public.workshop_games;
-create policy "master admins can delete workshop games"
+create policy "publishers and master admins can delete workshop games"
 on public.workshop_games
 for delete
 to authenticated
-using (public.is_signal_share_master_admin());
+using (
+  auth.uid() = author_id
+  or public.is_signal_share_master_admin()
+);
 
 drop trigger if exists set_workshop_games_updated_at on public.workshop_games;
 create trigger set_workshop_games_updated_at
