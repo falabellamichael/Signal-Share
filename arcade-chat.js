@@ -2122,74 +2122,98 @@ window.sendChatMessage = async function() {
                 }
             }
 
-            const payload = JSON.stringify({
-                message: text,
-                model: requestModel,
-                customInstructions,
-                attachment: arcadeChatHistory[arcadeChatHistory.length - 1].attachment,
-                history: normalizedHistory,
-                pageContext: fullPageContext
-            });
+            const attachment = arcadeChatHistory[arcadeChatHistory.length - 1].attachment;
+            const compactHistory = Array.isArray(normalizedHistory) ? normalizedHistory.slice(-14) : [];
+            const compactPageContext = `${fullPageContext || ''}`.slice(0, 2400);
+            const payloadVariants = [
+                {
+                    label: 'full',
+                    body: JSON.stringify({
+                        message: text,
+                        model: requestModel,
+                        customInstructions,
+                        attachment,
+                        history: normalizedHistory,
+                        pageContext: fullPageContext
+                    })
+                },
+                {
+                    label: 'compact',
+                    body: JSON.stringify({
+                        message: text,
+                        model: requestModel,
+                        customInstructions,
+                        attachment,
+                        history: compactHistory,
+                        pageContext: compactPageContext
+                    })
+                }
+            ];
 
             const chatPaths = ['/api/local-llm/chat', '/api/llm/chat'];
             const attemptErrors = [];
 
-            for (const chatPath of chatPaths) {
-                try {
-                    const nextResponse = await bridgeFetch(chatPath, {
-                        method: 'POST',
-                        timeoutMs: 0,
-                        signal,
-                        body: payload
-                    });
+            for (const payloadVariant of payloadVariants) {
+                for (const chatPath of chatPaths) {
+                    const attemptPath = `${payloadVariant.label}:${chatPath}`;
+                    try {
+                        const nextResponse = await bridgeFetch(chatPath, {
+                            method: 'POST',
+                            timeoutMs: 0,
+                            signal,
+                            body: payloadVariant.body
+                        });
 
-                    if (nextResponse?.ok) {
-                        const data = await nextResponse.json().catch(() => null);
-                        if (!data || typeof data !== 'object') {
-                            attemptErrors.push(formatAttemptError(chatPath, 'non-JSON payload', captureClientSourceLocation()));
-                            continue;
-                        }
-                        const candidateReply = typeof data.reply === 'string' ? data.reply : '';
-                        if (!candidateReply.trim()) {
-                            attemptErrors.push(formatAttemptError(chatPath, 'empty AI reply', captureClientSourceLocation()));
-                            continue;
-                        }
+                        if (nextResponse?.ok) {
+                            const data = await nextResponse.json().catch(() => null);
+                            if (!data || typeof data !== 'object') {
+                                attemptErrors.push(formatAttemptError(attemptPath, 'non-JSON payload', captureClientSourceLocation()));
+                                continue;
+                            }
+                            const candidateReply = typeof data.reply === 'string' ? data.reply : '';
+                            if (!candidateReply.trim()) {
+                                attemptErrors.push(formatAttemptError(attemptPath, 'empty AI reply', captureClientSourceLocation()));
+                                continue;
+                            }
 
-                        if (chatPath === '/api/local-llm/chat' && isBridgeLightweightOfflineReply(candidateReply)) {
-                            attemptErrors.push(formatAttemptError(chatPath, 'lightweight offline fallback from bridge', captureClientSourceLocation()));
-                            continue;
-                        }
+                            if (isBridgeLightweightOfflineReply(candidateReply)) {
+                                attemptErrors.push(formatAttemptError(attemptPath, 'lightweight offline fallback from bridge', captureClientSourceLocation()));
+                                continue;
+                            }
 
-                        reply = candidateReply;
-                        break;
-                    } else {
-                        const statusCode = nextResponse?.status ?? "unknown";
-                        const errorDetails = await readBridgeErrorDetails(nextResponse);
-                        const statusReason = errorDetails.message
-                            ? `HTTP ${statusCode} (${errorDetails.message})`
-                            : `HTTP ${statusCode}`;
-                        attemptErrors.push(formatAttemptError(
-                            chatPath,
-                            statusReason,
-                            errorDetails.sourceLocation || captureClientSourceLocation()
-                        ));
+                            reply = candidateReply;
+                            break;
+                        } else {
+                            const statusCode = nextResponse?.status ?? "unknown";
+                            const errorDetails = await readBridgeErrorDetails(nextResponse);
+                            const statusReason = errorDetails.message
+                                ? `HTTP ${statusCode} (${errorDetails.message})`
+                                : `HTTP ${statusCode}`;
+                            attemptErrors.push(formatAttemptError(
+                                attemptPath,
+                                statusReason,
+                                errorDetails.sourceLocation || captureClientSourceLocation()
+                            ));
 
-                        if (nextResponse.status === 404 && chatPath !== chatPaths[chatPaths.length - 1]) {
-                            continue;
-                        }
+                            if (nextResponse.status === 404 && chatPath !== chatPaths[chatPaths.length - 1]) {
+                                continue;
+                            }
 
-                        if ((nextResponse.status === 401 || nextResponse.status === 403)
-                            && chatPath === '/api/local-llm/chat'
-                            && chatPath !== chatPaths[chatPaths.length - 1]) {
-                            // Token/secret mismatch on strict local-llm route; try legacy chat route.
-                            continue;
+                            if ((nextResponse.status === 401 || nextResponse.status === 403)
+                                && chatPath === '/api/local-llm/chat'
+                                && chatPath !== chatPaths[chatPaths.length - 1]) {
+                                // Token/secret mismatch on strict local-llm route; try legacy chat route.
+                                continue;
+                            }
                         }
+                    } catch (routeError) {
+                        const routeMessage = `${routeError?.message || 'request failed'}`.trim();
+                        const routeLocation = extractStackLocation(routeError) || captureClientSourceLocation();
+                        attemptErrors.push(formatAttemptError(attemptPath, routeMessage, routeLocation));
                     }
-                } catch (routeError) {
-                    const routeMessage = `${routeError?.message || 'request failed'}`.trim();
-                    const routeLocation = extractStackLocation(routeError) || captureClientSourceLocation();
-                    attemptErrors.push(formatAttemptError(chatPath, routeMessage, routeLocation));
                 }
+
+                if (reply !== null) break;
             }
 
             if (reply !== null) {
