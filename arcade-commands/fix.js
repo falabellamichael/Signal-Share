@@ -15,7 +15,7 @@
                     if (Array.isArray(games) && games.length === 1) targetGame = games[0];
                 }
                 if (targetGame) {
-                    const selected = window.setWorkshopEditActiveGame(targetGame.id);
+                    const selected = window.setWorkshopEditActiveGame(targetGame.id, { prompt: args });
                     if (selected?.ok) {
                         console.log(`[Command: Fix] Auto-switching context to: ${selected.title} / ${selected.fileName}`);
                     }

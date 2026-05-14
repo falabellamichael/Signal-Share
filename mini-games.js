@@ -1201,6 +1201,28 @@ function resolveWorkshopEditGameFromPrompt(prompt = '') {
     return bestScore >= 35 ? bestGame : null;
 }
 
+function resolveWorkshopPreferredFileForPrompt(prompt = '', editableFiles = []) {
+    const files = Array.isArray(editableFiles) ? editableFiles : [];
+    if (files.length === 0) return null;
+
+    const normalizedPrompt = normalizeWorkshopSearchText(prompt);
+    const byName = (pattern) => files.find((file) => pattern.test(`${file?.name || ''}`.trim().toLowerCase())) || null;
+
+    if (/\b(style|styles|css|design|visual|theme|color|colour|pretty|background|button|layout)\b/.test(normalizedPrompt)) {
+        return byName(/\.css$/i) || byName(/style/i) || byName(/\.html?$/i) || files[0];
+    }
+
+    if (/\b(script|javascript|js|logic|function|score|timer|random|number|click|event|bug|error)\b/.test(normalizedPrompt)) {
+        return byName(/\.(js|mjs|cjs)$/i) || byName(/game|script/i) || byName(/\.html?$/i) || files[0];
+    }
+
+    if (/\b(html|markup|text|title|heading|label|button)\b/.test(normalizedPrompt)) {
+        return byName(/index\.html?$/i) || byName(/\.html?$/i) || files[0];
+    }
+
+    return byName(/index\.html?$/i) || byName(/\.html?$/i) || files[0];
+}
+
 function isWorkshopFileEditable(file) {
     if (!file || typeof file !== 'object') return false;
     const fileName = `${file.name || ''}`.trim().toLowerCase();
@@ -1735,6 +1757,11 @@ function handleWorkshopEditFileChange() {
 
 function setWorkshopEditActiveGame(gameId, preferredFileName = '') {
     const targetGameId = `${gameId || ''}`.trim();
+    const options = preferredFileName && typeof preferredFileName === 'object' ? preferredFileName : {};
+    const prompt = `${options.prompt || ''}`.trim();
+    const requestedFileName = typeof preferredFileName === 'string'
+        ? preferredFileName
+        : `${options.fileName || options.preferredFileName || ''}`;
     const games = getWorkshopManageableGames();
     const game = games.find((entry) => entry.id === targetGameId) || null;
     if (!game) {
@@ -1746,10 +1773,12 @@ function setWorkshopEditActiveGame(gameId, preferredFileName = '') {
         return { ok: false, message: `${game.title || game.id} has no editable text files.` };
     }
 
-    const preferred = `${preferredFileName || ''}`.trim().toLowerCase();
+    const preferred = `${requestedFileName || ''}`.trim().toLowerCase();
+    const promptSelectedFile = resolveWorkshopPreferredFileForPrompt(prompt, editableFiles);
     const selectedFile = (preferred
         ? editableFiles.find((file) => `${file.name || ''}`.trim().toLowerCase() === preferred)
         : null)
+        || promptSelectedFile
         || editableFiles.find((file) => `${file.name || ''}`.trim().toLowerCase() === 'index.html')
         || editableFiles.find((file) => /\.html?$/i.test(`${file.name || ''}`))
         || editableFiles[0];

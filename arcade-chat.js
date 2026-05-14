@@ -2205,8 +2205,9 @@ window.sendChatMessage = async function() {
         const pageContext = JSON.stringify(contextForModel);
         // Omit visible page text if we are in the editor to save tokens
         const pageText = richContext.workshopEditor ? "" : document.body.innerText.substring(0, 300);
+        const editRequestActive = isWorkshopEditIntentPrompt(text, richContext);
         // Keep only the most recent messages to prevent context window overflow on small local models
-        const maxHistory = 6;
+        const maxHistory = editRequestActive ? 2 : 6;
         const recentHistory = arcadeChatHistory.slice(-maxHistory);
         
         const normalizedHistory = window.SignalShareAiCore
@@ -2248,8 +2249,9 @@ window.sendChatMessage = async function() {
 
             const protocolAwareMessage = buildProtocolAwareUserMessage(text);
             const attachment = arcadeChatHistory[arcadeChatHistory.length - 1].attachment;
-            const compactHistory = Array.isArray(normalizedHistory) ? normalizedHistory.slice(-10) : [];
-            const compactPageContext = `${fullPageContext || ''}`.slice(0, 12000); // Reduced from 25k to improve stability on small local models
+            const compactHistory = Array.isArray(normalizedHistory) ? normalizedHistory.slice(editRequestActive ? -4 : -10) : [];
+            const maxContextChars = editRequestActive ? 9000 : 12000;
+            const compactPageContext = `${fullPageContext || ''}`.slice(0, maxContextChars); // Keep small local models responsive
             
             const payloadVariants = [
                 {
@@ -2382,6 +2384,18 @@ window.sendChatMessage = async function() {
         }
 
         if (reply !== null) {
+            if (editRequestActive && isUnhelpfulWorkshopEditReply(reply)) {
+                const localStyleFallback = await tryLocalWorkshopStyleFallback(text, richContext);
+                if (localStyleFallback?.ok) {
+                    const fallbackReply = `[Workshop Edit]: ${localStyleFallback.message}`;
+                    addChatMessage('ai', fallbackReply);
+                    arcadeChatHistory.push({ role: 'assistant', content: fallbackReply });
+                    saveCurrentChat();
+                    updateChatStatus('active');
+                    return;
+                }
+            }
+
             addChatMessage('ai', reply || "...");
             arcadeChatHistory.push({ role: 'assistant', content: reply });
             saveCurrentChat();
@@ -3024,6 +3038,120 @@ async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '', r
     }
 
     result.ok = true;
+    return result;
+}
+
+function isUnhelpfulWorkshopEditReply(replyText = '') {
+    const text = `${replyText || ''}`.trim().toLowerCase();
+    if (!text) return true;
+    return text.includes('logic core returned an empty result')
+        || text.includes('please provide the source')
+        || text.includes('please provide the content')
+        || text.includes('i still require the source')
+        || text.includes('i do not have the current code');
+}
+
+function isStyleEditPrompt(prompt = '') {
+    return /\b(style|styles|css|design|visual|theme|color|colour|pretty|background|polish|make it look)\b/i.test(`${prompt || ''}`);
+}
+
+function buildLocalStyleEnhancementCss() {
+    return `/* AI style enhancement */
+:root {
+  color-scheme: dark;
+  --ai-accent: #62c8ff;
+  --ai-accent-strong: #8be26b;
+  --ai-panel: rgba(8, 18, 30, 0.82);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(98, 200, 255, 0.28), transparent 34rem),
+    linear-gradient(135deg, #08121e 0%, #152943 55%, #07111d 100%);
+  color: #f3f8ff;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+main,
+.game,
+.container,
+.app,
+#app {
+  background: var(--ai-panel);
+  border: 1px solid rgba(98, 200, 255, 0.24);
+  border-radius: 18px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
+}
+
+button,
+input,
+select {
+  border-radius: 12px;
+}
+
+button {
+  border: 0;
+  background: linear-gradient(135deg, var(--ai-accent), var(--ai-accent-strong));
+  color: #04101c;
+  font-weight: 800;
+  box-shadow: 0 10px 24px rgba(98, 200, 255, 0.24);
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}`;
+}
+
+function upsertLocalStyleEnhancement(content = '', fileName = '') {
+    const css = buildLocalStyleEnhancementCss();
+    const lowerName = `${fileName || ''}`.toLowerCase();
+    if (/\.css$/i.test(lowerName)) {
+        const withoutOld = `${content || ''}`.replace(/\/\* AI style enhancement \*\/[\s\S]*$/i, '').trimEnd();
+        return `${withoutOld}\n\n${css}\n`;
+    }
+
+    const styleBlock = `<style id="ai-style-enhancement">\n${css}\n</style>`;
+    const withoutOld = `${content || ''}`.replace(/\n?\s*<style\s+id=["']ai-style-enhancement["'][\s\S]*?<\/style>\s*/i, '\n');
+    if (/<\/head>/i.test(withoutOld)) {
+        return withoutOld.replace(/<\/head>/i, `  ${styleBlock}\n</head>`);
+    }
+    return `${styleBlock}\n${withoutOld}`;
+}
+
+async function tryLocalWorkshopStyleFallback(userPrompt = '', richContext = null) {
+    const result = { attempted: false, ok: false, message: '' };
+    if (!isStyleEditPrompt(userPrompt)) return result;
+    if (typeof window.internalApplyWorkshopFileEdit !== 'function') {
+        result.message = 'Workshop edit function is unavailable.';
+        return result;
+    }
+
+    const editorState = getActiveWorkshopEditorContext(richContext);
+    const gameId = `${editorState?.activeGameId || ''}`.trim();
+    const fileName = `${editorState?.activeFileName || ''}`.trim();
+    const oldContent = typeof window.getWorkshopFileContent === 'function'
+        ? window.getWorkshopFileContent(gameId, fileName)
+        : editorState?.activeFileContent;
+
+    if (!gameId || !fileName || typeof oldContent !== 'string' || !oldContent.trim()) {
+        result.message = 'No active Workshop file content is available.';
+        return result;
+    }
+
+    result.attempted = true;
+    const nextContent = upsertLocalStyleEnhancement(oldContent, fileName);
+    const applyResult = await window.internalApplyWorkshopFileEdit(gameId, fileName, nextContent, { save: true });
+    if (!applyResult?.ok) {
+        result.message = applyResult?.message || 'Local style fallback failed.';
+        return result;
+    }
+
+    result.ok = true;
+    result.message = `Applied a local style enhancement to ${fileName}.`;
     return result;
 }
 
