@@ -263,9 +263,9 @@ export function formatDisplayNameFromEmail(email) {
  */
 export function resolveMemberDisplayName(profile, fallback = "Member") {
   if (!profile) return fallback;
-  const displayName = profile.displayName;
+  const displayName = typeof profile.displayName === "string" ? profile.displayName.trim() : "";
   const prettyEmailName = formatDisplayNameFromEmail(profile.email);
-  return prettyEmailName || (displayName ? displayName.slice(0, 40) : fallback);
+  return (displayName ? displayName.slice(0, 40) : "") || prettyEmailName || fallback;
 }
 
 /**
