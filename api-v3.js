@@ -81,9 +81,23 @@ export async function loadSiteSettingsFromSupabase() {
 export async function syncCurrentProfileToSupabase(displayNameOverride = "") {
   const { state } = apiContext;
   if (!state.currentUser) throw new Error("Authentication required to sync profile.");
-  
-  const displayName = (displayNameOverride || state.currentUser.displayName || "").trim().slice(0, 40);
-  if (displayName.length < 2) throw new Error("Use a display name with at least 2 characters.");
+
+  const explicitDisplayName = typeof displayNameOverride === "string" ? displayNameOverride.trim() : "";
+  const fallbackDisplayName =
+    state.profileRecord?.displayName
+    || state.currentUser?.displayName
+    || state.currentUser?.user_metadata?.display_name
+    || state.currentUser?.user_metadata?.full_name
+    || state.currentUser?.user_metadata?.name
+    || "";
+
+  let displayName = (explicitDisplayName || fallbackDisplayName || "").trim().slice(0, 40);
+  if (explicitDisplayName && displayName.length < 2) {
+    throw new Error("Use a display name with at least 2 characters.");
+  }
+  if (displayName.length < 2) {
+    displayName = "Member";
+  }
 
   const payload = {
     id: state.currentUser.id,

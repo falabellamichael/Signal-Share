@@ -1879,7 +1879,12 @@ function updateUserPreferences(nextPreferences) {
   applyUserPreferences(state.preferences);
   saveUserPreferences();
   if (state.supabase && state.currentUser) {
-    void syncCurrentProfileToSupabase().catch(err => {
+    void syncCurrentProfileToSupabase(getDefaultProfileName()).catch(err => {
+      const message = String(err?.message || "");
+      if (message.includes("display name with at least 2 characters")) {
+        console.warn("[Preferences] Sync skipped due to display name validation.", err);
+        return;
+      }
       console.error("[Preferences] Sync failed:", err);
       if (window.notifications) {
         window.notifications.error("Failed to sync privacy settings to database. You may need to add columns to your 'profiles' table.", "Sync Error");
