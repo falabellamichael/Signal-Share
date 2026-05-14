@@ -134,44 +134,87 @@ let arcadeSpeechSynth = window.speechSynthesis;
 
 function initArcadeSpeech() {
     if (arcadeSpeechRecognition) return;
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition;
+    if (!SpeechRecognition) {
+        console.error('[Voice] Speech Recognition API not supported in this browser.');
+        return;
+    }
 
-    arcadeSpeechRecognition = new SpeechRecognition();
-    arcadeSpeechRecognition.continuous = true;
-    arcadeSpeechRecognition.interimResults = true;
-    arcadeSpeechRecognition.lang = 'en-US';
+    try {
+        arcadeSpeechRecognition = new SpeechRecognition();
+        arcadeSpeechRecognition.continuous = true;
+        arcadeSpeechRecognition.interimResults = true;
+        arcadeSpeechRecognition.lang = 'en-US';
 
-    arcadeSpeechRecognition.onresult = (event) => {
-        const input = document.getElementById('arc-chat-input');
-        if (!input) return;
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-            transcript += event.results[i][0].transcript;
-        }
-        input.value = transcript;
-        input.focus();
-    };
+        arcadeSpeechRecognition.onstart = () => {
+            console.log('[Voice] Dictation started.');
+            const input = document.getElementById('arc-chat-input');
+            if (input) input.placeholder = "Listening...";
+        };
 
-    arcadeSpeechRecognition.onerror = (event) => {
-        console.error('[Voice] Recognition error:', event.error);
-        stopArcadeDictation();
-    };
+        arcadeSpeechRecognition.onresult = (event) => {
+            const input = document.getElementById('arc-chat-input');
+            if (!input) return;
+            let transcript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                transcript += event.results[i][0].transcript;
+            }
+            input.value = transcript;
+            input.focus();
+        };
+
+        arcadeSpeechRecognition.onerror = (event) => {
+            console.error('[Voice] Recognition error:', event.error);
+            if (event.error === 'not-allowed') {
+                alert('Microphone access denied. Please enable microphone permissions in your Android settings for this app.');
+            }
+            stopArcadeDictation();
+        };
+
+        arcadeSpeechRecognition.onend = () => {
+            console.log('[Voice] Dictation ended.');
+            updateChatPlaceholder();
+        };
+    } catch (err) {
+        console.error('[Voice] Failed to initialize SpeechRecognition:', err);
+    }
 }
 
 function speakArcadeText(text) {
     if (!arcadeSpeechSynth) return;
+    
+    // On some Androids, we need to wait for voices to load or handle empty list
+    const voices = arcadeSpeechSynth.getVoices();
+    if (voices.length === 0) {
+        // If no voices yet, wait for them and try again once
+        arcadeSpeechSynth.onvoiceschanged = () => {
+            arcadeSpeechSynth.onvoiceschanged = null; // Only once
+            speakArcadeText(text);
+        };
+        // Also try a silent speak to "prime" the engine on Android
+        try { arcadeSpeechSynth.speak(new SpeechSynthesisUtterance("")); } catch(e){}
+        return;
+    }
+
     arcadeSpeechSynth.cancel(); // Stop current speech
     
     const cleanText = text.replace(/\[[\s\S]*?\]/g, "").trim();
     if (!cleanText) return;
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
-    const voices = arcadeSpeechSynth.getVoices();
-    // Try to find a nice English voice
-    utterance.voice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+    // Find best English voice, or fallback to any
+    const voice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) 
+               || voices.find(v => v.lang.startsWith('en')) 
+               || voices[0];
+               
+    if (voice) utterance.voice = voice;
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
+    
+    // ERROR HANDLING: If it fails, log it for debugging
+    utterance.onerror = (e) => console.error('[Voice] TTS Error:', e);
+    
     arcadeSpeechSynth.speak(utterance);
 }
 
@@ -2723,9 +2766,22 @@ function setupCloseParityHandlers() {
     if (arcSendBtn) {
         let holdTimer = null;
         const HOLD_THRESHOLD = 400;
+        let speechPrimed = false;
 
         arcSendBtn.addEventListener('pointerdown', (e) => {
             if (isSendingChatMessage) return;
+            
+            // Prime the speech engine on the very first interaction (Required for Android)
+            if (!speechPrimed && arcadeSpeechSynth) {
+                try {
+                    const silent = new SpeechSynthesisUtterance("");
+                    silent.volume = 0;
+                    arcadeSpeechSynth.speak(silent);
+                    speechPrimed = true;
+                    console.log("[Voice] Speech engine primed for Android.");
+                } catch(e){}
+            }
+
             holdTimer = setTimeout(() => {
                 startArcadeDictation();
                 holdTimer = null;
