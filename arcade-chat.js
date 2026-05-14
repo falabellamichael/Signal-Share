@@ -2019,30 +2019,7 @@ window.sendChatMessage = async function() {
             return;
         }
 
-        // Check for local intents/actions via the Chatbot Engine (ONLY IF BRIDGE IS OFFLINE)
-        const bridgeIsActuallyOffline = isEngineStatusOffline();
-        if (window.ArcadeChatbotEngine && bridgeIsActuallyOffline) {
-            const intentReply = window.ArcadeChatbotEngine.processIntent(text);
-            if (intentReply) {
-                const typingId = addTypingIndicator();
-                
-                // Handle both sync strings and async Promises from the engine
-                Promise.resolve(intentReply).then(resolvedReply => {
-                    setTimeout(() => {
-                        removeTypingIndicator(typingId);
-                        addChatMessage('ai', resolvedReply);
-                        arcadeChatHistory.push({ role: 'assistant', content: resolvedReply });
-                        saveCurrentChat();
-                        updateChatStatus('idle');
-                    }, 600);
-                });
-                
-                input.value = '';
-                clearChatAttachment();
-                isSendingChatMessage = false;
-                return;
-            }
-        }
+        const workshopPublishIntent = isWorkshopPublishIntentPrompt(text);
 
         // Add to history with attachment if present
         arcadeChatHistory.push({ 
@@ -2308,7 +2285,7 @@ window.sendChatMessage = async function() {
                 await tryAutoPublishWorkshopFromReply(reply, text);
             }
         } else {
-            if (isWorkshopPublishIntentPrompt(text)) {
+            if (workshopPublishIntent) {
                 const emergencyPublish = await tryEmergencyWorkshopPublishFromPrompt(text, lastError);
                 if (emergencyPublish?.attempted && emergencyPublish?.ok) {
                     const publishReply = `🕹️ [Arcade Protocol]: Remote generation failed, so I generated and published "${emergencyPublish.title}" directly to your Workshop (${emergencyPublish.assetCount} assets).`;
@@ -2340,7 +2317,20 @@ window.sendChatMessage = async function() {
                     container.scrollTop = container.scrollHeight;
                 }
             }
-            const offlineReply = getArcadeProtocolOfflineResponse(text);
+            let offlineReply = '';
+            if (!workshopPublishIntent && window.ArcadeChatbotEngine?.processIntent) {
+                try {
+                    const localIntentReply = await Promise.resolve(window.ArcadeChatbotEngine.processIntent(text));
+                    if (typeof localIntentReply === 'string' && localIntentReply.trim()) {
+                        offlineReply = localIntentReply.trim();
+                    }
+                } catch (_intentError) {
+                    // Fall through to standard offline protocol response.
+                }
+            }
+            if (!offlineReply) {
+                offlineReply = getArcadeProtocolOfflineResponse(text);
+            }
             addChatMessage('ai', offlineReply);
             
             arcadeChatHistory.push({ role: 'assistant', content: offlineReply });
@@ -3031,13 +3021,16 @@ body{
 async function tryEmergencyWorkshopPublishFromPrompt(userPrompt = '', reason = '') {
     const result = { attempted: false, ok: false, reason: '', title: '', assetCount: 0 };
     if (!isWorkshopPublishIntentPrompt(userPrompt)) return result;
+    result.attempted = true;
     if (typeof window.publishCustomGameFromAi !== 'function') {
-        result.reason = 'publish-function-unavailable';
+        const source = captureClientSourceLocation();
+        result.reason = source
+            ? `publish-function-unavailable@${source}`
+            : 'publish-function-unavailable';
         return result;
     }
 
     const payload = buildEmergencyWorkshopPublishPayload(userPrompt);
-    result.attempted = true;
     const publishResult = await window.publishCustomGameFromAi({
         target: 'workshop',
         title: payload.title,
