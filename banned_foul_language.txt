@@ -1,5 +1,14 @@
-Banned Foul Language List:
+# Signal Share banned language patterns
+# One term per line. Lines beginning with "#" are ignored.
+# Keep this list focused on severe profanity/abuse terms.
 
-- [Insert banned words or phrases here, one per line]
-
-Note: This list should be updated regularly to ensure compliance with website policies and community guidelines.
+fuck
+fucking
+motherfucker
+shit
+bullshit
+asshole
+bitch
+cunt
+dickhead
+bastard

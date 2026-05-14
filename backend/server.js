@@ -120,7 +120,10 @@ app.use((req, res, next) => {
 
   const incomingSecret = req.headers["x-bridge-secret"] || req.headers["X-Bridge-Secret"];
   const incomingDevice = req.headers["x-device-id"] || req.headers["X-Device-Id"];
-  const isSensitive = req.path.startsWith('/api/system/') || req.path.startsWith('/api/system-media/action') || req.path.startsWith('/api/security/');
+  const isSensitive = req.path.startsWith('/api/system/')
+    || req.path.startsWith('/api/system-media/action')
+    || req.path.startsWith('/api/security/')
+    || req.path.startsWith('/api/moderation/');
   
   // 2. Device ID Validation (Hardware-bound)
   if (isSensitive && !security.validateDevice(incomingDevice)) {
