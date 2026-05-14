@@ -301,6 +301,7 @@ const WORKSHOP_GAMES_TABLE = 'workshop_games';
 const MASTER_ADMIN_RPC_NAME = 'is_signal_share_master_admin';
 let isCurrentMasterAdmin = false;
 let workshopTileMode = 'library';
+let workshopLastLibraryCategory = 'all';
 let workshopEditActiveGameId = '';
 let workshopEditActiveFileName = '';
 let workshopEditToolsExpanded = false;
@@ -1441,6 +1442,21 @@ function syncWorkshopModeToggleButtons() {
 
 function setWorkshopTileMode(nextMode) {
     workshopTileMode = `${nextMode || ''}`.trim().toLowerCase() === 'edit' ? 'edit' : 'library';
+    if (workshopTileMode === 'edit') {
+        if (currentCategory !== 'edit') {
+            if (currentCategory && currentCategory !== 'edit') {
+                workshopLastLibraryCategory = currentCategory;
+            }
+            setCategory('edit');
+            return;
+        }
+    } else if (currentCategory === 'edit') {
+        const fallbackCategory = workshopLastLibraryCategory && workshopLastLibraryCategory !== 'edit'
+            ? workshopLastLibraryCategory
+            : 'all';
+        setCategory(fallbackCategory);
+        return;
+    }
     syncWorkshopEditOverlay();
 }
 
@@ -1451,7 +1467,7 @@ function syncWorkshopEditOverlay() {
     const overlay = document.getElementById('workshop-edit-overlay');
     if (!overlay) return;
 
-    const shouldShow = workshopTileMode === 'edit';
+    const shouldShow = workshopTileMode === 'edit' && currentCategory === 'edit';
     overlay.hidden = !shouldShow;
     overlay.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
     if (!shouldShow) return;
@@ -1888,16 +1904,22 @@ function updateAuthUI() {
 
 function setCategory(cat, skipPush = false) {
     vibrate(5);
-    currentCategory = cat;
+    const nextCategory = `${cat || ''}`.trim().toLowerCase() || 'all';
+    if (nextCategory !== 'edit') {
+        workshopLastLibraryCategory = nextCategory;
+    }
+    workshopTileMode = nextCategory === 'edit' ? 'edit' : 'library';
+    currentCategory = nextCategory;
     syncCurrentCategoryGlobal();
 
 
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    const navEl = document.getElementById(`nav-${cat}`);
+    const activeNavCategory = nextCategory === 'edit' ? 'publish' : nextCategory;
+    const navEl = document.getElementById(`nav-${activeNavCategory}`);
     if (navEl) navEl.classList.add('active');
 
     document.querySelectorAll('.mobile-nav-item').forEach(el => el.classList.remove('active'));
-    const mobNavEl = document.getElementById(`mob-nav-${cat}`);
+    const mobNavEl = document.getElementById(`mob-nav-${activeNavCategory}`);
     if (mobNavEl) mobNavEl.classList.add('active');
 
     const hero = document.querySelector('.featured-hero');
@@ -1906,6 +1928,7 @@ function setCategory(cat, skipPush = false) {
     const publish = document.getElementById('publish-view');
     const detail = document.getElementById('detail-view');
     const leader = document.getElementById('leaderboard-view');
+    const workshopEditView = document.getElementById('workshop-edit-view');
     const runner = document.getElementById('app-runner');
     const title = document.getElementById('library-title');
     const clearBtn = document.getElementById('clear-recent');
@@ -1915,23 +1938,24 @@ function setCategory(cat, skipPush = false) {
     if (publish) publish.style.display = 'none';
     if (detail) detail.style.display = 'none';
     if (leader) leader.style.display = 'none';
+    if (workshopEditView) workshopEditView.style.display = 'none';
     if (runner) runner.style.display = 'none';
     document.body.style.overflow = 'auto';
 
-    if (cat === 'store') {
+    if (nextCategory === 'store') {
         if (store) store.style.display = 'block';
         const msg = document.getElementById('store-locked-msg');
         const content = document.getElementById('store-content');
         if (msg) msg.style.display = currentUser ? 'none' : 'block';
         if (content) content.style.display = currentUser ? 'block' : 'none';
-    } else if (cat === 'publish') {
+    } else if (nextCategory === 'publish') {
         if (publish) publish.style.display = 'block';
         const msg = document.getElementById('publish-locked-msg');
         const content = document.getElementById('publish-content');
         if (msg) msg.style.display = currentUser ? 'none' : 'block';
         if (content) content.style.display = currentUser ? 'block' : 'none';
         if (currentUser) renderPublishedGames();
-    } else if (cat === 'leaderboard') {
+    } else if (nextCategory === 'leaderboard') {
         if (leader) leader.style.display = 'block';
         const msg = document.getElementById('leader-locked-msg');
         const content = document.getElementById('leader-content');
@@ -1943,24 +1967,28 @@ function setCategory(cat, skipPush = false) {
                 void window.renderGlobalLeaderboards();
             }
         }
+    } else if (nextCategory === 'edit') {
+        if (workshopEditView) workshopEditView.style.display = 'block';
+        if (title) title.textContent = 'WORKSHOP EDITOR';
+        if (clearBtn) clearBtn.style.display = 'none';
     } else {
         if (library) library.style.display = 'block';
-        if (hero) hero.style.display = (cat === 'all') ? 'flex' : 'none';
+        if (hero) hero.style.display = (nextCategory === 'all') ? 'flex' : 'none';
 
-        let displayTitle = cat.toUpperCase();
-        if (cat === 'all') displayTitle = 'ALL GAMES & UTILITIES';
-        if (cat === 'games') displayTitle = 'GAMES';
-        if (cat === 'utilities') displayTitle = 'UTILITIES';
+        let displayTitle = nextCategory.toUpperCase();
+        if (nextCategory === 'all') displayTitle = 'ALL GAMES & UTILITIES';
+        if (nextCategory === 'games') displayTitle = 'GAMES';
+        if (nextCategory === 'utilities') displayTitle = 'UTILITIES';
 
         if (title) title.textContent = displayTitle;
-        if (clearBtn) clearBtn.style.display = (cat === 'recent') ? 'block' : 'none';
+        if (clearBtn) clearBtn.style.display = (nextCategory === 'recent') ? 'block' : 'none';
         renderLibrary();
     }
 
     syncWorkshopEditOverlay();
 
     if (!skipPush && !isNavigatingHistory) {
-        history.pushState({ type: 'category', cat: cat }, '');
+        history.pushState({ type: 'category', cat: nextCategory }, '');
     }
 
     resetShellScrollPosition();

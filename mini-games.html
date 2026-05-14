@@ -527,9 +527,8 @@
         }
 
         .workshop-edit-overlay {
-            position: absolute;
-            inset: 0;
-            z-index: 20;
+            position: relative;
+            z-index: 2;
             display: flex;
             flex-direction: column;
             border: 1px solid rgba(102, 192, 244, 0.3);
@@ -1624,67 +1623,69 @@
                 </div>
             </div>
 
-            <section id="workshop-edit-overlay" class="workshop-edit-overlay" hidden aria-hidden="true">
-                <div class="workshop-edit-header">
-                    <div>
-                        <h4 class="workshop-edit-title">Workshop Edit Mode</h4>
-                        <p class="workshop-edit-subtitle">Select a game and file, edit code directly, then save to update the published version.</p>
+            <div id="workshop-edit-view" style="display: none;">
+                <section id="workshop-edit-overlay" class="workshop-edit-overlay" hidden aria-hidden="true">
+                    <div class="workshop-edit-header">
+                        <div>
+                            <h4 class="workshop-edit-title">Workshop Edit Mode</h4>
+                            <p class="workshop-edit-subtitle">Select a game and file, edit code directly, then save to update the published version.</p>
+                        </div>
+                        <button type="button" class="workshop-edit-secondary-btn" onclick="setWorkshopTileMode('library')">Back To Library</button>
                     </div>
-                    <button type="button" class="workshop-edit-secondary-btn" onclick="setWorkshopTileMode('library')">Back To Library</button>
-                </div>
 
-                <div class="workshop-edit-grid">
-                    <div class="workshop-edit-field">
-                        <label class="setting-label" for="workshop-edit-game-select">Game</label>
-                        <select id="workshop-edit-game-select" class="steam-select form-input" onchange="handleWorkshopEditGameChange()"></select>
-                    </div>
-                    <div class="workshop-edit-field">
-                        <label class="setting-label" for="workshop-edit-file-select">File</label>
-                        <select id="workshop-edit-file-select" class="steam-select form-input" onchange="handleWorkshopEditFileChange()"></select>
-                    </div>
-                </div>
-
-                <div id="workshop-edit-file-meta" class="workshop-edit-meta"></div>
-
-                <div class="workshop-edit-tools-bar">
-                    <button type="button" class="workshop-edit-tools-toggle" id="workshop-edit-tools-toggle" onclick="toggleWorkshopEditToolsPanel()">Show Asset Tools</button>
-                    <span class="workshop-edit-tools-label">Cover + Additional Files</span>
-                </div>
-
-                <div id="workshop-edit-tools-panel" class="workshop-edit-tools-panel" hidden>
-                    <div class="workshop-edit-controls-row">
+                    <div class="workshop-edit-grid">
                         <div class="workshop-edit-field">
-                            <label class="setting-label" for="workshop-edit-cover-url">Cover Image URL</label>
-                            <input id="workshop-edit-cover-url" type="text" class="form-input" placeholder="https://example.com/cover.png or data:image/..." oninput="handleWorkshopEditCoverInput()">
+                            <label class="setting-label" for="workshop-edit-game-select">Game</label>
+                            <select id="workshop-edit-game-select" class="steam-select form-input" onchange="handleWorkshopEditGameChange()"></select>
                         </div>
-                        <div class="workshop-edit-asset-block">
-                            <label class="setting-label" for="workshop-edit-cover-file">Upload Cover</label>
-                            <button type="button" class="workshop-edit-secondary-btn" onclick="triggerWorkshopEditCoverFilePicker()">Choose Image</button>
-                            <input id="workshop-edit-cover-file" type="file" accept="image/*" hidden onchange="handleWorkshopEditCoverFileChange(event)">
-                        </div>
-                        <div class="workshop-edit-asset-block">
-                            <label class="setting-label" for="workshop-edit-add-files">Add Files</label>
-                            <button type="button" class="workshop-edit-secondary-btn" onclick="triggerWorkshopEditAddFilesPicker()">Add Files</button>
-                            <input id="workshop-edit-add-files" type="file" hidden multiple onchange="handleWorkshopEditAddFiles(event)">
+                        <div class="workshop-edit-field">
+                            <label class="setting-label" for="workshop-edit-file-select">File</label>
+                            <select id="workshop-edit-file-select" class="steam-select form-input" onchange="handleWorkshopEditFileChange()"></select>
                         </div>
                     </div>
 
-                    <div class="workshop-edit-assets-grid">
-                        <img id="workshop-edit-cover-preview" class="workshop-edit-cover-preview" alt="Workshop cover preview">
-                        <div class="workshop-edit-upload-row">
-                            <div id="workshop-edit-upload-list" class="workshop-edit-upload-list"></div>
+                    <div id="workshop-edit-file-meta" class="workshop-edit-meta"></div>
+
+                    <div class="workshop-edit-tools-bar">
+                        <button type="button" class="workshop-edit-tools-toggle" id="workshop-edit-tools-toggle" onclick="toggleWorkshopEditToolsPanel()">Show Asset Tools</button>
+                        <span class="workshop-edit-tools-label">Cover + Additional Files</span>
+                    </div>
+
+                    <div id="workshop-edit-tools-panel" class="workshop-edit-tools-panel" hidden>
+                        <div class="workshop-edit-controls-row">
+                            <div class="workshop-edit-field">
+                                <label class="setting-label" for="workshop-edit-cover-url">Cover Image URL</label>
+                                <input id="workshop-edit-cover-url" type="text" class="form-input" placeholder="https://example.com/cover.png or data:image/..." oninput="handleWorkshopEditCoverInput()">
+                            </div>
+                            <div class="workshop-edit-asset-block">
+                                <label class="setting-label" for="workshop-edit-cover-file">Upload Cover</label>
+                                <button type="button" class="workshop-edit-secondary-btn" onclick="triggerWorkshopEditCoverFilePicker()">Choose Image</button>
+                                <input id="workshop-edit-cover-file" type="file" accept="image/*" hidden onchange="handleWorkshopEditCoverFileChange(event)">
+                            </div>
+                            <div class="workshop-edit-asset-block">
+                                <label class="setting-label" for="workshop-edit-add-files">Add Files</label>
+                                <button type="button" class="workshop-edit-secondary-btn" onclick="triggerWorkshopEditAddFilesPicker()">Add Files</button>
+                                <input id="workshop-edit-add-files" type="file" hidden multiple onchange="handleWorkshopEditAddFiles(event)">
+                            </div>
+                        </div>
+
+                        <div class="workshop-edit-assets-grid">
+                            <img id="workshop-edit-cover-preview" class="workshop-edit-cover-preview" alt="Workshop cover preview">
+                            <div class="workshop-edit-upload-row">
+                                <div id="workshop-edit-upload-list" class="workshop-edit-upload-list"></div>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <textarea id="workshop-edit-file-content" class="workshop-edit-content" spellcheck="false" oninput="handleWorkshopEditContentInput()"></textarea>
+                    <textarea id="workshop-edit-file-content" class="workshop-edit-content" spellcheck="false" oninput="handleWorkshopEditContentInput()"></textarea>
 
-                <div class="workshop-edit-actions">
-                    <button type="button" class="play-btn" id="workshop-edit-save-btn" onclick="saveWorkshopEditPanel()" style="font-size: 0.85rem; padding: 12px 22px; margin: 0; letter-spacing: 1px;">Save Changes</button>
-                    <button type="button" class="workshop-edit-secondary-btn" onclick="revertWorkshopEditCurrentFile()">Revert File</button>
-                </div>
-                <div id="workshop-edit-status" class="workshop-edit-status"></div>
-            </section>
+                    <div class="workshop-edit-actions">
+                        <button type="button" class="play-btn" id="workshop-edit-save-btn" onclick="saveWorkshopEditPanel()" style="font-size: 0.85rem; padding: 12px 22px; margin: 0; letter-spacing: 1px;">Save Changes</button>
+                        <button type="button" class="workshop-edit-secondary-btn" onclick="revertWorkshopEditCurrentFile()">Revert File</button>
+                    </div>
+                    <div id="workshop-edit-status" class="workshop-edit-status"></div>
+                </section>
+            </div>
 
             <div class="questions-guide-footer" style="margin-top: 80px; background: var(--steam-dark); border-top: 1px solid var(--border); padding: 60px 40px; width: calc(100% + 80px); margin-left: -40px; margin-bottom: -40px;">
                 <div style="display: flex; justify-content: center; gap: 40px; margin-bottom: 30px;">
