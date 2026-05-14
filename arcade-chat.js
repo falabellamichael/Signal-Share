@@ -422,6 +422,17 @@ async function bridgeFetch(path, options = {}) {
             });
 
             if (response.ok) {
+                const normalizedPath = `${path || ""}`.trim().toLowerCase();
+                const expectsJson = normalizedPath.startsWith("/api/");
+                if (expectsJson) {
+                    const contentType = `${response.headers?.get("content-type") || ""}`.toLowerCase();
+                    if (!contentType.includes("application/json")) {
+                        const error = new Error(`Unexpected non-JSON response for ${normalizedPath} (content-type: ${contentType || "unknown"})`);
+                        networkFailures.push({ baseUrl, error });
+                        lastNetworkError = error;
+                        continue;
+                    }
+                }
                 BRIDGE_BASE_URL = baseUrl;
                 localStorage.setItem(BRIDGE_LAST_WORKING_BASE_KEY, baseUrl);
                 return response;
@@ -501,6 +512,11 @@ async function checkBridgeConnectivity({ signal, timeoutMs = 1800 } = {}) {
                     const payload = await res.json().catch(() => null);
                     const models = Array.isArray(payload?.models) ? payload.models : [];
                     if (models.length > 0) return true;
+                    continue;
+                }
+                if (path.endsWith("/health")) {
+                    const payload = await res.json().catch(() => null);
+                    if (payload?.ok === true) return true;
                     continue;
                 }
                 return true;
@@ -1863,7 +1879,10 @@ window.sendChatMessage = async function() {
             }
 
             if (response?.ok) {
-                const data = await response.json();
+                const data = await response.json().catch(() => null);
+                if (!data || typeof data !== 'object') {
+                    throw new Error("Bridge returned a non-JSON payload. Check Bridge URL and endpoint.");
+                }
                 reply = data.reply;
                 updateEngineStatus(true);
                 bridgePollFailureCount = 0;

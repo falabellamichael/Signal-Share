@@ -409,9 +409,14 @@ async function callLocalAI({
         });
 
         if (response.ok) {
-          const data = await response.json().catch(() => ({}));
-          reply = data.reply;
-          break;
+          const data = await response.json().catch(() => null);
+          const nextReply = typeof data?.reply === "string" ? data.reply : "";
+          if (nextReply) {
+            reply = nextReply;
+            break;
+          }
+          lastError = "Bridge returned an invalid AI payload";
+          continue;
         }
 
         if (response.status === 404 && chatPath !== candidateChatPaths[candidateChatPaths.length - 1]) {
