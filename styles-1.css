@@ -349,6 +349,7 @@ body[data-theme="midnight"] .search-field input,
 body[data-theme="midnight"] .select-field select,
 body[data-theme="midnight"] .settings-field select,
 body[data-theme="midnight"] .settings-field input,
+body[data-theme="midnight"] .settings-field textarea,
 body[data-theme="midnight"] .message-form textarea {
   background: rgba(8, 14, 22, 0.82);
   border-color: rgba(164, 184, 201, 0.16);
@@ -635,6 +636,7 @@ body[data-theme="contrast"] .search-field input,
 body[data-theme="contrast"] .select-field select,
 body[data-theme="contrast"] .settings-field select,
 body[data-theme="contrast"] .settings-field input,
+body[data-theme="contrast"] .settings-field textarea,
 body[data-theme="contrast"] .message-form textarea,
 body[data-theme="ember"] .post-form input,
 body[data-theme="ember"] .post-form textarea,
@@ -643,6 +645,7 @@ body[data-theme="ember"] .search-field input,
 body[data-theme="ember"] .select-field select,
 body[data-theme="ember"] .settings-field select,
 body[data-theme="ember"] .settings-field input,
+body[data-theme="ember"] .settings-field textarea,
 body[data-theme="ember"] .message-form textarea {
   background: rgba(0, 0, 0, 0.78);
   border-color: var(--line);
@@ -1627,16 +1630,9 @@ h1 {
   line-height: 1.5;
 }
 
-.settings-field select {
-  width: 100%;
-  padding: 14px 16px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(19, 33, 43, 0.12);
-  background: rgba(255, 255, 255, 0.82);
-  color: var(--text);
-}
-
-.settings-field input {
+.settings-field select,
+.settings-field input,
+.settings-field textarea {
   width: 100%;
   padding: 14px 16px;
   border-radius: var(--radius-sm);
