@@ -3,6 +3,15 @@
   "appName": "Signal Share",
   "webDir": "dist",
   "bundledWebRuntime": false,
+  "server": {
+    "allowNavigation": [
+      "localhost",
+      "127.0.0.1",
+      "192.168.2.11",
+      "192.168.137.1"
+    ],
+    "cleartext": true
+  },
   "plugins": {
     "PushNotifications": {
       "presentationOptions": ["badge", "sound", "alert"]

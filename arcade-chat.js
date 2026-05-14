@@ -105,9 +105,10 @@ function resolveBridgeBaseCandidates() {
     }
 
     if (isAndroidRuntime()) {
+        // ALWAYS prioritize the ADB tunnel on Android
+        pushBridgeBaseCandidate(candidates, seen, "http://localhost:3000");
+        pushBridgeBaseCandidate(candidates, seen, "http://127.0.0.1:3000");
         pushBridgeBaseCandidate(candidates, seen, "http://10.0.2.2:3000");
-    } else if (configured && configured.includes("10.0.2.2")) {
-        // Keep custom candidate if explicitly configured, but add desktop loopback fallbacks above.
     }
 
     if (candidates.length > 0) {
@@ -401,6 +402,7 @@ async function bridgeFetch(path, options = {}) {
         ...(getBridgeSecret() ? { "X-Bridge-Secret": getBridgeSecret() } : {}),
         ...(getLocalLlmToken() ? { "X-Local-LLM-Token": getLocalLlmToken() } : localLlmHeaders),
         ...(getDeviceId() ? { "X-Device-Id": getDeviceId() } : {}),
+        "Access-Control-Request-Private-Network": "true",
         ...(optionHeaders || {}),
     };
     const candidates = resolveBridgeBaseCandidates();
@@ -439,7 +441,7 @@ async function bridgeFetch(path, options = {}) {
                 ...fetchRest,
                 headers,
                 signal: requestController.signal,
-                ...(targetAddressSpace ? { targetAddressSpace } : {})
+                targetAddressSpace: targetAddressSpace || "private"
             });
 
             if (response.ok) {
@@ -692,19 +694,6 @@ function updateEngineStatus(online) {
         statusText.dataset.bridgeStatus = statusKey;
     }
 
-    // NEW: Add a prompt when connection is first established
-    if (online && !lastBridgeStatusWasOnline) {
-        console.log("[Arcade Chat] Bridge connection established. Showing prompt.");
-        const container = document.getElementById('chat-messages');
-        if (container) {
-            const promptDiv = document.createElement('div');
-            promptDiv.className = 'chat-message system-prompt';
-            promptDiv.style.cssText = 'align-self: center; background: rgba(117, 176, 34, 0.1); color: #75b022; border: 1px solid rgba(117, 176, 34, 0.2); font-size: 0.75rem; padding: 6px 12px; border-radius: 20px; margin: 10px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;';
-            promptDiv.textContent = 'Bridge Connection Established! 🤖';
-            container.appendChild(promptDiv);
-            container.scrollTop = container.scrollHeight;
-        }
-    }
     lastBridgeStatusWasOnline = online;
 }
 
