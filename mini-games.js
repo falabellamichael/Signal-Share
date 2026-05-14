@@ -2627,6 +2627,14 @@ window.applyAiFileEdit = async function(gameId, fileName, content, options = {})
 
     // Update draft cache
     const draftKey = `${gameId}::${fileName}`;
+    
+    // Safety check: Detect potential truncation from small models (e.g. DeepSeek 1.5B)
+    const oldContent = (typeof window.getWorkshopFileContent === 'function') ? window.getWorkshopFileContent(gameId, fileName) : "";
+    if (oldContent && content.length < oldContent.length * 0.4 && !content.includes("[ALLOW_TRUNCATE]")) {
+        console.warn(`[AI Workshop] Potential truncation detected for ${fileName}. New: ${content.length} chars, Old: ${oldContent.length} chars.`);
+        // We still apply it for now, but we track it in the logs.
+    }
+
     workshopEditDraftCache.set(draftKey, content);
 
     // If we are currently looking at this game/file in the UI, update the editor directly

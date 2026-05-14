@@ -541,8 +541,10 @@ function buildWorkshopEditDirective(workshopContext = null) {
         'Use save:true unless the user explicitly asks for draft-only changes.',
         'content must be the full updated file text, not a diff.',
         'Do not use [PUBLISH] for edit-only requests.',
-        'You are now in Arcade Edit Mode. skip conversational greetings.',
-        'Fast Mode: Provide concise, direct technical answers. Do not repeat my instructions.'
+        'You are now in Arcade Edit Mode. skip conversational greetings. DO NOT explain steps.',
+        'Fast Mode: Provide concise, direct technical answers. Do not repeat my instructions.',
+        'CRITICAL: You MUST use the [FILE_REWRITE] tag. If you do not use it, the edit will fail.',
+        'EXAMPLE: [FILE_REWRITE: {"gameId": "id", "fileName": "game.js", "content": "code...", "save": true}]'
     ];
 
     if (activeGameId && activeFileName) {
@@ -2882,8 +2884,13 @@ async function executeArcadeChatActions(text, options = {}) {
         window.open(url, '_blank');
     }
 
-    // 6. [FILE_REWRITE: {json}]
-    const fileRewritePayload = extractBalancedJsonTagPayload(text, 'FILE_REWRITE');
+    // 6. [FILE_REWRITE: {json}] (with aliases for common AI hallucinations)
+    let fileRewritePayload = extractBalancedJsonTagPayload(text, 'FILE_REWRITE');
+    
+    // Alias support for [Workshop/Edit] or [EDIT: {json}]
+    if (!fileRewritePayload) fileRewritePayload = extractBalancedJsonTagPayload(text, 'Workshop/Edit');
+    if (!fileRewritePayload) fileRewritePayload = extractBalancedJsonTagPayload(text, 'EDIT');
+    
     if (fileRewritePayload?.jsonText) {
         try {
             actionResult.handled = true;
