@@ -304,6 +304,7 @@ let workshopTileMode = 'library';
 let workshopEditActiveGameId = '';
 let workshopEditActiveFileName = '';
 let workshopEditToolsExpanded = false;
+let workshopEditorAutosizeRaf = 0;
 const workshopEditDraftCache = new Map();
 const workshopEditPendingFilesByGame = new Map();
 const workshopEditCoverDraftByGame = new Map();
@@ -549,6 +550,7 @@ async function init() {
 
     // Standardize Signal Share Suite UI - Adjust for different viewport contexts
     handleIframeContext();
+    window.addEventListener('resize', queueWorkshopEditorAutosize, { passive: true });
 }
 
 /**
@@ -1269,11 +1271,40 @@ function syncWorkshopEditToolsPanel() {
     toolsPanel.hidden = !workshopEditToolsExpanded;
     toolsToggle.textContent = workshopEditToolsExpanded ? 'Hide Asset Tools' : 'Show Asset Tools';
     toolsToggle.setAttribute('aria-expanded', workshopEditToolsExpanded ? 'true' : 'false');
+    queueWorkshopEditorAutosize();
 }
 
 function toggleWorkshopEditToolsPanel() {
     workshopEditToolsExpanded = !workshopEditToolsExpanded;
     syncWorkshopEditToolsPanel();
+    queueWorkshopEditorAutosize();
+}
+
+function queueWorkshopEditorAutosize() {
+    if (workshopEditorAutosizeRaf) return;
+    workshopEditorAutosizeRaf = window.requestAnimationFrame(() => {
+        workshopEditorAutosizeRaf = 0;
+        autoSizeWorkshopEditor();
+    });
+}
+
+function autoSizeWorkshopEditor() {
+    const overlay = document.getElementById('workshop-edit-overlay');
+    const editor = document.getElementById('workshop-edit-file-content');
+    if (!overlay || !editor) return;
+    if (overlay.hidden || editor.disabled) return;
+
+    const minHeight = window.innerWidth <= 860 ? 220 : 260;
+    const reservedBottomSpace = 130;
+    const overlayRect = overlay.getBoundingClientRect();
+    const editorRect = editor.getBoundingClientRect();
+    const availableHeight = Math.max(minHeight, Math.floor(overlayRect.bottom - editorRect.top - reservedBottomSpace));
+
+    editor.style.height = 'auto';
+    const desiredHeight = Math.max(minHeight, editor.scrollHeight + 2);
+    const nextHeight = Math.min(desiredHeight, availableHeight);
+    editor.style.height = `${Math.max(minHeight, nextHeight)}px`;
+    editor.style.overflowY = desiredHeight > availableHeight ? 'auto' : 'hidden';
 }
 
 function refreshWorkshopEditMeta() {
@@ -1441,6 +1472,8 @@ function syncWorkshopEditOverlay() {
         fileSelect.disabled = true;
         editor.value = '';
         editor.disabled = true;
+        editor.style.height = '';
+        editor.style.overflowY = 'hidden';
         saveButton.disabled = true;
         coverInput.value = '';
         coverInput.disabled = true;
@@ -1544,6 +1577,7 @@ function syncWorkshopEditOverlay() {
     if (!cachedDraft) {
         setWorkshopEditStatus('Edit the file and click Save Changes.');
     }
+    queueWorkshopEditorAutosize();
 }
 
 function handleWorkshopEditGameChange() {
@@ -1567,6 +1601,7 @@ function handleWorkshopEditContentInput() {
     const draftKey = `${workshopEditActiveGameId}::${workshopEditActiveFileName}`;
     workshopEditDraftCache.set(draftKey, editor.value);
     setWorkshopEditStatus('Unsaved changes.');
+    queueWorkshopEditorAutosize();
 }
 
 function revertWorkshopEditCurrentFile() {
