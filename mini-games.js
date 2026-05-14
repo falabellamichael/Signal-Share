@@ -2593,6 +2593,94 @@ window.getWorkshopGamesForAi = function() {
 };
 
 /**
+ * Applies a surgical file edit from the AI to the workshop editor state.
+ * This version is optimized for command-based editing.
+ */
+window.applyAiFilePatch = async function(gameId, fileName, search, replace, options = {}) {
+    console.log(`[AI Workshop] Applying surgical patch to ${fileName}`);
+    const { save = false, silent = false } = options;
+
+    const oldContent = (typeof window.getWorkshopFileContent === 'function') ? window.getWorkshopFileContent(gameId, fileName) : "";
+    if (!oldContent) return { ok: false, message: "Original file content unavailable." };
+
+    // 1. Line-by-Line Normalized Matching (High Precision)
+    const fileLines = oldContent.split(/\r?\n/);
+    const searchLines = search.trim().split(/\r?\n/).map(l => l.trim());
+    const searchLen = searchLines.length;
+    
+    if (searchLen === 0) return { ok: false, message: "SEARCH block is empty." };
+
+    let matchIdx = -1;
+    const normalize = (s) => s.replace(/['"]/g, '"').replace(/\s+/g, ' ').trim();
+
+    for (let i = 0; i <= fileLines.length - searchLen; i++) {
+        let match = true;
+        for (let j = 0; j < searchLen; j++) {
+            if (normalize(fileLines[i + j]) !== normalize(searchLines[j])) {
+                match = false;
+                break;
+            }
+        }
+        if (match) { matchIdx = i; break; }
+    }
+
+    if (matchIdx !== -1) {
+        const lineEnding = oldContent.includes('\r\n') ? '\r\n' : '\n';
+        const before = fileLines.slice(0, matchIdx);
+        const after = fileLines.slice(matchIdx + searchLen);
+        
+        // Indentation Preservation
+        const indent = fileLines[matchIdx].match(/^(\s*)/)?.[1] || "";
+        let finalReplace = replace;
+        if (replace.includes('\n') && !replace.startsWith(' ') && !replace.startsWith('\t')) {
+            finalReplace = replace.split('\n').map(line => line.trim() ? indent + line : line).join('\n');
+        }
+
+        const newContent = [...before, finalReplace, ...after].join(lineEnding);
+        return window.internalApplyWorkshopFileEdit(gameId, fileName, newContent, options);
+    }
+
+    return { 
+        ok: false, 
+        message: `Could not find exact code block in ${fileName}. Ensure SEARCH is a direct copy.` 
+    };
+};
+
+window.internalApplyWorkshopFileEdit = async function(gameId, fileName, content, options = {}) {
+    const { save = false, silent = false } = options;
+    const games = getWorkshopManageableGames();
+    const game = games.find(g => g.id === gameId);
+    if (!game) return { ok: false, message: "Game not found." };
+
+    const draftKey = `${gameId}::${fileName}`;
+    workshopEditDraftCache.set(draftKey, content);
+
+    if (workshopEditActiveGameId === gameId && (!workshopEditActiveFileName || workshopEditActiveFileName === fileName)) {
+        workshopEditActiveFileName = fileName;
+        const editor = document.getElementById('workshop-edit-file-content');
+        if (editor) {
+            editor.value = content;
+            setWorkshopEditStatus('A.I. updated file.');
+            queueWorkshopEditorAutosize();
+        }
+        syncWorkshopEditOverlay();
+    }
+
+    if (!silent && window.showFeedback) window.showFeedback(`Updated: ${fileName}`);
+
+    if (save) {
+        try {
+            await saveWorkshopEditPanel();
+            return { ok: true, message: `Updated and saved ${fileName}.`, saved: true };
+        } catch (err) {
+            return { ok: false, message: `Save failed: ${err.message}`, saved: false };
+        }
+    }
+
+    return { ok: true, message: `Updated ${fileName} (Draft).`, saved: false };
+};
+
+/**
  * Retrieves the decoded text content of a workshop file.
  * Used by the AI to read existing code before editing.
  */
@@ -2611,140 +2699,7 @@ window.getWorkshopFileContent = function(gameId, fileName) {
     return decodeWorkshopFileContent(file);
 };
 
-/**
- * Applies a file edit from the AI to the workshop editor state.
- * Can optionally trigger a save to Supabase.
- */
-window.applyAiFilePatch = async function(gameId, fileName, search, replace, options = {}) {
-    console.log(`[AI Workshop] Applying strengthened surgical patch to ${fileName} for game ${gameId}`);
-    const { save = false, silent = false } = options;
 
-    const oldContent = (typeof window.getWorkshopFileContent === 'function') ? window.getWorkshopFileContent(gameId, fileName) : "";
-    if (!oldContent) {
-        return { ok: false, message: "Could not read original file for patching." };
-    }
-
-    // 1. Direct Search/Replace (Exact)
-    if (oldContent.includes(search)) {
-        const newContent = oldContent.replace(search, replace);
-        return window.internalApplyWorkshopFileEdit(gameId, fileName, newContent, options);
-    }
-
-    // 2. Line-by-Line Robust Normalization
-    const fileLines = oldContent.split(/\r?\n/);
-    const searchLines = search.trim().split(/\r?\n/).map(l => l.trim());
-    const searchLen = searchLines.length;
-    
-    if (searchLen === 0) return { ok: false, message: "Search block is empty." };
-
-    let bestMatchIndex = -1;
-    let bestMatchScore = 0; // In case we want to do true fuzzy, for now we want "near-exact"
-
-    for (let i = 0; i <= fileLines.length - searchLen; i++) {
-        let matchCount = 0;
-        for (let j = 0; j < searchLen; j++) {
-            const fLine = fileLines[i + j].trim();
-            const sLine = searchLines[j];
-            
-            // Indifferent to quotes and internal whitespace normalization
-            const normalize = (s) => s.replace(/['"]/g, '"').replace(/\s+/g, ' ').trim();
-            if (normalize(fLine) === normalize(sLine)) {
-                matchCount++;
-            } else {
-                break;
-            }
-        }
-        if (matchCount === searchLen) {
-            bestMatchIndex = i;
-            break; // Found perfect normalized match
-        }
-    }
-
-    if (bestMatchIndex !== -1) {
-        console.log(`[AI Workshop] Found robust normalized match at line ${bestMatchIndex + 1}`);
-        
-        // Reconstruct content by replacing the specific line range
-        // We preserve the file's original line endings
-        const lineEnding = oldContent.includes('\r\n') ? '\r\n' : '\n';
-        
-        const before = fileLines.slice(0, bestMatchIndex);
-        const after = fileLines.slice(bestMatchIndex + searchLen);
-        
-        // We use the replacement as provided, but try to detect if it needs indentation
-        // If the first line of the match had indentation, we can try to apply it to the replacement
-        const originalFirstLine = fileLines[bestMatchIndex];
-        const indentMatch = originalFirstLine.match(/^(\s*)/);
-        const indent = indentMatch ? indentMatch[1] : "";
-        
-        let finalReplace = replace;
-        // If replacement is multi-line and not indented, apply the original indentation
-        if (replace.includes('\n') && !replace.startsWith(' ') && !replace.startsWith('\t')) {
-            finalReplace = replace.split('\n').map(line => indent + line).join('\n');
-        }
-
-        const newContent = [...before, finalReplace, ...after].join(lineEnding);
-        return window.internalApplyWorkshopFileEdit(gameId, fileName, newContent, options);
-    }
-
-    console.error(`[AI Workshop] Patch failed: Could not find code block in ${fileName} even with robust matching.`);
-    return { 
-        ok: false, 
-        message: `Surgical edit failed. I couldn't find the exact code block in ${fileName}.\n\n` +
-                 `TIP: Ensure your SEARCH block is a exact copy-paste from the file, including all punctuation.` 
-    };
-};
-
-window.internalApplyWorkshopFileEdit = async function(gameId, fileName, content, options = {}) {
-    console.log(`[AI Workshop] Applying edit to ${fileName} for game ${gameId}`);
-    const { save = false, silent = false } = options;
-
-    const games = getWorkshopManageableGames();
-    const game = games.find(g => g.id === gameId);
-    if (!game) {
-        return { ok: false, message: "Game not found or you don't have permission to edit it." };
-    }
-
-    // Update draft cache
-    const draftKey = `${gameId}::${fileName}`;
-    
-    // Safety check: Detect potential truncation from small models (e.g. DeepSeek 1.5B)
-    const oldContent = (typeof window.getWorkshopFileContent === 'function') ? window.getWorkshopFileContent(gameId, fileName) : "";
-    if (oldContent && content.length < oldContent.length * 0.4 && !content.includes("[ALLOW_TRUNCATE]")) {
-        console.warn(`[AI Workshop] Potential truncation detected for ${fileName}. New: ${content.length} chars, Old: ${oldContent.length} chars.`);
-        // We still apply it for now, but we track it in the logs.
-    }
-
-    workshopEditDraftCache.set(draftKey, content);
-
-    // If we are currently looking at this game/file in the UI, update the editor directly
-    if (workshopEditActiveGameId === gameId) {
-        if (!workshopEditActiveFileName || workshopEditActiveFileName === fileName) {
-            workshopEditActiveFileName = fileName;
-            const editor = document.getElementById('workshop-edit-file-content');
-            if (editor) {
-                editor.value = content;
-                setWorkshopEditStatus('A.I. updated file content.');
-                queueWorkshopEditorAutosize();
-            }
-        }
-        syncWorkshopEditOverlay();
-    }
-
-    if (!silent && window.showFeedback) {
-        window.showFeedback(`A.I. updated file: ${fileName}`);
-    }
-
-    if (save) {
-        try {
-            await saveWorkshopEditPanel();
-            return { ok: true, message: `Successfully updated and saved ${fileName}.`, saved: true };
-        } catch (err) {
-            return { ok: false, message: `Failed to save ${fileName}: ${err.message}`, saved: false };
-        }
-    }
-
-    return { ok: true, message: `Updated ${fileName} in draft editor.`, saved: false };
-};
 window.getWorkshopEditorState = function() {
     if (typeof workshopEditActiveGameId === 'undefined') return null;
     return {

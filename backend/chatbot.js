@@ -62,23 +62,21 @@ SYSTEM TOOLS:
 5. [LAUNCH/CLOSE: app_id] (spotify, chrome, notepad, calculator)
 6. [SCREENSHOT] | 7. [LIST_TABS] | 8. [LIST_APPS]
 7. [LIST_FILES/READ_FILE/WRITE_FILE: path]
-8. [SURGICAL EDIT PROTOCOL]:
-   - If user says "edit", "fix", "change", or "update" Workshop code, use the [EDIT] tag.
-   - FORMAT:
+8. [COMMAND PROTOCOLS]:
+   - /edit: Surgical code surgery. Use [EDIT] tags with small SEARCH/REPLACE snippets (2-5 lines).
+   - /publish: Create new project with [PUBLISH] tag.
+   - /fix: Focused bug fixing using [EDIT] snippets.
+   - [EDIT] FORMAT:
      [EDIT]
-     SEARCH: 2-5 lines of existing code
-     REPLACE: 2-5 lines of updated code
+     SEARCH: exact snippet to find
+     REPLACE: updated snippet
      [/EDIT]
-   - RULES:
-     - SNIPPET MODE: Break large changes into multiple small [EDIT] blocks.
-     - NEVER output the entire file or large blocks. Small snippets save VRAM and are faster.
-     - SEARCH block must be an EXACT match.
-     - Do NOT use JSON. Do NOT use conversational filler. Output only the tags.
+   - NEVER rewrite the whole file. Break changes into multiple [EDIT] blocks.
 9. [SYS_INFO] | 10. [PROCESS: list|kill] | 11. [SHELL: {cmd, shell}]
 
 PROTOCOLS:
 - Use [SEARCH] for all factual/live info.
-- Use [EDIT] for ALL Workshop code modifications. No exceptions.
+- Use [EDIT] for all code modifications triggered by /edit or /fix.
 - Be proactive but keep responses concise and technical.
 `.trim();
 

@@ -433,19 +433,7 @@
         };
     }
 
-    function buildFileEditContract() {
-        return [
-            "When the user asks to edit Workshop code, you MUST use small surgical [EDIT] tags:",
-            "[EDIT]",
-            "SEARCH: small exact unique block (2-5 lines)",
-            "REPLACE: small updated block (2-5 lines)",
-            "[/EDIT]",
-            "SNIPPET RULES:",
-            "1. Break large changes into multiple small [EDIT] snippets.",
-            "2. Small snippets are faster and more reliable. Never output the whole file.",
-            "3. Precision is key. SEARCH must be an exact copy-paste."
-        ].join("\n");
-    }
+
 
     function buildCapabilitiesManifest(surface) {
         const normalizedSurface = clampText(surface || "main", 32).toLowerCase() || "main";

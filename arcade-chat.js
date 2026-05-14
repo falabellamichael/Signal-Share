@@ -469,10 +469,6 @@ function isComposeDraftIntent(message = "") {
 function isWorkshopPublishIntentPrompt(message = "") {
     const text = `${message || ''}`.trim().toLowerCase();
     if (!text) return false;
-    const isEdit = /\b(edit|update|fix|modify|patch|change|tweak|adjust|improve)\b/.test(text);
-    const explicitPublish = /\b(publish|upload|submit|post|share)\b/.test(text);
-    if (isEdit && !explicitPublish) return false;
-
     const publishVerb = /\b(publish|upload|save|add|ship|submit|post|share)\b/.test(text);
     const buildVerb = /\b(write|create|build|make|generate|code|new)\b/.test(text);
     const target = /\b(library|workshop|arcade|store)\b/.test(text);
@@ -482,32 +478,7 @@ function isWorkshopPublishIntentPrompt(message = "") {
     return (target && publishVerb) || (buildVerb && gameMention) || (publishVerb && gameMention);
 }
 
-function isWorkshopEditIntentPrompt(message = "", context = null) {
-    const text = `${message || ''}`.trim().toLowerCase();
-    if (!text) return false;
-    
-    // Core edit verbs
-    const editVerb = /\b(edit|update|rewrite|refactor|fix|modify|change|patch|improve|adjust|tweak|add|remove|implement|style|color|background|ui|interface|look|feel|design|vibe|text|label|speed|movement|gravity|score|check|status|verify|am i|where)\b/.test(text);
-    
-    // Check if we are currently in the workshop editor via context
-    const inEditor = !!(context?.workshopEditor?.activeGameId);
-    
-    const target = /\b(workshop|editor|library|project)\b/.test(text);
-    const codeMention = /\b(game|file|html|css|js|javascript|json|code|logic|function|script|manifest)\b/.test(text);
-    
-    if (inEditor) {
-        // If already in the editor, we are much more permissive. 
-        // Any edit verb or code mention or even just a general "change" request should count.
-        return editVerb || codeMention || target;
-    }
-    
-    // If the word "edit" is anywhere, and we are in the editor, it's definitely an edit intent.
-    const hasEditKeyword = /\b(edit|update|fix|change|modify)\b/.test(text);
-    if (inEditor && hasEditKeyword) return true;
 
-    // Outside of editor, require a verb and either a target or code mention
-    return editVerb && (target || codeMention);
-}
 
 function buildWorkshopPublishDirective() {
     return [
@@ -518,63 +489,11 @@ function buildWorkshopPublishDirective() {
         'Preferred payload format: files:[{name,type,content}, ...].',
         'Alternative payload fields allowed: html, css, js, or code.',
         'Do not output placeholder/offline guidance when generation is available.',
-        '[/WORKSHOP_PROTOCOL]',
-        'CRITICAL: Use [PUBLISH] ONLY for new games or if the user explicitly asks to "publish" or "upload" the entire project.',
-        'DO NOT use [PUBLISH] for editing active files. Use [EDIT] instead.'
+        '[/WORKSHOP_PROTOCOL]'
     ].join('\n');
 }
 
-function buildWorkshopEditDirective(workshopContext = null) {
-    const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
-    const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
-    const workshopGames = Array.isArray(workshopContext?.workshop) ? workshopContext.workshop : [];
-    const compactTargets = workshopGames
-        .slice(0, 6)
-        .map((game) => {
-            const gameId = `${game?.id || ''}`.trim();
-            const files = Array.isArray(game?.files) ? game.files : [];
-            const names = files.slice(0, 4).map((file) => `${file?.name || ''}`.trim()).filter(Boolean);
-            if (!gameId || names.length === 0) return '';
-            return `${gameId}:${names.join(',')}`;
-        })
-        .filter(Boolean)
-        .join(' | ');
 
-    const lines = [
-        '[WORKSHOP_FILE_EDIT_PROTOCOL]',
-        'If the user asks to edit/fix/update Workshop code, you MUST use the [EDIT] tag with SEARCH/REPLACE format.',
-        'Tag format:',
-        '[EDIT]',
-        'SEARCH: exact code block to find (include unique context lines if needed)',
-        'REPLACE: new code block',
-        '[/EDIT]',
-        'SNIPPET RULES:',
-        '- Break large changes into multiple small [EDIT] blocks.',
-        '- Keep blocks to 5-10 lines max. This saves VRAM and is much faster.',
-        '- SEARCH must be an EXACT match (precision is key).',
-        '- Full file rewrites are strictly PROHIBITED and will FAIL.',
-        'You are now in Arcade Edit Mode. skip conversational greetings. DO NOT explain steps.',
-        'Fast Mode: Provide direct technical snippets only.',
-        'EXAMPLE: [EDIT]\nSEARCH: const x = 1;\nREPLACE: const x = 2;\n[/EDIT]'
-    ];
-
-    if (activeGameId && activeFileName) {
-        lines.push(`Default target gameId is "${activeGameId}" and default fileName is "${activeFileName}" when the user does not specify a target.`);
-        const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
-        // Safety limit for local LLM context windows (approx 15-20k tokens max for many small models)
-        const content = rawContent.length > 20000 ? rawContent.substring(0, 20000) + '\n\n[CONTENT TRUNCATED DUE TO SIZE]' : rawContent;
-        if (content) {
-            lines.push(`CURRENT CONTENT OF "${activeFileName}":\n\`\`\`\n${content}\n\`\`\``);
-        } else {
-            lines.push(`The file "${activeFileName}" is currently empty.`);
-        }
-    }
-    if (compactTargets) {
-        lines.push(`Valid editable targets: ${compactTargets}.`);
-    }
-    lines.push('[/WORKSHOP_FILE_EDIT_PROTOCOL]');
-    return lines.join('\n');
-}
 
 function buildProtocolAwareUserMessage(userPrompt = "") {
     return `${userPrompt || ''}`.trim();
@@ -583,22 +502,57 @@ function buildProtocolAwareUserMessage(userPrompt = "") {
 function getProtocolDirectives(userPrompt = "", workshopContext = null) {
     const text = `${userPrompt || ''}`.trim().toLowerCase();
     const directives = [];
-    // 1. EDIT DIRECTIVE (Highest Priority for Workshop Context)
-    if (workshopContext?.workshopEditor?.activeGameId) {
-        directives.push(buildWorkshopEditDirective(workshopContext));
-    } else if (isWorkshopEditIntentPrompt(text, workshopContext)) {
-        directives.push(buildWorkshopEditDirective(workshopContext));
-    }
+    const commandMode = window.activeArcadeCommandMode;
+    
+    // Clear flag so it doesn't persist to next message
+    window.activeArcadeCommandMode = null;
 
-    // 2. PUBLISH DIRECTIVE (Only if not already covered by Edit or if explicitly requested)
-    if (isWorkshopPublishIntentPrompt(text)) {
-        // If we are in the editor, we only add publish if the user actually said "publish" or "upload"
-        const explicitPublish = /\b(publish|upload|submit|post|share)\b/.test(text);
-        if (!workshopContext?.workshopEditor?.activeGameId || explicitPublish) {
+    // 1. COMMAND PRIORITY
+    if (commandMode === '/edit' || commandMode === '/fix') {
+        directives.push(buildWorkshopEditDirective(workshopContext, commandMode === '/fix'));
+    } else if (commandMode === '/publish') {
+        directives.push(buildWorkshopPublishDirective());
+    } else {
+        // 2. AUTO-DETECTION (Fallback)
+        if (isWorkshopPublishIntentPrompt(text)) {
             directives.push(buildWorkshopPublishDirective());
         }
+        
+        // If in editor, always allow edit protocol
+        if (workshopContext?.workshopEditor?.activeGameId) {
+            directives.push(buildWorkshopEditDirective(workshopContext));
+        }
     }
+
     return directives.join('\n\n');
+}
+
+function buildWorkshopEditDirective(workshopContext = null, isFixMode = false) {
+    const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
+    const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
+    
+    const lines = [
+        '[SURGICAL_EDIT_PROTOCOL]',
+        isFixMode ? 'FOCUS: Bug Fix / Error Resolution.' : 'FOCUS: Feature Update / Refactoring.',
+        'Format:',
+        '[EDIT]',
+        'SEARCH: 2-5 lines of exact existing code',
+        'REPLACE: updated snippet',
+        '[/EDIT]',
+        'RULES:',
+        '- Break changes into small, surgical [EDIT] blocks.',
+        '- NEVER rewrite the entire file.',
+        '- Be precise with whitespace/indentation in SEARCH.',
+        '[/SURGICAL_EDIT_PROTOCOL]'
+    ];
+
+    if (activeGameId && activeFileName) {
+        const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
+        const content = rawContent.length > 20000 ? rawContent.substring(0, 20000) + '\n\n[TRUNCATED]' : rawContent;
+        lines.push(`Target: ${activeFileName} (${activeGameId})\nContent:\n\`\`\`\n${content}\n\`\`\``);
+    }
+
+    return lines.join('\n');
 }
 
 function getBridgeTargetAddressSpace(baseUrl = "") {
@@ -2089,11 +2043,15 @@ window.sendChatMessage = async function() {
         return;
     }
 
-    try {
-        const attachmentData = currentChatAttachment;
-        const attachmentType = currentChatAttachmentType;
-        const attachmentName = currentChatAttachmentName;
-        
+        const isCommand = text.startsWith('/');
+        if (isCommand) {
+            const cmdHandled = await handleArcadeSlashCommand(text, input);
+            if (cmdHandled) {
+                isSendingChatMessage = false;
+                return;
+            }
+        }
+
         addChatMessage('user', text);
 
         const directSteamTarget = parseDirectSteamCommand(text);
@@ -2897,7 +2855,7 @@ async function executeArcadeChatActions(text, options = {}) {
         window.open(url, '_blank');
     }
 
-    // 6. RESILIENT WORKSHOP ACTIONS (Surgical Multi-Patch Support)
+    // 6. WORKSHOP ACTIONS (Re-enabled for Commands)
     const workshopActionRegex = /\[(EDIT|EDIT_FILE|FILE_EDIT|Workshop\/Edit)(?::\s*([\s\S]*?))?\]([\s\S]*?)(?:\[\/\1\]|$)/gi;
     const matches = Array.from(text.matchAll(workshopActionRegex));
     
@@ -2905,33 +2863,18 @@ async function executeArcadeChatActions(text, options = {}) {
         actionResult.handled = true;
         for (const workshopMatch of matches) {
             try {
-                const tagType = workshopMatch[1].toUpperCase();
                 let rawContent = workshopMatch[3].trim();
-                
                 let gameId = null;
                 let fileName = null;
-                let search = null;
-                let replace = null;
-
-                if (rawContent.startsWith('{') && rawContent.includes('}')) {
-                    try {
-                        const json = JSON.parse(rawContent);
-                        gameId = json.gameId;
-                        fileName = json.fileName;
-                        search = json.search;
-                        replace = json.replace;
-                        rawContent = json.content || json.replace || rawContent;
-                    } catch (e) {}
-                }
 
                 const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
-                gameId = gameId || editorState?.activeGameId || window.lastPlayedGameId || "";
-                fileName = fileName || editorState?.activeFileName || "index.html";
+                gameId = editorState?.activeGameId || window.lastPlayedGameId || "";
+                fileName = editorState?.activeFileName || "index.html";
 
                 if (gameId && fileName && rawContent) {
                     const searchMatch = rawContent.match(/SEARCH:\s*([\s\S]+?)\s*REPLACE:\s*([\s\S]+)/i);
-                    const finalSearch = search || (searchMatch ? searchMatch[1].trim() : "");
-                    const finalReplace = replace || (searchMatch ? searchMatch[2].trim() : "");
+                    const finalSearch = searchMatch ? searchMatch[1].trim() : "";
+                    const finalReplace = searchMatch ? searchMatch[2].trim() : "";
                     
                     if (finalSearch && typeof window.applyAiFilePatch === 'function') {
                         actionResult.workshopFileRewriteAttempted = true;
@@ -2939,19 +2882,83 @@ async function executeArcadeChatActions(text, options = {}) {
                         if (patchResult?.ok) {
                             actionResult.workshopFileRewriteSucceeded = true;
                         } else if (window.showFeedback) {
-                            window.showFeedback(patchResult?.message || "Surgical edit failed.", true);
+                            window.showFeedback(patchResult?.message || "Edit failed.", true);
                         }
-                    } else if (window.showFeedback) {
-                        window.showFeedback("Surgical [EDIT] block missing SEARCH/REPLACE fields.", true);
                     }
                 }
             } catch (e) {
-                console.error("[Arcade Chat] Workshop action failed:", e);
+                console.error("[Arcade Chat] Action failed:", e);
             }
         }
     }
 
     return actionResult;
+}
+
+async function handleArcadeSlashCommand(text, inputElement) {
+    const cleanText = text.trim();
+    const isSlash = cleanText.startsWith('/');
+    const isBracket = cleanText.startsWith('[') && cleanText.includes(']');
+    
+    if (!isSlash && !isBracket) return false;
+
+    // Normalize command extraction: /edit or [edit]
+    let cmd = "";
+    let args = "";
+
+    if (isSlash) {
+        const parts = cleanText.split(/\s+/);
+        cmd = parts[0].toLowerCase();
+        args = parts.slice(1).join(' ').trim();
+    } else {
+        const match = cleanText.match(/^\[(.*?)\]\s*(.*)$/);
+        if (match) {
+            cmd = '/' + match[1].toLowerCase();
+            args = match[2].trim();
+        }
+    }
+
+    if (cmd === '/clear') {
+        arcadeChatHistory = [];
+        saveCurrentChat();
+        renderArcadeChatMessages();
+        inputElement.value = '';
+        return true;
+    }
+
+    if (cmd === '/help') {
+        const helpText = `🛠️ [Command Hub]:
+/edit or [edit] [instructions] - Surgical code modification.
+/publish [title] - Full project upload/publish.
+/fix [error] - Rapid bug fixing protocol.
+/clear - Clear chat history.
+/help - Show this guide.`;
+        addChatMessage('ai', helpText);
+        inputElement.value = '';
+        return true;
+    }
+
+    // Force Protocol Injection for AI-bound commands
+    if (cmd === '/edit' || cmd === '/fix' || cmd === '/publish') {
+        // SMART CONTEXT: If args mention a known game, try to switch to it
+        if (typeof window.getWorkshopManageableGames === 'function') {
+            const games = window.getWorkshopManageableGames();
+            const mentionedGame = games.find(g => args.toLowerCase().includes((g.title || "").toLowerCase()));
+            if (mentionedGame && typeof window.setWorkshopEditActiveGame === 'function') {
+                console.log(`[Command Hub] Auto-switching context to: ${mentionedGame.title}`);
+                window.setWorkshopEditActiveGame(mentionedGame.id);
+            }
+        }
+
+        const promptPrefix = cmd === '/edit' ? "COMMAND: EDIT_SURGERY\nINSTRUCTION: " : 
+                           cmd === '/fix' ? "COMMAND: BUG_FIX\nERROR: " : 
+                           "COMMAND: PUBLISH_NEW\nTITLE: ";
+        
+        window.activeArcadeCommandMode = cmd;
+        return false; // Let normal flow continue
+    }
+
+    return false;
 }
 
 async function tryAutoPublishWorkshopFromReply(replyText, userPrompt = '') {
