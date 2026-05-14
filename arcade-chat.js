@@ -138,8 +138,11 @@ function initArcadeSpeech() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition;
     if (!SpeechRecognition) {
         console.error('[Voice] Speech Recognition API not supported in this browser.');
+        // If the user tries to talk and it's not supported, we should let them know once.
+        window.isSpeechSupported = false;
         return;
     }
+    window.isSpeechSupported = true;
 
     try {
         arcadeSpeechRecognition = new SpeechRecognition();
@@ -728,6 +731,12 @@ async function pollDesktopBridge() {
 async function startArcadeDictation() {
     if (isArcadeDictating) return;
     initArcadeSpeech();
+    
+    if (window.isSpeechSupported === false) {
+        alert("Speech-to-Text is not supported by your current browser (like Opera). Please use Chrome or Edge for voice features!");
+        return;
+    }
+    
     if (!arcadeSpeechRecognition) return;
 
     try {

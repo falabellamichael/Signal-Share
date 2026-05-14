@@ -87,6 +87,8 @@ MEDIA COMPANION PROTOCOL:
 - If a user wants to "play something", ask what vibe they are in (lifestyle/music).
 - If they ask to "pause the video", use [PLAY: pause].
 - If they ask to "go to the next video", use [PLAY: next].
+- For factual/time-sensitive questions (weather, forecast, news, prices, scores, "latest" info), ALWAYS emit [SEARCH: query] first before giving an answer.
+- After [SEARCH] results are returned, answer the user directly. Use [FETCH] only if the user asks for deeper detail from a specific link.
 - Proactively suggest lifestyle tips related to the page context.
 - PRIVACY BOUNDARY: You are only restricted from accessing *private* local networks or *unauthorized* personal computers. Standard websites like YouTube, Google, and news sites are 100% safe and permitted.
 
@@ -120,6 +122,10 @@ const AUTO_SELECT_PREFERS_LOADED_LM_STUDIO = process.env.SIGNAL_SHARE_AUTO_SELEC
 const AUTO_UNLOAD_OTHER_LM_STUDIO_MODELS = process.env.SIGNAL_SHARE_AUTO_UNLOAD_OTHERS !== "false";
 const SERVER_CUSTOM_INSTRUCTIONS = `${process.env.SIGNAL_SHARE_AI_CUSTOM_INSTRUCTIONS || ""}`.trim();
 const MAX_CUSTOM_INSTRUCTIONS_CHARS = Math.max(200, Number(process.env.SIGNAL_SHARE_AI_CUSTOM_MAX_CHARS || 2000));
+const CHAT_COMPLETION_TIMEOUT_MS = Math.max(15000, Number(process.env.SIGNAL_SHARE_CHAT_COMPLETION_TIMEOUT_MS || 35000));
+const WEB_SEARCH_TIMEOUT_MS = Math.max(2000, Number(process.env.SIGNAL_SHARE_WEB_SEARCH_TIMEOUT_MS || 10000));
+const WEB_FETCH_TIMEOUT_MS = Math.max(3000, Number(process.env.SIGNAL_SHARE_WEB_FETCH_TIMEOUT_MS || 12000));
+const DEFAULT_WEB_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 let modelCatalogCache = { at: 0, data: null };
 let lastSuccessfulModelByProvider = { lmstudio: "", ollama: "" };
 
@@ -241,6 +247,54 @@ async function fetchJsonWithTimeout(url, timeoutMs = 1800) {
     } finally {
         clearTimeout(timer);
     }
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.max(250, Number(timeoutMs) || 8000));
+    const {
+        signal: externalSignal,
+        ...rest
+    } = options || {};
+
+    const abortFromExternalSignal = () => controller.abort();
+    if (externalSignal) {
+        if (externalSignal.aborted) {
+            controller.abort();
+        } else {
+            externalSignal.addEventListener("abort", abortFromExternalSignal, { once: true });
+        }
+    }
+
+    try {
+        return await fetch(url, {
+            ...rest,
+            signal: controller.signal
+        });
+    } finally {
+        clearTimeout(timer);
+        if (externalSignal) {
+            externalSignal.removeEventListener("abort", abortFromExternalSignal);
+        }
+    }
+}
+
+function decodeBasicHtmlEntities(value = "") {
+    return `${value || ""}`
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, "\"")
+        .replace(/&#39;/g, "'")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">");
+}
+
+function stripHtmlTags(value = "") {
+    return decodeBasicHtmlEntities(
+        `${value || ""}`
+            .replace(/<[^>]*>/g, " ")
+            .replace(/\s+/g, " ")
+    ).trim();
 }
 
 function getLmStudioRequestHeaders() {
@@ -665,11 +719,11 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                     }
                 }
 
-                const response = await fetch(endpoint.chatUrl, {
+                const response = await fetchWithTimeout(endpoint.chatUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
-                });
+                }, CHAT_COMPLETION_TIMEOUT_MS);
 
                 if (!response.ok) continue;
 
@@ -783,36 +837,80 @@ async function executeWebTools(text) {
       // Handle [SEARCH: query]
     const searchMatch = text.match(/\[SEARCH:\s*([^\]]+)\]/i);
     if (searchMatch) {
-        const query = searchMatch[1].trim();
+        const query = searchMatch[1].trim().slice(0, 240);
         try {
-            // Use DuckDuckGo HTML version for easier scraping
-            const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-            const response = await fetch(searchUrl, {
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-            });
-            const html = await response.text();
-            
-            // Extract search results using more robust patterns
-            const resultsList = [];
-            // Pattern for DuckDuckGo HTML results
-            const resultRegex = /<a class="result__a" href="([^"]+)">([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet" href="[^"]+">([\s\S]*?)<\/a>/g;
-            
-            let match;
-            let count = 0;
-            while ((match = resultRegex.exec(html)) !== null && count < 5) {
-                const link = match[1];
-                const title = match[2].replace(/<[^>]*>/g, '').trim();
-                const snippet = match[3].replace(/<[^>]*>/g, '').trim();
-                if (title && snippet) {
-                    resultsList.push(`- ${title} (${link})\n  ${snippet}`);
-                    count++;
+            const weatherLocationMatch = query.match(/\b(?:weather|forecast)\b(?:\s+(?:in|for|at)\s+)?(.+)/i);
+            if (weatherLocationMatch?.[1]) {
+                const location = weatherLocationMatch[1].replace(/[.,!?;:]+$/g, "").trim();
+                if (location) {
+                    const weatherUrl = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
+                    const weatherResponse = await fetchWithTimeout(weatherUrl, {
+                        headers: {
+                            "User-Agent": DEFAULT_WEB_USER_AGENT,
+                            "Accept": "application/json"
+                        }
+                    }, WEB_SEARCH_TIMEOUT_MS);
+                    if (weatherResponse.ok) {
+                        const weatherPayload = await weatherResponse.json().catch(() => null);
+                        const current = weatherPayload?.current_condition?.[0];
+                        const summary = current?.weatherDesc?.[0]?.value || "";
+                        const tempC = `${current?.temp_C ?? ""}`.trim();
+                        const feelsLikeC = `${current?.FeelsLikeC ?? ""}`.trim();
+                        const humidity = `${current?.humidity ?? ""}`.trim();
+                        const windKph = `${current?.windspeedKmph ?? ""}`.trim();
+                        const resolvedArea = weatherPayload?.nearest_area?.[0]?.areaName?.[0]?.value || location;
+                        if (summary || tempC) {
+                            const pieces = [
+                                summary ? summary : "",
+                                tempC ? `${tempC}°C` : "",
+                                feelsLikeC ? `feels like ${feelsLikeC}°C` : "",
+                                humidity ? `humidity ${humidity}%` : "",
+                                windKph ? `wind ${windKph} km/h` : ""
+                            ].filter(Boolean);
+                            results.push(`[SEARCH_RESULTS_FOR_${query.toUpperCase()}]:\n- Current weather in ${resolvedArea}: ${pieces.join(", ")}.\n- Source: ${weatherUrl}\n\n(AI Instruction: Give the user a direct weather answer and include that this data is current conditions from the source above.)`);
+                        }
+                    }
                 }
             }
-            
-            if (resultsList.length > 0) {
-                results.push(`[SEARCH_RESULTS_FOR_${query.toUpperCase()}]:\n${resultsList.join('\n\n')}\n\n(AI Instruction: Summarize these results for the user and ask if they want to [FETCH] any specific link for more detail.)`);
-            } else {
-                results.push(`SEARCH RESULTS FOR "${query}": I found the search page but couldn't parse direct snippets. Link: ${searchUrl}`);
+
+            if (results.length === 0) {
+                // Use DuckDuckGo HTML version for easier scraping
+                const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+                const response = await fetchWithTimeout(searchUrl, {
+                    headers: { "User-Agent": DEFAULT_WEB_USER_AGENT }
+                }, WEB_SEARCH_TIMEOUT_MS);
+                if (!response.ok) {
+                    throw new Error(`Search HTTP ${response.status}`);
+                }
+                const html = await response.text();
+                
+                // Extract search results using multiple pattern variants.
+                const resultsList = [];
+                const seenLinks = new Set();
+                const resultRegexes = [
+                    /<a class="result__a" href="([^"]+)">([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet" href="[^"]+">([\s\S]*?)<\/a>/g,
+                    /<a class="result__a" href="([^"]+)">([\s\S]*?)<\/a>[\s\S]*?<div class="result__snippet">([\s\S]*?)<\/div>/g
+                ];
+
+                for (const resultRegex of resultRegexes) {
+                    let match;
+                    while ((match = resultRegex.exec(html)) !== null && resultsList.length < 5) {
+                        const link = decodeBasicHtmlEntities(match[1] || "").trim();
+                        const title = stripHtmlTags(match[2]);
+                        const snippet = stripHtmlTags(match[3]);
+                        const linkKey = link.toLowerCase();
+                        if (!title || !snippet || !link || seenLinks.has(linkKey)) continue;
+                        seenLinks.add(linkKey);
+                        resultsList.push(`- ${title} (${link})\n  ${snippet}`);
+                    }
+                    if (resultsList.length >= 5) break;
+                }
+                
+                if (resultsList.length > 0) {
+                    results.push(`[SEARCH_RESULTS_FOR_${query.toUpperCase()}]:\n${resultsList.join('\n\n')}\n\n(AI Instruction: Summarize these results for the user with a direct answer first, then optionally mention one source link.)`);
+                } else {
+                    results.push(`SEARCH RESULTS FOR "${query}": I found the search page but couldn't parse direct snippets. Link: ${searchUrl}`);
+                }
             }
         } catch (e) {
             results.push(`SEARCH FAILED FOR "${query}": ${e.message}`);
@@ -827,18 +925,23 @@ async function executeWebTools(text) {
             results.push(`SECURITY ERROR: Access to ${url} is restricted.`);
         } else {
             try {
-                const resp = await fetch(url, {
-                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-                });
+                const resp = await fetchWithTimeout(url, {
+                    headers: {
+                        "User-Agent": DEFAULT_WEB_USER_AGENT
+                    }
+                }, WEB_FETCH_TIMEOUT_MS);
+                if (!resp.ok) {
+                    throw new Error(`HTTP ${resp.status}`);
+                }
                 const html = await resp.text();
                 
                 // Very basic text extraction: strip scripts, styles, and tags
-                let cleanText = html
+                let cleanText = stripHtmlTags(
+                    html
                     .replace(/<script[\s\S]*?<\/script>/gi, "")
                     .replace(/<style[\s\S]*?<\/style>/gi, "")
-                    .replace(/<[^>]*>/g, " ")
                     .replace(/\s+/g, " ")
-                    .trim();
+                );
                 
                 // Truncate to avoid context window overflow
                 const snippet = cleanText.substring(0, 4000);
