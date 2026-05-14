@@ -217,6 +217,24 @@ The companion bridge is designed with several security layers to keep your PC sa
     return "none";
   }
 
+  function resolveSnapshotPlaybackState(raw = {}) {
+    const candidates = [
+      raw?.playbackState,
+      raw?.playback_state,
+      raw?.playback,
+      raw?.playback?.state,
+      raw?.playback?.status,
+      raw?.state,
+    ];
+
+    for (const candidate of candidates) {
+      const normalized = normalizePlaybackState(candidate);
+      if (normalized !== "none") return normalized;
+    }
+
+    return Boolean(raw?.active) ? "playing" : "none";
+  }
+
 
   function getPreferredHeroControlSource() {
     const value = normalizeText(state.heroControlSource || state.heroMediaSource || state.systemMediaSource || "");
@@ -677,7 +695,7 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function normalizeNativeSnapshot(raw = {}) {
-    const playbackState = normalizePlaybackState(raw.playbackState || (raw.active ? "playing" : "none"));
+    const playbackState = resolveSnapshotPlaybackState(raw);
     return {
       title: typeof raw.title === "string" ? raw.title.trim() : "",
       meta: typeof raw.meta === "string" ? raw.meta.trim() : "",
@@ -1096,7 +1114,7 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   function normalizeDesktopSnapshot(raw = {}) {
     const appPackage = typeof raw.appPackage === "string" ? raw.appPackage.trim() : "";
-    const playbackState = normalizePlaybackState(raw.playbackState || (raw.active ? "playing" : "none"));
+    const playbackState = resolveSnapshotPlaybackState(raw);
     return {
       source: `${raw.source || "windows-smtc"}`.trim(),
       available: Boolean(raw.available),

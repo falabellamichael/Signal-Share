@@ -136,8 +136,9 @@ app.use((req, res, next) => {
     return res.status(403).json({ error: "Access denied: Unauthorized hardware device." });
   }
 
-  // 3. Secret Validation
-  if (isSensitive && !security.validateSecret(incomingSecret, BRIDGE_SECRET)) {
+  // 3. Secret Validation (Bypass for loopback/local development)
+  const isLoopback = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+  if (isSensitive && !isLoopback && !security.validateSecret(incomingSecret, BRIDGE_SECRET)) {
     console.warn(`[Bridge] Unauthorized access attempt from ${req.ip} to ${req.path}`);
     
     // Check if we should ban this IP after multiple failures
@@ -148,8 +149,7 @@ app.use((req, res, next) => {
     return res.status(401).json({ error: "Unauthorized: Invalid or missing X-Bridge-Secret." });
   }
 
-  // 4. Rate Limiting Check (Bypass for loopback/local development)
-  const isLoopback = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+  // 4. Rate Limiting Check
   if (!isLoopback && !security.checkRateLimit(req.ip, MAX_ACTIONS_PER_MINUTE)) {
     return res.status(429).json({ error: "Too many requests. Please wait a minute." });
   }
