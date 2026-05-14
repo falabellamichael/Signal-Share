@@ -497,6 +497,10 @@ function isWorkshopEditIntentPrompt(message = "", context = null) {
         return editVerb || codeMention || target;
     }
     
+    // If the word "edit" is anywhere, and we are in the editor, it's definitely an edit intent.
+    const hasEditKeyword = /\b(edit|update|fix|change|modify)\b/.test(text);
+    if (inEditor && hasEditKeyword) return true;
+
     // Outside of editor, require a verb and either a target or code mention
     return editVerb && (target || codeMention);
 }
