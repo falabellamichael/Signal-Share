@@ -629,21 +629,41 @@
 
         .workshop-edit-cover-row {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 120px;
+            grid-template-columns: minmax(0, 1fr);
             gap: 12px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             align-items: end;
+        }
+
+        .workshop-edit-asset-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .workshop-edit-asset-block {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .workshop-edit-assets-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            align-items: start;
         }
 
         .workshop-edit-cover-preview {
             width: 100%;
-            height: 110px;
+            height: 92px;
             border-radius: 10px;
             border: 1px solid rgba(255,255,255,0.1);
             object-fit: cover;
             background: rgba(0,0,0,0.35);
             display: none;
-            margin-bottom: 10px;
         }
 
         .workshop-edit-cover-preview.visible {
@@ -651,21 +671,18 @@
         }
 
         .workshop-edit-upload-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
-            flex-wrap: wrap;
+            display: block;
+            min-width: 0;
         }
 
         .workshop-edit-upload-list {
             display: flex;
             flex-direction: column;
             gap: 8px;
-            margin-bottom: 10px;
-            max-height: 132px;
+            max-height: 104px;
             overflow: auto;
             padding-right: 4px;
+            margin: 0;
         }
 
         .workshop-edit-upload-item {
@@ -758,6 +775,14 @@
 
         @media (max-width: 860px) {
             .workshop-edit-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .workshop-edit-asset-actions-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .workshop-edit-assets-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -1633,19 +1658,27 @@
                             <label class="setting-label" for="workshop-edit-cover-url">Cover Image URL</label>
                             <input id="workshop-edit-cover-url" type="text" class="form-input" placeholder="https://example.com/cover.png or data:image/..." oninput="handleWorkshopEditCoverInput()">
                         </div>
-                        <div class="workshop-edit-field">
+                    </div>
+
+                    <div class="workshop-edit-asset-actions-grid">
+                        <div class="workshop-edit-asset-block">
                             <label class="setting-label" for="workshop-edit-cover-file">Upload Cover</label>
                             <button type="button" class="workshop-edit-secondary-btn" onclick="triggerWorkshopEditCoverFilePicker()">Choose Image</button>
                             <input id="workshop-edit-cover-file" type="file" accept="image/*" hidden onchange="handleWorkshopEditCoverFileChange(event)">
                         </div>
+                        <div class="workshop-edit-asset-block">
+                            <label class="setting-label" for="workshop-edit-add-files">Add Files</label>
+                            <button type="button" class="workshop-edit-secondary-btn" onclick="triggerWorkshopEditAddFilesPicker()">Add Files</button>
+                            <input id="workshop-edit-add-files" type="file" hidden multiple onchange="handleWorkshopEditAddFiles(event)">
+                        </div>
                     </div>
-                    <img id="workshop-edit-cover-preview" class="workshop-edit-cover-preview" alt="Workshop cover preview">
 
-                    <div class="workshop-edit-upload-row">
-                        <button type="button" class="workshop-edit-secondary-btn" onclick="triggerWorkshopEditAddFilesPicker()">Add Files</button>
-                        <input id="workshop-edit-add-files" type="file" hidden multiple onchange="handleWorkshopEditAddFiles(event)">
+                    <div class="workshop-edit-assets-grid">
+                        <img id="workshop-edit-cover-preview" class="workshop-edit-cover-preview" alt="Workshop cover preview">
+                        <div class="workshop-edit-upload-row">
+                            <div id="workshop-edit-upload-list" class="workshop-edit-upload-list"></div>
+                        </div>
                     </div>
-                    <div id="workshop-edit-upload-list" class="workshop-edit-upload-list"></div>
                 </div>
 
                 <textarea id="workshop-edit-file-content" class="workshop-edit-content" spellcheck="false" oninput="handleWorkshopEditContentInput()"></textarea>
