@@ -1339,17 +1339,7 @@ function clearMessengerState() {
   clearMessageAttachmentSelection({ preserveFeedback: true });
 }
 
-async function refreshAdminBanStateLocal() {
-  return refreshAdminBanState(state, APP_CONFIG);
-}
-
-function toggleUserBanLocal(profile) {
-  return toggleUserBan(profile, state, APP_CONFIG);
-}
-
-function toggleProfileBlockLocal(profile) {
-  return toggleProfileBlock(profile, state);
-}
+// Local wrappers moved to inline arrow functions in createAppUi
 
 function getDefaultProfileName() {
   const accountName = state.profileRecord?.displayName?.trim() || state.currentUser?.user_metadata?.display_name?.trim() || state.currentUser?.user_metadata?.full_name?.trim() || state.currentUser?.user_metadata?.name?.trim();
@@ -1359,19 +1349,7 @@ function getDefaultProfileName() {
   return prettyName || "Member";
 }
 
-function formatDisplayNameFromEmail(email = "") { 
-  const localPart = String(email ?? "").trim().split("@")[0] ?? ""; 
-  const prettyName = localPart.replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "); 
-  return prettyName ? prettyName.slice(0, 40) : ""; 
-}
-
-function resolveMemberDisplayName(profile, fallback = "Member") { 
-  if (!profile || typeof profile !== "object") return fallback; 
-  const displayName = String(profile.displayName ?? "").trim(); 
-  if (displayName && !normalizeEmailForMatch(displayName).includes("@")) return displayName.slice(0, 40); 
-  const prettyEmailName = formatDisplayNameFromEmail(profile.email); 
-  return prettyEmailName || (displayName ? displayName.slice(0, 40) : fallback); 
-}
+// Display name helpers moved to shared-utils.js
 // Data normalization moved to api-v3.js and admin-v3.js
 // Data normalization moved to api-v3.js
 function getThreadPartnerId(thread) { if (!thread || !state.currentUser) return ""; return thread.userOneId === state.currentUser.id ? thread.userTwoId : thread.userOneId; }
