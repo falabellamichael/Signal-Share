@@ -623,7 +623,16 @@ window.toggleChatSecurity = function() {
     // Hide others
     if (messages) messages.style.display = isShowing ? 'flex' : 'none';
     if (history) history.style.display = 'none';
-    if (inputArea) inputArea.style.display = isShowing ? 'flex' : 'none';
+    if (inputArea) {
+        if (isShowing) {
+            // Restore stylesheet default instead of forcing flex on the container.
+            inputArea.style.removeProperty('display');
+            inputArea.style.opacity = '1';
+            inputArea.style.pointerEvents = 'all';
+        } else {
+            inputArea.style.display = 'none';
+        }
+    }
     
     // Toggle security
     security.style.display = isShowing ? 'none' : 'flex';
