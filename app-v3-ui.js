@@ -1439,17 +1439,27 @@ export function createAppUi(context) {
   function renderMessageAttachmentPreview() { elements.messageAttachmentPreview.replaceChildren(); const file = state.messageAttachmentFile; const hasAttachment = Boolean(file); elements.messageAttachmentPreview.hidden = !hasAttachment; elements.messageAttachmentClearButton.hidden = !hasAttachment; if (!file) return; const card = document.createElement("div"); card.className = "message-attachment-card is-preview"; card.appendChild(createMessageAttachmentPreviewNode(file)); elements.messageAttachmentPreview.appendChild(card); }
 
   function renderMessageBody(container, text) {
-    if (!text) { container.hidden = true; container.innerHTML = ""; return; }
+    let sourceText = "";
+    if (typeof text === "string") {
+      sourceText = text;
+    } else if (text != null) {
+      try {
+        sourceText = typeof text === "object" ? JSON.stringify(text) : `${text}`;
+      } catch (_error) {
+        sourceText = `${text}`;
+      }
+    }
+    if (!sourceText) { container.hidden = true; container.innerHTML = ""; return; }
     
     // Strip internal protocol tags from display
-    const cleanText = text
+    const cleanText = sourceText
       .replace(/\[(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\][\s\S]*?\[\/(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\]/gi, "")
       .replace(/\[(?:\/)?(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\]/gi, "")
       .replace(/\[COMPOSE:\s*([\s\S]*?)\]/gi, "$1")
       .replace(/\[(?:ARCADE|DUCKDUCKGO|OPEN):\s*[^\]]+\]/gi, "")
       .replace(/\[PUBLISH:\s*({[\s\S]*?})\]/gi, "")
       .trim();
-    if (!cleanText && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|\/?(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION))(?::|\])/i.test(text)) {
+    if (!cleanText && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|\/?(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION))(?::|\])/i.test(sourceText)) {
         container.hidden = true; 
         container.innerHTML = ""; 
         return; 

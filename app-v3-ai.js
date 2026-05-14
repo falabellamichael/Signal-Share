@@ -281,11 +281,22 @@ export async function handleAiThreadMessageSubmit({
 
     if (window.heroMediaPlayerController) {
       try {
+        const refreshTasks = [];
         if (typeof window.heroMediaPlayerController.refreshDesktopSnapshot === "function") {
-          await window.heroMediaPlayerController.refreshDesktopSnapshot({ force: true, renderAfter: false });
+          refreshTasks.push(Promise.resolve(
+            window.heroMediaPlayerController.refreshDesktopSnapshot({ force: true, renderAfter: false })
+          ));
         }
         if (typeof window.heroMediaPlayerController.refreshNativeSnapshot === "function") {
-          await window.heroMediaPlayerController.refreshNativeSnapshot({ renderAfter: false });
+          refreshTasks.push(Promise.resolve(
+            window.heroMediaPlayerController.refreshNativeSnapshot({ renderAfter: false })
+          ));
+        }
+        if (refreshTasks.length > 0) {
+          await Promise.race([
+            Promise.allSettled(refreshTasks),
+            new Promise((resolve) => window.setTimeout(resolve, 500))
+          ]);
         }
       } catch (error) {
         console.warn("Failed to refresh media context for AI", error);
@@ -293,7 +304,8 @@ export async function handleAiThreadMessageSubmit({
     }
 
     const pageContext = document.title || "Signal Share";
-    const pageText = document.body.innerText.substring(0, 600);
+    const pageRoot = document.querySelector(".page-shell") || document.body;
+    const pageText = `${pageRoot?.textContent || ""}`.replace(/\s+/g, " ").trim().slice(0, 600);
     const sharedAiContext = window.SignalShareAiCore
       ? window.SignalShareAiCore.buildCompanionContext({
           surface: "main",
