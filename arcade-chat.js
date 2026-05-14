@@ -187,20 +187,37 @@ function initArcadeSpeech() {
         arcadeSpeechRecognition.onresult = (event) => {
             const input = document.getElementById('arc-chat-input');
             if (!input) return;
-            let transcript = '';
-            for (let i = 0; i < event.results.length; ++i) {
-                transcript += event.results[i][0].transcript;
+            
+            let finalTranscript = '';
+            let interimTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interimTranscript += transcript;
+                }
             }
-            input.value = transcript;
-            input.scrollTop = input.scrollHeight; // Auto-scroll if text is long
+
+            // Update the input with what we have so far
+            const combined = (finalTranscript || interimTranscript).trim();
+            if (combined) {
+                input.value = combined;
+                input.placeholder = "Listening...";
+                console.log('[Voice] Transcript:', combined);
+            }
         };
 
         arcadeSpeechRecognition.onerror = (event) => {
             console.error('[Voice] Recognition error:', event.error);
-            if (event.error === 'not-allowed') {
-                alert('Microphone access denied. Please enable microphone permissions in your Android settings for this app.');
+            if (event.error === 'no-speech') {
+                const input = document.getElementById('arc-chat-input');
+                if (input) input.placeholder = "No speech detected. Try speaking louder!";
             }
-            stopArcadeDictation();
+            if (event.error === 'audio-capture') {
+                alert("Microphone not found. Check your Chrome mic settings!");
+            }
         };
 
         arcadeSpeechRecognition.onend = () => {

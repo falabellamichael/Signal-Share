@@ -804,8 +804,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     const customBridgeUrl = `${localStorage.getItem("signal-share-bridge-url") || ""}`.trim();
     if (customBridgeUrl) return true;
 
-    const bridgeSecret = `${localStorage.getItem("ss_bridge_secret") || ""}`.trim()
-      || `${localStorage.getItem("signal-share-bridge-secret") || ""}`.trim();
+    const bridgeSecret = getStoredBridgeSecret();
     if (bridgeSecret) return true;
 
     return false;
