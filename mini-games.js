@@ -2808,10 +2808,25 @@ window.getWorkshopFileContent = function(gameId, fileName) {
 
 window.getWorkshopEditorState = function() {
     if (typeof workshopEditActiveGameId === 'undefined') return null;
+    const gameSelect = document.getElementById('workshop-edit-game-select');
+    const fileSelect = document.getElementById('workshop-edit-file-select');
+    const editor = document.getElementById('workshop-edit-file-content');
+    const selectedGameId = `${gameSelect?.value || ''}`.trim();
+    const selectedFileName = `${fileSelect?.value || ''}`.trim();
+    const activeGameId = `${selectedGameId || workshopEditActiveGameId || ''}`.trim();
+    const activeFileName = `${selectedFileName || workshopEditActiveFileName || ''}`.trim();
+    const editorContent = editor && !editor.disabled && typeof editor.value === 'string'
+        ? editor.value
+        : null;
+    const storedContent = activeGameId && activeFileName
+        ? window.getWorkshopFileContent(activeGameId, activeFileName)
+        : null;
+
     return {
-        activeGameId: workshopEditActiveGameId,
-        activeFileName: workshopEditActiveFileName,
-        activeFileContent: workshopEditActiveGameId && workshopEditActiveFileName ? window.getWorkshopFileContent(workshopEditActiveGameId, workshopEditActiveFileName) : null,
+        activeGameId,
+        activeFileName,
+        activeFileContent: typeof editorContent === 'string' ? editorContent : storedContent,
+        activeFileContentSource: typeof editorContent === 'string' ? 'editor' : 'stored',
         isToolsExpanded: !!(typeof workshopEditToolsExpanded !== 'undefined' && workshopEditToolsExpanded)
     };
 };

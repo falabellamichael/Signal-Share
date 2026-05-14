@@ -609,6 +609,83 @@ function buildWorkshopEditDirective(workshopContext = null, isFixMode = false, u
     return lines.join('\n');
 }
 
+function buildWorkshopEditRetryContext(userPrompt = '', richContext = null) {
+    const latestEditor = typeof window.getWorkshopEditorState === 'function'
+        ? window.getWorkshopEditorState()
+        : null;
+    const editor = latestEditor || getActiveWorkshopEditorContext(richContext);
+    const activeGameId = `${editor?.activeGameId || ''}`.trim();
+    const activeFileName = `${editor?.activeFileName || ''}`.trim();
+    const activeFileContent = `${editor?.activeFileContent || ''}`;
+    if (!activeGameId || !activeFileName || !activeFileContent.trim()) return '';
+
+    const context = {
+        workshopEditor: {
+            activeGameId,
+            activeFileName,
+            activeFileContent
+        }
+    };
+    const strippedEditor = {
+        activeGameId,
+        activeFileName,
+        activeFileContentLength: activeFileContent.length,
+        activeFileContentProvidedInEditProtocol: true,
+        retry: true
+    };
+
+    return [
+        '[WORKSHOP_EDIT_RETRY]',
+        'The active editor file content is provided below. Do not ask the user for the file.',
+        'Return only an [EDIT] block, or for style-only edits return exactly one fenced css code block.',
+        buildWorkshopEditDirective(context, false, userPrompt),
+        `[ACTIVE_WORKSHOP_EDITOR]\n${JSON.stringify(strippedEditor)}`
+    ].join('\n');
+}
+
+async function retryWorkshopEditWithEditorContext(userPrompt = '', richContext = null, signal = null) {
+    const retryContext = buildWorkshopEditRetryContext(userPrompt, richContext);
+    if (!retryContext) return '';
+
+    const modelSelect = document.getElementById('chat-model-select');
+    const selectedModel = modelSelect ? modelSelect.value : 'auto';
+    const requestModel = resolveChatRequestModel(selectedModel);
+    const customInstructions = typeof getAiCore()?.getStoredCustomInstructions === 'function'
+        ? getAiCore().getStoredCustomInstructions()
+        : `${localStorage.getItem('ss_ai_custom_instructions') || ''}`.trim().slice(0, 2000);
+    const payload = JSON.stringify({
+        message: buildProtocolAwareUserMessage(userPrompt),
+        model: requestModel,
+        customInstructions,
+        attachment: null,
+        history: [],
+        pageContext: retryContext.slice(0, 10000)
+    });
+
+    const chatPaths = ['/api/local-llm/chat', '/api/llm/chat'];
+    for (const chatPath of chatPaths) {
+        try {
+            const response = await bridgeFetch(chatPath, {
+                method: 'POST',
+                timeoutMs: 0,
+                signal,
+                body: payload
+            });
+            if (!response?.ok) continue;
+            const data = await response.json().catch(() => null);
+            const retryReply = typeof data?.reply === 'string' ? data.reply.trim() : '';
+            if (retryReply && !isBridgeLightweightOfflineReply(retryReply)) {
+                return retryReply;
+            }
+        } catch (error) {
+            if (signal?.aborted) throw error;
+            console.warn('[Arcade Chat] Workshop edit retry failed:', error);
+        }
+    }
+
+    return '';
+}
+
 function getBridgeTargetAddressSpace(baseUrl = "") {
     try {
         const parsed = new URL(baseUrl, window.location.href);
@@ -2429,6 +2506,13 @@ window.sendChatMessage = async function() {
         }
 
         if (reply !== null) {
+            if (editRequestActive && isUnhelpfulWorkshopEditReply(reply)) {
+                const retryReply = await retryWorkshopEditWithEditorContext(text, richContext, signal);
+                if (retryReply && !isUnhelpfulWorkshopEditReply(retryReply)) {
+                    reply = retryReply;
+                }
+            }
+
             if (editRequestActive && isUnhelpfulWorkshopEditReply(reply) && allowsLocalStyleFallback(text)) {
                 const localStyleFallback = await tryLocalWorkshopStyleFallback(text, richContext);
                 if (localStyleFallback?.ok) {
