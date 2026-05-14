@@ -88,15 +88,25 @@ export function getCurrentUserEmailCandidates(currentUser) {
 }
 
 export function isCurrentUserAdmin(state, appConfig) {
-  if (!state.currentUser) return false;
-  const emails = getCurrentUserEmailCandidates(state.currentUser);
-  return emails.some((email) => appConfig.adminEmails.includes(email));
+  const currentUser = state?.currentUser ?? null;
+  if (!currentUser) return false;
+  const emails = getCurrentUserEmailCandidates(currentUser);
+  if (!emails.length) return false;
+  const adminEmails = Array.isArray(appConfig?.adminEmails) ? appConfig.adminEmails : [];
+  if (!adminEmails.length) return false;
+  const adminEmailSet = new Set(adminEmails);
+  return emails.some((email) => adminEmailSet.has(email));
 }
 
 export function isCurrentUserMasterAdmin(state, appConfig) {
-  if (!state.currentUser) return false;
-  const emails = getCurrentUserEmailCandidates(state.currentUser);
-  return emails.some((email) => appConfig.masterAdminEmails.includes(email));
+  const currentUser = state?.currentUser ?? null;
+  if (!currentUser) return false;
+  const emails = getCurrentUserEmailCandidates(currentUser);
+  if (!emails.length) return false;
+  const masterAdminEmails = Array.isArray(appConfig?.masterAdminEmails) ? appConfig.masterAdminEmails : [];
+  if (!masterAdminEmails.length) return false;
+  const masterAdminEmailSet = new Set(masterAdminEmails);
+  return emails.some((email) => masterAdminEmailSet.has(email));
 }
 
 export function canRevealMemberEmails(state, appConfig) {
@@ -104,7 +114,7 @@ export function canRevealMemberEmails(state, appConfig) {
 }
 
 export function canAccessAdminBanPanel(state, appConfig) {
-  return Boolean(state.currentUser) && isCurrentUserAdmin(state, appConfig);
+  return Boolean(state?.currentUser) && isCurrentUserAdmin(state, appConfig);
 }
 
 // --- Post Moderation Logic ---
