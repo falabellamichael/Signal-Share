@@ -353,3 +353,42 @@ html.platform-android .messenger-section {
         padding-bottom: 5px !important;
     }
 }
+
+/* Keep Android theme picker buttons aligned with the desktop layout. */
+html.platform-android .theme-picker-trigger {
+    display: grid !important;
+    grid-template-columns: 108px minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 14px !important;
+    min-height: 96px !important;
+    padding: 12px !important;
+}
+
+html.platform-android .theme-picker-menu {
+    position: absolute !important;
+    top: calc(100% + 8px) !important;
+    right: 0 !important;
+    left: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    max-height: min(540px, calc(var(--viewport-visible-height) - 180px)) !important;
+    overflow-y: auto !important;
+    padding: 10px !important;
+}
+
+html.platform-android .theme-option-tile {
+    display: grid !important;
+    grid-template-columns: 76px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 12px !important;
+    min-height: 92px !important;
+    padding: 10px !important;
+    text-align: left !important;
+}
+
+html.platform-android .theme-picker .theme-preview {
+    width: auto !important;
+    height: 72px !important;
+    border-radius: 18px !important;
+}
