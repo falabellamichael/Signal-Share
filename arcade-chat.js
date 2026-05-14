@@ -529,9 +529,15 @@ function buildWorkshopPublishDirective() {
         '[WORKSHOP_PROTOCOL]',
         'If the user asks to create/build/write a game and publish/add it to the Arcade Library/Workshop, you MUST include exactly one [PUBLISH:{...}] tag.',
         'Set target to "workshop".',
+        'Generate a complete, playable, self-contained browser game.',
         'Include title, category, tags, and code payload.',
         'Preferred payload format: files:[{name,type,content}, ...].',
         'Alternative payload fields allowed: html, css, js, or code.',
+        'Required files: index.html plus linked styles.css and/or game.js when useful.',
+        'index.html must reference every extra CSS/JS file by exact filename.',
+        'The game must include visible controls, a reset/start path, win/lose or score feedback, and no placeholder/TODO code.',
+        'Use plain browser APIs only; do not depend on external libraries, bundlers, CDNs, imports, or module syntax.',
+        'Before replying, mentally verify that every referenced file exists and every JavaScript block parses as classic browser JavaScript.',
         'Do not output placeholder/offline guidance when generation is available.',
         '[/WORKSHOP_PROTOCOL]'
     ].join('\n');
@@ -2659,23 +2665,13 @@ window.sendChatMessage = async function() {
                 await tryAutoPublishWorkshopFromReply(reply, text);
             }
         } else {
-            // Only trigger emergency publish if it's NOT an edit request
             if (workshopPublishIntent && !isWorkshopEditIntentPrompt(text, richContext)) {
-                const emergencyPublish = await tryEmergencyWorkshopPublishFromPrompt(text, lastError);
-                if (emergencyPublish?.attempted && emergencyPublish?.ok) {
-                    const publishReply = `🕹️ [Arcade Protocol]: Remote generation failed, so I generated and published "${emergencyPublish.title}" directly to your Workshop (${emergencyPublish.assetCount} assets).`;
-                    addChatMessage('ai', publishReply);
-                    arcadeChatHistory.push({ role: 'assistant', content: publishReply });
-                    saveCurrentChat();
-                    updateChatStatus('active');
-                    return;
-                }
-                if (emergencyPublish?.attempted && !emergencyPublish?.ok) {
-                    const emergencyReason = `${emergencyPublish.reason || 'publish-failed'}`.trim();
-                    if (emergencyReason) {
-                        lastError = `${lastError || 'Bridge failed'} | emergency-publish:${emergencyReason}`;
-                    }
-                }
+                const publishReply = '🕹️ [Arcade Protocol]: I did not publish anything because the local model did not return a valid game. Please retry with a stronger code model or ask me to generate the files again.';
+                addChatMessage('ai', publishReply);
+                arcadeChatHistory.push({ role: 'assistant', content: publishReply });
+                saveCurrentChat();
+                updateChatStatus('idle');
+                return;
             }
 
             if (lastError !== 'Bridge disabled') {

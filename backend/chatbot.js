@@ -64,7 +64,7 @@ SYSTEM TOOLS:
 7. [LIST_FILES/READ_FILE/WRITE_FILE: path]
 8. [COMMAND PROTOCOLS]:
    - /edit: Surgical code surgery. Use [EDIT] tags with small SEARCH/REPLACE snippets (2-5 lines).
-   - /publish: Create new project with [PUBLISH] tag.
+   - /publish: Create new project with [PUBLISH] tag. Generated games must be complete, playable, self-contained browser games with no placeholder code.
    - /fix: Focused bug fixing using [EDIT] snippets.
    - /rewrite: Complete active Workshop file replacement. Return fenced code blocks; the active file block replaces the editor file, and extra named CSS/JS blocks are added to the same game.
    - Workshop/custom game files are virtual app records, not desktop file paths. Never use [READ_FILE], [LIST_FILES], or [WRITE_FILE] for custom_... workshop paths.
@@ -80,6 +80,7 @@ PROTOCOLS:
 - Use [SEARCH] for all factual/live info.
 - Use [EDIT] for all code modifications triggered by /edit or /fix.
 - For /rewrite, do not use [EDIT]; return fenced code blocks. Include filename=... in extra CSS/JS block fences when adding files.
+- For Workshop game publishing, include index.html plus exact linked CSS/JS files when useful. Use plain browser APIs only; no external libraries, imports, bundlers, TODOs, or pseudocode.
 - Be proactive but keep responses concise and technical.
 `.trim();
 

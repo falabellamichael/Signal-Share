@@ -927,6 +927,165 @@ function collectTrackedStatsFromFiles(processedFiles) {
     return trackedStats;
 }
 
+function normalizeWorkshopAssetReference(value = '') {
+    const clean = `${value || ''}`.trim().replace(/^['"]|['"]$/g, '');
+    if (!clean || /^(?:https?:|data:|blob:|#|mailto:|tel:)/i.test(clean)) return '';
+    const withoutQuery = clean.split(/[?#]/)[0].replace(/^\.\/+/, '');
+    if (!withoutQuery || withoutQuery.includes('..')) return '';
+    return normalizeWorkshopFileName(withoutQuery, '').toLowerCase();
+}
+
+function extractWorkshopHtmlReferences(html = '') {
+    const references = [];
+    const pushReference = (type, rawValue) => {
+        const name = normalizeWorkshopAssetReference(rawValue);
+        if (name) references.push({ type, name });
+    };
+
+    const scriptRegex = /<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
+    let scriptMatch;
+    while ((scriptMatch = scriptRegex.exec(html)) !== null) {
+        pushReference('script', scriptMatch[1]);
+    }
+
+    const stylesheetRegex = /<link\b(?=[^>]*\brel\s*=\s*["'][^"']*stylesheet[^"']*["'])(?=[^>]*\bhref\s*=\s*["']([^"']+)["'])[^>]*>/gi;
+    let stylesheetMatch;
+    while ((stylesheetMatch = stylesheetRegex.exec(html)) !== null) {
+        pushReference('stylesheet', stylesheetMatch[1]);
+    }
+
+    const assetRegex = /\b(?:src|href)\s*=\s*["']([^"']+)["']/gi;
+    let assetMatch;
+    while ((assetMatch = assetRegex.exec(html)) !== null) {
+        const value = `${assetMatch[1] || ''}`.trim();
+        if (/\.(?:png|jpe?g|gif|webp|svg|mp3|wav|ogg|mp4|webm)$/i.test(value)) {
+            pushReference('asset', value);
+        }
+    }
+
+    return references;
+}
+
+function extractInlineScriptsFromHtml(html = '') {
+    const scripts = [];
+    const scriptRegex = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+    let match;
+    while ((match = scriptRegex.exec(html)) !== null) {
+        const attributes = `${match[1] || ''}`;
+        if (/\bsrc\s*=/i.test(attributes)) continue;
+        const code = `${match[2] || ''}`.trim();
+        if (code) scripts.push(code);
+    }
+    return scripts;
+}
+
+function validateJavaScriptSyntax(code = '', label = 'script') {
+    const source = `${code || ''}`.trim();
+    if (!source) return { ok: true };
+    try {
+        // Generated Workshop games are executed as classic scripts by the runner.
+        // This catches syntax/runtime-loader issues before saving bad games.
+        new Function(source);
+        return { ok: true };
+    } catch (error) {
+        return {
+            ok: false,
+            message: `${label} has JavaScript syntax error: ${error?.message || 'invalid JavaScript'}`
+        };
+    }
+}
+
+function hasBalancedCssBraces(css = '') {
+    let depth = 0;
+    for (const char of `${css || ''}`) {
+        if (char === '{') depth += 1;
+        if (char === '}') depth -= 1;
+        if (depth < 0) return false;
+    }
+    return depth === 0;
+}
+
+function validateWorkshopGameFiles(files = [], options = {}) {
+    const result = { ok: true, message: '', warnings: [] };
+    const fileList = Array.isArray(files) ? files : [];
+    if (fileList.length === 0) {
+        return { ok: false, message: 'No game files were provided.', warnings: [] };
+    }
+
+    const fileByName = new Map();
+    fileList.forEach((file) => {
+        const name = normalizeWorkshopFileName(file?.name || '', '');
+        if (name) fileByName.set(name.toLowerCase(), file);
+    });
+
+    const entryFile = fileList.find(f => `${f.name || ''}`.toLowerCase() === 'index.html')
+        || fileList.find(f => `${f.name || ''}`.toLowerCase().endsWith('.html'))
+        || fileList.find((f) => `${f.name || ''}` === `${options.entryFile || ''}`)
+        || fileList[0];
+    if (!entryFile?.name) {
+        return { ok: false, message: 'No entry file could be selected for the game.', warnings: [] };
+    }
+
+    const decodedFiles = fileList.map((file) => ({
+        file,
+        name: normalizeWorkshopFileName(file.name, 'file.txt'),
+        lowerName: normalizeWorkshopFileName(file.name, 'file.txt').toLowerCase(),
+        type: file.type || inferFileTypeFromName(file.name),
+        content: decodeWorkshopFileContent(file)
+    }));
+
+    const placeholderFile = decodedFiles.find(({ content }) => {
+        return /\b(?:TODO|FIXME|placeholder|your code here|implementation here|rest of (?:the )?code|existing code|pseudo(?:code)?)\b/i.test(content);
+    });
+    if (placeholderFile) {
+        return { ok: false, message: `${placeholderFile.name} still contains placeholder code.`, warnings: [] };
+    }
+
+    const htmlFile = decodedFiles.find(({ lowerName }) => lowerName === `${entryFile.name || ''}`.toLowerCase() && /\.html?$/i.test(lowerName))
+        || decodedFiles.find(({ lowerName }) => /\.html?$/i.test(lowerName));
+    if (htmlFile) {
+        const html = htmlFile.content.trim();
+        if (!/<(?:!doctype|html|body|main|section|div|canvas|button|input)\b/i.test(html)) {
+            return { ok: false, message: `${htmlFile.name} does not look like runnable HTML.`, warnings: [] };
+        }
+
+        const interactiveMarkers = /<canvas\b|<button\b|<input\b|onclick\s*=|addEventListener|requestAnimationFrame|setInterval|setTimeout|function\s+\w+|\bconst\s+\w+\s*=|\blet\s+\w+\s*=/i;
+        if (!interactiveMarkers.test(html)) {
+            return { ok: false, message: `${htmlFile.name} does not appear to include playable game controls or logic.`, warnings: [] };
+        }
+
+        const missingReference = extractWorkshopHtmlReferences(html).find((reference) => !fileByName.has(reference.name));
+        if (missingReference) {
+            return {
+                ok: false,
+                message: `${htmlFile.name} references missing ${missingReference.type} file: ${missingReference.name}`,
+                warnings: []
+            };
+        }
+
+        for (const inlineScript of extractInlineScriptsFromHtml(html)) {
+            const syntax = validateJavaScriptSyntax(inlineScript, `${htmlFile.name} inline script`);
+            if (!syntax.ok) return { ok: false, message: syntax.message, warnings: [] };
+        }
+    } else if (!/\.js$/i.test(`${entryFile.name || ''}`)) {
+        return { ok: false, message: 'Generated games need an index.html or JavaScript entry file.', warnings: [] };
+    }
+
+    for (const decoded of decodedFiles) {
+        if (/\.(?:js|mjs|cjs)$/i.test(decoded.name) || /javascript/i.test(decoded.type)) {
+            const syntax = validateJavaScriptSyntax(decoded.content, decoded.name);
+            if (!syntax.ok) return { ok: false, message: syntax.message, warnings: [] };
+        }
+        if (/\.css$/i.test(decoded.name) || /text\/css/i.test(decoded.type)) {
+            if (!hasBalancedCssBraces(decoded.content)) {
+                return { ok: false, message: `${decoded.name} has unbalanced CSS braces.`, warnings: [] };
+            }
+        }
+    }
+
+    return result;
+}
+
 async function publishProcessedGameFiles(options = {}) {
     if (!currentUser) {
         return { ok: false, error: 'auth-required', message: 'Please sign in to publish games.' };
@@ -1001,6 +1160,16 @@ async function publishProcessedGameFiles(options = {}) {
         || finalProcessedFiles.find(f => f.name.toLowerCase().endsWith('.html'))
         || finalProcessedFiles.find((f) => f.name === existingGame?.entryFile)
         || finalProcessedFiles[0];
+    if (options.validateGame !== false) {
+        const validation = validateWorkshopGameFiles(finalProcessedFiles, { entryFile: entryFile?.name || '' });
+        if (!validation.ok) {
+            return {
+                ok: false,
+                error: 'validation-failed',
+                message: `Workshop validation failed: ${validation.message}`
+            };
+        }
+    }
     const trackedStats = collectTrackedStatsFromFiles(finalProcessedFiles);
 
     const newGame = {
