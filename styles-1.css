@@ -225,6 +225,21 @@ body[data-theme="midnight"] {
     linear-gradient(180deg, #081017 0%, #0c151d 50%, #111b23 100%);
 }
 
+body[data-theme="sunset"] {
+  --surface-dark: #000000;
+  --accent-2: #000000;
+  --shadow: 0 22px 62px rgba(0, 0, 0, 0.2);
+  background:
+    radial-gradient(circle at top left, rgba(238, 108, 77, 0.24), transparent 28%),
+    radial-gradient(circle at top right, rgba(0, 0, 0, 0.22), transparent 25%),
+    linear-gradient(180deg, #fff7ec 0%, #f6efe3 48%, #efe6d7 100%);
+}
+
+body[data-theme="sunset"] .button-primary {
+  background: #000000;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
+}
+
 body[data-theme="gallery"] {
   --surface: rgba(252, 250, 245, 0.82);
   --surface-strong: rgba(255, 253, 248, 0.96);
@@ -1568,7 +1583,7 @@ h1 {
 .theme-preview-sunset {
   background:
     radial-gradient(circle at top left, rgba(238, 108, 77, 0.42), transparent 32%),
-    linear-gradient(135deg, #f8e9d2, #eedbcc 52%, #dce8e2);
+    linear-gradient(135deg, #f8e9d2, #eedbcc 52%, #2a2a2a);
 }
 
 .theme-preview-midnight {
