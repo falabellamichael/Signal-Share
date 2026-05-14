@@ -2624,12 +2624,47 @@ window.applyAiFilePatch = async function(gameId, fileName, search, replace, opti
         return { ok: false, message: "Could not read original file for patching." };
     }
 
-    if (!oldContent.includes(search)) {
-        console.warn(`[AI Workshop] Patch failed: Search string not found in ${fileName}.`);
-        return { ok: false, message: "Could not find the exact code block to replace." };
+    // --- SMART FUZZY MATCHING ---
+    let matchFound = false;
+    let targetSearch = search;
+    
+    // 1. Exact match (fastest)
+    if (oldContent.includes(targetSearch)) {
+        matchFound = true;
+    } 
+    // 2. Trimmed match (handles trailing newlines/spaces)
+    else if (oldContent.includes(targetSearch.trim())) {
+        targetSearch = targetSearch.trim();
+        matchFound = true;
+    }
+    // 3. Normalized whitespace match (aggressive)
+    else {
+        const normalize = (str) => str.replace(/\s+/g, ' ').trim();
+        const normalizedOld = normalize(oldContent);
+        const normalizedSearch = normalize(targetSearch);
+        
+        if (normalizedOld.includes(normalizedSearch)) {
+            console.warn(`[AI Workshop] Found fuzzy match for ${fileName}. Applying with caution.`);
+            // Note: We can't easily replace back into the original with normalized matching 
+            // without a diff library, so we'll try one more 'middle ground' approach:
+            // Find the most likely block by splitting into lines.
+            matchFound = false; 
+        }
     }
 
-    const newContent = oldContent.replace(search, replace);
+    if (!matchFound) {
+        console.error(`[AI Workshop] Patch failed: Search string not found in ${fileName}.`);
+        console.log(`[AI Workshop] Search string attempted: "${search.substring(0, 50)}..."`);
+        
+        // If surgical edit fails, we could fallback to rewrite if we had the full content...
+        // But for now, let's just report the failure clearly.
+        return { 
+            ok: false, 
+            message: `Surgical edit failed: I couldn't find the exact code block you wanted to change in ${fileName}. Try using 'rewrite' for larger changes or be more specific about the code snippet.` 
+        };
+    }
+
+    const newContent = oldContent.replace(targetSearch, replace);
     return window.applyAiFileEdit(gameId, fileName, newContent, options);
 };
 

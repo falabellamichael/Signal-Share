@@ -2881,90 +2881,54 @@ async function executeArcadeChatActions(text, options = {}) {
         window.open(url, '_blank');
     }
 
-    // 6. [FILE_REWRITE: {json}] (with aliases for common AI hallucinations)
-    let fileRewritePayload = extractBalancedJsonTagPayload(text, 'FILE_REWRITE');
-    
-    // Alias support for [Workshop/Edit] or [EDIT: {json}]
-    if (!fileRewritePayload) fileRewritePayload = extractBalancedJsonTagPayload(text, 'Workshop/Edit');
-    if (!fileRewritePayload) fileRewritePayload = extractBalancedJsonTagPayload(text, 'EDIT');
-    
-    if (fileRewritePayload?.jsonText) {
+    // 6. SIMPLE TEXT-BASED WORKSHOP ACTIONS (Replaces old JSON logic)
+    const workshopMatch = text.match(/\[(REWRITE|EDIT|REWRITE_FILE|EDIT_FILE|FILE_REWRITE|FILE_EDIT)\]([\s\S]+?)\[\/\1\]/i);
+    if (workshopMatch) {
         try {
             actionResult.handled = true;
-            const data = JSON.parse(fileRewritePayload.jsonText);
-            const editorState = typeof window.getWorkshopEditorState === 'function'
-                ? window.getWorkshopEditorState()
-                : null;
-            const gameId = `${data?.gameId || editorState?.activeGameId || ''}`.trim();
-            const fileName = `${data?.fileName || editorState?.activeFileName || ''}`.trim();
-            let content = typeof data?.content === 'string' ? data.content : '';
-            
-            // Clean up common AI protocol leakage
-            content = content
-                .replace(/---BEGIN_CONTENT---/g, '')
-                .replace(/---END_CONTENT---/g, '')
-                .replace(/\[\/?FILE_REWRITE\]/g, '')
-                .trim();
-            
-            // If the content is wrapped in markdown code blocks by accident, strip them
-            if (content.startsWith('```') && content.endsWith('```')) {
-                content = content.replace(/^```[a-z]*\n/i, '').replace(/\n```$/i, '').trim();
-            }
-
-            const save = data?.save !== false;
-            if (!gameId || !fileName || !content) {
-                if (window.showFeedback) {
-                    window.showFeedback('AI file rewrite missing gameId, fileName, or content.', true);
-                }
-                return actionResult;
-            }
-            if (typeof window.applyAiFileEdit === 'function') {
-                actionResult.workshopFileRewriteAttempted = true;
-                const applyResult = await window.applyAiFileEdit(gameId, fileName, content, { save: !!save });
-                if (applyResult?.ok) {
-                    actionResult.workshopFileRewriteSucceeded = true;
-                } else if (window.showFeedback) {
-                    window.showFeedback(applyResult?.message || `Failed to apply AI edit to ${fileName}.`, true);
-                }
-            }
-        } catch (e) {
-            console.error("[Arcade Chat] Failed to execute [FILE_REWRITE] action:", e);
-        }
-    }
-
-    // 7. [FILE_EDIT: {json}] (Surgical search & replace)
-    let fileEditPayload = extractBalancedJsonTagPayload(text, 'FILE_EDIT');
-    if (!fileEditPayload) fileEditPayload = extractBalancedJsonTagPayload(text, 'Edit/Surgical');
-
-    if (fileEditPayload?.jsonText) {
-        try {
-            actionResult.handled = true;
-            const data = JSON.parse(fileEditPayload.jsonText);
+            const tagType = workshopMatch[1].toUpperCase();
+            const rawContent = workshopMatch[2].trim();
             const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
-            const gameId = `${data?.gameId || editorState?.activeGameId || ''}`.trim();
-            const fileName = `${data?.fileName || editorState?.activeFileName || ''}`.trim();
-            const search = typeof data?.search === 'string' ? data.search : '';
-            const replace = typeof data?.replace === 'string' ? data.replace : '';
-            const save = data?.save !== false;
+            const gameId = editorState?.activeGameId;
+            const fileName = editorState?.activeFileName;
 
-            if (!gameId || !fileName || !search) {
-                if (window.showFeedback) window.showFeedback('AI file edit missing gameId, fileName, or search block.', true);
-                return actionResult;
-            }
+            if (gameId && fileName && rawContent) {
+                if (tagType.includes('REWRITE')) {
+                    // FULL REWRITE
+                    const sanitized = rawContent
+                        .replace(/---BEGIN_CONTENT---/g, '')
+                        .replace(/---END_CONTENT---/g, '')
+                        .trim();
 
-            if (typeof window.applyAiFilePatch === 'function') {
-                actionResult.workshopFileRewriteAttempted = true; // Still counts as an edit attempt
-                const patchResult = await window.applyAiFilePatch(gameId, fileName, search, replace, { save: !!save });
-                if (patchResult?.ok) {
-                    actionResult.workshopFileRewriteSucceeded = true;
-                } else if (window.showFeedback) {
-                    window.showFeedback(patchResult?.message || `Failed to apply surgical edit to ${fileName}.`, true);
+                    if (typeof window.applyAiFileEdit === 'function') {
+                        actionResult.workshopFileRewriteAttempted = true;
+                        await window.applyAiFileEdit(gameId, fileName, sanitized, { save: true });
+                        actionResult.workshopFileRewriteSucceeded = true;
+                    }
+                } else {
+                    // SURGICAL EDIT (Expects SEARCH: ... REPLACE: ... format inside the tag)
+                    const searchMatch = rawContent.match(/SEARCH:\s*([\s\S]+?)\s*REPLACE:\s*([\s\S]+)/i);
+                    if (searchMatch && typeof window.applyAiFilePatch === 'function') {
+                        actionResult.workshopFileRewriteAttempted = true;
+                        const patchResult = await window.applyAiFilePatch(gameId, fileName, searchMatch[1].trim(), searchMatch[2].trim(), { save: true });
+                        if (patchResult?.ok) {
+                            actionResult.workshopFileRewriteSucceeded = true;
+                        } else if (window.showFeedback) {
+                            window.showFeedback(patchResult?.message || "Surgical edit failed to find the code block.", true);
+                        }
+                    } else if (typeof window.applyAiFileEdit === 'function') {
+                        // If it's not in SEARCH/REPLACE format, fallback to full rewrite just in case
+                        actionResult.workshopFileRewriteAttempted = true;
+                        await window.applyAiFileEdit(gameId, fileName, rawContent, { save: true });
+                        actionResult.workshopFileRewriteSucceeded = true;
+                    }
                 }
             }
         } catch (e) {
-            console.error("[Arcade Chat] Failed to execute [FILE_EDIT] action:", e);
+            console.error("[Arcade Chat] Workshop action failed:", e);
         }
     }
+
     return actionResult;
 }
 

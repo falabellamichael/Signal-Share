@@ -437,12 +437,16 @@
 
     function buildFileRewriteContract() {
         return [
-            "When the user asks to edit or rewrite code for the Workshop, use the appropriate format:",
-            "1) Surgical EDIT (Use when user says 'edit', 'patch', or 'change'):",
-            "[FILE_EDIT: {\"gameId\":\"string\",\"fileName\":\"string\",\"search\":\"exact code block to find\",\"replace\":\"new code block\",\"save\":true}]",
-            "2) Full REWRITE (Use only when user says 'rewrite', 'refactor', or 'reset'):",
-            "[FILE_REWRITE: {\"gameId\":\"string\",\"fileName\":\"string\",\"content\":\"full updated file text\",\"save\":true}]",
-            "The 'search' block in FILE_EDIT must match the existing code EXACTLY, including indentation."
+            "When the user asks to edit or rewrite code for the Workshop, use these simple text tags:",
+            "1) Surgical EDIT (For small changes):",
+            "[EDIT]",
+            "SEARCH: exact code block to find",
+            "REPLACE: new code block",
+            "[/EDIT]",
+            "2) Full REWRITE (For large changes or when 'rewrite' is requested):",
+            "[REWRITE]",
+            "full updated file content here",
+            "[/REWRITE]"
         ].join("\n");
     }
 
