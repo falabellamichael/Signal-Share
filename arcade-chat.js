@@ -1135,6 +1135,7 @@ async function bridgeFetch(path, options = {}) {
     }
 
     if (lastHttpResponse) return lastHttpResponse;
+    
     if (!suppressNetworkErrors && networkFailures.length > 0) {
         const hasNonAbortFailure = networkFailures.some(({ error }) => {
             const name = `${error?.name || ""}`.toLowerCase();
@@ -1149,6 +1150,12 @@ async function bridgeFetch(path, options = {}) {
             console.warn(`[Arcade Chat] Bridge request failed across candidates: ${summary}`);
         }
     }
+
+    // If suppressed, return a mock failed response instead of throwing
+    if (suppressNetworkErrors) {
+        return { ok: false, status: 0, statusText: "Bridge request failed", json: async () => ({}) };
+    }
+
     throw lastNetworkError || new Error("Bridge request failed");
 }
 
@@ -2608,11 +2615,17 @@ window.sendChatMessage = async function() {
             }
             const shouldBridgeSendPreflight = isEngineStatusOffline();
             if (shouldBridgeSendPreflight) {
-                const bridgeOnlineOnSend = await checkBridgeConnectivity({ signal, timeoutMs: 1200 });
+                const bridgeOnlineOnSend = await checkBridgeConnectivity({ signal, timeoutMs: 1500 });
                 updateEngineStatus(bridgeOnlineOnSend);
                 if (bridgeOnlineOnSend) {
                     bridgePollFailureCount = 0;
                     bridgePollNextAllowedAt = 0;
+                } else {
+                    // Preflight failed, the bridge is unreachable. 
+                    // Stop here and fall through to the offline protocol.
+                    reply = null;
+                    lastError = "Bridge is unreachable. Ensure the PC bridge is running and reachable.";
+                    throw new Error(lastError);
                 }
             }
 
@@ -2707,9 +2720,10 @@ window.sendChatMessage = async function() {
                 bridgePollFailureCount = 0;
                 bridgePollNextAllowedAt = 0;
             } else {
-                lastError = attemptErrors.length > 0
+                const isAbort = attemptErrors.some(err => err.toLowerCase().includes('abort') || err.toLowerCase().includes('cancel'));
+                lastError = isAbort ? 'Request cancelled by user' : (attemptErrors.length > 0
                     ? attemptErrors.join(" | ")
-                    : "Bridge did not return an AI reply";
+                    : "Bridge did not return an AI reply");
                 updateEngineStatus(false);
             }
         } catch (err) {
@@ -2804,7 +2818,7 @@ window.sendChatMessage = async function() {
                 return;
             }
 
-            if (lastError !== 'Bridge disabled') {
+            if (lastError !== 'Bridge disabled' && lastError !== 'Request cancelled by user') {
                 console.warn(`[Arcade Chat] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
                 
                 // NEW: Add a specific error prompt to the chat for the user
