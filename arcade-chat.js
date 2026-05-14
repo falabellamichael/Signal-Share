@@ -2624,7 +2624,8 @@ window.sendChatMessage = async function() {
                     // Preflight failed, the bridge is unreachable. 
                     // Stop here and fall through to the offline protocol.
                     reply = null;
-                    lastError = "Bridge is unreachable. Ensure the PC bridge is running and reachable.";
+                    const bridgeHint = `Try: http://192.168.2.11:3000`;
+                    lastError = `Bridge unreachable. Ensure your PC is running the Bridge and your phone is on the same Wi-Fi. (${bridgeHint})`;
                     throw new Error(lastError);
                 }
             }
@@ -2745,7 +2746,7 @@ window.sendChatMessage = async function() {
                             : '';
                         nextError = `Failed to fetch bridge at ${configuredBridge}. Ensure phone and PC are on the same Wi-Fi and port 3000 is allowed.${hint}`;
                     } else {
-                        nextError = 'Failed to fetch bridge. Set Bridge URL (PC IP) in settings (example: http://192.168.x.x:3000).';
+                        nextError = 'Failed to fetch bridge. Set Bridge URL to your PC\'s IP (Example: http://192.168.2.11:3000) in settings.';
                     }
                 }
                 const topLevelErrorLocation = extractStackLocation(err);
@@ -2826,8 +2827,14 @@ window.sendChatMessage = async function() {
                 if (container && lastError) {
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'chat-message system-error';
-                    errorDiv.style.cssText = 'align-self: center; background: rgba(231, 76, 60, 0.1); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.2); font-size: 0.7rem; padding: 4px 10px; border-radius: 4px; margin: 8px 0; font-family: monospace; opacity: 0.8;';
-                    errorDiv.textContent = `A.I. Bridge Error: ${lastError}`;
+                    errorDiv.style.cssText = 'align-self: center; background: rgba(231, 76, 60, 0.1); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.2); font-size: 0.7rem; padding: 8px 12px; border-radius: 8px; margin: 8px 0; font-family: monospace; opacity: 0.9; display: flex; flex-direction: column; gap: 8px; align-items: center;';
+                    
+                    let errorHtml = `<span>A.I. Bridge Error: ${lastError}</span>`;
+                    if (lastError.includes('192.168.2.11')) {
+                        errorHtml += `<button onclick="localStorage.setItem('ss_bridge_url', 'http://192.168.2.11:3000'); window.location.reload();" style="background: #e74c3c; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.6rem; cursor: pointer; font-weight: bold; text-transform: uppercase;">Use 192.168.2.11:3000</button>`;
+                    }
+                    
+                    errorDiv.innerHTML = errorHtml;
                     container.appendChild(errorDiv);
                     container.scrollTop = container.scrollHeight;
                 }
