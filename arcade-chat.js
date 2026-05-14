@@ -529,8 +529,6 @@ function stopDesktopBridgePolling() {
  */
 async function pollDesktopBridge() {
     if (!bridgeEnabled || bridgePollInFlight) return;
-    const now = Date.now();
-    if (now < bridgePollNextAllowedAt) return;
 
     bridgePollInFlight = true;
     try {
@@ -540,8 +538,6 @@ async function pollDesktopBridge() {
 
         if (!online) {
             bridgePollFailureCount += 1;
-            const delayMs = Math.min(30000, Math.round(4000 * Math.pow(1.5, Math.min(8, bridgePollFailureCount))));
-            bridgePollNextAllowedAt = Date.now() + delayMs;
             return;
         }
 
@@ -558,8 +554,6 @@ async function pollDesktopBridge() {
         }
     } catch (_error) {
         bridgePollFailureCount += 1;
-        const delayMs = Math.min(30000, Math.round(4000 * Math.pow(1.5, Math.min(8, bridgePollFailureCount))));
-        bridgePollNextAllowedAt = Date.now() + delayMs;
         updateEngineStatus(false);
     } finally {
         bridgePollInFlight = false;
