@@ -49,6 +49,12 @@ import {
   handleAdminSettingsSubmit
 } from './admin-v3.js';
 import {
+  loadProfilesFromSupabase,
+  loadOwnProfileFromSupabase,
+  loadUserBansFromSupabase,
+  loadCurrentUserBanFromSupabase,
+  loadBlockedUsersFromSupabase,
+  loadSiteSettingsFromSupabase,
   loadDirectThreadsFromSupabase,
   loadMessagesFromSupabase,
   loadThreadAttachmentPaths,
