@@ -34,7 +34,7 @@ export function createAppUi(context) {
     unsubscribeMessagingChannels, subscribeMessagingChannels, playIncomingMessageSound, handleProfileSave, openExistingThread,
     deleteConversation, openOrCreateThread, handleMessageSubmit, formatMessageTimestamp, loadUserPreferences,
     normalizeUserPreferences, saveUserPreferences, updateUserPreferences, isCurrentUserActivated, getCurrentUserEmail,
-    normalizeEmailForMatch, getCurrentUserEmailCandidates, isCurrentUserAdmin, canRevealMemberEmails, canUseLiveLikesForPost,
+    normalizeEmailForMatch, getCurrentUserEmailCandidates, isCurrentUserAdmin, isCurrentUserMasterAdmin, canRevealMemberEmails, canUseLiveLikesForPost,
     getPersonalStateScope, getScopedStorageKey, parseStoredPostIds, loadScopedPostIds, persistScopedPostIds,
     refreshLikedPostsState, isAdminRestrictedUploadKind, canCurrentUserUploadMediaKind, getRestrictedUploadMessage, canDeletePost,
     getAuthRedirectUrl, normalizeModerationText, getActiveBlockedTerms, normalizePostModerationText, normalizePostModerationTextSafe,
@@ -1850,7 +1850,7 @@ export function createAppUi(context) {
 
   function updateAdminSettingsValues() { elements.layoutWidthValue.textContent = `${state.siteSettings.shellWidth}px`; elements.layoutGapValue.textContent = `${state.siteSettings.sectionGap}px`; elements.layoutRadiusValue.textContent = `${state.siteSettings.surfaceRadius}px`; }
 
-  function renderAdminEditor() { const showAdminEditor = state.backendMode === "supabase" && isCurrentUserActivated() && isCurrentUserAdmin(); elements.adminEditor.hidden = !showAdminEditor; if (!showAdminEditor) return; elements.layoutWidthInput.value = String(state.siteSettings.shellWidth); elements.layoutGapInput.value = String(state.siteSettings.sectionGap); elements.layoutRadiusInput.value = String(state.siteSettings.surfaceRadius); elements.mediaFitSelect.value = state.siteSettings.mediaFit; updateAdminSettingsValues(); }
+  function renderAdminEditor() { const showAdminEditor = state.backendMode === "supabase" && isCurrentUserActivated() && isCurrentUserMasterAdmin(); elements.adminEditor.hidden = !showAdminEditor; if (!showAdminEditor) return; elements.layoutWidthInput.value = String(state.siteSettings.shellWidth); elements.layoutGapInput.value = String(state.siteSettings.sectionGap); elements.layoutRadiusInput.value = String(state.siteSettings.surfaceRadius); elements.mediaFitSelect.value = state.siteSettings.mediaFit; updateAdminSettingsValues(); }
 
   function renderTagCloud() { const posts = getVisiblePosts(); const tagCounts = new Map(); posts.forEach((post) => { post.tags.forEach((tag) => tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1)); }); const tags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 8); elements.tagCloud.innerHTML = ""; tags.forEach(([tag, count]) => { const button = document.createElement("button"); button.type = "button"; button.className = "tag-chip"; button.dataset.tag = tag; button.textContent = `#${tag} ${count}`; if (state.search === tag.toLowerCase()) button.classList.add("is-active"); elements.tagCloud.appendChild(button); }); }
 

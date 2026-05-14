@@ -238,8 +238,8 @@ function getAppConfig() {
     storageBucket: config.storageBucket?.trim() || "media",
     webPushPublicKey: config.webPushPublicKey?.trim() ?? "",
     notificationFunctionName: config.notificationFunctionName?.trim() || "send-message-notification",
-    spotifyPreviewFunctionName: config.spotifyPreviewFunctionName?.trim() || "spotify-preview-metadata",
     adminEmails: Array.isArray(config.adminEmails) ? config.adminEmails.map((e) => normalizeEmailForMatch(e)).filter(Boolean) : [],
+    masterAdminEmails: Array.isArray(config.masterAdminEmails) ? config.masterAdminEmails.map((e) => normalizeEmailForMatch(e)).filter(Boolean) : [],
   };
 }
 
@@ -2076,6 +2076,7 @@ function getCurrentUserEmailCandidates() {
 }
 
 function isCurrentUserAdmin() { const emails = getCurrentUserEmailCandidates(); return emails.some((email) => APP_CONFIG.adminEmails.includes(email)); }
+function isCurrentUserMasterAdmin() { const emails = getCurrentUserEmailCandidates(); return emails.some((email) => APP_CONFIG.masterAdminEmails.includes(email)); }
 function canRevealMemberEmails() { return isCurrentUserAdmin(); }
 function canUseLiveLikesForPost(post) { return Boolean(state.supabase && state.backendMode === "supabase" && state.currentUser && post && !post.isLocal); }
 function getPersonalStateScope() { return state.currentUser?.id ? `user:${state.currentUser.id}` : "guest"; }
@@ -2145,7 +2146,7 @@ function getPlayerViewportPadding() { return window.innerWidth <= 760 ? 12 : 20;
 function clampPlayerPosition(position) { if (!position) return null; const padding = getPlayerViewportPadding(); const width = elements.miniPlayer.offsetWidth || Math.min(360, Math.max(240, window.innerWidth - padding * 2)); const height = elements.miniPlayer.offsetHeight || 280; const maxX = Math.max(padding, window.innerWidth - width - padding); const maxY = Math.max(padding, window.innerHeight - height - padding); return { x: Math.min(maxX, Math.max(padding, Math.round(position.x))), y: Math.min(maxY, Math.max(padding, Math.round(position.y))) }; }
 
 async function loadSiteSettingsFromSupabase() { const { data, error } = await state.supabase.from("site_settings").select("*").eq("id", "global").maybeSingle(); if (error) throw error; return data ? normalizeSiteSettings(data) : { ...DEFAULT_SITE_SETTINGS }; }
-async function handleAdminSettingsSubmit(event) { event.preventDefault(); if (state.backendMode !== "supabase" || !state.supabase || !isCurrentUserAdmin()) { elements.adminSettingsFeedback.textContent = "Only live admin accounts can save site settings."; elements.adminSettingsFeedback.classList.add("is-error"); return; } const { error } = await state.supabase.from("site_settings").upsert(getSiteSettingsPayload()); if (error) { console.error("Failed to save site settings", error); elements.adminSettingsFeedback.textContent = "The layout settings could not be saved."; elements.adminSettingsFeedback.classList.add("is-error"); return; } elements.adminSettingsFeedback.textContent = "Layout settings saved for the live site."; elements.adminSettingsFeedback.classList.remove("is-error"); }
+async function handleAdminSettingsSubmit(event) { event.preventDefault(); if (state.backendMode !== "supabase" || !state.supabase || !isCurrentUserMasterAdmin()) { elements.adminSettingsFeedback.textContent = "Only master admin accounts can save site settings."; elements.adminSettingsFeedback.classList.add("is-error"); return; } const { error } = await state.supabase.from("site_settings").upsert(getSiteSettingsPayload()); if (error) { console.error("Failed to save site settings", error); elements.adminSettingsFeedback.textContent = "The layout settings could not be saved."; elements.adminSettingsFeedback.classList.add("is-error"); return; } elements.adminSettingsFeedback.textContent = "Layout settings saved for the live site."; elements.adminSettingsFeedback.classList.remove("is-error"); }
 
 function getAllPosts() { if (state.backendMode === "local" && state.userPosts.length === 0) return [...DEMO_POSTS]; return [...state.userPosts]; }
 function getVisiblePosts() {
@@ -2406,7 +2407,7 @@ export const {
   unsubscribeMessagingChannels, subscribeMessagingChannels, playIncomingMessageSound, handleProfileSave, openExistingThread,
   deleteConversation, openOrCreateThread, handleMessageSubmit, formatMessageTimestamp, loadUserPreferences,
   normalizeUserPreferences, saveUserPreferences, updateUserPreferences, isCurrentUserActivated, getCurrentUserEmail,
-  normalizeEmailForMatch, getCurrentUserEmailCandidates, isCurrentUserAdmin, canRevealMemberEmails, canUseLiveLikesForPost,
+  normalizeEmailForMatch, getCurrentUserEmailCandidates, isCurrentUserAdmin, isCurrentUserMasterAdmin, canRevealMemberEmails, canUseLiveLikesForPost,
   getPersonalStateScope, getScopedStorageKey, parseStoredPostIds, loadScopedPostIds, persistScopedPostIds,
   refreshLikedPostsState, canCurrentUserUploadMediaKind, getRestrictedUploadMessage, canDeletePost,
   getAuthRedirectUrl, normalizeModerationText, getActiveBlockedTerms,

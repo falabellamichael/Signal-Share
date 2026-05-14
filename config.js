@@ -12,4 +12,5 @@ window.SIGNAL_SHARE_CONFIG = {
   notificationFunctionName: "send-message-notification",
   spotifyPreviewFunctionName: "spotify-preview-metadata",
   adminEmails: ["falabellamichael@gmail.com", "falabellasocials@gmail.com"],
+  masterAdminEmails: ["falabellamichael@gmail.com"],
 };
