@@ -286,6 +286,122 @@ function isLoopbackSiteOrigin() {
 }
 
 /**
+ * Robustly parses balanced JSON tags like [PUBLISH:{...}] or [EDIT]...[/EDIT]
+ */
+function extractBalancedJsonTagPayload(text, tagName) {
+    const source = `${text || ''}`;
+    const upperSource = source.toUpperCase();
+    const marker = `[${`${tagName || ''}`.trim().toUpperCase()}:`;
+    if (!marker || marker === '[:') return null;
+
+    let searchFrom = 0;
+    while (searchFrom < source.length) {
+        const markerIndex = upperSource.indexOf(marker, searchFrom);
+        if (markerIndex < 0) return null;
+
+        let cursor = markerIndex + marker.length;
+        while (cursor < source.length && /\s/.test(source[cursor])) cursor += 1;
+        if (source[cursor] !== '{') {
+            searchFrom = markerIndex + marker.length;
+            continue;
+        }
+
+        let depth = 0;
+        let inString = false;
+        let isEscaped = false;
+        for (let i = cursor; i < source.length; i += 1) {
+            const ch = source[i];
+            if (inString) {
+                if (isEscaped) {
+                    isEscaped = false;
+                } else if (ch === '\\') {
+                    isEscaped = true;
+                } else if (ch === '"') {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (ch === '"') {
+                inString = true;
+                continue;
+            }
+            if (ch === '{') {
+                depth += 1;
+                continue;
+            }
+            if (ch !== '}') continue;
+
+            depth -= 1;
+            if (depth !== 0) continue;
+
+            let endCursor = i + 1;
+            while (endCursor < source.length && /\s/.test(source[endCursor])) endCursor += 1;
+            if (source[endCursor] !== ']') {
+                searchFrom = i + 1;
+                break;
+            }
+
+            return {
+                jsonText: source.slice(cursor, i + 1),
+                start: markerIndex,
+                end: endCursor + 1
+            };
+        }
+
+        searchFrom = markerIndex + marker.length;
+    }
+
+    return null;
+}
+
+/**
+ * Cleans the AI response text for UI display by removing protocol tags.
+ * Uses balanced parsing for [PUBLISH:...] to ensure robust removal.
+ */
+function stripArcadeProtocolTags(content = "") {
+    let text = `${content || ""}`;
+    let hadTags = false;
+    let publishData = null;
+
+    // 1. Balanced [PUBLISH:{...}]
+    let pub;
+    while ((pub = extractBalancedJsonTagPayload(text, 'PUBLISH')) !== null) {
+        hadTags = true;
+        try {
+            if (!publishData) publishData = JSON.parse(pub.jsonText);
+        } catch(e){}
+        text = text.substring(0, pub.start) + text.substring(pub.end);
+    }
+
+    // 2. [EDIT]...[/EDIT] blocks
+    const editRegex = /\[(IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit)\][\s\S]*?\[\/\1\]/gi;
+    if (editRegex.test(text)) {
+        hadTags = true;
+        text = text.replace(editRegex, "");
+    }
+
+    // 3. Simple tags [OPEN: url], [COMPOSE: text] etc.
+    const simpleRegex = /\[(ARCADE|DUCKDUCKGO|OPEN|COMPOSE|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit):\s*([^\]]+)\]/gi;
+    if (simpleRegex.test(text)) {
+        hadTags = true;
+        text = text.replace(simpleRegex, (match, tag, val) => {
+            if (tag === 'COMPOSE') return val;
+            return "";
+        });
+    }
+
+    // 4. Any remaining stray tags
+    const strayRegex = /\[(?:\/)?(ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit)\]/gi;
+    if (strayRegex.test(text)) {
+        hadTags = true;
+        text = text.replace(strayRegex, "");
+    }
+
+    return { text: text.trim(), hadTags, publishData };
+}
+
+/**
  * Checks if the current origin is a private network (LAN) address.
  */
 function isPrivateNetworkOrigin() {
@@ -528,17 +644,12 @@ function buildWorkshopPublishDirective() {
     return [
         '[WORKSHOP_PROTOCOL]',
         'If the user asks to create/build/write a game and publish/add it to the Arcade Library/Workshop, you MUST include exactly one [PUBLISH:{...}] tag.',
-        'Set target to "workshop".',
+        'The tag MUST contain a valid JSON object with: { "target": "workshop", "title": "...", "files": [{ "name": "...", "content": "..." }] }.',
         'Generate a complete, playable, self-contained browser game.',
-        'Include title, category, tags, and code payload.',
-        'Preferred payload format: files:[{name,type,content}, ...].',
-        'Alternative payload fields allowed: html, css, js, or code.',
-        'Required files: index.html plus linked styles.css and/or game.js when useful.',
-        'index.html must reference every extra CSS/JS file by exact filename.',
-        'The game must include visible controls, a reset/start path, win/lose or score feedback, and no placeholder/TODO code.',
-        'Use plain browser APIs only; do not depend on external libraries, bundlers, CDNs, imports, or module syntax.',
-        'Before replying, mentally verify that every referenced file exists and every JavaScript block parses as classic browser JavaScript.',
-        'Do not output placeholder/offline guidance when generation is available.',
+        'index.html MUST be the entry point and reference any other files (style.css, game.js) by their exact name.',
+        'Use plain browser APIs only; no external libraries, CDNs, or module syntax.',
+        'VISUALIZATION: In addition to the [PUBLISH] tag, you SHOULD also provide a markdown code block (```html or ```javascript) containing the primary game code so the user can see what you built.',
+        'The [PUBLISH] tag itself will be hidden from the user, while the code blocks will be shown.',
         '[/WORKSHOP_PROTOCOL]'
     ].join('\n');
 }
@@ -1861,8 +1972,12 @@ function addChatMessage(role, content) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `chat-message message-${role === 'ai' ? 'ai' : 'user'}`;
     
+    // Use robust protocol tag stripping to prevent leaking raw JSON/Tags into UI
+    const protocolInfo = stripArcadeProtocolTags(content);
+    const cleanContent = protocolInfo.text;
+
     if (content.includes('```')) {
-        const parts = content.split('```');
+        const parts = cleanContent.split('```');
         parts.forEach((part, index) => {
             if (index % 2 === 0) {
                 const paragraphs = part.split(/\n\n+/);
@@ -1908,16 +2023,31 @@ function addChatMessage(role, content) {
             }
         });
     } else {
-        // Strip internal protocol tags from display
-        const cleanContent = content
-            .replace(/\[(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT)\][\s\S]*?\[\/(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT)\]/gi, "")
-            .replace(/\[(?:\/)?(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT)\]/gi, "")
-            .replace(/\[COMPOSE:\s*([\s\S]*?)\]/gi, "$1")
-            .replace(/\[(?:ARCADE|DUCKDUCKGO|OPEN):\s*[^\]]+\]/gi, "")
-            .replace(/\[PUBLISH:\s*({[\s\S]*?})\]/gi, "")
-            .trim();
         msgDiv.textContent = cleanContent;
-        if (!cleanContent && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|\/?(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT))(?::|\])/i.test(content)) {
+        
+        // If the AI is publishing a game but forgot to include markdown code blocks, 
+        // automatically generate a snippet box for the main file so the user sees it.
+        if (protocolInfo.publishData?.files && protocolInfo.publishData.files.length > 0) {
+            const mainFile = protocolInfo.publishData.files.find(f => f.name === 'index.html' || f.name === 'game.js') || protocolInfo.publishData.files[0];
+            if (mainFile && mainFile.content) {
+                const codeWrapper = document.createElement('div');
+                codeWrapper.className = 'code-block-wrapper';
+                const pre = document.createElement('pre');
+                pre.className = 'chat-code-block';
+                pre.setAttribute('data-lang', mainFile.name.split('.').pop() || 'code');
+                pre.textContent = mainFile.content;
+                
+                const label = document.createElement('div');
+                label.style.cssText = 'font-size: 0.6rem; opacity: 0.5; margin-bottom: 4px; font-family: monospace;';
+                label.textContent = `Attached Project: ${mainFile.name}`;
+                
+                msgDiv.appendChild(label);
+                codeWrapper.appendChild(pre);
+                msgDiv.appendChild(codeWrapper);
+            }
+        }
+
+        if (!cleanContent && protocolInfo.hadTags) {
             msgDiv.style.display = 'none';
         }
     }
@@ -2856,6 +2986,22 @@ function buildAiWorkshopFilesFromText(rawText) {
         return files;
     }
 
+    // Fallback: Check if the AI returned a raw JSON array or object containing files (ignoring our protocol tags)
+    const trimmed = sourceText.trim();
+    if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+        try {
+            const rawJson = JSON.parse(trimmed);
+            const rawFiles = Array.isArray(rawJson) ? rawJson : (Array.isArray(rawJson.files) ? rawJson.files : null);
+            if (rawFiles && rawFiles.length > 0 && (rawFiles[0].content || rawFiles[0].code)) {
+                return rawFiles.map(f => ({
+                    name: f.name || f.filename || `file-${Math.random().toString(36).slice(2, 5)}.txt`,
+                    type: f.type || inferAiWorkshopFileType(f.name || f.filename),
+                    content: f.content || f.code || ""
+                })).filter(f => f.content);
+            }
+        } catch(e){}
+    }
+
     let fallback = sourceText.split(/\[PUBLISH:\s*/i)[0] || '';
     fallback = decodeEscapedCodeText(fallback).split(/\n#{2,}\s*step\s*2\b/i)[0].trim();
     const codeStart = fallback.search(/<!doctype html|<html|(?:^|\n)\s*(?:function|const|let|var|class)\s+/i);
@@ -3346,72 +3492,7 @@ function shouldRoutePublishToWorkshop(data, rawReplyText, userPrompt) {
     return replyLooksLikeWorkshopIntent;
 }
 
-function extractBalancedJsonTagPayload(text, tagName) {
-    const source = `${text || ''}`;
-    const upperSource = source.toUpperCase();
-    const marker = `[${`${tagName || ''}`.trim().toUpperCase()}:`;
-    if (!marker || marker === '[:') return null;
-
-    let searchFrom = 0;
-    while (searchFrom < source.length) {
-        const markerIndex = upperSource.indexOf(marker, searchFrom);
-        if (markerIndex < 0) return null;
-
-        let cursor = markerIndex + marker.length;
-        while (cursor < source.length && /\s/.test(source[cursor])) cursor += 1;
-        if (source[cursor] !== '{') {
-            searchFrom = markerIndex + marker.length;
-            continue;
-        }
-
-        let depth = 0;
-        let inString = false;
-        let isEscaped = false;
-        for (let i = cursor; i < source.length; i += 1) {
-            const ch = source[i];
-            if (inString) {
-                if (isEscaped) {
-                    isEscaped = false;
-                } else if (ch === '\\') {
-                    isEscaped = true;
-                } else if (ch === '"') {
-                    inString = false;
-                }
-                continue;
-            }
-
-            if (ch === '"') {
-                inString = true;
-                continue;
-            }
-            if (ch === '{') {
-                depth += 1;
-                continue;
-            }
-            if (ch !== '}') continue;
-
-            depth -= 1;
-            if (depth !== 0) continue;
-
-            let endCursor = i + 1;
-            while (endCursor < source.length && /\s/.test(source[endCursor])) endCursor += 1;
-            if (source[endCursor] !== ']') {
-                searchFrom = i + 1;
-                break;
-            }
-
-            return {
-                jsonText: source.slice(cursor, i + 1),
-                start: markerIndex,
-                end: endCursor + 1
-            };
-        }
-
-        searchFrom = markerIndex + marker.length;
-    }
-
-    return null;
-}
+// (Function moved to higher scope)
 
 function inferWorkshopTitleFromPrompt(userPrompt = '') {
     const text = `${userPrompt || ''}`.trim();
@@ -3778,6 +3859,7 @@ function isUnhelpfulWorkshopEditReply(replyText = '') {
     const text = `${replyText || ''}`.trim().toLowerCase();
     if (!text) return true;
     return text.includes('logic core returned an empty result')
+        || text.includes('empty edit response')
         || text.includes('please provide the source')
         || text.includes('please provide the content')
         || text.includes('i still require the source')

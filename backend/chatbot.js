@@ -855,10 +855,12 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         // Protocol tags are handled by the frontend; they should NOT trigger a backend tool iteration loop
         const isProtocolTag = lmResponse.includes('[PUBLISH:') || 
                               lmResponse.includes('[ARCADE:') || 
-                              lmResponse.includes('[COMPOSE:');
+                              lmResponse.includes('[COMPOSE:') ||
+                              lmResponse.includes('[EDIT]') ||
+                              lmResponse.includes('[/EDIT]');
         
         const effectiveHasTools = hasTools && !isProtocolTag;
-        const shouldForceSearchTool = iteration === 0 && isLiveWebInfoRequest(message || "");
+        const shouldForceSearchTool = !workshopEditActive && iteration === 0 && isLiveWebInfoRequest(message || "");
         const shouldBlockWorkshopFileTool = iteration === 0
             && workshopEditActive
             && hasVirtualWorkshopFileToolRequest(lmResponse);
@@ -881,7 +883,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                                    lmResponse.toLowerCase().includes('pulling up') ||
                                    lmResponse.toLowerCase().includes('checking');
         
-        if (isClaimingToSearch && !effectiveHasTools && iteration === 0) {
+        if (!workshopEditActive && isClaimingToSearch && !effectiveHasTools && iteration === 0) {
             console.log("[Chatbot] Auto-correcting missing search tag...");
             return getChatResponse(null, [
                 ...conversation,
