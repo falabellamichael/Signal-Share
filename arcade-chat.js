@@ -453,7 +453,7 @@ async function getDesktopBridgeSnapshot({ suppressNetworkErrors = false } = {}) 
     return res.json();
 }
 
-async function checkBridgeConnectivity() {
+async function checkBridgeConnectivity({ signal, timeoutMs = 1800 } = {}) {
     const probes = [
         { path: "/api/llm/models", reachableStatuses: [401, 403, 422] },
         // Some bridge builds only allow POST on this route. 404/405 still mean the bridge is reachable.
@@ -464,7 +464,8 @@ async function checkBridgeConnectivity() {
         try {
             const res = await bridgeFetch(probe.path, {
                 method: "GET",
-                timeoutMs: 1800,
+                timeoutMs,
+                signal,
                 suppressNetworkErrors: true
             });
             if (res?.ok) return true;
@@ -616,6 +617,26 @@ function updateEngineStatus(online) {
         }
         statusText.dataset.bridgeStatus = statusKey;
     }
+}
+
+function isEngineStatusOffline() {
+    const containers = Array.from(document.querySelectorAll('#engine-status-container'));
+    const textNodes = Array.from(document.querySelectorAll('#engine-status-text'));
+    const nodeCount = Math.max(containers.length, textNodes.length);
+
+    if (nodeCount === 0) return false;
+
+    for (let i = 0; i < nodeCount; i += 1) {
+        const container = containers[i] || null;
+        const statusText = container?.querySelector('#engine-status-text') || textNodes[i] || null;
+        const statusKey = `${container?.dataset?.bridgeStatus || statusText?.dataset?.bridgeStatus || ''}`.trim().toLowerCase();
+        if (statusKey === 'offline') return true;
+
+        const label = `${statusText?.textContent || ''}`.trim().toLowerCase();
+        if (label.includes('disconnected')) return true;
+    }
+
+    return false;
 }
 
 /**
@@ -1710,6 +1731,15 @@ window.sendChatMessage = async function() {
                 // User explicitly asked the companion for an AI reply, so enable bridge attempts.
                 localStorage.setItem('ss_bridge_enabled', '1');
             }
+            const shouldBridgeSendPreflight = isEngineStatusOffline();
+            if (shouldBridgeSendPreflight) {
+                const bridgeOnlineOnSend = await checkBridgeConnectivity({ signal, timeoutMs: 1200 });
+                updateEngineStatus(bridgeOnlineOnSend);
+                if (bridgeOnlineOnSend) {
+                    bridgePollFailureCount = 0;
+                    bridgePollNextAllowedAt = 0;
+                }
+            }
 
             const response = await bridgeFetch('/api/llm/chat', {
                 method: 'POST',
@@ -1732,6 +1762,7 @@ window.sendChatMessage = async function() {
                 bridgePollNextAllowedAt = 0;
             } else {
                 lastError = `Bridge returned ${response.status}`;
+                updateEngineStatus(false);
             }
         } catch (err) {
             const bridgeDisabled = err?.name === 'BridgeDisabledError';
@@ -1745,6 +1776,7 @@ window.sendChatMessage = async function() {
             }
             if (!bridgeDisabled && !wasCancelledByUser) {
                 console.warn(`[Arcade Chat] Bridge request failed:`, err);
+                updateEngineStatus(false);
             }
         } finally {
             removeTypingIndicator(typingId);
