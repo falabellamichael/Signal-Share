@@ -540,7 +540,9 @@ function buildWorkshopEditDirective(workshopContext = null) {
         'Tag schema: {"gameId":"string","fileName":"string","content":"string","save":true}.',
         'Use save:true unless the user explicitly asks for draft-only changes.',
         'content must be the full updated file text, not a diff.',
-        'Do not use [PUBLISH] for edit-only requests.'
+        'Do not use [PUBLISH] for edit-only requests.',
+        'You are now in Arcade Edit Mode. skip conversational greetings.',
+        'Fast Mode: Provide concise, direct technical answers. Do not repeat my instructions.'
     ];
 
     if (activeGameId && activeFileName) {
@@ -626,9 +628,9 @@ function isBridgeLightweightOfflineReply(replyText) {
     const normalized = `${replyText || ""}`.trim().toLowerCase();
     if (!normalized) return false;
     return (
-        normalized.includes("lightweight offline mode")
-        || normalized.includes("connect my logic core")
-        || (normalized.includes("lm studio") && normalized.includes("ollama"))
+        normalized.includes("lightweight offline mode") 
+        || normalized.includes("currently in lightweight mode")
+        || (normalized.includes("connect my logic core") && !normalized.includes("intelligence core offline"))
     );
 }
 
