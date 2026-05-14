@@ -2373,15 +2373,22 @@ window.sendChatMessage = async function() {
             
             // Execute any tags in the reply
             const actionResult = await executeArcadeChatActions(reply, { userPrompt: text });
-            if (isWorkshopPublishIntentPrompt(text) && !actionResult?.workshopPublishAttempted) {
+            
+            // MUTUAL EXCLUSION: If an edit was attempted/performed, do not also try to publish a new game.
+            // This prevents "Double Actioning" when the prompt is ambiguous.
+            if (actionResult?.workshopFileRewriteAttempted) {
+                // Edit was handled (either via tag or fallback was skipped because tag handled it)
+                // No further action needed for this message.
+            } else if (isWorkshopEditIntentPrompt(text, richContext)) {
+                // Attempt automated edit fallback if no tag was found
+                await tryAutoWorkshopFileRewriteFromReply(reply, text, richContext);
+            } else if (isWorkshopPublishIntentPrompt(text) && !actionResult?.workshopPublishAttempted) {
+                // Only try auto-publish if NOT an edit intent and no publish tag was found
                 await tryAutoPublishWorkshopFromReply(reply, text);
             }
-            // Optional: Automated Workshop File Rewrite Fallback
-            if (isWorkshopEditIntentPrompt(text, richContext) && !actionResult?.workshopFileRewriteAttempted) {
-                await tryAutoWorkshopFileRewriteFromReply(reply, text, richContext);
-            }
         } else {
-            if (workshopPublishIntent) {
+            // Only trigger emergency publish if it's NOT an edit request
+            if (workshopPublishIntent && !isWorkshopEditIntentPrompt(text, richContext)) {
                 const emergencyPublish = await tryEmergencyWorkshopPublishFromPrompt(text, lastError);
                 if (emergencyPublish?.attempted && emergencyPublish?.ok) {
                     const publishReply = `🕹️ [Arcade Protocol]: Remote generation failed, so I generated and published "${emergencyPublish.title}" directly to your Workshop (${emergencyPublish.assetCount} assets).`;
