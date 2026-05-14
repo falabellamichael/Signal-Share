@@ -508,6 +508,76 @@ function getDeviceId() {
         || "";
 }
 
+function isBridgeLightweightOfflineReply(replyText) {
+    const normalized = `${replyText || ""}`.trim().toLowerCase();
+    if (!normalized) return false;
+    return (
+        normalized.includes("lightweight offline mode")
+        || normalized.includes("connect my logic core")
+        || (normalized.includes("lm studio") && normalized.includes("ollama"))
+    );
+}
+
+function extractStackLocation(errorLike) {
+    const stack = `${errorLike?.stack || ''}`.trim();
+    if (!stack) return '';
+
+    const stackLines = stack
+        .split('\n')
+        .map((line) => `${line || ''}`.trim())
+        .filter(Boolean);
+
+    const locationPattern = /([A-Za-z]:\\[^:\s)]+|https?:\/\/[^:\s)]+|file:\/\/\/[^:\s)]+|\/[^:\s)]+|[^:\s)]+\.js(?:\?[^:\s)]*)?):(\d+):(\d+)/i;
+    for (const line of stackLines) {
+        const match = line.match(locationPattern);
+        if (!match) continue;
+        const rawFile = `${match[1] || ''}`.trim();
+        const normalizedFile = rawFile
+            .replace(/^file:\/\/\//i, '')
+            .split('?')[0];
+        const fileName = normalizedFile.split(/[\\/]/).pop() || normalizedFile || 'unknown-file';
+        return `${fileName}:${match[2]}:${match[3]}`;
+    }
+    return '';
+}
+
+function captureClientSourceLocation() {
+    return extractStackLocation(new Error());
+}
+
+function formatAttemptError(route, reason, sourceLocation = '') {
+    const routeLabel = `${route || 'route'}`.trim();
+    const reasonLabel = `${reason || 'request failed'}`.trim();
+    const source = `${sourceLocation || ''}`.trim();
+    return source
+        ? `${routeLabel}: ${reasonLabel} @ ${source}`
+        : `${routeLabel}: ${reasonLabel}`;
+}
+
+async function readBridgeErrorDetails(response) {
+    if (!response) {
+        return { message: '', sourceLocation: '' };
+    }
+
+    const contentType = `${response.headers?.get('content-type') || ''}`.toLowerCase();
+    try {
+        if (contentType.includes('application/json')) {
+            const data = await response.clone().json().catch(() => null);
+            const message = `${data?.error || data?.message || data?.detail || ''}`.trim();
+            const stackLocation = extractStackLocation({ stack: `${data?.stack || ''}` });
+            return { message, sourceLocation: stackLocation };
+        }
+
+        const textBody = `${await response.clone().text().catch(() => '')}`.trim();
+        if (!textBody) return { message: '', sourceLocation: '' };
+        const trimmed = textBody.slice(0, 240).replace(/\s+/g, ' ');
+        const stackLocation = extractStackLocation({ stack: textBody });
+        return { message: trimmed, sourceLocation: stackLocation };
+    } catch (_error) {
+        return { message: '', sourceLocation: '' };
+    }
+}
+
 async function bridgeFetch(path, options = {}) {
     if (!isBridgeFeatureEnabled()) {
         const error = new Error("Bridge requests disabled");
@@ -2062,42 +2132,74 @@ window.sendChatMessage = async function() {
             });
 
             const chatPaths = ['/api/local-llm/chat', '/api/llm/chat'];
-            let response = null;
+            const attemptErrors = [];
 
             for (const chatPath of chatPaths) {
-                const nextResponse = await bridgeFetch(chatPath, {
-                    method: 'POST',
-                    timeoutMs: 0,
-                    signal,
-                    body: payload
-                });
+                try {
+                    const nextResponse = await bridgeFetch(chatPath, {
+                        method: 'POST',
+                        timeoutMs: 0,
+                        signal,
+                        body: payload
+                    });
 
-                if (nextResponse.status === 404 && chatPath !== chatPaths[chatPaths.length - 1]) {
-                    continue;
+                    if (nextResponse?.ok) {
+                        const data = await nextResponse.json().catch(() => null);
+                        if (!data || typeof data !== 'object') {
+                            attemptErrors.push(formatAttemptError(chatPath, 'non-JSON payload', captureClientSourceLocation()));
+                            continue;
+                        }
+                        const candidateReply = typeof data.reply === 'string' ? data.reply : '';
+                        if (!candidateReply.trim()) {
+                            attemptErrors.push(formatAttemptError(chatPath, 'empty AI reply', captureClientSourceLocation()));
+                            continue;
+                        }
+
+                        if (chatPath === '/api/local-llm/chat' && isBridgeLightweightOfflineReply(candidateReply)) {
+                            attemptErrors.push(formatAttemptError(chatPath, 'lightweight offline fallback from bridge', captureClientSourceLocation()));
+                            continue;
+                        }
+
+                        reply = candidateReply;
+                        break;
+                    } else {
+                        const statusCode = nextResponse?.status ?? "unknown";
+                        const errorDetails = await readBridgeErrorDetails(nextResponse);
+                        const statusReason = errorDetails.message
+                            ? `HTTP ${statusCode} (${errorDetails.message})`
+                            : `HTTP ${statusCode}`;
+                        attemptErrors.push(formatAttemptError(
+                            chatPath,
+                            statusReason,
+                            errorDetails.sourceLocation || captureClientSourceLocation()
+                        ));
+
+                        if (nextResponse.status === 404 && chatPath !== chatPaths[chatPaths.length - 1]) {
+                            continue;
+                        }
+
+                        if ((nextResponse.status === 401 || nextResponse.status === 403)
+                            && chatPath === '/api/local-llm/chat'
+                            && chatPath !== chatPaths[chatPaths.length - 1]) {
+                            // Token/secret mismatch on strict local-llm route; try legacy chat route.
+                            continue;
+                        }
+                    }
+                } catch (routeError) {
+                    const routeMessage = `${routeError?.message || 'request failed'}`.trim();
+                    const routeLocation = extractStackLocation(routeError) || captureClientSourceLocation();
+                    attemptErrors.push(formatAttemptError(chatPath, routeMessage, routeLocation));
                 }
-
-                if ((nextResponse.status === 401 || nextResponse.status === 403)
-                    && chatPath === '/api/local-llm/chat'
-                    && chatPath !== chatPaths[chatPaths.length - 1]) {
-                    // Token/secret mismatch on strict local-llm route; try legacy chat route.
-                    continue;
-                }
-
-                response = nextResponse;
-                break;
             }
 
-            if (response?.ok) {
-                const data = await response.json().catch(() => null);
-                if (!data || typeof data !== 'object') {
-                    throw new Error("Bridge returned a non-JSON payload. Check Bridge URL and endpoint.");
-                }
-                reply = data.reply;
+            if (reply !== null) {
                 updateEngineStatus(true);
                 bridgePollFailureCount = 0;
                 bridgePollNextAllowedAt = 0;
             } else {
-                lastError = `Bridge returned ${response?.status ?? "unknown"}`;
+                lastError = attemptErrors.length > 0
+                    ? attemptErrors.join(" | ")
+                    : "Bridge did not return an AI reply";
                 updateEngineStatus(false);
             }
         } catch (err) {
@@ -2121,6 +2223,10 @@ window.sendChatMessage = async function() {
                     } else {
                         nextError = 'Failed to fetch bridge. Set Bridge URL (PC IP) in settings (example: http://192.168.x.x:3000).';
                     }
+                }
+                const topLevelErrorLocation = extractStackLocation(err);
+                if (topLevelErrorLocation) {
+                    nextError = `${nextError} @ ${topLevelErrorLocation}`;
                 }
                 lastError = nextError;
             }
