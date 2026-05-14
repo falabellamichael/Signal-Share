@@ -33,6 +33,21 @@ function normalizeBridgeBaseUrl(baseUrl = "") {
     }
 }
 
+function resolveHttpFallbackBridgeBaseUrl(baseUrl = "") {
+    const normalized = normalizeBridgeBaseUrl(baseUrl);
+    if (!normalized) return "";
+    try {
+        const parsed = new URL(normalized, window.location.href);
+        if (parsed.protocol !== "https:") return "";
+        const targetAddressSpace = getBridgeTargetAddressSpace(normalized);
+        if (targetAddressSpace !== "loopback" && targetAddressSpace !== "private") return "";
+        parsed.protocol = "http:";
+        return normalizeBridgeBaseUrl(parsed.toString());
+    } catch (_error) {
+        return "";
+    }
+}
+
 function isAndroidRuntime() {
     return document.documentElement.classList.contains('platform-android')
         || (window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android');
@@ -59,9 +74,11 @@ function resolveBridgeBaseCandidates() {
         || localStorage.getItem('signal-share-bridge-url')
         || ""
     );
+    const configuredHttpFallback = resolveHttpFallbackBridgeBaseUrl(configured);
     const lastWorking = normalizeBridgeBaseUrl(localStorage.getItem(BRIDGE_LAST_WORKING_BASE_KEY) || "");
     pushBridgeBaseCandidate(candidates, seen, lastWorking);
     pushBridgeBaseCandidate(candidates, seen, configured);
+    pushBridgeBaseCandidate(candidates, seen, configuredHttpFallback);
 
     const isLoopbackOrigin = protocol === 'file:'
         || !host
@@ -1897,9 +1914,23 @@ window.sendChatMessage = async function() {
                 wasCancelledByUser = true;
                 lastError = 'Request cancelled by user';
             } else {
-                lastError = bridgeDisabled
+                let nextError = bridgeDisabled
                     ? 'Bridge disabled'
                     : (err?.message || "Connection refused or blocked by browser");
+                if (!bridgeDisabled && /failed to fetch/i.test(`${nextError}`)) {
+                    const configuredBridge = `${window.SignalShareLocalLlm?.getBridgeBaseUrl?.()
+                        || localStorage.getItem('signal-share-bridge-url')
+                        || ''}`.trim();
+                    if (configuredBridge) {
+                        const hint = configuredBridge.toLowerCase().startsWith('https://')
+                            ? ' Use http:// for local bridge URLs.'
+                            : '';
+                        nextError = `Failed to fetch bridge at ${configuredBridge}. Ensure phone and PC are on the same Wi-Fi and port 3000 is allowed.${hint}`;
+                    } else {
+                        nextError = 'Failed to fetch bridge. Set Bridge URL (PC IP) in settings (example: http://192.168.x.x:3000).';
+                    }
+                }
+                lastError = nextError;
             }
             if (!bridgeDisabled && !wasCancelledByUser) {
                 console.warn(`[Arcade Chat] Bridge request failed:`, err);

@@ -437,9 +437,23 @@ async function callLocalAI({
           return "🛑 [Signal Protocol] AI request stopped.";
         }
         const bridgeDisabled = error?.name === "BridgeDisabledError";
-        lastError = bridgeDisabled
+        let nextError = bridgeDisabled
           ? "Bridge disabled"
           : (error?.message || "Connection refused or blocked by browser");
+        if (!bridgeDisabled && /failed to fetch/i.test(`${nextError}`)) {
+          const configuredBridge = `${window.SignalShareLocalLlm?.getBridgeBaseUrl?.()
+            || localStorage.getItem("signal-share-bridge-url")
+            || ""}`.trim();
+          if (configuredBridge) {
+            const hint = configuredBridge.toLowerCase().startsWith("https://")
+              ? " Use http:// for local bridge URLs."
+              : "";
+            nextError = `Failed to fetch bridge at ${configuredBridge}. Ensure phone and PC are on the same Wi-Fi and port 3000 is allowed.${hint}`;
+          } else {
+            nextError = "Failed to fetch bridge. Set Bridge URL (PC IP) in settings (example: http://192.168.x.x:3000).";
+          }
+        }
+        lastError = nextError;
         if (!bridgeDisabled) {
           console.warn(`[AI Messenger] Bridge request failed (${chatPath}):`, error);
         }
