@@ -469,20 +469,36 @@ function isComposeDraftIntent(message = "") {
 function isWorkshopPublishIntentPrompt(message = "") {
     const text = `${message || ''}`.trim().toLowerCase();
     if (!text) return false;
-    const publishVerb = /\b(publish|upload|save|add|ship|submit)\b/.test(text);
-    const buildVerb = /\b(write|create|build|make|generate|code)\b/.test(text);
-    const target = /\b(library|workshop|arcade)\b/.test(text);
-    const gameMention = /\b(game|mini[-\s]?game|arcade game)\b/.test(text);
-    return target && (publishVerb || (buildVerb && gameMention));
+    const publishVerb = /\b(publish|upload|save|add|ship|submit|post|share)\b/.test(text);
+    const buildVerb = /\b(write|create|build|make|generate|code|new)\b/.test(text);
+    const target = /\b(library|workshop|arcade|store)\b/.test(text);
+    const gameMention = /\b(game|mini[-\s]?game|arcade game|app|utility)\b/.test(text);
+    
+    // Allow either (target + publish) OR (build + gameMention) OR (publish + gameMention)
+    return (target && publishVerb) || (buildVerb && gameMention) || (publishVerb && gameMention);
 }
 
-function isWorkshopEditIntentPrompt(message = "") {
+function isWorkshopEditIntentPrompt(message = "", context = null) {
     const text = `${message || ''}`.trim().toLowerCase();
     if (!text) return false;
-    const editVerb = /\b(edit|update|rewrite|refactor|fix|modify|change|patch|improve|adjust|tweak)\b/.test(text);
-    const target = /\b(workshop|editor|library)\b/.test(text);
-    const codeMention = /\b(game|file|html|css|js|javascript|json|code)\b/.test(text);
-    return editVerb && target && codeMention;
+    
+    // Core edit verbs
+    const editVerb = /\b(edit|update|rewrite|refactor|fix|modify|change|patch|improve|adjust|tweak|rewrite|add|remove|implement|style|color|speed|movement|gravity|score)\b/.test(text);
+    
+    // Check if we are currently in the workshop editor via context
+    const inEditor = !!(context?.workshopEditor?.activeGameId);
+    
+    const target = /\b(workshop|editor|library|project)\b/.test(text);
+    const codeMention = /\b(game|file|html|css|js|javascript|json|code|logic|function|script|manifest)\b/.test(text);
+    
+    if (inEditor) {
+        // If already in the editor, we are much more permissive. 
+        // Any edit verb or code mention or even just a general "change" request should count.
+        return editVerb || codeMention || target;
+    }
+    
+    // Outside of editor, require a verb and either a target or code mention
+    return editVerb && (target || codeMention);
 }
 
 function buildWorkshopPublishDirective() {
@@ -540,7 +556,11 @@ function buildProtocolAwareUserMessage(userPrompt = "", workshopContext = null) 
     if (isWorkshopPublishIntentPrompt(text)) {
         directives.push(buildWorkshopPublishDirective());
     }
-    if (isWorkshopEditIntentPrompt(text)) {
+    if (isWorkshopEditIntentPrompt(text, workshopContext)) {
+        directives.push(buildWorkshopEditDirective(workshopContext));
+    } else if (workshopContext?.workshopEditor?.activeGameId && !isWorkshopPublishIntentPrompt(text)) {
+        // If in editor but intent wasn't explicitly detected, still add the directive as a secondary option 
+        // to ensure the AI knows it can edit the current file.
         directives.push(buildWorkshopEditDirective(workshopContext));
     }
     if (directives.length === 0) return text;
@@ -2336,8 +2356,9 @@ window.sendChatMessage = async function() {
             if (isWorkshopPublishIntentPrompt(text) && !actionResult?.workshopPublishAttempted) {
                 await tryAutoPublishWorkshopFromReply(reply, text);
             }
-            if (isWorkshopEditIntentPrompt(text) && !actionResult?.workshopFileRewriteAttempted) {
-                await tryAutoWorkshopFileRewriteFromReply(reply, text);
+            // Optional: Automated Workshop File Rewrite Fallback
+            if (isWorkshopEditIntentPrompt(text, richContext) && !actionResult?.workshopFileRewriteAttempted) {
+                await tryAutoWorkshopFileRewriteFromReply(reply, text, richContext);
             }
         } else {
             if (workshopPublishIntent) {
@@ -2878,13 +2899,13 @@ async function executeArcadeChatActions(text, options = {}) {
     return actionResult;
 }
 
-async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '') {
+async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt, context = null) {
     const result = {
         attempted: false,
         ok: false,
         reason: ''
     };
-    if (!isWorkshopEditIntentPrompt(userPrompt)) return result;
+    if (!isWorkshopEditIntentPrompt(userPrompt, context)) return result;
     if (extractBalancedJsonTagPayload(replyText, 'FILE_REWRITE')) return result;
     if (typeof window.applyAiFileEdit !== 'function') {
         result.reason = 'file-rewrite-unavailable';
