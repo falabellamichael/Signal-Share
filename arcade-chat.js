@@ -416,20 +416,9 @@ function resolveChatRequestModel(selectedValue = "auto") {
     if (normalizedSelected && normalizedSelected.toLowerCase() !== "auto") {
         return normalizedSelected;
     }
-
-    const select = document.getElementById("chat-model-select");
-    if (!select) return "auto";
-    const values = Array.from(select.options)
-        .map((option) => `${option.value || ""}`.trim())
-        .filter(Boolean);
-
-    const preferred = values.find((value) => {
-        const lower = value.toLowerCase();
-        if (lower === "auto" || lower.includes("embedding")) return false;
-        return lower.includes("1.5b") || lower.includes("e2b");
-    });
-
-    return preferred || "auto";
+    // Let the backend auto-selector choose:
+    // 1) currently loaded model, 2) DeepSeek fallback if none are loaded.
+    return "auto";
 }
 
 function getAiCore() {

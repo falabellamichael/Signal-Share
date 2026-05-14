@@ -780,7 +780,6 @@ body[data-theme="midnight"] .message-row.is-self .message-bubble p {
   color: #000000 !important;
   font-weight: 700;
   border: none !important;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
 }
 
 /* Keyboard Key Component Styles */
