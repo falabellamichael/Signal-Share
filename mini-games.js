@@ -296,6 +296,7 @@ function vibrate(ms) {
 
 let customGames = readStoredArray('ss-custom-games');
 let uploadedFiles = [];
+const DEFAULT_CUSTOM_GAME_POSTER_DATA_URL = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22%3E%3Crect fill=%22%23233c51%22 width=%22200%22 height=%22300%22/%3E%3C/svg%3E';
 
 // Detection
 const isNative = !!window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() !== 'web';
@@ -612,7 +613,7 @@ async function publishCustomGame() {
     const title = document.getElementById('game-title').value || 'Untitled Game';
     const category = document.getElementById('game-category').value;
     const description = document.getElementById('game-description').value || '';
-    const thumbnail = document.getElementById('game-thumbnail').value || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22%3E%3Crect fill=%22%23233c51%22 width=%22200%22 height=%22300%22/%3E%3C/svg%3E';
+    const thumbnail = document.getElementById('game-thumbnail').value || DEFAULT_CUSTOM_GAME_POSTER_DATA_URL;
     const tags = document.getElementById('game-tags').value || '';
 
     try {
@@ -630,45 +631,17 @@ async function publishCustomGame() {
         });
 
         const processedFiles = await Promise.all(filePromises);
-        const gameId = 'custom_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-
-        let entryFile = processedFiles.find(f => f.name.toLowerCase() === 'index.html') ||
-            processedFiles.find(f => f.name.endsWith('.html')) ||
-            processedFiles[0];
-
-        const allCode = processedFiles.map(f => f.content).join(' ');
-        const trackedStats = [];
-        const statRegex = /localStorage\.(?:get|set)Item\(['"]([^'"]+)['"]\)/g;
-        let match;
-        while ((match = statRegex.exec(allCode)) !== null) {
-            const key = match[1];
-            const lowerKey = key.toLowerCase();
-            // Expanded scanner keywords from the sophisticated list
-            const keywords = ['score', 'best', 'level', 'stats', 'rank', 'xp', 'streak', 'win', 'lose', 'food', 'points', 'plays', 'time', 'likes', 'views', 'eng', 'rep', 'consecutive'];
-            if (keywords.some(k => lowerKey.includes(k))) {
-                if (!trackedStats.includes(key)) trackedStats.push(key);
-            }
+        const publishResult = publishProcessedGameFiles({
+            processedFiles,
+            title,
+            category,
+            description,
+            thumbnail,
+            tags
+        });
+        if (!publishResult.ok) {
+            throw new Error(publishResult.error || 'publish-failed');
         }
-
-        const newGame = {
-            id: gameId,
-            title: title,
-            category: category,
-            poster: thumbnail,
-            tag: `${category} • CUSTOM`,
-            type: category.toLowerCase() === 'utility' ? 'utility' : 'game',
-            description: description,
-            tags: tags,
-            author: currentUser.name,
-            files: processedFiles,
-            entryFile: entryFile.name,
-            publishedAt: new Date().toISOString(),
-            trackedStats: trackedStats
-        };
-
-        customGames.push(newGame);
-        GAMES.push(newGame);
-        localStorage.setItem('ss-custom-games', JSON.stringify(customGames));
 
         document.getElementById('game-title').value = '';
         document.getElementById('game-category').value = 'GAME';
@@ -685,6 +658,147 @@ async function publishCustomGame() {
         console.error('Publish error:', err);
         alert('Failed to process files. Please try again.');
     }
+}
+
+function inferFileTypeFromName(fileName) {
+    const lowerName = `${fileName || ''}`.trim().toLowerCase();
+    if (lowerName.endsWith('.html')) return 'text/html';
+    if (lowerName.endsWith('.css')) return 'text/css';
+    if (lowerName.endsWith('.js')) return 'text/javascript';
+    if (lowerName.endsWith('.json')) return 'application/json';
+    return 'text/plain';
+}
+
+function encodeTextAsDataUrl(text, mimeType = 'text/plain;charset=utf-8') {
+    try {
+        const input = `${text ?? ''}`;
+        const bytes = new TextEncoder().encode(input);
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.subarray(i, i + chunkSize);
+            binary += String.fromCharCode(...chunk);
+        }
+        return `data:${mimeType};base64,${btoa(binary)}`;
+    } catch (_error) {
+        return `${text ?? ''}`;
+    }
+}
+
+function collectTrackedStatsFromFiles(processedFiles) {
+    const allCode = processedFiles.map(f => `${f.content || ''}`).join(' ');
+    const trackedStats = [];
+    const statRegex = /localStorage\.(?:get|set)Item\(['"]([^'"]+)['"]\)/g;
+    let match;
+    while ((match = statRegex.exec(allCode)) !== null) {
+        const key = match[1];
+        const lowerKey = key.toLowerCase();
+        const keywords = ['score', 'best', 'level', 'stats', 'rank', 'xp', 'streak', 'win', 'lose', 'food', 'points', 'plays', 'time', 'likes', 'views', 'eng', 'rep', 'consecutive'];
+        if (keywords.some(k => lowerKey.includes(k)) && !trackedStats.includes(key)) {
+            trackedStats.push(key);
+        }
+    }
+    return trackedStats;
+}
+
+function publishProcessedGameFiles(options = {}) {
+    if (!currentUser) {
+        return { ok: false, error: 'auth-required' };
+    }
+
+    const rawFiles = Array.isArray(options.processedFiles) ? options.processedFiles : [];
+    if (rawFiles.length === 0) {
+        return { ok: false, error: 'no-files' };
+    }
+
+    const processedFiles = rawFiles
+        .map((file, index) => {
+            if (!file || typeof file !== 'object') return null;
+            const fallbackName = `file-${index + 1}.txt`;
+            const rawName = typeof file.name === 'string' && file.name.trim() ? file.name.trim() : fallbackName;
+            const name = rawName.replace(/[/\\]+/g, '_');
+            const type = typeof file.type === 'string' && file.type.trim() ? file.type.trim() : inferFileTypeFromName(name);
+            let content = typeof file.content === 'string' ? file.content : '';
+            if (!content) return null;
+            if (!content.startsWith('data:')) {
+                content = encodeTextAsDataUrl(content, type);
+            }
+            return { name, content, type };
+        })
+        .filter(Boolean);
+
+    if (processedFiles.length === 0) {
+        return { ok: false, error: 'invalid-files' };
+    }
+
+    const title = typeof options.title === 'string' && options.title.trim() ? options.title.trim() : 'Untitled Game';
+    const category = typeof options.category === 'string' && options.category.trim() ? options.category.trim().toUpperCase() : 'GAME';
+    const description = typeof options.description === 'string' ? options.description.trim() : '';
+    const thumbnail = typeof options.thumbnail === 'string' && options.thumbnail.trim() ? options.thumbnail.trim() : DEFAULT_CUSTOM_GAME_POSTER_DATA_URL;
+    const tags = typeof options.tags === 'string' ? options.tags.trim() : '';
+
+    const gameId = 'custom_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+    const entryFile = processedFiles.find(f => f.name.toLowerCase() === 'index.html')
+        || processedFiles.find(f => f.name.toLowerCase().endsWith('.html'))
+        || processedFiles[0];
+    const trackedStats = collectTrackedStatsFromFiles(processedFiles);
+
+    const newGame = {
+        id: gameId,
+        title,
+        category,
+        poster: thumbnail,
+        tag: `${category} • CUSTOM`,
+        type: category.toLowerCase() === 'utility' ? 'utility' : 'game',
+        description,
+        tags,
+        author: currentUser.name,
+        files: processedFiles,
+        entryFile: entryFile.name,
+        publishedAt: new Date().toISOString(),
+        trackedStats
+    };
+
+    customGames.push(newGame);
+    GAMES.push(newGame);
+    localStorage.setItem('ss-custom-games', JSON.stringify(customGames));
+    renderLibrary();
+    if (currentCategory === 'publish') {
+        renderPublishedGames();
+    }
+
+    return { ok: true, game: newGame };
+}
+
+async function publishCustomGameFromAi(payload = {}) {
+    if (!currentUser) {
+        return { ok: false, error: 'auth-required', message: 'Sign in to publish games to the workshop.' };
+    }
+
+    const files = Array.isArray(payload.files) ? payload.files : [];
+    if (files.length === 0) {
+        return { ok: false, error: 'no-files', message: 'No game files were provided by the AI response.' };
+    }
+
+    const publishResult = publishProcessedGameFiles({
+        processedFiles: files,
+        title: payload.title,
+        category: payload.category,
+        description: payload.description,
+        thumbnail: payload.thumbnail,
+        tags: payload.tags
+    });
+
+    if (!publishResult.ok) {
+        return { ok: false, error: publishResult.error || 'publish-failed', message: 'Unable to publish the generated game.' };
+    }
+
+    return {
+        ok: true,
+        gameId: publishResult.game.id,
+        title: publishResult.game.title,
+        assetCount: publishResult.game.files.length
+    };
 }
 
 function renderPublishedGames() {
@@ -1425,6 +1539,7 @@ window.hideAuth = hideAuth;
 window.showAuth = showAuth;
 window.removeUploadedFile = removeUploadedFile;
 window.publishCustomGame = publishCustomGame;
+window.publishCustomGameFromAi = publishCustomGameFromAi;
 window.clearRecent = clearRecent;
 window.toggleObstCount = toggleObstCount;
 

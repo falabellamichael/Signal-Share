@@ -1760,6 +1760,193 @@ window.sendChatMessage = async function() {
     }
 }
 
+function inferAiWorkshopFileType(fileName) {
+    const lower = `${fileName || ''}`.trim().toLowerCase();
+    if (lower.endsWith('.html')) return 'text/html';
+    if (lower.endsWith('.css')) return 'text/css';
+    if (lower.endsWith('.js')) return 'text/javascript';
+    if (lower.endsWith('.json')) return 'application/json';
+    return 'text/plain';
+}
+
+function decodeEscapedCodeText(value) {
+    return `${value || ''}`
+        .replace(/\\r\\n/g, '\n')
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+}
+
+function looksLikeExecutableCode(value) {
+    const text = `${value || ''}`.trim();
+    if (text.length < 80) return false;
+    const markers = [
+        'function ',
+        'const ',
+        'let ',
+        'var ',
+        '=>',
+        'document.',
+        'addEventListener',
+        '<html',
+        '<!doctype',
+        'return '
+    ];
+    const hitCount = markers.reduce((count, marker) => count + (text.toLowerCase().includes(marker) ? 1 : 0), 0);
+    const structureHits = (text.match(/[{};]/g) || []).length;
+    return hitCount >= 2 && structureHits >= 4;
+}
+
+function buildAiWorkshopFilesFromText(rawText) {
+    const files = [];
+    const counters = { html: 0, css: 0, js: 0, txt: 0 };
+    const nextName = (kind) => {
+        counters[kind] += 1;
+        if (kind === 'html') return counters[kind] === 1 ? 'index.html' : `view-${counters[kind]}.html`;
+        if (kind === 'css') return counters[kind] === 1 ? 'styles.css' : `styles-${counters[kind]}.css`;
+        if (kind === 'js') return counters[kind] === 1 ? 'game.js' : `game-${counters[kind]}.js`;
+        return `snippet-${counters.txt}.txt`;
+    };
+
+    const sourceText = `${rawText || ''}`;
+    const blockRegex = /```([a-z0-9_+-]*)\s*\n([\s\S]*?)```/gi;
+    let blockMatch;
+    while ((blockMatch = blockRegex.exec(sourceText)) !== null) {
+        const lang = `${blockMatch[1] || ''}`.trim().toLowerCase();
+        const code = `${blockMatch[2] || ''}`.trim();
+        if (!code) continue;
+        let kind = 'txt';
+        if (lang.includes('html')) kind = 'html';
+        else if (lang.includes('css')) kind = 'css';
+        else if (lang.includes('js') || lang.includes('javascript') || lang.includes('ts')) kind = 'js';
+        else if (code.toLowerCase().includes('<!doctype html') || code.toLowerCase().includes('<html')) kind = 'html';
+        else if (looksLikeExecutableCode(code)) kind = 'js';
+        files.push({
+            name: nextName(kind),
+            type: kind === 'html' ? 'text/html' : kind === 'css' ? 'text/css' : kind === 'js' ? 'text/javascript' : 'text/plain',
+            content: code
+        });
+    }
+
+    if (files.length > 0) {
+        return files;
+    }
+
+    let fallback = sourceText.split(/\[PUBLISH:\s*/i)[0] || '';
+    fallback = decodeEscapedCodeText(fallback).split(/\n#{2,}\s*step\s*2\b/i)[0].trim();
+    const codeStart = fallback.search(/<!doctype html|<html|(?:^|\n)\s*(?:function|const|let|var|class)\s+/i);
+    if (codeStart > 0) {
+        fallback = fallback.slice(codeStart).trim();
+    }
+
+    if (!looksLikeExecutableCode(fallback)) {
+        return [];
+    }
+
+    const isHtml = /<!doctype html|<html/i.test(fallback);
+    return [{
+        name: isHtml ? 'index.html' : 'game.js',
+        type: isHtml ? 'text/html' : 'text/javascript',
+        content: fallback
+    }];
+}
+
+function buildAiWorkshopFilesFromHistory() {
+    if (!Array.isArray(arcadeChatHistory)) return [];
+    let assistantMessagesChecked = 0;
+    for (let i = arcadeChatHistory.length - 1; i >= 0; i -= 1) {
+        const entry = arcadeChatHistory[i];
+        if (!entry || entry.role !== 'assistant' || typeof entry.content !== 'string') continue;
+        assistantMessagesChecked += 1;
+        const files = buildAiWorkshopFilesFromText(entry.content);
+        if (files.length > 0) return files;
+        if (assistantMessagesChecked >= 8) break;
+    }
+    return [];
+}
+
+function buildAiWorkshopPublishFiles(data, rawReplyText) {
+    const collected = [];
+    const pushFile = (file, fallbackIndex) => {
+        if (!file || typeof file !== 'object') return;
+        const rawName = typeof file.name === 'string' && file.name.trim() ? file.name.trim() : `file-${fallbackIndex}.txt`;
+        const rawContent = typeof file.content === 'string' ? file.content : '';
+        if (!rawContent.trim()) return;
+        const name = rawName.replace(/[/\\]+/g, '_');
+        const type = typeof file.type === 'string' && file.type.trim() ? file.type.trim() : inferAiWorkshopFileType(name);
+        collected.push({ name, type, content: rawContent });
+    };
+
+    if (Array.isArray(data?.files)) {
+        data.files.forEach((file, index) => pushFile(file, index + 1));
+    }
+
+    if (typeof data?.html === 'string' && data.html.trim()) {
+        collected.push({ name: 'index.html', type: 'text/html', content: data.html.trim() });
+    }
+    if (typeof data?.css === 'string' && data.css.trim()) {
+        collected.push({ name: 'styles.css', type: 'text/css', content: data.css.trim() });
+    }
+    if (typeof data?.js === 'string' && data.js.trim()) {
+        collected.push({ name: 'game.js', type: 'text/javascript', content: data.js.trim() });
+    }
+    if (typeof data?.code === 'string' && data.code.trim()) {
+        const code = decodeEscapedCodeText(data.code.trim());
+        const codeLooksHtml = /<!doctype html|<html/i.test(code);
+        collected.push({
+            name: codeLooksHtml ? 'index.html' : 'game.js',
+            type: codeLooksHtml ? 'text/html' : 'text/javascript',
+            content: code
+        });
+    }
+
+    if (collected.length === 0) {
+        collected.push(...buildAiWorkshopFilesFromText(rawReplyText));
+    }
+
+    if (collected.length === 0) {
+        collected.push(...buildAiWorkshopFilesFromHistory());
+    }
+
+    const usedNames = new Set();
+    return collected
+        .map((file, index) => {
+            const baseName = `${file.name || `file-${index + 1}.txt`}`.trim() || `file-${index + 1}.txt`;
+            let uniqueName = baseName;
+            let suffix = 2;
+            while (usedNames.has(uniqueName.toLowerCase())) {
+                const dotIndex = baseName.lastIndexOf('.');
+                if (dotIndex > 0) {
+                    uniqueName = `${baseName.slice(0, dotIndex)}-${suffix}${baseName.slice(dotIndex)}`;
+                } else {
+                    uniqueName = `${baseName}-${suffix}`;
+                }
+                suffix += 1;
+            }
+            usedNames.add(uniqueName.toLowerCase());
+            return {
+                name: uniqueName,
+                type: file.type || inferAiWorkshopFileType(uniqueName),
+                content: file.content
+            };
+        })
+        .filter((file) => typeof file.content === 'string' && file.content.trim());
+}
+
+function shouldRoutePublishToWorkshop(data, rawReplyText, userPrompt) {
+    const target = `${data?.target || data?.destination || data?.publishTo || data?.scope || ''}`.trim().toLowerCase();
+    if (target && /(library|workshop|arcade)/.test(target)) return true;
+
+    const prompt = `${userPrompt || ''}`.trim().toLowerCase();
+    const promptLooksLikeWorkshopIntent = /(publish|upload|save|add)/.test(prompt) && /(library|workshop)/.test(prompt);
+    if (promptLooksLikeWorkshopIntent) return true;
+
+    const reply = `${rawReplyText || ''}`.trim().toLowerCase();
+    const replyLooksLikeWorkshopIntent = /(library|workshop)/.test(reply) && /\[publish:/i.test(reply);
+    return replyLooksLikeWorkshopIntent;
+}
+
 /**
  * Executes AI-generated tags in the chat reply.
  * Handles [PUBLISH], [COMPOSE], [ARCADE], [DUCKDUCKGO], [OPEN].
@@ -1768,11 +1955,45 @@ async function executeArcadeChatActions(text, options = {}) {
     if (!text) return;
 
     // 1. [PUBLISH: {json}]
-    const publishMatch = text.match(/\[PUBLISH:\s*({.+?})\]/);
+    const publishMatch = text.match(/\[PUBLISH:\s*({[\s\S]+?})\]/);
     if (publishMatch) {
         try {
             const data = JSON.parse(publishMatch[1]);
             const { title, caption, tags } = data;
+
+            const routeToWorkshop = shouldRoutePublishToWorkshop(data, text, options.userPrompt || '');
+            if (routeToWorkshop) {
+                if (typeof window.publishCustomGameFromAi !== 'function') {
+                    if (window.showFeedback) window.showFeedback("Workshop publishing is available from the Arcade Library page.", true);
+                    return;
+                }
+
+                const workshopFiles = buildAiWorkshopPublishFiles(data, text);
+                if (workshopFiles.length === 0) {
+                    if (window.showFeedback) {
+                        window.showFeedback("Couldn't find game code to publish. Ask the AI to include a code block or code field.", true);
+                    }
+                    return;
+                }
+
+                const workshopResult = await window.publishCustomGameFromAi({
+                    title: title || data.gameTitle || 'AI Workshop Game',
+                    category: data.category || 'GAME',
+                    description: data.description || caption || '',
+                    thumbnail: data.thumbnail || data.poster || '',
+                    tags: Array.isArray(tags) ? tags.join(', ') : (typeof tags === 'string' ? tags : ''),
+                    files: workshopFiles
+                });
+
+                if (workshopResult?.ok) {
+                    if (window.showFeedback) {
+                        window.showFeedback(`Published "${workshopResult.title}" to Workshop (${workshopResult.assetCount} assets).`);
+                    }
+                } else if (window.showFeedback) {
+                    window.showFeedback(workshopResult?.message || 'Failed to publish game to Workshop.', true);
+                }
+                return;
+            }
             
             if (window.publishPostToSupabase) {
                 // Determine what to publish. 
