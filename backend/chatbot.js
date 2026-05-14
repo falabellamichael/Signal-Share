@@ -553,8 +553,8 @@ export async function getLocalModelCatalog({ force = false } = {}) {
 export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0, attachment = null, preferredModel = 'auto', customInstructions = "") {
     if (!message && iteration === 0) return "I didn't receive a message to process.";
     
-    // Safety check for infinite recursion
-    const MAX_ITERATIONS = 3;
+    // Safety check for infinite recursion - reduced for memory pressure
+    const MAX_ITERATIONS = 2;
     if (iteration >= MAX_ITERATIONS) {
         console.warn("[Chatbot] Maximum tool-calling iterations reached. Stopping loop.");
         return "I've hit a limit while trying to execute tools for you. Please try rephrasing your request!";

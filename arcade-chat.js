@@ -2168,9 +2168,10 @@ window.sendChatMessage = async function() {
         };
 
         const pageContext = JSON.stringify(richContext);
-        const pageText = document.body.innerText.substring(0, 500);
+        // Omit visible page text if we are in the editor to save tokens
+        const pageText = richContext.workshopEditor ? "" : document.body.innerText.substring(0, 300);
         // Keep only the most recent messages to prevent context window overflow on small local models
-        const maxHistory = 12;
+        const maxHistory = 6;
         const recentHistory = arcadeChatHistory.slice(-maxHistory);
         
         const normalizedHistory = window.SignalShareAiCore

@@ -2577,6 +2577,8 @@ window.saveWorkshopEditPanel = saveWorkshopEditPanel;
 window.getWorkshopGamesForAi = function() {
     return customGames
         .filter((game) => canCurrentSessionEditWorkshopGame(game))
+        .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0))
+        .slice(0, 5) // Drastically reduce memory pressure by only showing top 5 recent games
         .map((game) => {
             const editableFiles = (Array.isArray(game.files) ? game.files : [])
                 .filter(isWorkshopFileEditable)
@@ -2585,10 +2587,7 @@ window.getWorkshopGamesForAi = function() {
             return {
                 id: game.id,
                 title: game.title,
-                category: game.category,
-                tag: game.tag,
-                updatedAt: game.publishedAt,
-                files: editableFiles
+                files: editableFiles // Only provide names/types, no content
             };
         });
 };
