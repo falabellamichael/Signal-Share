@@ -482,29 +482,35 @@ async function getDesktopBridgeSnapshot({ suppressNetworkErrors = false } = {}) 
 
 async function checkBridgeConnectivity({ signal, timeoutMs = 1800 } = {}) {
     const probes = [
-        { path: "/api/local-llm/models", reachableStatuses: [401, 403, 422] },
-        { path: "/api/local-llm/health", reachableStatuses: [401, 403, 422] },
-        { path: "/api/local-llm/chat", reachableStatuses: [401, 403, 404, 405, 422] },
-        { path: "/api/llm/models", reachableStatuses: [401, 403, 422] },
-        // Some bridge builds only allow POST on this route. 404/405 still mean the bridge is reachable.
-        { path: "/api/llm/chat", reachableStatuses: [401, 403, 404, 405, 422] }
+        "/api/local-llm/health",
+        "/api/local-llm/models",
+        "/api/llm/models",
+        "/api/llm/chat"
     ];
+    let sawAuthFailure = false;
 
-    for (const probe of probes) {
+    for (const path of probes) {
         try {
-            const res = await bridgeFetch(probe.path, {
+            const res = await bridgeFetch(path, {
                 method: "GET",
                 timeoutMs,
                 signal,
                 suppressNetworkErrors: true
             });
             if (res?.ok) return true;
-            if (probe.reachableStatuses.includes(Number(res?.status || 0))) return true;
+
+            const status = Number(res?.status || 0);
+            if (status === 401 || status === 403) {
+                sawAuthFailure = true;
+            }
         } catch (_error) {
             // Try the next probe.
         }
     }
 
+    if (sawAuthFailure) {
+        console.warn("[Arcade Chat] Bridge reachable but authentication failed. Verify Bridge Secret / Local LLM Token.");
+    }
     return false;
 }
 
