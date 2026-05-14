@@ -788,6 +788,12 @@ The companion bridge is designed with several security layers to keep your PC sa
     return null;
   }
 
+  function getStoredBridgeSecret() {
+    return `${localStorage.getItem("SIGNAL_SHARE_BRIDGE_SECRET") || ""}`.trim()
+      || `${localStorage.getItem("ss_bridge_secret") || ""}`.trim()
+      || `${localStorage.getItem("signal-share-bridge-secret") || ""}`.trim();
+  }
+
   function isDesktopBridgeFeatureEnabled() {
     const explicitFlag = parseBridgeBoolean(
       localStorage.getItem("ss_bridge_enabled")
@@ -889,7 +895,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       const addressSpace = getTargetAddressSpaceForHostname(resolved.hostname);
       if (!["local", "private", "loopback"].includes(addressSpace)) return init;
 
-      const secret = localStorage.getItem("ss_bridge_secret");
+      const secret = getStoredBridgeSecret();
       const headers = { ...init.headers };
       if (secret) {
         headers["X-Bridge-Secret"] = secret;

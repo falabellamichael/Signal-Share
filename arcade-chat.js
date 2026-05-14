@@ -130,6 +130,24 @@ function resolveBridgeBaseCandidates() {
 let arcadeSpeechRecognition = null;
 let isArcadeDictating = false;
 let isVoiceSessionActive = false;
+let isSecureInsecure = false;
+
+function playStartBeep() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.1);
+    } catch (e) {
+        console.warn('[Voice] Beep failed:', e);
+    }
+}
 let arcadeSpeechSynth = window.speechSynthesis;
 
 function initArcadeSpeech() {
@@ -138,10 +156,16 @@ function initArcadeSpeech() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition;
     if (!SpeechRecognition) {
         console.error('[Voice] Speech Recognition API not supported in this browser.');
-        // If the user tries to talk and it's not supported, we should let them know once.
         window.isSpeechSupported = false;
         return;
     }
+    
+    // Check for Secure Context (Required for Mic in most browsers)
+    if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        console.warn('[Voice] Warning: Insecure context detected. Microphone might be blocked.');
+        window.isSecureInsecure = true;
+    }
+
     window.isSpeechSupported = true;
 
     try {
@@ -153,18 +177,22 @@ function initArcadeSpeech() {
         arcadeSpeechRecognition.onstart = () => {
             console.log('[Voice] Dictation started.');
             const input = document.getElementById('arc-chat-input');
-            if (input) input.placeholder = "Listening...";
+            if (input) {
+                input.placeholder = "Listening...";
+                input.value = ""; // Clear for new dictation
+            }
+            playStartBeep();
         };
 
         arcadeSpeechRecognition.onresult = (event) => {
             const input = document.getElementById('arc-chat-input');
             if (!input) return;
             let transcript = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
+            for (let i = 0; i < event.results.length; ++i) {
                 transcript += event.results[i][0].transcript;
             }
             input.value = transcript;
-            input.focus();
+            input.scrollTop = input.scrollHeight; // Auto-scroll if text is long
         };
 
         arcadeSpeechRecognition.onerror = (event) => {
@@ -733,7 +761,13 @@ async function startArcadeDictation() {
     initArcadeSpeech();
     
     if (window.isSpeechSupported === false) {
-        alert("Speech-to-Text is not supported by your current browser (like Opera). Please use Chrome or Edge for voice features!");
+        alert("Speech-to-Text is not supported by your current browser. Please use Chrome or Edge for voice features!");
+        return;
+    }
+
+    // Special Alert for Insecure IP access
+    if (window.isSecureInsecure) {
+        alert("MICROPHONE BLOCKED: Chrome blocks microphones on IP addresses (like 192.168...) unless they use HTTPS. \n\nFIX: Please use 'http://localhost:3000' on this PC instead!");
         return;
     }
     
