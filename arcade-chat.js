@@ -454,16 +454,27 @@ async function getDesktopBridgeSnapshot({ suppressNetworkErrors = false } = {}) 
 }
 
 async function checkBridgeConnectivity() {
-    try {
-        const res = await bridgeFetch("/api/llm/chat", {
-            method: "GET",
-            timeoutMs: 1800,
-            suppressNetworkErrors: true
-        });
-        return Boolean(res?.ok);
-    } catch (_error) {
-        return false;
+    const probes = [
+        { path: "/api/llm/models", reachableStatuses: [401, 403, 422] },
+        // Some bridge builds only allow POST on this route. 404/405 still mean the bridge is reachable.
+        { path: "/api/llm/chat", reachableStatuses: [401, 403, 404, 405, 422] }
+    ];
+
+    for (const probe of probes) {
+        try {
+            const res = await bridgeFetch(probe.path, {
+                method: "GET",
+                timeoutMs: 1800,
+                suppressNetworkErrors: true
+            });
+            if (res?.ok) return true;
+            if (probe.reachableStatuses.includes(Number(res?.status || 0))) return true;
+        } catch (_error) {
+            // Try the next probe.
+        }
     }
+
+    return false;
 }
 
 async function sendDesktopBridgeAction(action, appPackage = "") {
@@ -1716,6 +1727,9 @@ window.sendChatMessage = async function() {
             if (response.ok) {
                 const data = await response.json();
                 reply = data.reply;
+                updateEngineStatus(true);
+                bridgePollFailureCount = 0;
+                bridgePollNextAllowedAt = 0;
             } else {
                 lastError = `Bridge returned ${response.status}`;
             }
