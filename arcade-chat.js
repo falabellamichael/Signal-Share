@@ -478,6 +478,41 @@ function isWorkshopPublishIntentPrompt(message = "") {
     return (target && publishVerb) || (buildVerb && gameMention) || (publishVerb && gameMention);
 }
 
+function isExplicitWorkshopPublishIntentPrompt(message = "") {
+    const text = `${message || ''}`.trim().toLowerCase();
+    if (!text) return false;
+    if (/^\/publish\b/.test(text) || /^\[publish\]/.test(text)) return true;
+    const publishVerb = /\b(publish|upload|submit|ship|post|share)\b/.test(text);
+    const target = /\b(library|workshop|arcade|store)\b/.test(text);
+    return publishVerb && target;
+}
+
+function getActiveWorkshopEditorContext(workshopContext = null) {
+    const providedEditor = workshopContext?.workshopEditor || null;
+    if (providedEditor) return providedEditor;
+    if (typeof window.getWorkshopEditorState === 'function') {
+        return window.getWorkshopEditorState();
+    }
+    return null;
+}
+
+function hasActiveWorkshopEditor(workshopContext = null) {
+    const editor = getActiveWorkshopEditorContext(workshopContext);
+    return !!(`${editor?.activeGameId || ''}`.trim() && `${editor?.activeFileName || ''}`.trim());
+}
+
+function isWorkshopEditIntentPrompt(message = "", workshopContext = null) {
+    const text = `${message || ''}`.trim().toLowerCase();
+    if (!text) return false;
+    if (/^\/(?:edit|fix)\b/.test(text) || /^\[(?:edit|fix)\]/.test(text)) return true;
+
+    const editVerb = /\b(edit|fix|repair|change|update|modify|replace|remove|delete|add|insert|improve|tweak|adjust|refactor|rename|debug)\b/.test(text);
+    if (!editVerb) return false;
+
+    const fileTarget = /\b(editor|website|workshop|file|code|html|css|javascript|js|game|page|button|screen|layout|style)\b/.test(text);
+    return hasActiveWorkshopEditor(workshopContext) || fileTarget;
+}
+
 
 
 function buildWorkshopPublishDirective() {
@@ -503,6 +538,7 @@ function getProtocolDirectives(userPrompt = "", workshopContext = null) {
     const text = `${userPrompt || ''}`.trim().toLowerCase();
     const directives = [];
     const commandMode = window.activeArcadeCommandMode;
+    const editorIsActive = hasActiveWorkshopEditor(workshopContext);
     
     // Clear flag so it doesn't persist to next message
     window.activeArcadeCommandMode = null;
@@ -514,12 +550,11 @@ function getProtocolDirectives(userPrompt = "", workshopContext = null) {
         directives.push(buildWorkshopPublishDirective());
     } else {
         // 2. AUTO-DETECTION (Fallback)
-        if (isWorkshopPublishIntentPrompt(text)) {
+        if (editorIsActive && !isExplicitWorkshopPublishIntentPrompt(text)) {
+            directives.push(buildWorkshopEditDirective(workshopContext));
+        } else if (isWorkshopPublishIntentPrompt(text)) {
             directives.push(buildWorkshopPublishDirective());
-        }
-        
-        // If in editor, always allow edit protocol
-        if (workshopContext?.workshopEditor?.activeGameId) {
+        } else if (editorIsActive && isWorkshopEditIntentPrompt(text, workshopContext)) {
             directives.push(buildWorkshopEditDirective(workshopContext));
         }
     }
@@ -542,6 +577,9 @@ function buildWorkshopEditDirective(workshopContext = null, isFixMode = false) {
         'RULES:',
         '- Break changes into small, surgical [EDIT] blocks.',
         '- NEVER rewrite the entire file.',
+        '- NEVER use [PUBLISH] for edits to the active editor file.',
+        '- Do not return full-file code fences unless the user explicitly asks for a full file.',
+        '- Your actionable output should be the [EDIT] block, not a rewritten file.',
         '- Be precise with whitespace/indentation in SEARCH.',
         '[/SURGICAL_EDIT_PROTOCOL]'
     ];
@@ -2090,10 +2128,10 @@ window.sendChatMessage = async function() {
         arcadeChatHistory.push({ 
             role: 'user', 
             content: text,
-            attachment: attachmentData ? {
-                data: attachmentData,
-                type: attachmentType,
-                name: attachmentName
+            attachment: currentChatAttachment ? {
+                data: currentChatAttachment,
+                type: currentChatAttachmentType,
+                name: currentChatAttachmentName
             } : null
         });
         
@@ -2432,6 +2470,48 @@ function decodeEscapedCodeText(value) {
         .replace(/\\\\/g, '\\');
 }
 
+function stripWorkshopEditSnippet(value = "") {
+    let text = decodeEscapedCodeText(value).trim();
+    text = text.replace(/\[\/?(?:EDIT|EDIT_FILE|FILE_EDIT|Workshop\/Edit)\]/gi, '').trim();
+    const fenceMatch = text.match(/^```[a-z0-9_+-]*\s*\n([\s\S]*?)\n?```$/i);
+    if (fenceMatch) text = fenceMatch[1].trim();
+    return text;
+}
+
+function parseWorkshopSearchReplaceBlock(rawContent = "") {
+    const text = stripWorkshopEditSnippet(rawContent);
+    const searchMatch = text.match(/SEARCH:\s*([\s\S]+?)\s*REPLACE:\s*([\s\S]+)/i);
+    if (!searchMatch) return null;
+
+    const search = stripWorkshopEditSnippet(searchMatch[1]);
+    let replace = stripWorkshopEditSnippet(searchMatch[2]);
+    replace = replace
+        .replace(/\n\s*(?:EXPLANATION|NOTES?|TEST(?:ING)?|SUMMARY)\s*:\s*[\s\S]*$/i, '')
+        .trim();
+
+    if (!search || !replace) return null;
+    return { search, replace };
+}
+
+function extractWorkshopEditBlocks(text = "") {
+    const source = `${text || ''}`;
+    const blocks = [];
+    const workshopActionRegex = /\[(EDIT|EDIT_FILE|FILE_EDIT|Workshop\/Edit)(?::\s*([\s\S]*?))?\]([\s\S]*?)(?:\[\/\1\]|$)/gi;
+    let match;
+
+    while ((match = workshopActionRegex.exec(source)) !== null) {
+        const parsed = parseWorkshopSearchReplaceBlock(match[3]);
+        if (parsed) blocks.push(parsed);
+    }
+
+    if (blocks.length === 0 && /SEARCH:\s*[\s\S]+?REPLACE:/i.test(source)) {
+        const parsed = parseWorkshopSearchReplaceBlock(source);
+        if (parsed) blocks.push(parsed);
+    }
+
+    return blocks;
+}
+
 function looksLikeExecutableCode(value) {
     const text = `${value || ''}`.trim();
     if (text.length < 80) return false;
@@ -2694,7 +2774,14 @@ async function executeArcadeChatActions(text, options = {}) {
 
     // 1. [PUBLISH: {json}]
     const publishPayload = extractBalancedJsonTagPayload(text, 'PUBLISH');
-    if (publishPayload?.jsonText) {
+    const editorStateForActions = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
+    const shouldSkipPublishForEditorEdit = publishPayload?.jsonText
+        && isWorkshopEditIntentPrompt(options.userPrompt || '', { workshopEditor: editorStateForActions })
+        && !isExplicitWorkshopPublishIntentPrompt(options.userPrompt || '');
+    if (shouldSkipPublishForEditorEdit) {
+        actionResult.publishTagDetected = true;
+        console.warn('[Arcade Chat] Ignoring [PUBLISH] during active editor edit request; expecting [EDIT] SEARCH/REPLACE blocks.');
+    } else if (publishPayload?.jsonText) {
         actionResult.publishTagDetected = true;
         try {
             const data = JSON.parse(publishPayload.jsonText);
@@ -2857,34 +2944,26 @@ async function executeArcadeChatActions(text, options = {}) {
     }
 
     // 6. WORKSHOP ACTIONS (Re-enabled for Commands)
-    const workshopActionRegex = /\[(EDIT|EDIT_FILE|FILE_EDIT|Workshop\/Edit)(?::\s*([\s\S]*?))?\]([\s\S]*?)(?:\[\/\1\]|$)/gi;
-    const matches = Array.from(text.matchAll(workshopActionRegex));
+    const editBlocks = extractWorkshopEditBlocks(text);
     
-    if (matches.length > 0) {
+    if (editBlocks.length > 0) {
         actionResult.handled = true;
-        for (const workshopMatch of matches) {
+        for (const editBlock of editBlocks) {
             try {
-                let rawContent = workshopMatch[3].trim();
                 let gameId = null;
                 let fileName = null;
 
-                const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
+                const editorState = editorStateForActions || (typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null);
                 gameId = editorState?.activeGameId || window.lastPlayedGameId || "";
                 fileName = editorState?.activeFileName || "index.html";
 
-                if (gameId && fileName && rawContent) {
-                    const searchMatch = rawContent.match(/SEARCH:\s*([\s\S]+?)\s*REPLACE:\s*([\s\S]+)/i);
-                    const finalSearch = searchMatch ? searchMatch[1].trim() : "";
-                    const finalReplace = searchMatch ? searchMatch[2].trim() : "";
-                    
-                    if (finalSearch && typeof window.applyAiFilePatch === 'function') {
-                        actionResult.workshopFileRewriteAttempted = true;
-                        const patchResult = await window.applyAiFilePatch(gameId, fileName, finalSearch, finalReplace, { save: true });
-                        if (patchResult?.ok) {
-                            actionResult.workshopFileRewriteSucceeded = true;
-                        } else if (window.showFeedback) {
-                            window.showFeedback(patchResult?.message || "Edit failed.", true);
-                        }
+                if (gameId && fileName && editBlock?.search && typeof window.applyAiFilePatch === 'function') {
+                    actionResult.workshopFileRewriteAttempted = true;
+                    const patchResult = await window.applyAiFilePatch(gameId, fileName, editBlock.search, editBlock.replace, { save: true });
+                    if (patchResult?.ok) {
+                        actionResult.workshopFileRewriteSucceeded = true;
+                    } else if (window.showFeedback) {
+                        window.showFeedback(patchResult?.message || "Edit failed.", true);
                     }
                 }
             } catch (e) {
@@ -2894,6 +2973,45 @@ async function executeArcadeChatActions(text, options = {}) {
     }
 
     return actionResult;
+}
+
+async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '', richContext = null) {
+    const result = { attempted: false, ok: false, reason: '' };
+    if (!isWorkshopEditIntentPrompt(userPrompt, richContext)) return result;
+    if (typeof window.applyAiFilePatch !== 'function') {
+        result.reason = 'patch-function-unavailable';
+        return result;
+    }
+
+    const editorState = getActiveWorkshopEditorContext(richContext);
+    const gameId = `${editorState?.activeGameId || ''}`.trim();
+    const fileName = `${editorState?.activeFileName || ''}`.trim();
+    if (!gameId || !fileName) {
+        result.reason = 'no-active-editor-file';
+        return result;
+    }
+
+    const editBlocks = extractWorkshopEditBlocks(replyText);
+    if (editBlocks.length === 0) {
+        result.reason = 'no-edit-blocks';
+        if (window.showFeedback && looksLikeExecutableCode(replyText)) {
+            window.showFeedback('AI returned a full file. Use /edit and ask for SEARCH/REPLACE blocks so the editor can apply a targeted patch.', true);
+        }
+        return result;
+    }
+
+    for (const editBlock of editBlocks) {
+        result.attempted = true;
+        const patchResult = await window.applyAiFilePatch(gameId, fileName, editBlock.search, editBlock.replace, { save: true });
+        if (!patchResult?.ok) {
+            result.reason = patchResult?.message || 'patch-failed';
+            if (window.showFeedback) window.showFeedback(result.reason, true);
+            return result;
+        }
+    }
+
+    result.ok = true;
+    return result;
 }
 
 async function handleArcadeSlashCommand(text, inputElement) {
