@@ -725,12 +725,23 @@ window.refreshBannedIps = async function() {
         if (bans.length === 0) {
             list.innerHTML = '<span style="color: #75b022">No IPs currently banned.</span>';
         } else {
-            list.innerHTML = bans.map(ip => `
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid rgba(255,0,0,0.1); padding: 4px 0;">
-                    <span style="font-family: monospace;">${ip}</span>
-                    <span style="font-size: 0.6rem; color: #ff5555; text-transform: uppercase; font-weight: 800;">BANNED</span>
-                </div>
-            `).join('');
+            list.innerHTML = '';
+            bans.forEach(ip => {
+                const item = document.createElement('div');
+                item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid rgba(255,0,0,0.1); padding: 4px 0;';
+                
+                const ipSpan = document.createElement('span');
+                ipSpan.style.fontFamily = 'monospace';
+                ipSpan.textContent = ip;
+                
+                const statusSpan = document.createElement('span');
+                statusSpan.style.cssText = 'font-size: 0.6rem; color: #ff5555; text-transform: uppercase; font-weight: 800;';
+                statusSpan.textContent = 'BANNED';
+                
+                item.appendChild(ipSpan);
+                item.appendChild(statusSpan);
+                list.appendChild(item);
+            });
         }
     } catch (err) {
         list.innerHTML = '<span style="color: #ff5555">Bridge unreachable.</span>';
@@ -1084,19 +1095,34 @@ function renderHistoryList() {
         return;
     }
 
-    container.innerHTML = chats.map(chat => {
+    container.innerHTML = '';
+    chats.forEach(chat => {
         const date = new Date(chat.lastUsed).toLocaleDateString();
         const time = new Date(chat.lastUsed).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        return `
-            <div class="chat-history-item" onclick="loadChat('${chat.id}')">
-                <div class="history-name">${chat.name}</div>
-                <div class="history-meta">
-                    <span>${chat.messages.length} messages</span>
-                    <span>${date} ${time}</span>
-                </div>
-            </div>
-        `;
-    }).join('');
+        
+        const item = document.createElement('div');
+        item.className = 'chat-history-item';
+        item.onclick = () => loadChat(chat.id);
+        
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'history-name';
+        nameDiv.textContent = chat.name;
+        
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'history-meta';
+        
+        const countSpan = document.createElement('span');
+        countSpan.textContent = `${chat.messages.length} messages`;
+        
+        const dateSpan = document.createElement('span');
+        dateSpan.textContent = `${date} ${time}`;
+        
+        metaDiv.appendChild(countSpan);
+        metaDiv.appendChild(dateSpan);
+        item.appendChild(nameDiv);
+        item.appendChild(metaDiv);
+        container.appendChild(item);
+    });
 }
 
 function addChatMessage(role, content) {

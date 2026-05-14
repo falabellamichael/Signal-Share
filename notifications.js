@@ -541,7 +541,14 @@
       // but we should prioritize classes.
       // Based on the user's request, the .read class will handle the opacity.
       
-      li.innerHTML = `<strong style="color:inherit;">${notification.title}</strong><p style="margin:4px 0; font-size:0.9rem; opacity:0.8; color:inherit;">${notification.message}</p>`;
+      li.innerHTML = "";
+      const strong = document.createElement("strong");
+      strong.style.color = "inherit";
+      strong.textContent = notification.title;
+      const p = document.createElement("p");
+      p.style.cssText = "margin:4px 0; font-size:0.9rem; opacity:0.8; color:inherit;";
+      p.textContent = notification.message;
+      li.append(strong, p);
       
       li.onclick = (event) => {
         event.stopPropagation();
@@ -577,7 +584,13 @@
     
     // Maintain some of the premium banner styling but allow the .read class to affect it
     el.style.cssText = "background:rgba(0,0,0,0.95); color:white; padding:15px; margin-bottom:10px; border-radius:10px; border-left:5px solid #3b82f6; box-shadow:0 5px 20px rgba(0,0,0,0.5); z-index:10001; position:relative; pointer-events:auto; cursor:pointer;";
-    el.innerHTML = `<strong>${item.title}</strong><div style="font-size:0.9rem;">${item.message}</div>`;
+    el.innerHTML = "";
+    const bannerStrong = document.createElement("strong");
+    bannerStrong.textContent = item.title;
+    const bannerDiv = document.createElement("div");
+    bannerDiv.style.fontSize = "0.9rem";
+    bannerDiv.textContent = item.message;
+    el.append(bannerStrong, bannerDiv);
     el.onclick = () => {
       handleNotificationClick(item);
       el.classList.add("read"); // Visual feedback before removal

@@ -90,13 +90,20 @@ class ProfileUploader {
     createUploadElement(upload) {
         const element = document.createElement('div');
         element.className = 'upload-item';
-        element.innerHTML = `
-            <div class="upload-content">
-                <h3>${upload.title}</h3>
-                <p>Date: ${upload.date}</p>
-                <p>Type: ${upload.type}</p>
-            </div>
-        `;
+        const content = document.createElement('div');
+        content.className = 'upload-content';
+        
+        const h3 = document.createElement('h3');
+        h3.textContent = upload.title;
+        
+        const pDate = document.createElement('p');
+        pDate.textContent = `Date: ${upload.date}`;
+        
+        const pType = document.createElement('p');
+        pType.textContent = `Type: ${upload.type}`;
+        
+        content.append(h3, pDate, pType);
+        element.appendChild(content);
         return element;
     }
 

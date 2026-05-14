@@ -1272,6 +1272,70 @@ app.post("/api/system/launch", (req, res) => {
   }
 });
 
+// Advanced System Automation - Shell Execution (Fortress Mode Protected)
+app.post("/api/system/shell", (req, res) => {
+  const { cmd, shell = "pwsh" } = req.body || {};
+  if (!cmd) return res.status(400).json({ ok: false, error: "No command provided" });
+
+  if (!ALLOW_OPEN_URI) {
+    return res.status(403).json({ ok: false, error: "System automation is disabled in bridge config." });
+  }
+
+  const shellExec = shell === "bash" ? "bash.exe" : "pwsh.exe";
+  console.log(`[Bridge] Executing shell command [${shell}]: ${cmd}`);
+  
+  exec(`"${shellExec}" -c "${cmd.replace(/"/g, '\\"')}"`, (error, stdout, stderr) => {
+    if (error) {
+      console.warn(`[Bridge] Shell error: ${error.message}`);
+      return res.json({ ok: false, error: error.message, stderr });
+    }
+    return res.json({ ok: true, stdout, stderr });
+  });
+});
+
+// System Telemetry - Resource Usage
+app.get("/api/system/telemetry", (req, res) => {
+  try {
+    const os = require('os');
+    const telemetry = {
+      platform: os.platform(),
+      release: os.release(),
+      uptime: Math.floor(os.uptime()),
+      cpu: os.cpus()[0].model,
+      cpuCount: os.cpus().length,
+      memory: {
+        total: Math.floor(os.totalmem() / (1024 * 1024)),
+        free: Math.floor(os.freemem() / (1024 * 1024)),
+        usage: Math.floor(((os.totalmem() - os.freemem()) / os.totalmem()) * 100)
+      }
+    };
+    return res.json(telemetry);
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to fetch telemetry" });
+  }
+});
+
+// Process Management - List
+app.get("/api/system/processes", (req, res) => {
+  exec('tasklist /fo csv', (error, stdout) => {
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ ok: true, data: stdout });
+  });
+});
+
+// Process Management - Kill
+app.post("/api/system/kill", (req, res) => {
+  const { id, name } = req.body || {};
+  const target = id ? `/pid ${id}` : (name ? `/im ${name}` : null);
+  
+  if (!target) return res.status(400).json({ error: "No PID or process name provided" });
+
+  exec(`taskkill /f ${target}`, (error, stdout) => {
+    if (error) return res.json({ ok: false, error: error.message });
+    return res.json({ ok: true, output: stdout });
+  });
+});
+
 // Remaining API routes
 
 app.get("/security", (req, res) => res.sendFile(path.join(projectRoot, "security.html")));

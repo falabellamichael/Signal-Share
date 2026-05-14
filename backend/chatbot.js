@@ -78,6 +78,9 @@ CODING & FILE SYSTEM TOOLS:
 10. [LIST_FILES: path] -> Explore the project.
 11. [READ_FILE: path] -> Read code.
 12. [WRITE_FILE: {"path": "...", "content": "..."}] -> Modify local site files.
+13. [SYS_INFO] -> Get system telemetry (CPU, RAM, Disk, Uptime).
+14. [PROCESS: list | kill <id>] -> Manage running processes.
+15. [SHELL: { "cmd": "...", "shell": "pwsh" | "bash" }] -> Run a command in PowerShell 7 (pwsh) or Git Bash.
 
 MEDIA COMPANION PROTOCOL:
 - AUTHORIZED ACCESS: You ARE ALLOWED and encouraged to open YouTube and Spotify links. This is part of your core duty.
@@ -942,6 +945,85 @@ async function executeWebTools(text) {
             results.push(`RUNNING APPLICATIONS:\n${JSON.stringify(data.apps, null, 2)}`);
         } catch (e) {
             results.push(`LIST_APPS FAILED: ${e.message}`);
+        }
+    }
+
+    // Handle [SYS_INFO]
+    if (text.includes('[SYS_INFO]')) {
+        try {
+            const bridgeUrl = `http://127.0.0.1:3000/api/system/telemetry`;
+            const response = await fetch(bridgeUrl, { 
+                headers: { 
+                    'X-Bridge-Secret': BRIDGE_SECRET,
+                    'X-Device-Id': DEVICE_ID
+                } 
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            results.push(`SYSTEM TELEMETRY:\n${JSON.stringify(data, null, 2)}`);
+        } catch (e) {
+            results.push(`SYS_INFO FAILED: ${e.message}`);
+        }
+    }
+
+    // Handle [PROCESS: list | kill <id>]
+    const processMatch = text.match(/\[PROCESS:\s*(list|kill\s+[\d]+|kill\s+[^\s\]]+)\]/i);
+    if (processMatch) {
+        const action = processMatch[1].trim().toLowerCase();
+        try {
+            if (action === 'list') {
+                const bridgeUrl = `http://127.0.0.1:3000/api/system/processes`;
+                const response = await fetch(bridgeUrl, { 
+                    headers: { 
+                        'X-Bridge-Secret': BRIDGE_SECRET,
+                        'X-Device-Id': DEVICE_ID
+                    } 
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                results.push(`SYSTEM PROCESSES:\n${data.data}`);
+            } else if (action.startsWith('kill')) {
+                const target = action.replace('kill', '').trim();
+                const isId = /^\d+$/.test(target);
+                const bridgeUrl = `http://127.0.0.1:3000/api/system/kill`;
+                const response = await fetch(bridgeUrl, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Bridge-Secret': BRIDGE_SECRET,
+                        'X-Device-Id': DEVICE_ID
+                    },
+                    body: JSON.stringify(isId ? { id: target } : { name: target })
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                results.push(`PROCESS KILL RESULT: ${data.ok ? "Success" : "Failed: " + data.error}`);
+            }
+        } catch (e) {
+            results.push(`PROCESS COMMAND FAILED: ${e.message}`);
+        }
+    }
+
+    // Handle [SHELL: data]
+    const shellMatch = text.match(/\[SHELL:\s*({.+?})\]/);
+    if (shellMatch) {
+        try {
+            const data = JSON.parse(shellMatch[1]);
+            const bridgeUrl = `http://127.0.0.1:3000/api/system/shell`;
+            const response = await fetch(bridgeUrl, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Bridge-Secret': BRIDGE_SECRET,
+                    'X-Device-Id': DEVICE_ID
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const resData = await response.json();
+            results.push(`SHELL EXECUTION [${data.shell || "pwsh"}]:\nSTDOUT: ${resData.stdout || "None"}\nSTDERR: ${resData.stderr || "None"}`);
+        } catch (e) {
+            results.push(`SHELL EXECUTION FAILED: ${e.message}`);
         }
     }
 
