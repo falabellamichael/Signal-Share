@@ -1180,12 +1180,14 @@ function addChatMessage(role, content) {
     } else {
         // Strip internal protocol tags from display
         const cleanContent = content
+            .replace(/\[(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\][\s\S]*?\[\/(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\]/gi, "")
+            .replace(/\[(?:\/)?(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\]/gi, "")
             .replace(/\[COMPOSE:\s*([\s\S]*?)\]/gi, "$1")
             .replace(/\[(?:ARCADE|DUCKDUCKGO|OPEN):\s*[^\]]+\]/gi, "")
             .replace(/\[PUBLISH:\s*({[\s\S]*?})\]/gi, "")
             .trim();
         msgDiv.textContent = cleanContent;
-        if (!cleanContent && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE):/i.test(content)) {
+        if (!cleanContent && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|\/?(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION))(?::|\])/i.test(content)) {
             msgDiv.style.display = 'none';
         }
     }

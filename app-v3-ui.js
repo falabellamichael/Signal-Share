@@ -1395,11 +1395,13 @@ export function createAppUi(context) {
     
     // Strip internal protocol tags from display
     const cleanText = text
+      .replace(/\[(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\][\s\S]*?\[\/(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\]/gi, "")
+      .replace(/\[(?:\/)?(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\]/gi, "")
       .replace(/\[COMPOSE:\s*([\s\S]*?)\]/gi, "$1")
       .replace(/\[(?:ARCADE|DUCKDUCKGO|OPEN):\s*[^\]]+\]/gi, "")
       .replace(/\[PUBLISH:\s*({[\s\S]*?})\]/gi, "")
       .trim();
-    if (!cleanText && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE):/i.test(text)) {
+    if (!cleanText && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|\/?(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION))(?::|\])/i.test(text)) {
         container.hidden = true; 
         container.innerHTML = ""; 
         return; 

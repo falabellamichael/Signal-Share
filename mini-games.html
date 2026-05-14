@@ -67,6 +67,7 @@
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             padding: 40px;
+            position: relative;
         }
 
         .mobile-category-nav {
@@ -479,6 +480,163 @@
             color: #fff;
             border-color: rgba(255, 120, 120, 0.55);
             background: rgba(96, 20, 28, 0.65);
+        }
+
+        .workshop-mode-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .workshop-mode-btn {
+            border: none;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.66);
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            padding: 7px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .workshop-mode-btn:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .workshop-mode-btn.active {
+            color: #06121d;
+            background: var(--steam-light);
+        }
+
+        .workshop-grid-shell {
+            position: relative;
+            min-height: 340px;
+        }
+
+        .workshop-edit-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(102, 192, 244, 0.3);
+            border-radius: 16px;
+            background: rgba(10, 17, 26, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 16px;
+            box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+        }
+
+        .workshop-edit-overlay[hidden] {
+            display: none;
+        }
+
+        .workshop-edit-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .workshop-edit-title {
+            margin: 0;
+            font-size: 0.85rem;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            opacity: 0.85;
+            font-weight: 800;
+        }
+
+        .workshop-edit-subtitle {
+            margin: 6px 0 0;
+            font-size: 0.78rem;
+            opacity: 0.55;
+        }
+
+        .workshop-edit-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .workshop-edit-field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .workshop-edit-meta {
+            font-size: 0.72rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin: 4px 0 10px;
+            min-height: 1.2em;
+        }
+
+        .workshop-edit-content {
+            width: 100%;
+            min-height: 220px;
+            resize: vertical;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            color: #d6e0ea;
+            padding: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            outline: none;
+        }
+
+        .workshop-edit-content:focus {
+            border-color: rgba(102, 192, 244, 0.55);
+            box-shadow: 0 0 0 2px rgba(102, 192, 244, 0.15);
+        }
+
+        .workshop-edit-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .workshop-edit-secondary-btn {
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.82);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+        }
+
+        .workshop-edit-status {
+            margin-top: 8px;
+            min-height: 1.2em;
+            font-size: 0.75rem;
+            color: rgba(102, 192, 244, 0.9);
+        }
+
+        @media (max-width: 860px) {
+            .workshop-edit-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .workshop-edit-content {
+                min-height: 180px;
+            }
         }
 
         .card-info {
@@ -1246,18 +1404,27 @@
 
                     <!-- Published Games List -->
                     <div style="margin-top: 80px; padding: 0 10px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px; flex-wrap: wrap;">
                             <h3 style="font-size: 0.85rem; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; font-weight: 900; margin: 0;">WORKSHOP CONTRIBUTIONS</h3>
-                            <div id="workshop-count" style="font-size: 0.75rem; color: var(--steam-light); font-weight: 800; letter-spacing: 1px;">0 FILES</div>
+                            <div style="display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <div class="workshop-mode-toggle" role="tablist" aria-label="Workshop mode">
+                                    <button type="button" class="workshop-mode-btn active" id="workshop-mode-library" aria-selected="true" onclick="setWorkshopTileMode('library')">Library</button>
+                                    <button type="button" class="workshop-mode-btn" id="workshop-mode-edit" aria-selected="false" onclick="setWorkshopTileMode('edit')">Edit</button>
+                                </div>
+                                <div id="workshop-count" style="font-size: 0.75rem; color: var(--steam-light); font-weight: 800; letter-spacing: 1px;">0 FILES</div>
+                            </div>
                         </div>
-                        
-                        <div id="published-games-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px;">
-                            <!-- Populated dynamically -->
-                        </div>
-                        <div id="no-published-msg" style="text-align: center; padding: 80px 40px; background: rgba(255,255,255,0.01); border-radius: 16px; border: 1px dashed rgba(255,255,255,0.05); margin-top: 20px;">
-                            <div style="font-size: 2rem; margin-bottom: 15px; opacity: 0.2;">📦</div>
-                            <p style="opacity: 0.4; margin: 0; font-size: 1rem; font-weight: 500; letter-spacing: 0.5px;">Your workshop is currently empty.</p>
-                            <p style="opacity: 0.2; margin-top: 10px; font-size: 0.8rem;">Upload a game source above to get started.</p>
+
+                        <div id="workshop-grid-shell" class="workshop-grid-shell">
+                            <div id="published-games-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px;">
+                                <!-- Populated dynamically -->
+                            </div>
+                            <div id="no-published-msg" style="text-align: center; padding: 80px 40px; background: rgba(255,255,255,0.01); border-radius: 16px; border: 1px dashed rgba(255,255,255,0.05); margin-top: 20px;">
+                                <div style="font-size: 2rem; margin-bottom: 15px; opacity: 0.2;">📦</div>
+                                <p style="opacity: 0.4; margin: 0; font-size: 1rem; font-weight: 500; letter-spacing: 0.5px;">Your workshop is currently empty.</p>
+                                <p style="opacity: 0.2; margin-top: 10px; font-size: 0.8rem;">Upload a game source above to get started.</p>
+                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -1296,6 +1463,37 @@
                     </div>
                 </div>
             </div>
+
+            <section id="workshop-edit-overlay" class="workshop-edit-overlay" hidden aria-hidden="true">
+                <div class="workshop-edit-header">
+                    <div>
+                        <h4 class="workshop-edit-title">Workshop Edit Mode</h4>
+                        <p class="workshop-edit-subtitle">Select a game and file, edit code directly, then save to update the published version.</p>
+                    </div>
+                    <button type="button" class="workshop-edit-secondary-btn" onclick="setWorkshopTileMode('library')">Back To Library</button>
+                </div>
+
+                <div class="workshop-edit-grid">
+                    <div class="workshop-edit-field">
+                        <label class="setting-label" for="workshop-edit-game-select">Game</label>
+                        <select id="workshop-edit-game-select" class="steam-select form-input" onchange="handleWorkshopEditGameChange()"></select>
+                    </div>
+                    <div class="workshop-edit-field">
+                        <label class="setting-label" for="workshop-edit-file-select">File</label>
+                        <select id="workshop-edit-file-select" class="steam-select form-input" onchange="handleWorkshopEditFileChange()"></select>
+                    </div>
+                </div>
+
+                <div id="workshop-edit-file-meta" class="workshop-edit-meta"></div>
+
+                <textarea id="workshop-edit-file-content" class="workshop-edit-content" spellcheck="false" oninput="handleWorkshopEditContentInput()"></textarea>
+
+                <div class="workshop-edit-actions">
+                    <button type="button" class="play-btn" id="workshop-edit-save-btn" onclick="saveWorkshopEditPanel()" style="font-size: 0.85rem; padding: 12px 22px; margin: 0; letter-spacing: 1px;">Save Changes</button>
+                    <button type="button" class="workshop-edit-secondary-btn" onclick="revertWorkshopEditCurrentFile()">Revert File</button>
+                </div>
+                <div id="workshop-edit-status" class="workshop-edit-status"></div>
+            </section>
 
             <div class="questions-guide-footer" style="margin-top: 80px; background: var(--steam-dark); border-top: 1px solid var(--border); padding: 60px 40px; width: calc(100% + 80px); margin-left: -40px; margin-bottom: -40px;">
                 <div style="display: flex; justify-content: center; gap: 40px; margin-bottom: 30px;">
