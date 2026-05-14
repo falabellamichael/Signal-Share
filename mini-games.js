@@ -981,12 +981,27 @@ async function publishProcessedGameFiles(options = {}) {
         ? options.tags.trim()
         : (existingGame?.tags || '');
 
+    const finalProcessedFiles = (() => {
+        if (!existingGame || options.mergeExistingFiles !== true) return processedFiles;
+        const mergedByName = new Map();
+        (Array.isArray(existingGame.files) ? existingGame.files : []).forEach((file) => {
+            if (!file || typeof file !== 'object') return;
+            const name = normalizeWorkshopFileName(file.name, 'file.txt');
+            mergedByName.set(name, { ...file, name });
+        });
+        processedFiles.forEach((file) => {
+            const name = normalizeWorkshopFileName(file.name, 'file.txt');
+            mergedByName.set(name, { ...file, name });
+        });
+        return Array.from(mergedByName.values());
+    })();
+
     const gameId = existingGame?.id || ('custom_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now());
-    const entryFile = processedFiles.find(f => f.name.toLowerCase() === 'index.html')
-        || processedFiles.find(f => f.name.toLowerCase().endsWith('.html'))
-        || processedFiles.find((f) => f.name === existingGame?.entryFile)
-        || processedFiles[0];
-    const trackedStats = collectTrackedStatsFromFiles(processedFiles);
+    const entryFile = finalProcessedFiles.find(f => f.name.toLowerCase() === 'index.html')
+        || finalProcessedFiles.find(f => f.name.toLowerCase().endsWith('.html'))
+        || finalProcessedFiles.find((f) => f.name === existingGame?.entryFile)
+        || finalProcessedFiles[0];
+    const trackedStats = collectTrackedStatsFromFiles(finalProcessedFiles);
 
     const newGame = {
         id: gameId,
@@ -999,7 +1014,7 @@ async function publishProcessedGameFiles(options = {}) {
         tags,
         author: existingGame?.author || currentUser.name,
         authorId: existingGame?.authorId || currentUser.id || null,
-        files: processedFiles,
+        files: finalProcessedFiles,
         entryFile: entryFile.name,
         publishedAt: existingGame?.publishedAt || new Date().toISOString(),
         trackedStats,
@@ -1093,7 +1108,8 @@ async function publishCustomGameFromAi(payload = {}) {
         description: payload.description,
         thumbnail: payload.thumbnail,
         tags: payload.tags,
-        existingGameId
+        existingGameId,
+        mergeExistingFiles: !!existingGameId
     });
 
     if (!publishResult.ok) {
@@ -2784,6 +2800,86 @@ window.internalApplyWorkshopFileEdit = async function(gameId, fileName, content,
     }
 
     return { ok: true, message: `Updated ${fileName} (Draft).`, saved: false };
+};
+
+window.addAiWorkshopFilesToGame = async function(gameId, files = [], options = {}) {
+    const targetGameId = `${gameId || ''}`.trim();
+    const games = getWorkshopManageableGames();
+    const game = games.find(g => g.id === targetGameId);
+    if (!game) return { ok: false, message: "Game not found." };
+
+    const mergedByName = new Map();
+    (Array.isArray(game.files) ? game.files : []).forEach((file) => {
+        if (!file || typeof file !== 'object') return;
+        const name = normalizeWorkshopFileName(file.name, 'file.txt');
+        mergedByName.set(name, { ...file, name });
+    });
+
+    const activeFileName = normalizeWorkshopFileName(options.activeFileName || '', '');
+    if (activeFileName && typeof options.activeFileContent === 'string') {
+        const activeType = options.activeFileType || inferFileTypeFromName(activeFileName);
+        mergedByName.set(activeFileName, {
+            ...(mergedByName.get(activeFileName) || {}),
+            name: activeFileName,
+            type: activeType,
+            content: encodeTextAsDataUrl(options.activeFileContent, activeType)
+        });
+    }
+
+    let addedCount = 0;
+    (Array.isArray(files) ? files : []).forEach((file, index) => {
+        if (!file || typeof file !== 'object') return;
+        const name = normalizeWorkshopFileName(file.name, `ai-file-${index + 1}.txt`);
+        const type = file.type || inferFileTypeFromName(name);
+        let content = typeof file.content === 'string' ? file.content : '';
+        if (!content.trim()) return;
+        if (!content.startsWith('data:')) {
+            content = encodeTextAsDataUrl(content, type);
+        }
+        mergedByName.set(name, { name, type, content });
+        addedCount += 1;
+    });
+
+    const finalFiles = Array.from(mergedByName.values());
+    if (finalFiles.length === 0) {
+        return { ok: false, message: 'No files were available to save.' };
+    }
+
+    const result = await publishProcessedGameFiles({
+        processedFiles: finalFiles,
+        title: game.title,
+        category: game.category,
+        description: game.description,
+        thumbnail: getWorkshopCoverDraftValue(game),
+        tags: game.tags,
+        existingGameId: game.id
+    });
+
+    if (!result.ok) {
+        return { ok: false, message: result.message || 'Failed to save AI files.' };
+    }
+
+    if (activeFileName) {
+        workshopEditDraftCache.delete(`${game.id}::${activeFileName}`);
+        workshopEditActiveFileName = activeFileName;
+    }
+    (Array.isArray(files) ? files : []).forEach((file) => {
+        const name = normalizeWorkshopFileName(file?.name || '', '');
+        if (name) workshopEditDraftCache.delete(`${game.id}::${name}`);
+    });
+
+    setWorkshopPendingFiles(game.id, []);
+    renderPublishedGames();
+    syncWorkshopEditOverlay();
+    setWorkshopEditStatus(`Saved ${addedCount} AI file${addedCount === 1 ? '' : 's'} to ${game.title || 'game'}.`);
+
+    return {
+        ok: true,
+        gameId: game.id,
+        fileCount: addedCount,
+        totalFiles: result.game?.files?.length || finalFiles.length,
+        message: `Saved ${addedCount} AI file${addedCount === 1 ? '' : 's'} to ${game.title || 'game'}.`
+    };
 };
 
 /**

@@ -2228,7 +2228,7 @@
     }
 
     /* Theme-aware icon/button gradients. Sunset keeps the tan reference swatch. */
-    :root {
+    body {
       --icon-gradient-main: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
       --icon-gradient-outgoing: linear-gradient(135deg, var(--accent) 0%, var(--surface-dark) 100%);
     }

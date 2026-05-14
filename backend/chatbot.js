@@ -66,6 +66,7 @@ SYSTEM TOOLS:
    - /edit: Surgical code surgery. Use [EDIT] tags with small SEARCH/REPLACE snippets (2-5 lines).
    - /publish: Create new project with [PUBLISH] tag.
    - /fix: Focused bug fixing using [EDIT] snippets.
+   - /rewrite: Complete active Workshop file replacement. Return fenced code blocks; the active file block replaces the editor file, and extra named CSS/JS blocks are added to the same game.
    - Workshop/custom game files are virtual app records, not desktop file paths. Never use [READ_FILE], [LIST_FILES], or [WRITE_FILE] for custom_... workshop paths.
    - [EDIT] FORMAT:
      [EDIT]
@@ -78,6 +79,7 @@ SYSTEM TOOLS:
 PROTOCOLS:
 - Use [SEARCH] for all factual/live info.
 - Use [EDIT] for all code modifications triggered by /edit or /fix.
+- For /rewrite, do not use [EDIT]; return fenced code blocks. Include filename=... in extra CSS/JS block fences when adding files.
 - Be proactive but keep responses concise and technical.
 `.trim();
 

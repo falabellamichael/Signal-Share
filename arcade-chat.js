@@ -504,13 +504,22 @@ function hasActiveWorkshopEditor(workshopContext = null) {
 function isWorkshopEditIntentPrompt(message = "", workshopContext = null) {
     const text = `${message || ''}`.trim().toLowerCase();
     if (!text) return false;
-    if (/^\/(?:edit|fix)\b/.test(text) || /^\[(?:edit|fix)\]/.test(text)) return true;
+    if (/^\/(?:edit|fix|rewrite)\b/.test(text) || /^\[(?:edit|fix|rewrite)\]/.test(text)) return true;
 
-    const editVerb = /\b(edit|fix|repair|change|update|modify|replace|remove|delete|add|insert|improve|tweak|adjust|refactor|rename|debug)\b/.test(text);
+    const editVerb = /\b(edit|fix|repair|change|update|modify|replace|remove|delete|add|insert|improve|tweak|adjust|refactor|rename|debug|rewrite)\b/.test(text);
     if (!editVerb) return false;
 
     const fileTarget = /\b(editor|website|workshop|file|code|html|css|javascript|js|game|page|button|screen|layout|style)\b/.test(text);
     return hasActiveWorkshopEditor(workshopContext) || fileTarget;
+}
+
+function isWorkshopRewriteIntentPrompt(message = "", workshopContext = null) {
+    const text = `${message || ''}`.trim().toLowerCase();
+    if (!text) return false;
+    if (/^\/rewrite\b/.test(text) || /^\[rewrite\]/.test(text)) return true;
+    return /\brewrite\b/.test(text)
+        && /\b(editor|website|workshop|file|code|html|css|javascript|js|game|page)\b/.test(text)
+        && hasActiveWorkshopEditor(workshopContext);
 }
 
 
@@ -544,7 +553,9 @@ function getProtocolDirectives(userPrompt = "", workshopContext = null) {
     window.activeArcadeCommandMode = null;
 
     // 1. COMMAND PRIORITY
-    if (commandMode === '/edit' || commandMode === '/fix') {
+    if (commandMode === '/rewrite') {
+        directives.push(buildWorkshopRewriteDirective(workshopContext, userPrompt));
+    } else if (commandMode === '/edit' || commandMode === '/fix') {
         directives.push(buildWorkshopEditDirective(workshopContext, commandMode === '/fix', userPrompt));
     } else if (commandMode === '/publish') {
         directives.push(buildWorkshopPublishDirective());
@@ -609,6 +620,37 @@ function buildWorkshopEditDirective(workshopContext = null, isFixMode = false, u
     return lines.join('\n');
 }
 
+function buildWorkshopRewriteDirective(workshopContext = null, userPrompt = '') {
+    const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
+    const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
+    const fileKind = getWorkshopFileKindFromName(activeFileName);
+    const fenceLang = fileKind === 'js' ? 'javascript' : fileKind === 'css' ? 'css' : fileKind === 'html' ? 'html' : '';
+
+    const lines = [
+        '[FULL_FILE_REWRITE_PROTOCOL]',
+        'FOCUS: Complete replacement of the active Workshop editor file.',
+        'WORKSHOP FILES ARE VIRTUAL APP RECORDS, NOT DESKTOP FILE PATHS.',
+        'Do NOT use [READ_FILE], [LIST_FILES], [WRITE_FILE], [PUBLISH], or custom_.../filename paths for this request.',
+        'The file content below is already the current source of truth.',
+        'Format:',
+        `Return one fenced ${fenceLang || 'text'} code block containing the complete replacement content for the active file.`,
+        'If extra files are useful, add separate fenced code blocks for them and include a filename in the fence info, such as ```css filename=styles.css or ```javascript filename=game.js.',
+        'The editor will add or replace those extra files in the same Workshop game.',
+        'Do not wrap the answer in [EDIT] tags.',
+        'Do not ask the user to provide the source file.',
+        'Do not return explanations before or after the code blocks.',
+        '[/FULL_FILE_REWRITE_PROTOCOL]'
+    ];
+
+    if (activeGameId && activeFileName) {
+        const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
+        const content = rawContent.length > 22000 ? rawContent.substring(0, 22000) + '\n\n[TRUNCATED]' : rawContent;
+        lines.push(`Target: ${activeFileName} (${activeGameId})\nUser request: ${userPrompt}\nCurrent content:\n\`\`\`${fenceLang}\n${content}\n\`\`\``);
+    }
+
+    return lines.join('\n');
+}
+
 function buildWorkshopEditRetryContext(userPrompt = '', richContext = null) {
     const latestEditor = typeof window.getWorkshopEditorState === 'function'
         ? window.getWorkshopEditorState()
@@ -639,6 +681,40 @@ function buildWorkshopEditRetryContext(userPrompt = '', richContext = null) {
         'The active editor file content is provided below. Do not ask the user for the file.',
         'Return only an [EDIT] block, or for style-only edits return exactly one fenced css code block.',
         buildWorkshopEditDirective(context, false, userPrompt),
+        `[ACTIVE_WORKSHOP_EDITOR]\n${JSON.stringify(strippedEditor)}`
+    ].join('\n');
+}
+
+function buildWorkshopRewriteRetryContext(userPrompt = '', richContext = null) {
+    const latestEditor = typeof window.getWorkshopEditorState === 'function'
+        ? window.getWorkshopEditorState()
+        : null;
+    const editor = latestEditor || getActiveWorkshopEditorContext(richContext);
+    const activeGameId = `${editor?.activeGameId || ''}`.trim();
+    const activeFileName = `${editor?.activeFileName || ''}`.trim();
+    const activeFileContent = `${editor?.activeFileContent || ''}`;
+    if (!activeGameId || !activeFileName || !activeFileContent.trim()) return '';
+
+    const context = {
+        workshopEditor: {
+            activeGameId,
+            activeFileName,
+            activeFileContent
+        }
+    };
+    const strippedEditor = {
+        activeGameId,
+        activeFileName,
+        activeFileContentLength: activeFileContent.length,
+        activeFileContentProvidedInRewriteProtocol: true,
+        retry: true
+    };
+
+    return [
+        '[WORKSHOP_REWRITE_RETRY]',
+        'The active editor file content is provided below. Do not ask the user for the file.',
+        'Return fenced code blocks only. The first matching block replaces the active file; extra named blocks are added to the same game.',
+        buildWorkshopRewriteDirective(context, userPrompt),
         `[ACTIVE_WORKSHOP_EDITOR]\n${JSON.stringify(strippedEditor)}`
     ].join('\n');
 }
@@ -795,6 +871,40 @@ async function readBridgeErrorDetails(response) {
         return { message: trimmed, sourceLocation: stackLocation };
     } catch (_error) {
         return { message: '', sourceLocation: '' };
+    }
+}
+
+async function retryWorkshopRewriteWithEditorContext(userPrompt = '', richContext = null, signal = null) {
+    const retryContext = buildWorkshopRewriteRetryContext(userPrompt, richContext);
+    if (!retryContext) return '';
+
+    const modelSelect = document.getElementById('chat-model-select');
+    const selectedModel = modelSelect ? modelSelect.value : 'auto';
+    const requestModel = resolveChatRequestModel(selectedModel);
+    const customInstructions = typeof getAiCore()?.getStoredCustomInstructions === 'function'
+        ? getAiCore().getStoredCustomInstructions()
+        : `${localStorage.getItem('ss_ai_custom_instructions') || ''}`.trim().slice(0, 2000);
+
+    try {
+        const response = await bridgeFetch('/api/local-llm/chat', {
+            method: 'POST',
+            timeoutMs: 0,
+            signal,
+            body: JSON.stringify({
+                message: buildProtocolAwareUserMessage(userPrompt),
+                model: requestModel,
+                customInstructions,
+                attachment: null,
+                history: [],
+                pageContext: retryContext.slice(0, 24000)
+            })
+        });
+        if (!response?.ok) return '';
+        const data = await response.json().catch(() => null);
+        return typeof data?.reply === 'string' ? data.reply.trim() : '';
+    } catch (error) {
+        console.warn('[Arcade Chat] Workshop rewrite retry failed:', error);
+        return '';
     }
 }
 
@@ -2310,7 +2420,8 @@ window.sendChatMessage = async function() {
             }
         };
 
-        const editRequestActive = isWorkshopEditIntentPrompt(text, richContext);
+        const rewriteRequestActive = isWorkshopRewriteIntentPrompt(text, richContext);
+        const editRequestActive = rewriteRequestActive || isWorkshopEditIntentPrompt(text, richContext);
         const contextForModel = {
             ...richContext,
             workshopEditor: richContext.workshopEditor ? {
@@ -2507,7 +2618,9 @@ window.sendChatMessage = async function() {
 
         if (reply !== null) {
             if (editRequestActive && isUnhelpfulWorkshopEditReply(reply)) {
-                const retryReply = await retryWorkshopEditWithEditorContext(text, richContext, signal);
+                const retryReply = rewriteRequestActive
+                    ? await retryWorkshopRewriteWithEditorContext(text, richContext, signal)
+                    : await retryWorkshopEditWithEditorContext(text, richContext, signal);
                 if (retryReply && !isUnhelpfulWorkshopEditReply(retryReply)) {
                     reply = retryReply;
                 }
@@ -2671,7 +2784,7 @@ function extractWorkshopEditBlocks(text = "") {
 function extractAiCodeBlocks(rawText = '') {
     const blocks = [];
     const sourceText = `${rawText || ''}`;
-    const blockRegex = /```([a-z0-9_+-]*)\s*\n([\s\S]*?)```/gi;
+    const blockRegex = /```([^\n`]*)\n([\s\S]*?)```/gi;
     let blockMatch;
     while ((blockMatch = blockRegex.exec(sourceText)) !== null) {
         const lang = `${blockMatch[1] || ''}`.trim().toLowerCase();
@@ -2724,6 +2837,12 @@ function buildAiWorkshopFilesFromText(rawText) {
         if (kind === 'js') return counters[kind] === 1 ? 'game.js' : `game-${counters[kind]}.js`;
         return `snippet-${counters.txt}.txt`;
     };
+    const fileNameFromInfo = (info = '') => {
+        const text = `${info || ''}`.trim();
+        const named = text.match(/\b(?:file(?:name)?|name|path)=["']?([^"'\s`]+)["']?/i);
+        const direct = named?.[1] || text.match(/\b([a-z0-9][\w.-]*\.(?:html?|css|js|mjs|cjs|json|txt|svg|xml))\b/i)?.[1] || '';
+        return direct ? direct.replace(/[/\\]+/g, '_') : '';
+    };
 
     const sourceText = `${rawText || ''}`;
     const codeBlocks = extractAiCodeBlocks(sourceText);
@@ -2731,7 +2850,7 @@ function buildAiWorkshopFilesFromText(rawText) {
         const code = block.code;
         const kind = inferAiCodeKind(block.lang, code);
         files.push({
-            name: nextName(kind),
+            name: fileNameFromInfo(block.lang) || nextName(kind),
             type: kind === 'html' ? 'text/html' : kind === 'css' ? 'text/css' : kind === 'js' ? 'text/javascript' : 'text/plain',
             content: code
         });
@@ -2913,6 +3032,149 @@ function looksLikeFullActiveFileContent(fileName = '', generatedContent = '', ol
     return false;
 }
 
+function looksLikeHtmlFragment(value = '') {
+    const html = `${value || ''}`.trim();
+    if (!html) return false;
+    if (/<!doctype html|<html[\s>]/i.test(html)) return true;
+    const tagCount = (html.match(/<\/?[a-z][\w:-]*(?:\s[^>]*)?>/gi) || []).length;
+    return tagCount >= 3 && /<\/(?:div|main|section|style|script|button|form|p|h[1-6])>/i.test(html);
+}
+
+function getHtmlAttributeValue(attributes = '', name = '') {
+    const pattern = new RegExp(`\\b${name}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, 'i');
+    const match = `${attributes || ''}`.match(pattern);
+    return match?.[2] || '';
+}
+
+function getFirstHtmlElementSignature(fragment = '') {
+    const source = `${fragment || ''}`.replace(/^\s*(?:<!--[\s\S]*?-->\s*)+/, '');
+    const match = source.match(/<([a-z][\w:-]*)(\s[^>]*)?>/i);
+    if (!match) return null;
+    const tagName = `${match[1] || ''}`.toLowerCase();
+    const attributes = `${match[2] || ''}`;
+    const id = getHtmlAttributeValue(attributes, 'id').trim();
+    const classes = getHtmlAttributeValue(attributes, 'class')
+        .split(/\s+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+    return { tagName, id, classes };
+}
+
+function htmlOpenTagMatchesSignature(openTag = '', signature = null) {
+    if (!signature) return false;
+    const tagMatch = `${openTag || ''}`.match(/^<([a-z][\w:-]*)\b([\s\S]*?)>$/i);
+    if (!tagMatch || tagMatch[1].toLowerCase() !== signature.tagName) return false;
+
+    const attributes = `${tagMatch[2] || ''}`;
+    if (signature.id) {
+        return getHtmlAttributeValue(attributes, 'id') === signature.id;
+    }
+
+    if (signature.classes.length > 0) {
+        const existingClasses = new Set(getHtmlAttributeValue(attributes, 'class').split(/\s+/).filter(Boolean));
+        return signature.classes.some((className) => existingClasses.has(className));
+    }
+
+    return false;
+}
+
+function findMatchingHtmlElementEnd(content = '', startIndex = 0, tagName = '') {
+    const name = `${tagName || ''}`.trim().toLowerCase();
+    if (!name) return -1;
+
+    const tagRegex = new RegExp(`<\\/?${name}\\b[^>]*>`, 'gi');
+    tagRegex.lastIndex = startIndex;
+    let depth = 0;
+    let match;
+
+    while ((match = tagRegex.exec(content)) !== null) {
+        const tag = match[0];
+        const isClosing = /^<\//.test(tag);
+        const isSelfClosing = /\/\s*>$/.test(tag);
+
+        if (isClosing) {
+            depth -= 1;
+            if (depth === 0) return match.index + tag.length;
+        } else if (!isSelfClosing) {
+            depth += 1;
+        }
+    }
+
+    return -1;
+}
+
+function buildHtmlFragmentReplacement(oldContent = '', htmlFragment = '') {
+    const fragment = decodeEscapedCodeText(htmlFragment).trim();
+    if (!looksLikeHtmlFragment(fragment)) return null;
+
+    const signature = getFirstHtmlElementSignature(fragment);
+    if (!signature) return null;
+
+    const openTagRegex = new RegExp(`<${signature.tagName}\\b[^>]*>`, 'gi');
+    let match;
+    while ((match = openTagRegex.exec(oldContent)) !== null) {
+        if (!htmlOpenTagMatchesSignature(match[0], signature)) continue;
+        const endIndex = findMatchingHtmlElementEnd(oldContent, match.index, signature.tagName);
+        if (endIndex <= match.index) continue;
+        const nextContent = `${oldContent.slice(0, match.index)}${fragment}${oldContent.slice(endIndex)}`;
+        if (nextContent !== oldContent) {
+            return {
+                nextContent,
+                message: `Applied generated HTML fragment to <${signature.tagName}${signature.id ? ` id="${signature.id}"` : signature.classes[0] ? ` class="${signature.classes[0]}"` : ''}>.`
+            };
+        }
+    }
+
+    return null;
+}
+
+function ensureHtmlReferencesWorkshopFiles(html = '', generatedFiles = [], activeFileName = '') {
+    let nextHtml = `${html || ''}`.trim();
+    if (!nextHtml) return '';
+
+    const activeLower = `${activeFileName || ''}`.trim().toLowerCase();
+    const cssFiles = [];
+    const jsFiles = [];
+    for (const file of generatedFiles) {
+        const fileName = `${file?.name || ''}`.trim();
+        if (!fileName || fileName.toLowerCase() === activeLower) continue;
+        const kind = getWorkshopFileKindFromName(file.name) || inferAiCodeKind('', file.content);
+        if (kind === 'css' && file.content?.trim()) cssFiles.push(fileName);
+        if (kind === 'js' && file.content?.trim()) jsFiles.push(fileName);
+    }
+
+    nextHtml = nextHtml
+        .replace(/\n?\s*<style\s+id=["']ai-rewrite-inline-css["'][\s\S]*?<\/style>\s*/gi, '\n')
+        .replace(/\n?\s*<script\s+id=["']ai-rewrite-inline-js["'][\s\S]*?<\/script>\s*/gi, '\n');
+
+    const hasReference = (attr, fileName) => {
+        const escaped = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`${attr}\\s*=\\s*["'][^"']*${escaped}["']`, 'i').test(nextHtml);
+    };
+
+    const cssLinks = cssFiles
+        .filter((fileName) => !hasReference('href', fileName))
+        .map((fileName) => `  <link rel="stylesheet" href="${fileName}">`)
+        .join('\n');
+    if (cssLinks) {
+        nextHtml = /<\/head>/i.test(nextHtml)
+            ? nextHtml.replace(/<\/head>/i, `${cssLinks}\n</head>`)
+            : `${cssLinks}\n${nextHtml}`;
+    }
+
+    const scriptTags = jsFiles
+        .filter((fileName) => !hasReference('src', fileName))
+        .map((fileName) => `  <script src="${fileName}"></script>`)
+        .join('\n');
+    if (scriptTags) {
+        nextHtml = /<\/body>/i.test(nextHtml)
+            ? nextHtml.replace(/<\/body>/i, `${scriptTags}\n</body>`)
+            : `${nextHtml}\n${scriptTags}`;
+    }
+
+    return nextHtml;
+}
+
 function buildChangedRegionPatch(oldContent = '', newContent = '') {
     if (oldContent === newContent) return null;
 
@@ -2980,6 +3242,41 @@ async function tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt = '
     }
 
     const activeKind = getWorkshopFileKindFromName(fileName);
+    if (activeKind === 'html' && !isWorkshopRewriteIntentPrompt(userPrompt, richContext)) {
+        const htmlFragment = generatedFiles.find((file) => {
+            const kind = getWorkshopFileKindFromName(file.name) || inferAiCodeKind('', file.content);
+            return kind === 'html' && looksLikeHtmlFragment(file.content);
+        });
+
+        if (htmlFragment?.content && !looksLikeFullActiveFileContent(fileName, htmlFragment.content, oldContent)) {
+            const fragmentResult = buildHtmlFragmentReplacement(oldContent, htmlFragment.content);
+            if (fragmentResult?.nextContent) {
+                result.attempted = true;
+                const nextContent = ensureHtmlReferencesWorkshopFiles(fragmentResult.nextContent, generatedFiles, fileName);
+                const extraFiles = generatedFiles.filter((file) => {
+                    const name = `${file?.name || ''}`.trim();
+                    return name && name.toLowerCase() !== fileName.toLowerCase() && `${file.content || ''}`.trim();
+                });
+                const applyResult = extraFiles.length > 0 && typeof window.addAiWorkshopFilesToGame === 'function'
+                    ? await window.addAiWorkshopFilesToGame(gameId, extraFiles, {
+                        activeFileName: fileName,
+                        activeFileType: inferAiWorkshopFileType(fileName),
+                        activeFileContent: nextContent
+                    })
+                    : await window.internalApplyWorkshopFileEdit(gameId, fileName, nextContent, { save: true });
+                result.ok = !!applyResult?.ok;
+                result.reason = result.ok ? '' : (applyResult?.message || 'html-fragment-apply-failed');
+                result.message = result.ok
+                    ? (extraFiles.length > 0
+                        ? `${fragmentResult.message || `Applied generated HTML fragment to ${fileName}.`} Added ${extraFiles.length} file${extraFiles.length === 1 ? '' : 's'}.`
+                        : fragmentResult.message || `Applied generated HTML fragment to ${fileName}.`)
+                    : result.reason;
+                if (window.showFeedback) window.showFeedback(result.message, !result.ok);
+                return result;
+            }
+        }
+    }
+
     if (isStyleEditPrompt(userPrompt) && (activeKind === 'html' || activeKind === 'css')) {
         const cssFile = generatedFiles.find((file) => {
             const kind = getWorkshopFileKindFromName(file.name) || inferAiCodeKind('', file.content);
@@ -3347,6 +3644,79 @@ async function executeArcadeChatActions(text, options = {}) {
     return actionResult;
 }
 
+async function tryApplyWorkshopRewriteFromReply(replyText, userPrompt = '', richContext = null, target = {}) {
+    const result = { attempted: false, ok: false, reason: '', message: '' };
+    if (!isWorkshopRewriteIntentPrompt(userPrompt, richContext)) return result;
+    if (typeof window.getWorkshopFileContent !== 'function'
+        || typeof window.internalApplyWorkshopFileEdit !== 'function') {
+        result.reason = 'workshop-edit-functions-unavailable';
+        return result;
+    }
+
+    const editorState = getActiveWorkshopEditorContext(richContext);
+    const gameId = `${target.gameId || editorState?.activeGameId || ''}`.trim();
+    const fileName = `${target.fileName || editorState?.activeFileName || ''}`.trim();
+    if (!gameId || !fileName) {
+        result.reason = 'no-active-editor-file';
+        return result;
+    }
+
+    const oldContent = window.getWorkshopFileContent(gameId, fileName);
+    if (typeof oldContent !== 'string' || !oldContent.trim()) {
+        result.reason = 'active-file-content-unavailable';
+        return result;
+    }
+
+    const generatedFiles = buildAiWorkshopFilesFromText(replyText);
+    if (generatedFiles.length === 0) {
+        result.reason = 'no-generated-code-blocks';
+        return result;
+    }
+
+    const activeKind = getWorkshopFileKindFromName(fileName);
+    const activeLower = fileName.toLowerCase();
+    let generatedActiveFile = generatedFiles.find((file) => `${file.name || ''}`.toLowerCase() === activeLower)
+        || generatedFiles.find((file) => getWorkshopFileKindFromName(file.name) === activeKind)
+        || generatedFiles.find((file) => inferAiCodeKind('', file.content) === activeKind);
+
+    if (!generatedActiveFile?.content?.trim()) {
+        result.reason = 'no-generated-active-file';
+        return result;
+    }
+
+    let nextContent = decodeEscapedCodeText(generatedActiveFile.content).trim();
+    if (activeKind === 'html') {
+        nextContent = ensureHtmlReferencesWorkshopFiles(nextContent, generatedFiles, fileName);
+    }
+
+    if (!nextContent || nextContent === oldContent.trim()) {
+        result.reason = 'rewrite-made-no-change';
+        return result;
+    }
+
+    result.attempted = true;
+    const extraFiles = generatedFiles.filter((file) => {
+        const name = `${file?.name || ''}`.trim();
+        return name && name.toLowerCase() !== fileName.toLowerCase() && `${file.content || ''}`.trim();
+    });
+    const applyResult = extraFiles.length > 0 && typeof window.addAiWorkshopFilesToGame === 'function'
+        ? await window.addAiWorkshopFilesToGame(gameId, extraFiles, {
+            activeFileName: fileName,
+            activeFileType: inferAiWorkshopFileType(fileName),
+            activeFileContent: nextContent
+        })
+        : await window.internalApplyWorkshopFileEdit(gameId, fileName, nextContent, { save: true });
+    result.ok = !!applyResult?.ok;
+    result.reason = result.ok ? '' : (applyResult?.message || 'rewrite-apply-failed');
+    result.message = result.ok
+        ? (extraFiles.length > 0
+            ? `Rewrote ${fileName} and added ${extraFiles.length} file${extraFiles.length === 1 ? '' : 's'}.`
+            : `Rewrote and saved ${fileName}.`)
+        : result.reason;
+    if (window.showFeedback) window.showFeedback(result.message, !result.ok);
+    return result;
+}
+
 async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '', richContext = null) {
     const result = { attempted: false, ok: false, reason: '' };
     if (!isWorkshopEditIntentPrompt(userPrompt, richContext)) return result;
@@ -3361,6 +3731,18 @@ async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '', r
     if (!gameId || !fileName) {
         result.reason = 'no-active-editor-file';
         return result;
+    }
+
+    if (isWorkshopRewriteIntentPrompt(userPrompt, richContext)) {
+        const rewriteResult = await tryApplyWorkshopRewriteFromReply(replyText, userPrompt, richContext, { gameId, fileName });
+        if (rewriteResult.attempted) {
+            return {
+                attempted: true,
+                ok: rewriteResult.ok,
+                reason: rewriteResult.reason || '',
+                message: rewriteResult.message || ''
+            };
+        }
     }
 
     const editBlocks = extractWorkshopEditBlocks(replyText);
