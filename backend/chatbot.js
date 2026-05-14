@@ -66,6 +66,7 @@ SYSTEM TOOLS:
    - /edit: Surgical code surgery. Use [EDIT] tags with small SEARCH/REPLACE snippets (2-5 lines).
    - /publish: Create new project with [PUBLISH] tag.
    - /fix: Focused bug fixing using [EDIT] snippets.
+   - Workshop/custom game files are virtual app records, not desktop file paths. Never use [READ_FILE], [LIST_FILES], or [WRITE_FILE] for custom_... workshop paths.
    - [EDIT] FORMAT:
      [EDIT]
      SEARCH: exact snippet to find
@@ -102,6 +103,7 @@ const LM_STUDIO_SWITCH_TIMEOUT_MS = Number(process.env.SIGNAL_SHARE_LM_MODEL_SWI
 const MAX_AUTO_MODELS_PER_PROVIDER = Math.max(1, Number(process.env.SIGNAL_SHARE_AUTO_MODEL_MAX_TRIES || 1));
 const AUTO_SELECT_PREFERS_LOADED_LM_STUDIO = process.env.SIGNAL_SHARE_AUTO_SELECT_LOADED_LMSTUDIO !== "false";
 const AUTO_UNLOAD_OTHER_LM_STUDIO_MODELS = process.env.SIGNAL_SHARE_AUTO_UNLOAD_OTHERS !== "false";
+const ENABLE_OLLAMA_FALLBACK = /^(1|true|yes|on)$/i.test(`${process.env.SIGNAL_SHARE_ENABLE_OLLAMA || ""}`.trim());
 const SERVER_CUSTOM_INSTRUCTIONS = `${process.env.SIGNAL_SHARE_AI_CUSTOM_INSTRUCTIONS || ""}`.trim();
 const MAX_CUSTOM_INSTRUCTIONS_CHARS = Math.max(200, Number(process.env.SIGNAL_SHARE_AI_CUSTOM_MAX_CHARS || 2000));
 const CHAT_COMPLETION_TIMEOUT_MS = Math.max(15000, Number(process.env.SIGNAL_SHARE_CHAT_COMPLETION_TIMEOUT_MS || 120000));
@@ -151,6 +153,18 @@ function isLiveWebInfoRequest(value = "") {
         || /\b(latest|news|headline|headlines|update|updates)\b/.test(text)
         || /\b(price|stock|stocks|score|scores)\b/.test(text)
     );
+}
+
+function isWorkshopEditContext(value = "") {
+    const text = `${value || ""}`;
+    return text.includes("[SURGICAL_EDIT_PROTOCOL]")
+        || text.includes("activeFileContentProvidedInEditProtocol")
+        || /"workshopEditor"\s*:/.test(text);
+}
+
+function hasVirtualWorkshopFileToolRequest(value = "") {
+    const text = `${value || ""}`;
+    return /\[(?:READ_FILE|LIST_FILES|WRITE_FILE)\s*:/i.test(text);
 }
 
 function normalizeModelKey(value = "") {
@@ -370,6 +384,19 @@ function findBestMatchingModel(candidate, options = []) {
         }
     }
     return bestScore >= 45 ? best : "";
+}
+
+function resolvePinnedModelProvider(requestedModel, catalog = {}) {
+    const requested = `${requestedModel || ""}`.trim();
+    if (!requested || requested.toLowerCase() === "auto") return "";
+
+    const lmStudioMatch = findBestMatchingModel(requested, catalog?.lmstudio || []);
+    if (lmStudioMatch) return "lmstudio";
+
+    const ollamaMatch = findBestMatchingModel(requested, catalog?.ollama || []);
+    if (ollamaMatch) return "ollama";
+
+    return "";
 }
 
 function getLoadedLmStudioInstances(modelRows) {
@@ -612,24 +639,34 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         conversation.push({ role: "user", content: combinedContent.trim() || "[No text message provided]" });
     }
 
+    const hasPinnedModel = Boolean(preferredModel && preferredModel !== "auto");
+    const normalizedPinnedModel = `${preferredModel || ""}`.trim();
     const catalog = await getLocalModelCatalog().catch(() => ({ lmstudio: [], ollama: [], all: [] }));
-    const endpointConfigs = [
-        {
+    const pinnedModelProvider = hasPinnedModel ? resolvePinnedModelProvider(normalizedPinnedModel, catalog) : "";
+    const shouldIncludeLmStudio = pinnedModelProvider !== "ollama";
+    const shouldIncludeOllama = pinnedModelProvider === "ollama"
+        || (!hasPinnedModel && ENABLE_OLLAMA_FALLBACK)
+        || (hasPinnedModel && !pinnedModelProvider && ENABLE_OLLAMA_FALLBACK);
+    const endpointConfigs = [];
+
+    if (shouldIncludeLmStudio) {
+        endpointConfigs.push({
             provider: "lmstudio",
             chatUrl: "http://localhost:1234/v1/chat/completions",
             kind: "openai",
             models: mapRequestedModelsToAvailable(models, catalog?.lmstudio || [])
-        },
-        {
+        });
+    }
+
+    if (shouldIncludeOllama) {
+        endpointConfigs.push({
             provider: "ollama",
             chatUrl: "http://localhost:11434/api/chat",
             kind: "ollama",
             models: mapRequestedModelsToAvailable(models, catalog?.ollama || [])
-        }
-    ];
+        });
+    }
 
-    const hasPinnedModel = Boolean(preferredModel && preferredModel !== "auto");
-    const normalizedPinnedModel = `${preferredModel || ""}`.trim();
     const isModelQuestion = iteration === 0 && isModelIdentityRequest(message || "");
     let lmStudioPreparedForPinnedModel = false;
     let autoSelectedLmStudioModel = "";
@@ -756,8 +793,9 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
 
     if (!success && iteration === 0) {
         // If all models failed on first pass, check if we should return offline response or a specific error
+        const localServerLabel = ENABLE_OLLAMA_FALLBACK ? "LM Studio/Ollama" : "LM Studio";
         if (lastEndpointError.includes("ECONNREFUSED") || lastEndpointError.includes("fetch failed")) {
-            return `⚠️ [Intelligence Core Offline]: I couldn't connect to your local AI server (LM Studio/Ollama). Please ensure it is running and accessible at the configured ports.`;
+            return `⚠️ [Intelligence Core Offline]: I couldn't connect to your local AI server (${localServerLabel}). Please ensure it is running and accessible at the configured ports.`;
         }
         if (lastEndpointError.includes("timeout")) {
             return `🕒 [Intelligence Core Timeout]: The local AI model took too long to respond. This can happen if the context (file size/history) is too large for your hardware.`;
@@ -790,6 +828,21 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         
         const effectiveHasTools = hasTools && !isProtocolTag;
         const shouldForceSearchTool = iteration === 0 && isLiveWebInfoRequest(message || "");
+        const shouldBlockWorkshopFileTool = iteration === 0
+            && isWorkshopEditContext(pageContext)
+            && hasVirtualWorkshopFileToolRequest(lmResponse);
+
+        if (shouldBlockWorkshopFileTool) {
+            console.log("[Chatbot] Blocking filesystem tool for virtual Workshop edit; requesting EDIT block.");
+            return getChatResponse(null, [
+                ...conversation,
+                { role: "assistant", content: lmResponse },
+                {
+                    role: "system",
+                    content: "You attempted to read a Workshop/custom game file as a desktop path. That is invalid. The current file content is already included in CURRENT CONTEXT under SURGICAL_EDIT_PROTOCOL. Do not use READ_FILE/LIST_FILES/WRITE_FILE. Emit only one or more [EDIT] SEARCH/REPLACE blocks for the active editor file."
+                }
+            ], pageContext, iteration + 1, attachment, preferredModel, customInstructions);
+        }
 
         if (shouldForceSearchTool && !effectiveHasTools) {
             console.log("[Chatbot] Enforcing SEARCH tool for live-web info request...");

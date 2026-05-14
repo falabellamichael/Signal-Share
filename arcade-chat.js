@@ -569,6 +569,9 @@ function buildWorkshopEditDirective(workshopContext = null, isFixMode = false) {
     const lines = [
         '[SURGICAL_EDIT_PROTOCOL]',
         isFixMode ? 'FOCUS: Bug Fix / Error Resolution.' : 'FOCUS: Feature Update / Refactoring.',
+        'WORKSHOP FILES ARE VIRTUAL APP RECORDS, NOT DESKTOP FILE PATHS.',
+        'Do NOT use [READ_FILE], [LIST_FILES], [WRITE_FILE], or custom_.../filename paths for this request.',
+        'The file content below is already the current source of truth.',
         'Format:',
         '[EDIT]',
         'SEARCH: 2-5 lines of exact existing code',
@@ -580,6 +583,7 @@ function buildWorkshopEditDirective(workshopContext = null, isFixMode = false) {
         '- NEVER use [PUBLISH] for edits to the active editor file.',
         '- Do not return full-file code fences unless the user explicitly asks for a full file.',
         '- Your actionable output should be the [EDIT] block, not a rewritten file.',
+        '- If you cannot find a safe SEARCH block in the provided content, ask the user to select the relevant file/section.',
         '- Be precise with whitespace/indentation in SEARCH.',
         '[/SURGICAL_EDIT_PROTOCOL]'
     ];
@@ -2189,7 +2193,16 @@ window.sendChatMessage = async function() {
             }
         };
 
-        const pageContext = JSON.stringify(richContext);
+        const contextForModel = {
+            ...richContext,
+            workshopEditor: richContext.workshopEditor ? {
+                ...richContext.workshopEditor,
+                activeFileContent: undefined,
+                activeFileContentLength: `${richContext.workshopEditor.activeFileContent || ''}`.length,
+                activeFileContentProvidedInEditProtocol: true
+            } : null
+        };
+        const pageContext = JSON.stringify(contextForModel);
         // Omit visible page text if we are in the editor to save tokens
         const pageText = richContext.workshopEditor ? "" : document.body.innerText.substring(0, 300);
         // Keep only the most recent messages to prevent context window overflow on small local models
@@ -2210,7 +2223,7 @@ window.sendChatMessage = async function() {
             })
             : '';
         const protocolDirectives = getProtocolDirectives(text, richContext);
-        const fullPageContext = `${pageContext} (Visible text: ${pageText})${sharedAiContext ? `\n\n${sharedAiContext}` : ''}${protocolDirectives ? `\n\n${protocolDirectives}` : ''}`;
+        const fullPageContext = `${protocolDirectives ? `${protocolDirectives}\n\n` : ''}${sharedAiContext ? `${sharedAiContext}\n\n` : ''}${pageContext} (Visible text: ${pageText})`;
 
         try {
             const modelSelect = document.getElementById('chat-model-select');
