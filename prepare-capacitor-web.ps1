@@ -157,10 +157,13 @@ Write-Host "`n--- Verifying Critical Dist Files ---" -ForegroundColor DarkCyan
 $criticalDistFiles = @(
   "index.html",
   "mini-games.html",
+  "mini-games.js",
   "app-v3.js",
+  "app-v3-ui.js",
   "arcade-chat.js",
   "companion-ai-core.js",
-  "hero-media-player.js"
+  "hero-media-player.js",
+  "notifications.js"
 )
 
 foreach ($file in $criticalDistFiles) {

@@ -1629,7 +1629,7 @@ window.sendChatMessage = async function() {
                 activeAiAbortController.abort();
                 activeAiAbortController = null;
                 removeTypingIndicator(typingId);
-                addChatMessage('assistant', '🕹️ [Arcade Protocol]: Intelligence process terminated by user.');
+                addChatMessage('ai', '🕹️ [Arcade Protocol]: Intelligence process terminated by user.');
                 updateChatStatus('idle');
                 setChatSendButtonMode('send');
             }
@@ -1637,6 +1637,7 @@ window.sendChatMessage = async function() {
 
         let reply = null;
         let lastError = null;
+        let wasCancelledByUser = false;
 
         // Prepare rich context for the AI
         let richContext = {
@@ -1712,14 +1713,23 @@ window.sendChatMessage = async function() {
             }
         } catch (err) {
             const bridgeDisabled = err?.name === 'BridgeDisabledError';
-            lastError = bridgeDisabled
-                ? 'Bridge disabled'
-                : (err?.message || "Connection refused or blocked by browser");
-            if (!bridgeDisabled) {
+            if (signal.aborted) {
+                wasCancelledByUser = true;
+                lastError = 'Request cancelled by user';
+            } else {
+                lastError = bridgeDisabled
+                    ? 'Bridge disabled'
+                    : (err?.message || "Connection refused or blocked by browser");
+            }
+            if (!bridgeDisabled && !wasCancelledByUser) {
                 console.warn(`[Arcade Chat] Bridge request failed:`, err);
             }
         } finally {
             removeTypingIndicator(typingId);
+        }
+
+        if (wasCancelledByUser) {
+            return;
         }
 
         if (reply !== null) {
