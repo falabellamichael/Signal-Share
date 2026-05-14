@@ -8,12 +8,18 @@
         description: 'Surgical code modification.',
         execute: async (args, inputElement) => {
             // SMART CONTEXT: If args mention a known game, try to switch to it
-            if (typeof window.getWorkshopManageableGames === 'function') {
-                const games = window.getWorkshopManageableGames();
-                const mentionedGame = games.find(g => args.toLowerCase().includes((g.title || "").toLowerCase()));
-                if (mentionedGame && typeof window.setWorkshopEditActiveGame === 'function') {
-                    console.log(`[Command: Edit] Auto-switching context to: ${mentionedGame.title}`);
-                    window.setWorkshopEditActiveGame(mentionedGame.id);
+            if (typeof window.resolveWorkshopEditGameFromPrompt === 'function'
+                && typeof window.setWorkshopEditActiveGame === 'function') {
+                let targetGame = window.resolveWorkshopEditGameFromPrompt(args);
+                if (!targetGame && typeof window.getWorkshopManageableGames === 'function') {
+                    const games = window.getWorkshopManageableGames();
+                    if (Array.isArray(games) && games.length === 1) targetGame = games[0];
+                }
+                if (targetGame) {
+                    const selected = window.setWorkshopEditActiveGame(targetGame.id);
+                    if (selected?.ok) {
+                        console.log(`[Command: Edit] Auto-switching context to: ${selected.title} / ${selected.fileName}`);
+                    }
                 }
             }
 

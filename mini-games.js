@@ -1162,6 +1162,45 @@ function getWorkshopManageableGames() {
         });
 }
 
+function normalizeWorkshopSearchText(value = '') {
+    return `${value || ''}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function scoreWorkshopGamePromptMatch(game, prompt = '') {
+    const normalizedPrompt = normalizeWorkshopSearchText(prompt);
+    const normalizedTitle = normalizeWorkshopSearchText(game?.title || '');
+    const normalizedId = normalizeWorkshopSearchText(game?.id || '');
+    if (!normalizedPrompt || (!normalizedTitle && !normalizedId)) return 0;
+    if (normalizedTitle && normalizedPrompt.includes(normalizedTitle)) return 100;
+    if (normalizedId && normalizedPrompt.includes(normalizedId)) return 95;
+
+    const promptTokens = new Set(normalizedPrompt.split(/\s+/).filter((token) => token.length > 2));
+    const titleTokens = normalizedTitle.split(/\s+/).filter((token) => token.length > 2);
+    if (!promptTokens.size || !titleTokens.length) return 0;
+
+    const overlap = titleTokens.filter((token) => promptTokens.has(token)).length;
+    return overlap > 0 ? Math.round((overlap / titleTokens.length) * 80) : 0;
+}
+
+function resolveWorkshopEditGameFromPrompt(prompt = '') {
+    const games = getWorkshopManageableGames();
+    let bestGame = null;
+    let bestScore = 0;
+
+    for (const game of games) {
+        const score = scoreWorkshopGamePromptMatch(game, prompt);
+        if (score > bestScore) {
+            bestGame = game;
+            bestScore = score;
+        }
+    }
+
+    return bestScore >= 35 ? bestGame : null;
+}
+
 function isWorkshopFileEditable(file) {
     if (!file || typeof file !== 'object') return false;
     const fileName = `${file.name || ''}`.trim().toLowerCase();
@@ -1692,6 +1731,41 @@ function handleWorkshopEditFileChange() {
     if (!fileSelect) return;
     workshopEditActiveFileName = `${fileSelect.value || ''}`.trim();
     syncWorkshopEditOverlay();
+}
+
+function setWorkshopEditActiveGame(gameId, preferredFileName = '') {
+    const targetGameId = `${gameId || ''}`.trim();
+    const games = getWorkshopManageableGames();
+    const game = games.find((entry) => entry.id === targetGameId) || null;
+    if (!game) {
+        return { ok: false, message: 'Workshop game not found or not editable.' };
+    }
+
+    const editableFiles = (Array.isArray(game.files) ? game.files : []).filter(isWorkshopFileEditable);
+    if (editableFiles.length === 0) {
+        return { ok: false, message: `${game.title || game.id} has no editable text files.` };
+    }
+
+    const preferred = `${preferredFileName || ''}`.trim().toLowerCase();
+    const selectedFile = (preferred
+        ? editableFiles.find((file) => `${file.name || ''}`.trim().toLowerCase() === preferred)
+        : null)
+        || editableFiles.find((file) => `${file.name || ''}`.trim().toLowerCase() === 'index.html')
+        || editableFiles.find((file) => /\.html?$/i.test(`${file.name || ''}`))
+        || editableFiles[0];
+
+    workshopEditActiveGameId = game.id;
+    workshopEditActiveFileName = selectedFile.name;
+    setWorkshopTileMode('edit');
+    syncWorkshopEditOverlay();
+
+    return {
+        ok: true,
+        gameId: game.id,
+        title: game.title || game.id,
+        fileName: selectedFile.name,
+        content: window.getWorkshopFileContent?.(game.id, selectedFile.name) || ''
+    };
 }
 
 function handleWorkshopEditContentInput() {
@@ -2560,6 +2634,9 @@ window.showAuth = showAuth;
 window.removeUploadedFile = removeUploadedFile;
 window.publishCustomGame = publishCustomGame;
 window.publishCustomGameFromAi = publishCustomGameFromAi;
+window.getWorkshopManageableGames = getWorkshopManageableGames;
+window.resolveWorkshopEditGameFromPrompt = resolveWorkshopEditGameFromPrompt;
+window.setWorkshopEditActiveGame = setWorkshopEditActiveGame;
 window.setWorkshopTileMode = setWorkshopTileMode;
 window.handleWorkshopEditGameChange = handleWorkshopEditGameChange;
 window.handleWorkshopEditFileChange = handleWorkshopEditFileChange;
