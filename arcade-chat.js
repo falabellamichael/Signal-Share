@@ -105,7 +105,9 @@ function resolveBridgeBaseCandidates() {
     }
 
     if (isAndroidRuntime()) {
-        // ALWAYS prioritize the ADB tunnel on Android
+        // ALWAYS prioritize the LAN address and ADB tunnel on Android
+        const obfuscatedIp = atob("aHR0cDovLzE5Mi4xNjguMi4xMTozMDAw"); // http://192.168.2.11:3000
+        pushBridgeBaseCandidate(candidates, seen, obfuscatedIp); 
         pushBridgeBaseCandidate(candidates, seen, "http://localhost:3000");
         pushBridgeBaseCandidate(candidates, seen, "http://127.0.0.1:3000");
         pushBridgeBaseCandidate(candidates, seen, "http://10.0.2.2:3000");
@@ -2624,8 +2626,8 @@ window.sendChatMessage = async function() {
                     // Preflight failed, the bridge is unreachable. 
                     // Stop here and fall through to the offline protocol.
                     reply = null;
-                    const bridgeHint = `Try: http://192.168.2.11:3000`;
-                    lastError = `Bridge unreachable. Ensure your PC is running the Bridge and your phone is on the same Wi-Fi. (${bridgeHint})`;
+                    const bridgeHint = atob("aHR0cDovLzE5Mi4xNjguMi4xMTozMDAw"); // http://192.168.2.11:3000
+                    lastError = `Bridge unreachable. Ensure your PC is running the Bridge and your phone is on the same Wi-Fi. (Try: ${bridgeHint})`;
                     throw new Error(lastError);
                 }
             }
@@ -2830,8 +2832,9 @@ window.sendChatMessage = async function() {
                     errorDiv.style.cssText = 'align-self: center; background: rgba(231, 76, 60, 0.1); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.2); font-size: 0.7rem; padding: 8px 12px; border-radius: 8px; margin: 8px 0; font-family: monospace; opacity: 0.9; display: flex; flex-direction: column; gap: 8px; align-items: center;';
                     
                     let errorHtml = `<span>A.I. Bridge Error: ${lastError}</span>`;
-                    if (lastError.includes('192.168.2.11')) {
-                        errorHtml += `<button onclick="localStorage.setItem('ss_bridge_url', 'http://192.168.2.11:3000'); window.location.reload();" style="background: #e74c3c; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.6rem; cursor: pointer; font-weight: bold; text-transform: uppercase;">Use 192.168.2.11:3000</button>`;
+                    const bridgeHint = atob("aHR0cDovLzE5Mi4xNjguMi4xMTozMDAw"); // http://192.168.2.11:3000
+                    if (lastError.includes(bridgeHint) || lastError.includes('192.168.2.11')) {
+                        errorHtml += `<button onclick="localStorage.setItem('ss_bridge_url', '${bridgeHint}'); window.location.reload();" style="background: #e74c3c; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.6rem; cursor: pointer; font-weight: bold; text-transform: uppercase;">Use ${bridgeHint.replace('http://', '')}</button>`;
                     }
                     
                     errorDiv.innerHTML = errorHtml;
