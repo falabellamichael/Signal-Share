@@ -2155,6 +2155,20 @@ window.sendChatMessage = async function() {
         
         input.value = '';
         clearChatAttachment();
+
+        if (allowsLocalStyleFallback(text)) {
+            window.activeArcadeCommandMode = null;
+            const localStyleFallback = await tryLocalWorkshopStyleFallback(text);
+            const fallbackReply = `[Workshop Edit]: ${localStyleFallback.ok
+                ? localStyleFallback.message
+                : (localStyleFallback.message || 'No active Workshop file content is available.')}`;
+            addChatMessage('ai', fallbackReply);
+            arcadeChatHistory.push({ role: 'assistant', content: fallbackReply });
+            saveCurrentChat();
+            updateChatStatus(localStyleFallback.ok ? 'active' : 'idle');
+            isSendingChatMessage = false;
+            return;
+        }
         
         // Refresh bridge context on demand so AI has latest info
         if (typeof pollDesktopBridge === 'function') {
@@ -2207,19 +2221,19 @@ window.sendChatMessage = async function() {
             }
         };
 
+        const editRequestActive = isWorkshopEditIntentPrompt(text, richContext);
         const contextForModel = {
             ...richContext,
             workshopEditor: richContext.workshopEditor ? {
                 ...richContext.workshopEditor,
                 activeFileContent: undefined,
                 activeFileContentLength: `${richContext.workshopEditor.activeFileContent || ''}`.length,
-                activeFileContentProvidedInEditProtocol: true
+                ...(editRequestActive ? { activeFileContentProvidedInEditProtocol: true } : {})
             } : null
         };
         const pageContext = JSON.stringify(contextForModel);
         // Omit visible page text if we are in the editor to save tokens
         const pageText = richContext.workshopEditor ? "" : document.body.innerText.substring(0, 300);
-        const editRequestActive = isWorkshopEditIntentPrompt(text, richContext);
         // Keep only the most recent messages to prevent context window overflow on small local models
         const maxHistory = editRequestActive ? 2 : 6;
         const recentHistory = arcadeChatHistory.slice(-maxHistory);
@@ -2238,7 +2252,12 @@ window.sendChatMessage = async function() {
             })
             : '';
         const protocolDirectives = getProtocolDirectives(text, richContext);
-        const fullPageContext = `${protocolDirectives ? `${protocolDirectives}\n\n` : ''}${sharedAiContext ? `${sharedAiContext}\n\n` : ''}${pageContext} (Visible text: ${pageText})`;
+        const workshopEditContext = editRequestActive
+            ? `[ACTIVE_WORKSHOP_EDITOR]\n${JSON.stringify(contextForModel.workshopEditor || null)}`
+            : '';
+        const fullPageContext = editRequestActive
+            ? `${protocolDirectives ? `${protocolDirectives}\n\n` : ''}${workshopEditContext}`
+            : `${protocolDirectives ? `${protocolDirectives}\n\n` : ''}${sharedAiContext ? `${sharedAiContext}\n\n` : ''}${pageContext} (Visible text: ${pageText})`;
 
         try {
             const modelSelect = document.getElementById('chat-model-select');

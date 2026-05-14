@@ -159,12 +159,28 @@ function isWorkshopEditContext(value = "") {
     const text = `${value || ""}`;
     return text.includes("[SURGICAL_EDIT_PROTOCOL]")
         || text.includes("activeFileContentProvidedInEditProtocol")
-        || /"workshopEditor"\s*:/.test(text);
+        || text.includes("[ACTIVE_WORKSHOP_EDITOR]");
 }
 
 function hasVirtualWorkshopFileToolRequest(value = "") {
     const text = `${value || ""}`;
     return /\[(?:READ_FILE|LIST_FILES|WRITE_FILE)\s*:/i.test(text);
+}
+
+function buildWorkshopFileToolBlockedReply() {
+    return [
+        "[Workshop Edit]: LM Studio tried to use a desktop file tool for a virtual Workshop game file.",
+        "I did not change anything.",
+        "The editor already sent the active file content, so try again with a stronger code model, or type \"apply local style fallback\" if you want the built-in basic style patch."
+    ].join(" ");
+}
+
+function buildWorkshopEmptyEditReply() {
+    return [
+        "[Workshop Edit]: LM Studio returned an empty edit response.",
+        "I did not change anything.",
+        "Try a stronger code model, shorten the request, or type \"apply local style fallback\" for the built-in basic style patch."
+    ].join(" ");
 }
 
 function normalizeModelKey(value = "") {
@@ -560,11 +576,15 @@ export async function getLocalModelCatalog({ force = false } = {}) {
  */
 export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0, attachment = null, preferredModel = 'auto', customInstructions = "") {
     if (!message && iteration === 0) return "I didn't receive a message to process.";
+    const workshopEditActive = isWorkshopEditContext(pageContext);
     
     // Safety check for infinite recursion - reduced for memory pressure
     const MAX_ITERATIONS = 2;
     if (iteration >= MAX_ITERATIONS) {
         console.warn("[Chatbot] Maximum tool-calling iterations reached. Stopping loop.");
+        if (workshopEditActive) {
+            return buildWorkshopEmptyEditReply();
+        }
         return "I've hit a limit while trying to execute tools for you. Please try rephrasing your request!";
     }
 
@@ -737,7 +757,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                     body = {
                         model: model,
                         messages: openAiMessages,
-                        temperature: 0.7
+                        temperature: workshopEditActive ? 0.2 : 0.7
                     };
                 } else {
                     body = {
@@ -829,19 +849,12 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         const effectiveHasTools = hasTools && !isProtocolTag;
         const shouldForceSearchTool = iteration === 0 && isLiveWebInfoRequest(message || "");
         const shouldBlockWorkshopFileTool = iteration === 0
-            && isWorkshopEditContext(pageContext)
+            && workshopEditActive
             && hasVirtualWorkshopFileToolRequest(lmResponse);
 
         if (shouldBlockWorkshopFileTool) {
-            console.log("[Chatbot] Blocking filesystem tool for virtual Workshop edit; requesting EDIT block.");
-            return getChatResponse(null, [
-                ...conversation,
-                { role: "assistant", content: lmResponse },
-                {
-                    role: "system",
-                    content: "You attempted to read a Workshop/custom game file as a desktop path. That is invalid. The current file content is already included in CURRENT CONTEXT under SURGICAL_EDIT_PROTOCOL. Do not use READ_FILE/LIST_FILES/WRITE_FILE. Emit only one or more [EDIT] SEARCH/REPLACE blocks for the active editor file."
-                }
-            ], pageContext, iteration + 1, attachment, preferredModel, customInstructions);
+            console.log("[Chatbot] Blocking filesystem tool for virtual Workshop edit.");
+            return buildWorkshopFileToolBlockedReply();
         }
 
         if (shouldForceSearchTool && !effectiveHasTools) {
@@ -905,6 +918,9 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
 
 
     if (!lmResponse?.trim() && iteration > 0) {
+        if (workshopEditActive) {
+            return buildWorkshopEmptyEditReply();
+        }
         // Fallback: If the model failed to summarize, return the last tool observation if available
         const lastObservation = history.findLast(h => h.role === "user" && h.content.includes("[SYSTEM OBSERVATION]"));
         if (lastObservation) {
