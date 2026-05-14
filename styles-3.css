@@ -2258,5 +2258,7 @@
     .message-row.is-self .message-bubble p,
     .message-row.is-self .message-bubble span {
       color: #ffffff !important;
+      background: none !important;
       border: none !important;
+      box-shadow: none !important;
     }

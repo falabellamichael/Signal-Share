@@ -515,6 +515,7 @@ body[data-theme="contrast"] .emoji-category-tab.is-active {
 body[data-theme="midnight"] .message-row.is-self .message-bubble span,
 body[data-theme="midnight"] .message-row.is-self .message-bubble p {
   color: #000000 !important;
+  background: none !important;
   border: none !important;
 }
 
@@ -781,6 +782,7 @@ body[data-theme="midnight"] .message-row.is-self .message-bubble span,
 body[data-theme="midnight"] .message-row.is-self .message-bubble p {
   color: #000000 !important;
   font-weight: 700;
+  background: none !important;
   border: none !important;
 }
 
