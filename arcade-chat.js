@@ -2308,6 +2308,24 @@ window.sendChatMessage = async function() {
                 await tryAutoPublishWorkshopFromReply(reply, text);
             }
         } else {
+            if (isWorkshopPublishIntentPrompt(text)) {
+                const emergencyPublish = await tryEmergencyWorkshopPublishFromPrompt(text, lastError);
+                if (emergencyPublish?.attempted && emergencyPublish?.ok) {
+                    const publishReply = `🕹️ [Arcade Protocol]: Remote generation failed, so I generated and published "${emergencyPublish.title}" directly to your Workshop (${emergencyPublish.assetCount} assets).`;
+                    addChatMessage('ai', publishReply);
+                    arcadeChatHistory.push({ role: 'assistant', content: publishReply });
+                    saveCurrentChat();
+                    updateChatStatus('active');
+                    return;
+                }
+                if (emergencyPublish?.attempted && !emergencyPublish?.ok) {
+                    const emergencyReason = `${emergencyPublish.reason || 'publish-failed'}`.trim();
+                    if (emergencyReason) {
+                        lastError = `${lastError || 'Bridge failed'} | emergency-publish:${emergencyReason}`;
+                    }
+                }
+            }
+
             if (lastError !== 'Bridge disabled') {
                 console.warn(`[Arcade Chat] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
                 
@@ -2834,6 +2852,209 @@ async function tryAutoPublishWorkshopFromReply(replyText, userPrompt = '') {
         const actionLabel = publishResult.updated ? 'Updated' : 'Published';
         window.showFeedback(`${actionLabel} "${publishResult.title}" in Workshop (${publishResult.assetCount} assets).`);
     }
+    return result;
+}
+
+function buildEmergencyWorkshopPublishPayload(userPrompt = '') {
+    const inferredTitle = inferWorkshopTitleFromPrompt(userPrompt);
+    const title = `${inferredTitle || 'AI Workshop Game'}`.replace(/[<>]/g, '').trim().slice(0, 72) || 'AI Workshop Game';
+    const description = 'Emergency local publish fallback: generated when remote AI routing is unavailable.';
+
+    const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${title}</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="game-shell">
+    <header class="top-bar">
+      <h1>${title}</h1>
+      <p>Tap targets fast. Misses cost time.</p>
+    </header>
+    <section class="hud">
+      <div><span>Score</span><strong id="score">0</strong></div>
+      <div><span>Time</span><strong id="time">30</strong></div>
+      <button id="startBtn" type="button">Start</button>
+    </section>
+    <section id="arena" class="arena" aria-label="Game arena">
+      <button id="target" type="button" class="target" aria-label="Target"></button>
+      <div id="message" class="message">Press Start</div>
+    </section>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>`;
+
+    const css = `:root{
+  color-scheme: dark;
+  --bg:#0b1220;
+  --panel:#13243b;
+  --accent:#66c0f4;
+  --good:#a4d007;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  background:radial-gradient(circle at 10% 10%,#1a2f4e 0%,var(--bg) 60%);
+  color:#e9f3ff;
+  font-family:"Segoe UI",Tahoma,sans-serif;
+}
+.game-shell{max-width:900px;margin:0 auto;padding:20px;display:grid;gap:14px}
+.top-bar h1{margin:0 0 6px;font-size:1.4rem}
+.top-bar p{margin:0;color:rgba(233,243,255,.75)}
+.hud{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:var(--panel);border:1px solid rgba(102,192,244,.25);padding:10px 12px;border-radius:10px
+}
+.hud div{display:flex;align-items:baseline;gap:8px}
+.hud span{opacity:.75;font-size:.85rem}
+.hud strong{font-size:1.2rem}
+#startBtn{
+  margin-left:auto;border:0;border-radius:8px;padding:10px 16px;
+  background:linear-gradient(135deg,var(--accent),#4ea8d9);
+  color:#00131f;font-weight:700;cursor:pointer
+}
+.arena{
+  position:relative;height:62vh;min-height:380px;max-height:640px;
+  background:linear-gradient(180deg,#0e1b2f,#0a1423);
+  border:1px solid rgba(102,192,244,.2);border-radius:14px;overflow:hidden;
+}
+.target{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:64px;height:64px;border-radius:50%;border:2px solid rgba(255,255,255,.7);
+  background:radial-gradient(circle at 30% 30%,#9ce6ff 0%,#53b3e0 55%,#1f5a7b 100%);
+  box-shadow:0 0 22px rgba(102,192,244,.65);cursor:pointer;display:none
+}
+.message{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-weight:700;color:rgba(233,243,255,.8);text-align:center;padding:8px 12px
+}
+@media (max-width:640px){
+  .arena{height:54vh;min-height:320px}
+  .target{width:56px;height:56px}
+}`;
+
+    const js = `(() => {
+  const arena = document.getElementById('arena');
+  const target = document.getElementById('target');
+  const scoreEl = document.getElementById('score');
+  const timeEl = document.getElementById('time');
+  const messageEl = document.getElementById('message');
+  const startBtn = document.getElementById('startBtn');
+
+  let score = 0;
+  let timeLeft = 30;
+  let running = false;
+  let tickTimer = null;
+  let relocateTimer = null;
+
+  function setMessage(text){ messageEl.textContent = text || ''; }
+  function clamp(value, min, max){ return Math.min(max, Math.max(min, value)); }
+  function updateHud(){ scoreEl.textContent = String(score); timeEl.textContent = String(timeLeft); }
+
+  function placeTarget() {
+    const rect = arena.getBoundingClientRect();
+    const pad = 36;
+    const x = Math.random() * (rect.width - pad * 2) + pad;
+    const y = Math.random() * (rect.height - pad * 2) + pad;
+    target.style.left = x + 'px';
+    target.style.top = y + 'px';
+  }
+
+  function stopGame() {
+    running = false;
+    target.style.display = 'none';
+    clearInterval(tickTimer); tickTimer = null;
+    clearInterval(relocateTimer); relocateTimer = null;
+    setMessage('Round complete. Final score: ' + score);
+    startBtn.disabled = false;
+  }
+
+  function startGame() {
+    if (running) return;
+    running = true;
+    score = 0;
+    timeLeft = 30;
+    updateHud();
+    startBtn.disabled = true;
+    setMessage('');
+    target.style.display = 'block';
+    placeTarget();
+
+    tickTimer = setInterval(() => {
+      timeLeft -= 1;
+      updateHud();
+      if (timeLeft <= 0) stopGame();
+    }, 1000);
+
+    relocateTimer = setInterval(() => {
+      if (!running) return;
+      placeTarget();
+    }, 900);
+  }
+
+  target.addEventListener('click', () => {
+    if (!running) return;
+    score += 1;
+    timeLeft = clamp(timeLeft + 1, 0, 45);
+    updateHud();
+    placeTarget();
+  });
+
+  arena.addEventListener('click', (event) => {
+    if (!running) return;
+    if (event.target === target) return;
+    timeLeft = clamp(timeLeft - 1, 0, 45);
+    updateHud();
+    if (timeLeft <= 0) stopGame();
+  });
+
+  startBtn.addEventListener('click', startGame);
+  updateHud();
+})();`;
+
+    return {
+        title,
+        description,
+        files: [
+            { name: 'index.html', type: 'text/html', content: html },
+            { name: 'styles.css', type: 'text/css', content: css },
+            { name: 'game.js', type: 'text/javascript', content: js }
+        ]
+    };
+}
+
+async function tryEmergencyWorkshopPublishFromPrompt(userPrompt = '', reason = '') {
+    const result = { attempted: false, ok: false, reason: '', title: '', assetCount: 0 };
+    if (!isWorkshopPublishIntentPrompt(userPrompt)) return result;
+    if (typeof window.publishCustomGameFromAi !== 'function') {
+        result.reason = 'publish-function-unavailable';
+        return result;
+    }
+
+    const payload = buildEmergencyWorkshopPublishPayload(userPrompt);
+    result.attempted = true;
+    const publishResult = await window.publishCustomGameFromAi({
+        target: 'workshop',
+        title: payload.title,
+        category: 'GAME',
+        description: `${payload.description}${reason ? ` (${reason})` : ''}`,
+        tags: 'arcade, ai, fallback',
+        files: payload.files
+    });
+
+    if (!publishResult?.ok) {
+        result.reason = publishResult?.error || 'publish-failed';
+        return result;
+    }
+
+    result.ok = true;
+    result.title = publishResult.title || payload.title;
+    result.assetCount = Number(publishResult.assetCount || payload.files.length) || payload.files.length;
     return result;
 }
 
