@@ -1,3 +1,7 @@
+param(
+  [switch]$SkipCapSync
+)
+
 $ErrorActionPreference = "Stop"
 
 $root = $PSScriptRoot
@@ -125,6 +129,10 @@ foreach ($file in $files) {
   $src = Join-Path $root $file
   $dest = Join-Path $dist $file
   if (Test-Path -LiteralPath $src) {
+    $destDir = Split-Path -Parent $dest
+    if ($destDir -and -not (Test-Path -LiteralPath $destDir)) {
+      New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+    }
     Copy-Item -Path $src -Destination $dest -Force
     Write-Host "[File] $file"
   } else {
@@ -178,9 +186,12 @@ foreach ($file in $criticalDistFiles) {
   }
 }
 
-Write-Host "`n--- Syncing with Capacitor ---" -ForegroundColor Green
-Set-Location -Path $root
-# Use sync instead of copy to ensure plugins and project structure are updated
-npx cap sync android
-
-Write-Host "`nSync Complete! Ready to build in Android Studio." -ForegroundColor White
+if ($SkipCapSync) {
+  Write-Host "`nSkipped Capacitor sync (`-SkipCapSync supplied)." -ForegroundColor Yellow
+} else {
+  Write-Host "`n--- Syncing with Capacitor ---" -ForegroundColor Green
+  Set-Location -Path $root
+  # Use sync instead of copy to ensure plugins and project structure are updated
+  npx cap sync android
+  Write-Host "`nSync Complete! Ready to build in Android Studio." -ForegroundColor White
+}
