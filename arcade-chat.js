@@ -466,6 +466,35 @@ function isComposeDraftIntent(message = "") {
     return hasMessagingTarget && hasComposeVerb;
 }
 
+function isWorkshopPublishIntentPrompt(message = "") {
+    const text = `${message || ''}`.trim().toLowerCase();
+    if (!text) return false;
+    const publishVerb = /\b(publish|upload|save|add|ship|submit)\b/.test(text);
+    const buildVerb = /\b(write|create|build|make|generate|code)\b/.test(text);
+    const target = /\b(library|workshop|arcade)\b/.test(text);
+    const gameMention = /\b(game|mini[-\s]?game|arcade game)\b/.test(text);
+    return target && (publishVerb || (buildVerb && gameMention));
+}
+
+function buildWorkshopPublishDirective() {
+    return [
+        '[WORKSHOP_PROTOCOL]',
+        'If the user asks to create/build/write a game and publish/add it to the Arcade Library/Workshop, you MUST include exactly one [PUBLISH:{...}] tag.',
+        'Set target to "workshop".',
+        'Include title, category, tags, and code payload.',
+        'Preferred payload format: files:[{name,type,content}, ...].',
+        'Alternative payload fields allowed: html, css, js, or code.',
+        'Do not output placeholder/offline guidance when generation is available.',
+        '[/WORKSHOP_PROTOCOL]'
+    ].join('\n');
+}
+
+function buildProtocolAwareUserMessage(userPrompt = "") {
+    const text = `${userPrompt || ''}`.trim();
+    if (!isWorkshopPublishIntentPrompt(text)) return text;
+    return `${text}\n\n${buildWorkshopPublishDirective()}`;
+}
+
 function getBridgeTargetAddressSpace(baseUrl = "") {
     try {
         const parsed = new URL(baseUrl, window.location.href);
@@ -2122,6 +2151,7 @@ window.sendChatMessage = async function() {
                 }
             }
 
+            const protocolAwareMessage = buildProtocolAwareUserMessage(text);
             const attachment = arcadeChatHistory[arcadeChatHistory.length - 1].attachment;
             const compactHistory = Array.isArray(normalizedHistory) ? normalizedHistory.slice(-14) : [];
             const compactPageContext = `${fullPageContext || ''}`.slice(0, 2400);
@@ -2129,7 +2159,7 @@ window.sendChatMessage = async function() {
                 {
                     label: 'full',
                     body: JSON.stringify({
-                        message: text,
+                        message: protocolAwareMessage,
                         model: requestModel,
                         customInstructions,
                         attachment,
@@ -2140,7 +2170,7 @@ window.sendChatMessage = async function() {
                 {
                     label: 'compact',
                     body: JSON.stringify({
-                        message: text,
+                        message: protocolAwareMessage,
                         model: requestModel,
                         customInstructions,
                         attachment,
@@ -2273,7 +2303,10 @@ window.sendChatMessage = async function() {
             updateChatStatus('active');
             
             // Execute any tags in the reply
-            executeArcadeChatActions(reply, { userPrompt: text });
+            const actionResult = await executeArcadeChatActions(reply, { userPrompt: text });
+            if (isWorkshopPublishIntentPrompt(text) && !actionResult?.workshopPublishAttempted) {
+                await tryAutoPublishWorkshopFromReply(reply, text);
+            }
         } else {
             if (lastError !== 'Bridge disabled') {
                 console.warn(`[Arcade Chat] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
@@ -2492,25 +2525,110 @@ function shouldRoutePublishToWorkshop(data, rawReplyText, userPrompt) {
     return replyLooksLikeWorkshopIntent;
 }
 
+function extractBalancedJsonTagPayload(text, tagName) {
+    const source = `${text || ''}`;
+    const upperSource = source.toUpperCase();
+    const marker = `[${`${tagName || ''}`.trim().toUpperCase()}:`;
+    if (!marker || marker === '[:') return null;
+
+    let searchFrom = 0;
+    while (searchFrom < source.length) {
+        const markerIndex = upperSource.indexOf(marker, searchFrom);
+        if (markerIndex < 0) return null;
+
+        let cursor = markerIndex + marker.length;
+        while (cursor < source.length && /\s/.test(source[cursor])) cursor += 1;
+        if (source[cursor] !== '{') {
+            searchFrom = markerIndex + marker.length;
+            continue;
+        }
+
+        let depth = 0;
+        let inString = false;
+        let isEscaped = false;
+        for (let i = cursor; i < source.length; i += 1) {
+            const ch = source[i];
+            if (inString) {
+                if (isEscaped) {
+                    isEscaped = false;
+                } else if (ch === '\\') {
+                    isEscaped = true;
+                } else if (ch === '"') {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (ch === '"') {
+                inString = true;
+                continue;
+            }
+            if (ch === '{') {
+                depth += 1;
+                continue;
+            }
+            if (ch !== '}') continue;
+
+            depth -= 1;
+            if (depth !== 0) continue;
+
+            let endCursor = i + 1;
+            while (endCursor < source.length && /\s/.test(source[endCursor])) endCursor += 1;
+            if (source[endCursor] !== ']') {
+                searchFrom = i + 1;
+                break;
+            }
+
+            return {
+                jsonText: source.slice(cursor, i + 1),
+                start: markerIndex,
+                end: endCursor + 1
+            };
+        }
+
+        searchFrom = markerIndex + marker.length;
+    }
+
+    return null;
+}
+
+function inferWorkshopTitleFromPrompt(userPrompt = '') {
+    const text = `${userPrompt || ''}`.trim();
+    const quoted = text.match(/["'`]{1}([^"'`\n]{2,80})["'`]{1}/);
+    if (quoted?.[1]) return quoted[1].trim();
+    const named = text.match(/\b(?:called|named|title(?:d)?)\s+([a-z0-9 _-]{2,80})$/i);
+    if (named?.[1]) return named[1].trim();
+    return 'AI Workshop Game';
+}
+
 /**
  * Executes AI-generated tags in the chat reply.
  * Handles [PUBLISH], [COMPOSE], [ARCADE], [DUCKDUCKGO], [OPEN].
  */
 async function executeArcadeChatActions(text, options = {}) {
-    if (!text) return;
+    const actionResult = {
+        handled: false,
+        publishTagDetected: false,
+        workshopPublishAttempted: false,
+        workshopPublishSucceeded: false
+    };
+    if (!text) return actionResult;
 
     // 1. [PUBLISH: {json}]
-    const publishMatch = text.match(/\[PUBLISH:\s*({[\s\S]+?})\]/);
-    if (publishMatch) {
+    const publishPayload = extractBalancedJsonTagPayload(text, 'PUBLISH');
+    if (publishPayload?.jsonText) {
+        actionResult.publishTagDetected = true;
         try {
-            const data = JSON.parse(publishMatch[1]);
+            const data = JSON.parse(publishPayload.jsonText);
             const { title, caption, tags } = data;
 
-        const routeToWorkshop = shouldRoutePublishToWorkshop(data, text, options.userPrompt || '');
-        if (routeToWorkshop) {
+            const routeToWorkshop = shouldRoutePublishToWorkshop(data, text, options.userPrompt || '');
+            if (routeToWorkshop) {
+                actionResult.handled = true;
+                actionResult.workshopPublishAttempted = true;
                 if (typeof window.publishCustomGameFromAi !== 'function') {
                     if (window.showFeedback) window.showFeedback("Workshop publishing is available from the Arcade Library page.", true);
-                    return;
+                    return actionResult;
                 }
 
                 const workshopFiles = buildAiWorkshopPublishFiles(data, text);
@@ -2518,7 +2636,7 @@ async function executeArcadeChatActions(text, options = {}) {
                     if (window.showFeedback) {
                         window.showFeedback("Couldn't find game code to publish. Ask the AI to include a code block or code field.", true);
                     }
-                    return;
+                    return actionResult;
                 }
 
                 const workshopResult = await window.publishCustomGameFromAi({
@@ -2534,6 +2652,7 @@ async function executeArcadeChatActions(text, options = {}) {
                 });
 
                 if (workshopResult?.ok) {
+                    actionResult.workshopPublishSucceeded = true;
                     if (window.showFeedback) {
                         const actionLabel = workshopResult.updated ? 'Updated' : 'Published';
                         window.showFeedback(`${actionLabel} "${workshopResult.title}" in Workshop (${workshopResult.assetCount} assets).`);
@@ -2541,10 +2660,11 @@ async function executeArcadeChatActions(text, options = {}) {
                 } else if (window.showFeedback) {
                     window.showFeedback(workshopResult?.message || 'Failed to publish game to Workshop.', true);
                 }
-                return;
+                return actionResult;
             }
             
             if (window.publishPostToSupabase) {
+                actionResult.handled = true;
                 // Determine what to publish. 
                 // If there's a recent attachment in history, use it.
                 // Otherwise check if there's a URL in the text.
@@ -2581,11 +2701,11 @@ async function executeArcadeChatActions(text, options = {}) {
                                  if (window.render) window.render();
                              }
                              if (window.showFeedback) window.showFeedback("Post published successfully via AI!");
-                             return;
-                         }
-                    }
+                             return actionResult;
+                          }
+                     }
                     if (window.showFeedback) window.showFeedback("AI wanted to publish but no file/link was found.", true);
-                    return;
+                    return actionResult;
                 }
 
                 // Prepare the post object
@@ -2620,6 +2740,7 @@ async function executeArcadeChatActions(text, options = {}) {
     // 2. [COMPOSE: text]
     const composeMatch = text.match(/\[COMPOSE:\s*(.+?)\]/);
     if (composeMatch && isComposeDraftIntent(options.userPrompt || "")) {
+        actionResult.handled = true;
         const composeText = composeMatch[1].trim();
         const messengerInput = document.getElementById('messageInput');
         if (messengerInput) {
@@ -2632,6 +2753,7 @@ async function executeArcadeChatActions(text, options = {}) {
     // 3. [ARCADE: action]
     const arcadeMatch = text.match(/\[ARCADE:\s*([^\]]+)\]/);
     if (arcadeMatch) {
+        actionResult.handled = true;
         const action = arcadeMatch[1].trim().toLowerCase();
         if (typeof window.executeArcadeAction === 'function') {
             window.executeArcadeAction(action);
@@ -2641,6 +2763,7 @@ async function executeArcadeChatActions(text, options = {}) {
     // 4. [DUCKDUCKGO: query]
     const duckDuckGoMatch = text.match(/\[DUCKDUCKGO:\s*([^\]]+)\]/i);
     if (duckDuckGoMatch) {
+        actionResult.handled = true;
         const query = duckDuckGoMatch[1].trim();
         if (query) {
             openDuckDuckGoSearch(query);
@@ -2650,15 +2773,17 @@ async function executeArcadeChatActions(text, options = {}) {
     // 5. [OPEN: url]
     const openMatch = text.match(/\[OPEN:\s*([^\]]+)\]/);
     if (openMatch) {
+        actionResult.handled = true;
         const url = openMatch[1].trim();
         window.open(url, '_blank');
     }
 
     // 6. [FILE_REWRITE: {json}]
-    const fileRewriteMatch = text.match(/\[FILE_REWRITE:\s*({[\s\S]+?})\]/i);
-    if (fileRewriteMatch) {
+    const fileRewritePayload = extractBalancedJsonTagPayload(text, 'FILE_REWRITE');
+    if (fileRewritePayload?.jsonText) {
         try {
-            const data = JSON.parse(fileRewriteMatch[1]);
+            actionResult.handled = true;
+            const data = JSON.parse(fileRewritePayload.jsonText);
             const { gameId, fileName, content, save } = data;
             if (typeof window.applyAiFileEdit === 'function') {
                 void window.applyAiFileEdit(gameId, fileName, content, { save: !!save });
@@ -2667,6 +2792,49 @@ async function executeArcadeChatActions(text, options = {}) {
             console.error("[Arcade Chat] Failed to execute [FILE_REWRITE] action:", e);
         }
     }
+    return actionResult;
+}
+
+async function tryAutoPublishWorkshopFromReply(replyText, userPrompt = '') {
+    const result = {
+        attempted: false,
+        ok: false,
+        reason: ''
+    };
+    if (!isWorkshopPublishIntentPrompt(userPrompt)) return result;
+    if (extractBalancedJsonTagPayload(replyText, 'PUBLISH')) return result;
+    if (typeof window.publishCustomGameFromAi !== 'function') {
+        result.reason = 'publish-function-unavailable';
+        return result;
+    }
+
+    const files = buildAiWorkshopPublishFiles({}, replyText);
+    if (files.length === 0) {
+        result.reason = 'no-files';
+        return result;
+    }
+
+    result.attempted = true;
+    const publishPayload = {
+        target: 'workshop',
+        title: inferWorkshopTitleFromPrompt(userPrompt),
+        category: 'GAME',
+        tags: 'arcade, ai',
+        description: 'AI-generated workshop game',
+        files
+    };
+    const publishResult = await window.publishCustomGameFromAi(publishPayload);
+    if (!publishResult?.ok) {
+        result.reason = publishResult?.error || 'publish-failed';
+        return result;
+    }
+
+    result.ok = true;
+    if (window.showFeedback) {
+        const actionLabel = publishResult.updated ? 'Updated' : 'Published';
+        window.showFeedback(`${actionLabel} "${publishResult.title}" in Workshop (${publishResult.assetCount} assets).`);
+    }
+    return result;
 }
 
 window.startNewChat = startNewChat;
