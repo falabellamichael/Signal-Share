@@ -541,7 +541,9 @@ function buildWorkshopEditDirective(workshopContext = null) {
 
     if (activeGameId && activeFileName) {
         lines.push(`Default target gameId is "${activeGameId}" and default fileName is "${activeFileName}" when the user does not specify a target.`);
-        const content = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
+        const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
+        // Safety limit for local LLM context windows (approx 15-20k tokens max for many small models)
+        const content = rawContent.length > 20000 ? rawContent.substring(0, 20000) + '\n\n[CONTENT TRUNCATED DUE TO SIZE]' : rawContent;
         if (content) {
             lines.push(`CURRENT CONTENT OF "${activeFileName}":\n\`\`\`\n${content}\n\`\`\``);
         } else {
@@ -2166,10 +2168,14 @@ window.sendChatMessage = async function() {
         };
 
         const pageContext = JSON.stringify(richContext);
-        const pageText = document.body.innerText.substring(0, 800);
+        const pageText = document.body.innerText.substring(0, 500);
+        // Keep only the most recent messages to prevent context window overflow on small local models
+        const maxHistory = 12;
+        const recentHistory = arcadeChatHistory.slice(-maxHistory);
+        
         const normalizedHistory = window.SignalShareAiCore
-            ? window.SignalShareAiCore.normalizeHistory(arcadeChatHistory, { aiSenderId: 'assistant' })
-            : arcadeChatHistory.map(m => ({ role: m.role, content: m.content }));
+            ? window.SignalShareAiCore.normalizeHistory(recentHistory, { aiSenderId: 'assistant' })
+            : recentHistory.map(m => ({ role: m.role, content: m.content }));
         const sharedAiContext = window.SignalShareAiCore
             ? window.SignalShareAiCore.buildCompanionContext({
                 surface: 'mini-games',

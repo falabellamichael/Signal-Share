@@ -665,6 +665,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         }
     }
 
+    let lastEndpointError = "";
     for (const endpoint of endpointConfigs) {
         if (success) break;
         const endpointFallbackModels = endpoint.models && endpoint.models.length > 0
@@ -759,8 +760,20 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 success = true;
                 break;
             } catch (_error) {
+                lastEndpointError = _error.message;
+                console.warn(`[Chatbot] Error on ${endpoint.provider}:${model} - ${lastEndpointError}`);
                 // Try the next model/endpoint candidate
             }
+        }
+    }
+
+    if (!success && iteration === 0) {
+        // If all models failed on first pass, check if we should return offline response or a specific error
+        if (lastEndpointError.includes("ECONNREFUSED") || lastEndpointError.includes("fetch failed")) {
+            return `⚠️ [Intelligence Core Offline]: I couldn't connect to your local AI server (LM Studio/Ollama). Please ensure it is running and accessible at the configured ports.`;
+        }
+        if (lastEndpointError.includes("timeout")) {
+            return `🕒 [Intelligence Core Timeout]: The local AI model took too long to respond. This can happen if the context (file size/history) is too large for your hardware.`;
         }
     }
 
