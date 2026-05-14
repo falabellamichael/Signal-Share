@@ -2907,7 +2907,20 @@ async function executeArcadeChatActions(text, options = {}) {
                 : null;
             const gameId = `${data?.gameId || editorState?.activeGameId || ''}`.trim();
             const fileName = `${data?.fileName || editorState?.activeFileName || ''}`.trim();
-            const content = typeof data?.content === 'string' ? data.content : '';
+            let content = typeof data?.content === 'string' ? data.content : '';
+            
+            // Clean up common AI protocol leakage
+            content = content
+                .replace(/---BEGIN_CONTENT---/g, '')
+                .replace(/---END_CONTENT---/g, '')
+                .replace(/\[\/?FILE_REWRITE\]/g, '')
+                .trim();
+            
+            // If the content is wrapped in markdown code blocks by accident, strip them
+            if (content.startsWith('```') && content.endsWith('```')) {
+                content = content.replace(/^```[a-z]*\n/i, '').replace(/\n```$/i, '').trim();
+            }
+
             const save = data?.save !== false;
             if (!gameId || !fileName || !content) {
                 if (window.showFeedback) {
@@ -2926,6 +2939,40 @@ async function executeArcadeChatActions(text, options = {}) {
             }
         } catch (e) {
             console.error("[Arcade Chat] Failed to execute [FILE_REWRITE] action:", e);
+        }
+    }
+
+    // 7. [FILE_EDIT: {json}] (Surgical search & replace)
+    let fileEditPayload = extractBalancedJsonTagPayload(text, 'FILE_EDIT');
+    if (!fileEditPayload) fileEditPayload = extractBalancedJsonTagPayload(text, 'Edit/Surgical');
+
+    if (fileEditPayload?.jsonText) {
+        try {
+            actionResult.handled = true;
+            const data = JSON.parse(fileEditPayload.jsonText);
+            const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
+            const gameId = `${data?.gameId || editorState?.activeGameId || ''}`.trim();
+            const fileName = `${data?.fileName || editorState?.activeFileName || ''}`.trim();
+            const search = typeof data?.search === 'string' ? data.search : '';
+            const replace = typeof data?.replace === 'string' ? data.replace : '';
+            const save = data?.save !== false;
+
+            if (!gameId || !fileName || !search) {
+                if (window.showFeedback) window.showFeedback('AI file edit missing gameId, fileName, or search block.', true);
+                return actionResult;
+            }
+
+            if (typeof window.applyAiFilePatch === 'function') {
+                actionResult.workshopFileRewriteAttempted = true; // Still counts as an edit attempt
+                const patchResult = await window.applyAiFilePatch(gameId, fileName, search, replace, { save: !!save });
+                if (patchResult?.ok) {
+                    actionResult.workshopFileRewriteSucceeded = true;
+                } else if (window.showFeedback) {
+                    window.showFeedback(patchResult?.message || `Failed to apply surgical edit to ${fileName}.`, true);
+                }
+            }
+        } catch (e) {
+            console.error("[Arcade Chat] Failed to execute [FILE_EDIT] action:", e);
         }
     }
     return actionResult;

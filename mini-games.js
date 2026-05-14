@@ -2615,6 +2615,24 @@ window.getWorkshopFileContent = function(gameId, fileName) {
  * Applies a file edit from the AI to the workshop editor state.
  * Can optionally trigger a save to Supabase.
  */
+window.applyAiFilePatch = async function(gameId, fileName, search, replace, options = {}) {
+    console.log(`[AI Workshop] Applying surgical patch to ${fileName} for game ${gameId}`);
+    const { save = false, silent = false } = options;
+
+    const oldContent = (typeof window.getWorkshopFileContent === 'function') ? window.getWorkshopFileContent(gameId, fileName) : "";
+    if (!oldContent) {
+        return { ok: false, message: "Could not read original file for patching." };
+    }
+
+    if (!oldContent.includes(search)) {
+        console.warn(`[AI Workshop] Patch failed: Search string not found in ${fileName}.`);
+        return { ok: false, message: "Could not find the exact code block to replace." };
+    }
+
+    const newContent = oldContent.replace(search, replace);
+    return window.applyAiFileEdit(gameId, fileName, newContent, options);
+};
+
 window.applyAiFileEdit = async function(gameId, fileName, content, options = {}) {
     console.log(`[AI Workshop] Applying edit to ${fileName} for game ${gameId}`);
     const { save = false, silent = false } = options;

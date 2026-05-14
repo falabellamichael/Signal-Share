@@ -62,7 +62,10 @@ SYSTEM TOOLS:
 5. [LAUNCH/CLOSE: app_id] (spotify, chrome, notepad, calculator)
 6. [SCREENSHOT] | 7. [LIST_TABS] | 8. [LIST_APPS]
 9. [LIST_FILES/READ_FILE/WRITE_FILE: path]
-10. [FILE_REWRITE: {"gameId", "fileName", "content", "save"}] (Workshop Edit)
+10.    - EDITING (Incremental): If user says "edit", "patch", or "change", use [FILE_EDIT: {"gameId":"id","fileName":"name","search":"old block","replace":"new block"}] to replace a specific snippet.
+    - REWRITING (Full): If user says "rewrite", "refactor", or "reset", use [FILE_REWRITE: {"gameId":"id","fileName":"name","content":"full text"}] to replace the entire file.
+    - DO NOT explain code steps. DO NOT use conversational filler.
+    - Only output the tag and any brief final status.
 11. [SYS_INFO] | 12. [PROCESS: list|kill] | 13. [SHELL: {cmd, shell}]
 
 PROTOCOLS:

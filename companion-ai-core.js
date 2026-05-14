@@ -437,38 +437,12 @@
 
     function buildFileRewriteContract() {
         return [
-            "When the user asks to rewrite or generate code/files, use one of these response formats:",
-            "1) Full-file rewrite:",
-            "[FILE_REWRITE]",
-            "path: relative/or/absolute/path.ext",
-            "language: html|css|javascript|json|text|other",
-            "summary: one-line reason for the rewrite",
-            "---BEGIN_CONTENT---",
-            "<full file content>",
-            "---END_CONTENT---",
-            "[/FILE_REWRITE]",
-            "2) Targeted patch suggestion:",
-            "[PATCH_SUGGESTION]",
-            "path: relative/or/absolute/path.ext",
-            "summary: what changed",
-            "---BEGIN_PATCH---",
-            "<unified diff or find/replace instructions>",
-            "---END_PATCH---",
-            "[/PATCH_SUGGESTION]",
-            "3) Multi-step implementation plan:",
-            "[IMPLEMENTATION_PLAN]",
-            "scope: short title",
-            "risk: low|medium|high",
-            "steps:",
-            "- step 1",
-            "- step 2",
-            "[/IMPLEMENTATION_PLAN]",
-            "4) Test plan for validation:",
-            "[TEST_PLAN]",
-            "- test case 1",
-            "- test case 2",
-            "[/TEST_PLAN]",
-            "Never claim tests passed unless explicit test results are provided."
+            "When the user asks to edit or rewrite code for the Workshop, use the appropriate format:",
+            "1) Surgical EDIT (Use when user says 'edit', 'patch', or 'change'):",
+            "[FILE_EDIT: {\"gameId\":\"string\",\"fileName\":\"string\",\"search\":\"exact code block to find\",\"replace\":\"new code block\",\"save\":true}]",
+            "2) Full REWRITE (Use only when user says 'rewrite', 'refactor', or 'reset'):",
+            "[FILE_REWRITE: {\"gameId\":\"string\",\"fileName\":\"string\",\"content\":\"full updated file text\",\"save\":true}]",
+            "The 'search' block in FILE_EDIT must match the existing code EXACTLY, including indentation."
         ].join("\n");
     }
 
