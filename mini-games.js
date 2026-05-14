@@ -1182,18 +1182,13 @@ function setWorkshopEditStatus(message = '', isError = false) {
 }
 
 function syncWorkshopModeToggleButtons() {
-    const libraryButton = document.getElementById('workshop-mode-library');
-    const editButton = document.getElementById('workshop-mode-edit');
-    if (libraryButton) {
-        const isActive = workshopTileMode !== 'edit';
-        libraryButton.classList.toggle('active', isActive);
-        libraryButton.setAttribute('aria-selected', isActive ? 'true' : 'false');
-    }
-    if (editButton) {
-        const isActive = workshopTileMode === 'edit';
-        editButton.classList.toggle('active', isActive);
-        editButton.setAttribute('aria-selected', isActive ? 'true' : 'false');
-    }
+    const buttons = Array.from(document.querySelectorAll('.workshop-mode-btn[data-workshop-mode]'));
+    buttons.forEach((button) => {
+        const mode = `${button.getAttribute('data-workshop-mode') || ''}`.trim().toLowerCase();
+        const isActive = mode === 'edit' ? workshopTileMode === 'edit' : workshopTileMode !== 'edit';
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
 }
 
 function setWorkshopTileMode(nextMode) {
@@ -1207,7 +1202,7 @@ function syncWorkshopEditOverlay() {
     const overlay = document.getElementById('workshop-edit-overlay');
     if (!overlay) return;
 
-    const shouldShow = workshopTileMode === 'edit' && currentCategory === 'publish' && !!currentUser;
+    const shouldShow = workshopTileMode === 'edit';
     overlay.hidden = !shouldShow;
     overlay.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
     if (!shouldShow) return;
@@ -1219,6 +1214,21 @@ function syncWorkshopEditOverlay() {
     const saveButton = document.getElementById('workshop-edit-save-btn');
     const metaEl = document.getElementById('workshop-edit-file-meta');
     if (!gameSelect || !fileSelect || !editor || !saveButton || !metaEl) return;
+
+    if (!currentUser) {
+        workshopEditActiveGameId = '';
+        workshopEditActiveFileName = '';
+        gameSelect.innerHTML = '<option value="">Sign in required</option>';
+        fileSelect.innerHTML = '<option value="">No files</option>';
+        gameSelect.disabled = true;
+        fileSelect.disabled = true;
+        editor.value = '';
+        editor.disabled = true;
+        saveButton.disabled = true;
+        metaEl.textContent = '';
+        setWorkshopEditStatus('Sign in to access workshop file editing.', true);
+        return;
+    }
 
     if (games.length === 0) {
         workshopEditActiveGameId = '';

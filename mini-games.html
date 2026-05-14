@@ -492,6 +492,13 @@
             background: rgba(255, 255, 255, 0.03);
         }
 
+        .workshop-mode-toggle.sidebar-toggle {
+            width: 100%;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 5px;
+        }
+
         .workshop-mode-btn {
             border: none;
             background: transparent;
@@ -1017,6 +1024,11 @@
             </div>
             
             <div style="margin-top: auto; padding: 20px; background: var(--glass); border-radius: 12px;">
+                <div style="font-size: 0.65rem; color: rgba(255,255,255,0.45); margin-bottom: 8px; font-weight: 800; letter-spacing: 1px;">WORKSHOP MODE</div>
+                <div class="workshop-mode-toggle sidebar-toggle" role="tablist" aria-label="Workshop mode">
+                    <button type="button" class="workshop-mode-btn active" id="workshop-mode-library-sidebar" data-workshop-mode="library" aria-selected="true" onclick="setWorkshopTileMode('library')">Library</button>
+                    <button type="button" class="workshop-mode-btn" id="workshop-mode-edit-sidebar" data-workshop-mode="edit" aria-selected="false" onclick="setWorkshopTileMode('edit')">Edit</button>
+                </div>
                 <div style="font-size: 0.7rem; color: rgba(255,255,255,0.4); margin-bottom: 8px;">ENGINE STATUS</div>
                 <div id="engine-status-container" style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; font-weight: 700; color: #75b022;">
                     <div id="engine-status-dot" style="width: 8px; height: 8px; background: #75b022; border-radius: 50%;"></div>
@@ -1408,8 +1420,8 @@
                             <h3 style="font-size: 0.85rem; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; font-weight: 900; margin: 0;">WORKSHOP CONTRIBUTIONS</h3>
                             <div style="display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                                 <div class="workshop-mode-toggle" role="tablist" aria-label="Workshop mode">
-                                    <button type="button" class="workshop-mode-btn active" id="workshop-mode-library" aria-selected="true" onclick="setWorkshopTileMode('library')">Library</button>
-                                    <button type="button" class="workshop-mode-btn" id="workshop-mode-edit" aria-selected="false" onclick="setWorkshopTileMode('edit')">Edit</button>
+                                    <button type="button" class="workshop-mode-btn active" id="workshop-mode-library" data-workshop-mode="library" aria-selected="true" onclick="setWorkshopTileMode('library')">Library</button>
+                                    <button type="button" class="workshop-mode-btn" id="workshop-mode-edit" data-workshop-mode="edit" aria-selected="false" onclick="setWorkshopTileMode('edit')">Edit</button>
                                 </div>
                                 <div id="workshop-count" style="font-size: 0.75rem; color: var(--steam-light); font-weight: 800; letter-spacing: 1px;">0 FILES</div>
                             </div>
