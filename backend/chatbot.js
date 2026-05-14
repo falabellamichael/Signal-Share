@@ -780,38 +780,39 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
  */
 async function executeWebTools(text) {
     let results = [];
-    
-    // Handle [SEARCH: query]
-    const searchMatch = text.match(/\[SEARCH:\s*([^\]]+)\]/);
+      // Handle [SEARCH: query]
+    const searchMatch = text.match(/\[SEARCH:\s*([^\]]+)\]/i);
     if (searchMatch) {
         const query = searchMatch[1].trim();
         try {
-            const searchUrl = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`;
-            const resp = await fetch(searchUrl, {
-                headers: { 
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
-                    'Accept': 'text/html'
-                }
+            // Use DuckDuckGo HTML version for easier scraping
+            const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+            const response = await fetch(searchUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
             });
-            const html = await resp.text();
+            const html = await response.text();
+            
+            // Extract search results using more robust patterns
             const resultsList = [];
-            const resultRegex = /<a class='result-link' href='([^']+)'>([\s\S]*?)<\/a>[\s\S]*?<td class='result-snippet'>([\s\S]*?)<\/td>/g;
+            // Pattern for DuckDuckGo HTML results
+            const resultRegex = /<a class="result__a" href="([^"]+)">([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet" href="[^"]+">([\s\S]*?)<\/a>/g;
+            
             let match;
             let count = 0;
-            while ((match = resultRegex.exec(html)) !== null && count < 4) {
+            while ((match = resultRegex.exec(html)) !== null && count < 5) {
+                const link = match[1];
                 const title = match[2].replace(/<[^>]*>/g, '').trim();
                 const snippet = match[3].replace(/<[^>]*>/g, '').trim();
-                const link = match[1];
                 if (title && snippet) {
                     resultsList.push(`- ${title} (${link})\n  ${snippet}`);
                     count++;
                 }
             }
+            
             if (resultsList.length > 0) {
-                resultsList.push(`\nFull search results: ${searchUrl}`);
-                results.push(`WEB SEARCH RESULTS FOR "${query}":\n${resultsList.join('\n\n')}`);
+                results.push(`[SEARCH_RESULTS_FOR_${query.toUpperCase()}]:\n${resultsList.join('\n\n')}\n\n(AI Instruction: Summarize these results for the user and ask if they want to [FETCH] any specific link for more detail.)`);
             } else {
-                results.push(`SEARCH TRIGGERED FOR "${query}":\nNo direct snippets parsed. See full results here: ${searchUrl}`);
+                results.push(`SEARCH RESULTS FOR "${query}": I found the search page but couldn't parse direct snippets. Link: ${searchUrl}`);
             }
         } catch (e) {
             results.push(`SEARCH FAILED FOR "${query}": ${e.message}`);
@@ -819,16 +820,29 @@ async function executeWebTools(text) {
     }
 
     // Handle [FETCH: url]
-    const fetchMatch = text.match(/\[FETCH:\s*([^\]]+)\]/);
+    const fetchMatch = text.match(/\[FETCH:\s*([^\]]+)\]/i);
     if (fetchMatch) {
         const url = fetchMatch[1].trim();
         if (!isUrlSafe(url)) {
-            results.push(`SECURITY ERROR: Access to ${url} is restricted. I am not allowed to access internal networks or other people's computers.`);
+            results.push(`SECURITY ERROR: Access to ${url} is restricted.`);
         } else {
             try {
-                const resp = await fetch(url);
-                const content = await resp.text();
-                results.push(`CONTENT FROM ${url}:\n${content.substring(0, 2000)}...`);
+                const resp = await fetch(url, {
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+                });
+                const html = await resp.text();
+                
+                // Very basic text extraction: strip scripts, styles, and tags
+                let cleanText = html
+                    .replace(/<script[\s\S]*?<\/script>/gi, "")
+                    .replace(/<style[\s\S]*?<\/style>/gi, "")
+                    .replace(/<[^>]*>/g, " ")
+                    .replace(/\s+/g, " ")
+                    .trim();
+                
+                // Truncate to avoid context window overflow
+                const snippet = cleanText.substring(0, 4000);
+                results.push(`[ARTICLE_CONTENT_FROM_${url}]:\n${snippet}...\n\n(AI Instruction: Summarize this content for the user.)`);
             } catch (e) {
                 results.push(`FAILED TO FETCH ${url}: ${e.message}`);
             }
