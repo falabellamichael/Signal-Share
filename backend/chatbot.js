@@ -727,6 +727,12 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                     await ensureLmStudioExclusiveModel(model);
                 }
                 lmResponse = `${messageText}`.trim();
+                
+                // DeepSeek R1 / Reasoning model cleanup: Strip <think> blocks
+                if (lmResponse.includes("<think>")) {
+                    lmResponse = lmResponse.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+                }
+                
                 lastSuccessfulModelByProvider[endpoint.provider] = `${model}`.trim();
                 activeRuntimeProvider = `${endpoint.provider || "unknown"}`.trim();
                 activeRuntimeModel = `${model || "unknown"}`.trim();
@@ -837,7 +843,6 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         }
     }
 
-    if (!lmResponse?.trim() && iteration === 0) return getOfflineResponse(message);
 
     if (!lmResponse?.trim() && iteration > 0) {
         // Fallback: If the model failed to summarize, return the last tool observation if available
