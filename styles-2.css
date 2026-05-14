@@ -1224,6 +1224,10 @@
     .message-bubble span {
       color: var(--muted);
       font-size: 0.82rem;
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+      background: transparent !important;
     }
 
     .message-row.is-self .message-bubble p,

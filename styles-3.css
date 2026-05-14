@@ -201,7 +201,7 @@
     place-items: center;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.2) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   }
 
   .viewer-media-scroller::-webkit-scrollbar {
@@ -210,7 +210,7 @@
   }
 
   .viewer-media-scroller::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.2);
     border-radius: 10px;
   }
 
@@ -806,7 +806,8 @@
       white-space: nowrap;
     }
 
-    #profileNavLink, #profileNavLink * {
+    #profileNavLink,
+    #profileNavLink * {
       text-decoration: none !important;
       outline: none !important;
       box-shadow: none !important;
@@ -1100,7 +1101,7 @@
       background: rgba(255, 255, 255, 0.05);
       backdrop-filter: blur(20px) saturate(180%);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 
+      box-shadow:
         0 8px 32px rgba(0, 0, 0, 0.3),
         inset 0 0 0 1px rgba(255, 255, 255, 0.05);
       display: grid !important;
@@ -2011,7 +2012,8 @@
         flex: 1;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        max-height: none; /* Let flexbox handle it */
+        max-height: none;
+        /* Let flexbox handle it */
       }
 
       .emoji-chip {
@@ -2258,7 +2260,5 @@
     .message-row.is-self .message-bubble p,
     .message-row.is-self .message-bubble span {
       color: #ffffff !important;
-      background: none !important;
       border: none !important;
-      box-shadow: none !important;
     }

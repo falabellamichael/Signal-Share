@@ -101,8 +101,10 @@ body[data-theme="ember"] {
     position: relative;
     z-index: 50;
     transition: width 0.1s ease, background 0.3s ease, border 0.3s ease;
-    overflow: hidden; /* Ensure content doesn't bleed out */
-    height: 100%; /* Fill the grid area */
+    overflow: hidden;
+    /* Ensure content doesn't bleed out */
+    height: 100%;
+    /* Fill the grid area */
 }
 
 .steam-chat-sidebar:not(.collapsed) {
@@ -121,7 +123,7 @@ body[data-theme="ember"] {
 }
 
 /* Fixed positioning for pages like index.html that don't use the steam-shell grid */
-body > .steam-chat-sidebar {
+body>.steam-chat-sidebar {
     position: fixed;
     top: 0;
     right: 0;
@@ -131,13 +133,13 @@ body > .steam-chat-sidebar {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
 }
 
-body > .steam-chat-sidebar.collapsed {
+body>.steam-chat-sidebar.collapsed {
     transform: translateX(100%);
     pointer-events: none;
     visibility: hidden;
 }
 
-body > .chat-resize-handle {
+body>.chat-resize-handle {
     position: fixed;
     top: 0;
     right: 380px;
@@ -146,7 +148,7 @@ body > .chat-resize-handle {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-body > .chat-resize-handle.collapsed {
+body>.chat-resize-handle.collapsed {
     transform: translateX(100%);
     visibility: hidden;
     pointer-events: none;
@@ -197,7 +199,8 @@ body.messenger-expanded .chat-toggle-btn {
 .chat-toggle-btn svg {
     width: 28px;
     height: 28px;
-    color: #67c1f5; /* Keep the icon blue */
+    color: #67c1f5;
+    /* Keep the icon blue */
     filter: drop-shadow(0 0 8px rgba(103, 193, 245, 0.5));
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -210,7 +213,8 @@ body.messenger-expanded .chat-toggle-btn {
     transform: translateY(-50%);
     width: 32px !important;
     height: 150px !important;
-    background: #0d121a !important; /* Premium dark background to match image */
+    background: #0d121a !important;
+    /* Premium dark background to match image */
     border: 1px solid rgba(255, 255, 255, 0.05) !important;
     border-right: none !important;
     border-radius: 8px 0 0 8px !important;
@@ -238,13 +242,15 @@ body.messenger-expanded .chat-toggle-btn {
 
 /* Ensure the tab isn't hidden by the general toggle rule if it's in tab mode */
 body:not(.chat-collapsed) .chat-toggle-btn.chat-tab-mode {
-    display: none !important; /* Only hide if the sidebar is actually open */
+    display: none !important;
+    /* Only hide if the sidebar is actually open */
 }
 
 /* Hide floating toggle and messenger launcher in integrated mode (steam-shell) 
     to prevent redundant UI and overlapping icons, BUT show them if the sidebar is collapsed. 
     On mobile, we ALWAYS show the floating toggle because the integrated one is pushed down. */
 @media (min-width: 769px) {
+
     .steam-shell .chat-toggle-btn:not(.chat-tab-mode),
     .steam-shell .messenger-launcher {
         display: none;
@@ -267,10 +273,13 @@ body:not(.chat-collapsed) .messenger-launcher,
 body:not(.chat-collapsed) .chat-toggle-btn,
 body:not(.chat-collapsed) .messenger-section,
 body:not(.chat-collapsed) #app-runner {
-    right: 400px !important; /* Default sidebar width (380) + 20px gutter */
+    right: 400px !important;
+    /* Default sidebar width (380) + 20px gutter */
 }
+
 body:not(.chat-collapsed) #app-runner {
-    right: 380px !important; /* Runner touches the edge, but buttons need the gutter */
+    right: 380px !important;
+    /* Runner touches the edge, but buttons need the gutter */
 }
 
 /* When collapsed, we have TWO floating buttons. Offset messenger to the left of the chat toggle. */
@@ -307,7 +316,7 @@ body:not(.chat-collapsed) .messenger-section {
     flex-wrap: wrap;
 }
 
-.chat-header > div:first-child {
+.chat-header>div:first-child {
     min-width: 120px;
     flex: 1 1 auto;
 }
@@ -350,6 +359,7 @@ body[data-theme="aurora"] #chat-model-select {
         font-size: 0.52rem !important;
     }
 }
+
 /* Mobile responsive sidebar handling */
 @media (max-width: 768px) {
     .chat-resize-handle {
@@ -374,15 +384,16 @@ body[data-theme="aurora"] #chat-model-select {
         top: var(--safe-area-top, 0px) !important;
         height: calc(100dvh - var(--safe-area-top, 0px)) !important;
     }
-    
+
     .steam-chat-sidebar.collapsed {
         transform: translateX(100%);
         pointer-events: none;
         visibility: hidden;
     }
-    
+
     body:not(.chat-collapsed) #app-runner {
-        right: 0 !important; /* Don't shrink the game on mobile when chat is open since it's an overlay */
+        right: 0 !important;
+        /* Don't shrink the game on mobile when chat is open since it's an overlay */
     }
 }
 
@@ -423,6 +434,7 @@ body[data-theme="aurora"] #chat-model-select {
         display: flex !important;
     }
 }
+
 .close-chat-btn {
     background: var(--arc-line);
     border: 1px solid var(--arc-border);
@@ -446,7 +458,8 @@ body[data-theme="aurora"] #chat-model-select {
 .chat-messages {
     flex: 1;
     overflow-y: auto;
-    min-height: 0; /* Crucial for flex shrinking */
+    min-height: 0;
+    /* Crucial for flex shrinking */
     padding: 15px;
     display: flex;
     flex-direction: column;
@@ -503,7 +516,8 @@ body[data-theme="aurora"] #chat-model-select {
     text-overflow: ellipsis;
     white-space: nowrap;
     overflow: hidden;
-    min-width: 0; /* Allow it to shrink if needed */
+    min-width: 0;
+    /* Allow it to shrink if needed */
 }
 
 .chat-input::placeholder {
@@ -511,6 +525,7 @@ body[data-theme="aurora"] #chat-model-select {
     white-space: nowrap;
     overflow: hidden;
 }
+
 .chat-send-btn {
     background: none;
     border: none;
@@ -608,12 +623,26 @@ body[data-theme="aurora"] #chat-model-select {
     margin-right: 2px;
 }
 
-.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+.typing-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
 
 @keyframes typing {
-    0%, 100% { opacity: 0.2; transform: translateY(0); }
-    50% { opacity: 1; transform: translateY(-2px); }
+
+    0%,
+    100% {
+        opacity: 0.2;
+        transform: translateY(0);
+    }
+
+    50% {
+        opacity: 1;
+        transform: translateY(-2px);
+    }
 }
 
 /* Code Blocks */
@@ -626,7 +655,8 @@ body[data-theme="aurora"] #chat-model-select {
     background: var(--arc-input-wrapper-bg);
     border: 1px solid var(--arc-border);
     border-radius: 6px;
-    padding: 24px 12px 12px 12px; /* Extra top padding for badges */
+    padding: 24px 12px 12px 12px;
+    /* Extra top padding for badges */
     margin: 0;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     font-size: 0.8rem;
@@ -700,18 +730,16 @@ body[data-theme="aurora"] #chat-model-select {
     opacity: 1 !important;
 }
 
-.chat-message p { 
-    margin: 8px 0; 
-    background: none !important;
-    border: none !important;
-    box-shadow: none !important;
+.chat-message p {
+    margin: 8px 0;
 }
-.chat-message p:first-child { margin-top: 0; }
-.chat-message p:last-child { margin-bottom: 0; }
-.chat-message span {
-    background: none !important;
-    border: none !important;
-    box-shadow: none !important;
+
+.chat-message p:first-child {
+    margin-top: 0;
+}
+
+.chat-message p:last-child {
+    margin-bottom: 0;
 }
 
 /* Resize Handle */
@@ -747,7 +775,8 @@ body[data-theme="aurora"] #chat-model-select {
     pointer-events: none;
 }
 
-.chat-resize-handle:hover, .chat-resize-handle.active {
+.chat-resize-handle:hover,
+.chat-resize-handle.active {
     background: var(--arc-accent);
     box-shadow: 0 0 10px var(--arc-accent);
 }
@@ -789,7 +818,8 @@ body.runner-open .chat-resize-handle {
     width: fit-content;
 }
 
-#chat-preview-img, #chat-preview-video {
+#chat-preview-img,
+#chat-preview-video {
     max-height: 80px;
     border-radius: 4px;
     border: 1px solid var(--arc-border);
@@ -831,10 +861,11 @@ body.runner-open .chat-resize-handle {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.chat-message-image, .chat-message-video {
+.chat-message-image,
+.chat-message-video {
     max-width: 100%;
     border-radius: 6px;
     margin-top: 8px;
@@ -860,9 +891,11 @@ body.runner-open .chat-resize-handle {
     background: var(--arc-line);
 }
 
-.message-user .chat-message-image, .message-user .chat-message-video {
+.message-user .chat-message-image,
+.message-user .chat-message-video {
     border-color: rgba(255, 255, 255, 0.2);
 }
+
 /* Voice Engine Styles */
 .chat-send-btn.recording {
     color: #ff4444 !important;
@@ -872,9 +905,20 @@ body.runner-open .chat-resize-handle {
 }
 
 @keyframes arc-voice-pulse {
-    0% { transform: scale(1.1); opacity: 1; }
-    50% { transform: scale(1.3); opacity: 0.7; }
-    100% { transform: scale(1.1); opacity: 1; }
+    0% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.3);
+        opacity: 0.7;
+    }
+
+    100% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
 }
 
 .chat-message {
@@ -899,7 +943,7 @@ body.runner-open .chat-resize-handle {
     transition: all 0.2s ease;
     z-index: 5;
     padding: 0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .message-ai:hover .msg-speak-btn {

@@ -42,12 +42,12 @@
   --accent-2: #2a9d8f;
   --accent-3: #f4a261;
   --shadow: 0 20px 60px rgba(15, 23, 32, 0.12);
-  
+
   /* Responsive Shell & Spacing */
   --shell-max-width: 1200px;
   --section-gap: clamp(1rem, 3vw, 2.5rem);
   --container-padding: clamp(1rem, 4vw, 2rem);
-  
+
   /* Fluid Typography */
   --font-size-h1: clamp(2rem, 5vw, 4.5rem);
   --font-size-h2: clamp(1.5rem, 4vw, 2.75rem);
@@ -55,13 +55,13 @@
   --font-size-base: 1rem;
   --font-size-sm: 0.875rem;
   --font-size-xs: 0.75rem;
-  
+
   --feed-media-fit: cover;
   --radius-xl: clamp(1.5rem, 4vw, 2rem);
   --radius-lg: clamp(1.25rem, 3vw, 1.5rem);
   --radius-md: 1.125rem;
   --radius-sm: 0.75rem;
-  
+
   --viewport-offset-top: 0px;
   --viewport-offset-bottom: 0px;
   --viewport-visible-height: 100dvh;
@@ -418,9 +418,7 @@ body[data-theme="midnight"] .message-row.is-self .message-bubble {
 
 body[data-theme="midnight"] .message-row.is-self .message-bubble span,
 body[data-theme="midnight"] .message-row.is-self .message-bubble p {
-  color: #000000 !important;
-  background: none !important;
-  border: none !important;
+  color: #000000;
 }
 
 body[data-theme="midnight"] .profile-view-dialog {
@@ -515,7 +513,6 @@ body[data-theme="contrast"] .emoji-category-tab.is-active {
 body[data-theme="midnight"] .message-row.is-self .message-bubble span,
 body[data-theme="midnight"] .message-row.is-self .message-bubble p {
   color: #000000 !important;
-  background: none !important;
   border: none !important;
 }
 
@@ -782,7 +779,6 @@ body[data-theme="midnight"] .message-row.is-self .message-bubble span,
 body[data-theme="midnight"] .message-row.is-self .message-bubble p {
   color: #000000 !important;
   font-weight: 700;
-  background: none !important;
   border: none !important;
 }
 
