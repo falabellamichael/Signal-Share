@@ -483,7 +483,7 @@ function isWorkshopEditIntentPrompt(message = "", context = null) {
     if (!text) return false;
     
     // Core edit verbs
-    const editVerb = /\b(edit|update|rewrite|refactor|fix|modify|change|patch|improve|adjust|tweak|add|remove|implement|style|color|background|ui|interface|look|feel|design|vibe|text|label|speed|movement|gravity|score)\b/.test(text);
+    const editVerb = /\b(edit|update|rewrite|refactor|fix|modify|change|patch|improve|adjust|tweak|add|remove|implement|style|color|background|ui|interface|look|feel|design|vibe|text|label|speed|movement|gravity|score|check|status|verify|am i|where)\b/.test(text);
     
     // Check if we are currently in the workshop editor via context
     const inEditor = !!(context?.workshopEditor?.activeGameId);
@@ -562,11 +562,12 @@ function buildProtocolAwareUserMessage(userPrompt = "", workshopContext = null) 
     if (isWorkshopPublishIntentPrompt(text)) {
         directives.push(buildWorkshopPublishDirective());
     }
-    if (isWorkshopEditIntentPrompt(text, workshopContext)) {
+    
+    // If we are in the workshop editor, ALWAYS provide the edit directive regardless of detected intent.
+    // This allows the AI to "see" the page context naturally as the user requested.
+    if (workshopContext?.workshopEditor?.activeGameId) {
         directives.push(buildWorkshopEditDirective(workshopContext));
-    } else if (workshopContext?.workshopEditor?.activeGameId && !isWorkshopPublishIntentPrompt(text)) {
-        // If in editor but intent wasn't explicitly detected, still add the directive as a secondary option 
-        // to ensure the AI knows it can edit the current file.
+    } else if (isWorkshopEditIntentPrompt(text, workshopContext)) {
         directives.push(buildWorkshopEditDirective(workshopContext));
     }
     if (directives.length === 0) return text;

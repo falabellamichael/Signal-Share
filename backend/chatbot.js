@@ -850,12 +850,19 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         }
     }
 
-    if (!lmResponse && iteration === 0) return getOfflineResponse(message);
-    if (!lmResponse && iteration > 0) {
+    if (!lmResponse?.trim() && iteration === 0) return getOfflineResponse(message);
+
+    if (!lmResponse?.trim() && iteration > 0) {
         // Fallback: If the model failed to summarize, return the last tool observation if available
         const lastObservation = history.findLast(h => h.role === "user" && h.content.includes("[SYSTEM OBSERVATION]"));
         if (lastObservation) {
-            return `I've processed the system tools, but I encountered an issue while generating my final summary. Here is the raw result:\n\n${lastObservation.content}`;
+            console.warn("[Chatbot] Model returned empty result after tool call. Attempting one last summary request...");
+            // One last attempt to force a summary
+            return getChatResponse(null, [
+                ...conversation,
+                { role: "assistant", content: "[No summary provided by model]" },
+                { role: "system", content: "You just received system data. Summarize it for the user now in 1-2 sentences. Do not use tools." }
+            ], pageContext, iteration + 1, null, preferredModel, customInstructions);
         }
         return "I've processed your request but my logic core returned an empty result. Please try again or rephrase!";
     }
