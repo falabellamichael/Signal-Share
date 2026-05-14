@@ -297,6 +297,9 @@ function vibrate(ms) {
 let customGames = readStoredArray('ss-custom-games');
 let uploadedFiles = [];
 const DEFAULT_CUSTOM_GAME_POSTER_DATA_URL = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22%3E%3Crect fill=%22%23233c51%22 width=%22200%22 height=%22300%22/%3E%3C/svg%3E';
+const WORKSHOP_GAMES_TABLE = 'workshop_games';
+const MASTER_ADMIN_RPC_NAME = 'is_signal_share_master_admin';
+let isCurrentMasterAdmin = false;
 
 // Detection
 const isNative = !!window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() !== 'web';
@@ -472,6 +475,16 @@ if (window.supabase) {
             } else {
                 syncStoredUser(null);
             }
+            void refreshMasterAdminStatus().finally(() => {
+                if (currentCategory === 'publish') renderPublishedGames();
+            });
+            void loadWorkshopGamesFromSupabase().finally(() => {
+                if (currentCategory === 'publish') {
+                    renderPublishedGames();
+                } else {
+                    renderLibrary();
+                }
+            });
             updateAuthUI();
         });
     } catch (error) {
@@ -506,7 +519,12 @@ async function init() {
         }
     }
 
-    loadCustomGames();
+    if (supabaseClient) {
+        await refreshMasterAdminStatus();
+        await loadWorkshopGamesFromSupabase();
+    } else {
+        loadCustomGames();
+    }
     setupFileUpload();
     updateAuthUI();
 
@@ -531,13 +549,169 @@ function handleIframeContext() {
     }
 }
 
-function loadCustomGames() {
-    customGames.forEach(game => {
-        const existing = GAMES.find(g => g.id === game.id);
-        if (!existing) {
+function normalizeCustomGameRecord(game) {
+    if (!game || typeof game !== 'object') return null;
+    const id = typeof game.id === 'string' && game.id.trim() ? game.id.trim() : '';
+    if (!id) return null;
+    const category = typeof game.category === 'string' && game.category.trim()
+        ? game.category.trim().toUpperCase()
+        : 'GAME';
+    const type = `${game.type || ''}`.trim().toLowerCase() === 'utility'
+        ? 'utility'
+        : (category.toLowerCase() === 'utility' ? 'utility' : 'game');
+    const files = Array.isArray(game.files) ? game.files.filter((file) => file && typeof file === 'object') : [];
+    const entryFile = typeof game.entryFile === 'string' && game.entryFile.trim()
+        ? game.entryFile.trim()
+        : (files[0]?.name || 'index.html');
+    const trackedStats = Array.isArray(game.trackedStats)
+        ? game.trackedStats.filter((value) => typeof value === 'string' && value.trim())
+        : [];
+
+    return {
+        id,
+        title: typeof game.title === 'string' && game.title.trim() ? game.title.trim() : 'Untitled Game',
+        category,
+        poster: typeof game.poster === 'string' && game.poster.trim() ? game.poster.trim() : DEFAULT_CUSTOM_GAME_POSTER_DATA_URL,
+        tag: typeof game.tag === 'string' && game.tag.trim() ? game.tag.trim() : `${category} • CUSTOM`,
+        type,
+        description: typeof game.description === 'string' ? game.description.trim() : '',
+        tags: typeof game.tags === 'string' ? game.tags.trim() : '',
+        author: typeof game.author === 'string' && game.author.trim() ? game.author.trim() : 'Unknown',
+        authorId: typeof game.authorId === 'string' && game.authorId.trim() ? game.authorId.trim() : null,
+        files,
+        entryFile,
+        publishedAt: typeof game.publishedAt === 'string' && game.publishedAt.trim() ? game.publishedAt : new Date().toISOString(),
+        trackedStats,
+        isCustomGame: true
+    };
+}
+
+function replaceCustomGames(nextGames) {
+    const normalizedNextGames = (Array.isArray(nextGames) ? nextGames : [])
+        .map(normalizeCustomGameRecord)
+        .filter(Boolean);
+    const nextById = new Map(normalizedNextGames.map((game) => [game.id, game]));
+
+    for (let index = GAMES.length - 1; index >= 0; index -= 1) {
+        const game = GAMES[index];
+        if (!game || typeof game.id !== 'string') continue;
+        if ((game.isCustomGame || game.id.startsWith('custom_')) && !nextById.has(game.id)) {
+            GAMES.splice(index, 1);
+        }
+    }
+
+    nextById.forEach((game, id) => {
+        const existingIndex = GAMES.findIndex((entry) => entry.id === id);
+        if (existingIndex >= 0) {
+            GAMES[existingIndex] = game;
+        } else {
             GAMES.push(game);
         }
     });
+
+    customGames = normalizedNextGames;
+    localStorage.setItem('ss-custom-games', JSON.stringify(customGames));
+}
+
+function mapWorkshopGameRowToLocalRecord(row) {
+    if (!row || typeof row !== 'object') return null;
+    return normalizeCustomGameRecord({
+        id: row.id,
+        title: row.title,
+        category: row.category,
+        poster: row.poster,
+        tag: row.tag,
+        type: row.game_type,
+        description: row.description,
+        tags: row.tags,
+        author: row.author_name,
+        authorId: row.author_id,
+        files: Array.isArray(row.files) ? row.files : [],
+        entryFile: row.entry_file,
+        publishedAt: row.published_at,
+        trackedStats: Array.isArray(row.tracked_stats) ? row.tracked_stats : []
+    });
+}
+
+function buildWorkshopGameRow(game) {
+    const normalized = normalizeCustomGameRecord(game);
+    if (!normalized) return null;
+    return {
+        id: normalized.id,
+        title: normalized.title,
+        category: normalized.category,
+        poster: normalized.poster,
+        tag: normalized.tag,
+        game_type: normalized.type,
+        description: normalized.description,
+        tags: normalized.tags,
+        author_name: normalized.author,
+        author_id: normalized.authorId,
+        files: normalized.files,
+        entry_file: normalized.entryFile,
+        tracked_stats: normalized.trackedStats,
+        published_at: normalized.publishedAt
+    };
+}
+
+async function refreshMasterAdminStatus() {
+    if (!supabaseClient || !currentUser?.id) {
+        isCurrentMasterAdmin = false;
+        return false;
+    }
+
+    try {
+        const { data, error } = await supabaseClient.rpc(MASTER_ADMIN_RPC_NAME);
+        if (error) {
+            console.warn('[Mini-Games] Master admin check failed:', error);
+            isCurrentMasterAdmin = false;
+            return false;
+        }
+        isCurrentMasterAdmin = data === true;
+        return isCurrentMasterAdmin;
+    } catch (error) {
+        console.warn('[Mini-Games] Master admin check threw:', error);
+        isCurrentMasterAdmin = false;
+        return false;
+    }
+}
+
+async function loadWorkshopGamesFromSupabase() {
+    const localGames = readStoredArray('ss-custom-games')
+        .map(normalizeCustomGameRecord)
+        .filter(Boolean);
+
+    if (!supabaseClient) {
+        replaceCustomGames(localGames);
+        return { ok: false, source: 'local-only' };
+    }
+
+    try {
+        const { data, error } = await supabaseClient
+            .from(WORKSHOP_GAMES_TABLE)
+            .select('*')
+            .order('published_at', { ascending: false });
+
+        if (error) {
+            console.warn('[Mini-Games] Failed to load workshop games from Supabase:', error);
+            replaceCustomGames(localGames);
+            return { ok: false, source: 'local-fallback', error };
+        }
+
+        const remoteGames = (Array.isArray(data) ? data : [])
+            .map(mapWorkshopGameRowToLocalRecord)
+            .filter(Boolean);
+        replaceCustomGames(remoteGames);
+        return { ok: true, source: 'supabase', count: remoteGames.length };
+    } catch (error) {
+        console.warn('[Mini-Games] Workshop load threw:', error);
+        replaceCustomGames(localGames);
+        return { ok: false, source: 'local-fallback', error };
+    }
+}
+
+function loadCustomGames() {
+    replaceCustomGames(customGames);
 }
 
 function setupFileUpload() {
@@ -631,7 +805,7 @@ async function publishCustomGame() {
         });
 
         const processedFiles = await Promise.all(filePromises);
-        const publishResult = publishProcessedGameFiles({
+        const publishResult = await publishProcessedGameFiles({
             processedFiles,
             title,
             category,
@@ -640,7 +814,7 @@ async function publishCustomGame() {
             tags
         });
         if (!publishResult.ok) {
-            throw new Error(publishResult.error || 'publish-failed');
+            throw new Error(publishResult.message || publishResult.error || 'publish-failed');
         }
 
         document.getElementById('game-title').value = '';
@@ -656,7 +830,7 @@ async function publishCustomGame() {
         alert('Game published successfully with ' + processedFiles.length + ' assets!');
     } catch (err) {
         console.error('Publish error:', err);
-        alert('Failed to process files. Please try again.');
+        alert(err?.message || 'Failed to process files. Please try again.');
     }
 }
 
@@ -701,14 +875,14 @@ function collectTrackedStatsFromFiles(processedFiles) {
     return trackedStats;
 }
 
-function publishProcessedGameFiles(options = {}) {
+async function publishProcessedGameFiles(options = {}) {
     if (!currentUser) {
-        return { ok: false, error: 'auth-required' };
+        return { ok: false, error: 'auth-required', message: 'Please sign in to publish games.' };
     }
 
     const rawFiles = Array.isArray(options.processedFiles) ? options.processedFiles : [];
     if (rawFiles.length === 0) {
-        return { ok: false, error: 'no-files' };
+        return { ok: false, error: 'no-files', message: 'No game files were provided.' };
     }
 
     const processedFiles = rawFiles
@@ -728,7 +902,7 @@ function publishProcessedGameFiles(options = {}) {
         .filter(Boolean);
 
     if (processedFiles.length === 0) {
-        return { ok: false, error: 'invalid-files' };
+        return { ok: false, error: 'invalid-files', message: 'Game files could not be processed.' };
     }
 
     const title = typeof options.title === 'string' && options.title.trim() ? options.title.trim() : 'Untitled Game';
@@ -753,21 +927,53 @@ function publishProcessedGameFiles(options = {}) {
         description,
         tags,
         author: currentUser.name,
+        authorId: currentUser.id || null,
         files: processedFiles,
         entryFile: entryFile.name,
         publishedAt: new Date().toISOString(),
-        trackedStats
+        trackedStats,
+        isCustomGame: true
     };
 
-    customGames.push(newGame);
-    GAMES.push(newGame);
-    localStorage.setItem('ss-custom-games', JSON.stringify(customGames));
-    renderLibrary();
-    if (currentCategory === 'publish') {
-        renderPublishedGames();
+    if (supabaseClient && currentUser.id) {
+        const row = buildWorkshopGameRow(newGame);
+        if (!row) {
+            return { ok: false, error: 'invalid-payload', message: 'Workshop payload could not be prepared.' };
+        }
+
+        try {
+            const { data, error } = await supabaseClient
+                .from(WORKSHOP_GAMES_TABLE)
+                .upsert(row, { onConflict: 'id' })
+                .select('*')
+                .single();
+
+            if (error) {
+                console.error('[Mini-Games] Supabase workshop publish failed:', error);
+                return { ok: false, error: 'supabase-save-failed', message: error.message || 'Supabase rejected the workshop publish.' };
+            }
+
+            const persistedGame = mapWorkshopGameRowToLocalRecord(data) || newGame;
+            replaceCustomGames([
+                ...customGames.filter((game) => game.id !== persistedGame.id),
+                persistedGame
+            ]);
+            renderLibrary();
+            if (currentCategory === 'publish') renderPublishedGames();
+            return { ok: true, game: persistedGame, source: 'supabase' };
+        } catch (error) {
+            console.error('[Mini-Games] Supabase workshop publish threw:', error);
+            return { ok: false, error: 'supabase-save-failed', message: error?.message || 'Supabase workshop publish failed.' };
+        }
     }
 
-    return { ok: true, game: newGame };
+    replaceCustomGames([
+        ...customGames.filter((game) => game.id !== newGame.id),
+        newGame
+    ]);
+    renderLibrary();
+    if (currentCategory === 'publish') renderPublishedGames();
+    return { ok: true, game: newGame, source: 'local' };
 }
 
 async function publishCustomGameFromAi(payload = {}) {
@@ -780,7 +986,7 @@ async function publishCustomGameFromAi(payload = {}) {
         return { ok: false, error: 'no-files', message: 'No game files were provided by the AI response.' };
     }
 
-    const publishResult = publishProcessedGameFiles({
+    const publishResult = await publishProcessedGameFiles({
         processedFiles: files,
         title: payload.title,
         category: payload.category,
@@ -790,7 +996,7 @@ async function publishCustomGameFromAi(payload = {}) {
     });
 
     if (!publishResult.ok) {
-        return { ok: false, error: publishResult.error || 'publish-failed', message: 'Unable to publish the generated game.' };
+        return { ok: false, error: publishResult.error || 'publish-failed', message: publishResult.message || 'Unable to publish the generated game.' };
     }
 
     return {
@@ -808,7 +1014,13 @@ function renderPublishedGames() {
 
     if (!grid) return;
 
-    const userGames = customGames.filter(g => g.author === currentUser?.name);
+    const userGames = customGames.filter((game) => {
+        if (!currentUser) return false;
+        if (currentUser.id && game.authorId) {
+            return `${game.authorId}` === `${currentUser.id}`;
+        }
+        return game.author === currentUser.name;
+    });
     if (countEl) countEl.textContent = userGames.length + ' FILES PUBLISHED';
 
     grid.innerHTML = '';
@@ -823,6 +1035,9 @@ function renderPublishedGames() {
 
         const posterUrl = resolveGamePoster(game);
         const gameTag = buildGameTag(game);
+        const removeButtonMarkup = isCurrentMasterAdmin
+            ? `<button class="play-btn" onclick="deleteCustomGame('${game.id}')" style="flex: 0 0 auto; font-size: 0.8rem; padding: 10px 15px; margin: 0; background: rgba(255, 100, 100, 0.15); color: #ff6464; border: 1px solid rgba(255, 100, 100, 0.1);">REMOVE</button>`
+            : '';
         card.innerHTML = `
             <div style="height: 160px; background: url('${posterUrl}') center/cover; position: relative; overflow: hidden;">
                 <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(16, 24, 34, 0.9), transparent); display: flex; align-items: flex-end; padding: 15px;">
@@ -834,7 +1049,7 @@ function renderPublishedGames() {
                 <p style="margin: 0 0 20px; font-size: 0.8rem; opacity: 0.5; line-height: 1.5; min-height: 2.4em;">${desc}${descSuffix}</p>
                 <div style="display: flex; gap: 10px;">
                     <button class="play-btn" onclick="launchCustomGame('${game.id}')" style="flex: 1; font-size: 0.8rem; padding: 10px; margin: 0; letter-spacing: 1px;">LAUNCH</button>
-                    <button class="play-btn" onclick="deleteCustomGame('${game.id}')" style="flex: 0 0 auto; font-size: 0.8rem; padding: 10px 15px; margin: 0; background: rgba(255, 100, 100, 0.15); color: #ff6464; border: 1px solid rgba(255, 100, 100, 0.1);">REMOVE</button>
+                    ${removeButtonMarkup}
                 </div>
             </div>`;
         grid.appendChild(card);
@@ -888,14 +1103,28 @@ function launchCustomGame(gameId) {
     }
 }
 
-function deleteCustomGame(gameId) {
+async function deleteCustomGame(gameId) {
+    if (!isCurrentMasterAdmin) {
+        alert('Only master admin accounts can delete workshop games.');
+        return;
+    }
+
     if (!confirm('Are you sure you want to delete this game?')) return;
 
-    customGames = customGames.filter(g => g.id !== gameId);
-    const gameIdx = GAMES.findIndex(g => g.id === gameId);
-    if (gameIdx >= 0) GAMES.splice(gameIdx, 1);
+    if (supabaseClient) {
+        const { error } = await supabaseClient
+            .from(WORKSHOP_GAMES_TABLE)
+            .delete()
+            .eq('id', gameId);
+        if (error) {
+            console.error('[Mini-Games] Workshop delete failed:', error);
+            alert(error.message || 'Failed to delete workshop game.');
+            return;
+        }
+    }
 
-    localStorage.setItem('ss-custom-games', JSON.stringify(customGames));
+    replaceCustomGames(customGames.filter((game) => game.id !== gameId));
+    renderLibrary();
     renderPublishedGames();
 }
 

@@ -965,3 +965,86 @@ begin
     alter publication supabase_realtime add table public.system_media_actions;
   end if;
 end $$;
+
+create or replace function public.is_signal_share_master_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select lower(coalesce(auth.jwt() ->> 'email', '')) = any (array[
+    'falabellamichael@gmail.com',
+    'falabellasocial@gmail.com',
+    'falabellasocials@gmail.com'
+  ]);
+$$;
+
+grant execute on function public.is_signal_share_master_admin() to anon, authenticated;
+
+create table if not exists public.workshop_games (
+  id text primary key,
+  title text not null,
+  category text not null,
+  poster text not null,
+  tag text not null,
+  game_type text not null check (game_type in ('game', 'utility')),
+  description text not null default '',
+  tags text not null default '',
+  author_name text not null,
+  author_id uuid not null references auth.users (id) on delete cascade,
+  files jsonb not null default '[]'::jsonb,
+  entry_file text not null,
+  tracked_stats text[] not null default '{}'::text[],
+  published_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (jsonb_typeof(files) = 'array')
+);
+
+create index if not exists workshop_games_published_at_idx
+on public.workshop_games (published_at desc);
+
+create index if not exists workshop_games_author_idx
+on public.workshop_games (author_id, published_at desc);
+
+alter table public.workshop_games enable row level security;
+
+grant select on table public.workshop_games to anon, authenticated;
+grant insert, update, delete on table public.workshop_games to authenticated;
+
+drop policy if exists "public can read workshop games" on public.workshop_games;
+create policy "public can read workshop games"
+on public.workshop_games
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "authenticated can publish workshop games" on public.workshop_games;
+create policy "authenticated can publish workshop games"
+on public.workshop_games
+for insert
+to authenticated
+with check (
+  auth.uid() = author_id
+);
+
+drop policy if exists "authors can edit their workshop games" on public.workshop_games;
+create policy "authors can edit their workshop games"
+on public.workshop_games
+for update
+to authenticated
+using (auth.uid() = author_id)
+with check (auth.uid() = author_id);
+
+drop policy if exists "master admins can delete workshop games" on public.workshop_games;
+create policy "master admins can delete workshop games"
+on public.workshop_games
+for delete
+to authenticated
+using (public.is_signal_share_master_admin());
+
+drop trigger if exists set_workshop_games_updated_at on public.workshop_games;
+create trigger set_workshop_games_updated_at
+before update on public.workshop_games
+for each row
+execute function public.set_updated_at();

@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import { getChatResponse, getLocalModelCatalog } from "./chatbot.js";
 import { SecurityEngine } from "./security-v3.js";
+import { isMasterAdmin, hasPermission, ADMIN_ROLES } from "./roles-v3.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -145,6 +146,18 @@ app.use((req, res, next) => {
   }
 
   next();
+});
+
+// MasterAdmin Verification Endpoint
+app.post("/api/security/verify-master", (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ isMaster: false });
+  
+  const isMaster = isMasterAdmin(email);
+  return res.json({ 
+    isMaster, 
+    role: isMaster ? ADMIN_ROLES.MASTER : ADMIN_ROLES.USER 
+  });
 });
 
 // Chat integration using the intelligence module
