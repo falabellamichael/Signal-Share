@@ -5,7 +5,8 @@ import {
   formatFileSize, formatKind, formatProviderName,
   formatPostBadge, formatPostMeta,
   clampNumber, parseTags, getMediaKind, compareByNewest,
-  getLatestPostedPostId, resolveMemberDisplayName, formatDisplayNameFromEmail
+  getLatestPostedPostId, resolveMemberDisplayName, formatDisplayNameFromEmail,
+  formatBackendError
 } from './shared-utils.js';
 import {
   AI_COMPANION_ID,
@@ -1067,30 +1068,7 @@ async function unlinkPushNotificationRegistration() {
   } catch (error) { console.error("Push subscription cleanup failed", error); }
 }
 
-function formatBackendError(error) {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
-    const parts = [];
-    if (error.message) parts.push(error.message);
-    if (error.details) parts.push(error.details);
-    if (error.hint) parts.push(error.hint);
-    if (error.code) parts.push(`Code: ${error.code}`);
-    if (parts.length) return parts.join(" ");
-  }
-  return "Supabase setup failed during startup.";
-}
-
-function isBlockingBackendUnavailable(error) {
-  const details = formatBackendError(error).toLowerCase();
-  const code = typeof error?.code === "string" ? error.code : "";
-  return code === "42P01" || code === "42501" || details.includes("user_blocks") || details.includes("permission denied for table user_blocks") || details.includes("relation \"public.user_blocks\" does not exist") || details.includes("relation \"user_blocks\" does not exist");
-}
-
-function isBanningBackendUnavailable(error) {
-  const details = formatBackendError(error).toLowerCase();
-  const code = typeof error?.code === "string" ? error.code : "";
-  return code === "42P01" || code === "42501" || details.includes("user_bans") || details.includes("permission denied for table user_bans") || details.includes("relation \"public.user_bans\" does not exist") || details.includes("relation \"user_bans\" does not exist");
-}
+// Error handling utilities moved to admin-v3.js and shared-utils.js
 
 async function initialize() {
   // SCOPE PLATFORM FOR CSS
@@ -1139,7 +1117,7 @@ async function initialize() {
       bindAuthStateListener();
     } catch (error) {
       console.error("Supabase is unavailable", error);
-      state.backendError = formatBackendError(error);
+      state.backendError = formatBackendError(error, "Supabase setup failed during startup.");
       showFeedback("Hosted posting setup failed. Falling back to local browser storage.", true);
       state.supabase = null;
       state.backendMode = "local";

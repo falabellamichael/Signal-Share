@@ -170,7 +170,7 @@ function showMessage(text, x, y, color = '#fff') {
     messages.push({ text, x, y, life: 1, color, vy: -66 });
 }
 
-function spawnParticles(x, y, amount = 18, color = '#ffffff') {
+function createParticles(x, y, amount = 18, color = '#ffffff') {
     const limit = PERF.particleLimit;
     const finalAmount = Math.min(amount, limit - particles.length);
     if (finalAmount <= 0) return;
@@ -477,7 +477,7 @@ function updateBall(dt) {
     ball.rotation += ball.vRot * dt;
     ball.vRot *= Math.pow(SPIN_DRAG_PER_SECOND, dt * 60);
 
-    if (ball.isOnFire && Math.random() > 0.35) {
+    if (ball.isOnFire && Math.random() > 0.35 && particles.length < PERF.particleLimit) {
         particles.push({
             x: ball.x + (Math.random() - 0.5) * getBallRadius() * 0.75,
             y: ball.y + (Math.random() - 0.5) * getBallRadius() * 0.75,
@@ -560,15 +560,7 @@ function updateHoop(dt) {
         hoop.y += Math.cos(time * jitterFreq * 1.5) * (jitterAmp * 0.5);
     }
 
-    // Sync net anchors to moving hoop
-    const spacing = (Math.PI * 2) / net.cols;
-    for (let i = 0; i < net.cols; i++) {
-        const node = net.points[i];
-        if (!node) continue;
-        const angle = i * spacing;
-        node.x = hoop.x + Math.cos(angle) * hoop.radius;
-        node.y = hoop.y + Math.sin(angle) * hoop.radius;
-    }
+    // Net anchors are automatically handled by updateNet using hoop.x and hoop.y
 }
 
 function update(dt) {

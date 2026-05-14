@@ -267,3 +267,21 @@ export function resolveMemberDisplayName(profile, fallback = "Member") {
   const prettyEmailName = formatDisplayNameFromEmail(profile.email);
   return prettyEmailName || (displayName ? displayName.slice(0, 40) : fallback);
 }
+
+/**
+ * Formats a backend/Supabase error into a readable string.
+ * @param {any} error The error object from Supabase or native Error
+ * @param {string} fallback Default message if error contains no details
+ */
+export function formatBackendError(error, fallback = "") {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object") {
+    const parts = [];
+    if (error.message) parts.push(error.message);
+    if (error.details) parts.push(error.details);
+    if (error.hint) parts.push(error.hint);
+    if (error.code) parts.push(`Code: ${error.code}`);
+    if (parts.length) return parts.join(" ");
+  }
+  return fallback;
+}

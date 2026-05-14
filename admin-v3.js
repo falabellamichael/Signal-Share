@@ -3,7 +3,7 @@ import {
   loadBlockedUsersFromSupabase, deleteHostedPost, normalizeUserBan, normalizeUserBlock, 
   normalizeSiteSettings, getApiContext 
 } from './api-v3.js';
-import { resolveMemberDisplayName } from './shared-utils.js';
+import { resolveMemberDisplayName, formatBackendError } from './shared-utils.js';
 
 /**
  * Administrative and Moderation Logic for Signal Share V3
@@ -153,18 +153,7 @@ export function isPostModerationError(error) {
   return details.includes("blocked language");
 }
 
-function formatBackendError(error) {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
-    const parts = [];
-    if (error.message) parts.push(error.message);
-    if (error.details) parts.push(error.details);
-    if (error.hint) parts.push(error.hint);
-    if (error.code) parts.push(`Code: ${error.code}`);
-    if (parts.length) return parts.join(" ");
-  }
-  return "";
-}
+// formatBackendError moved to shared-utils.js
 
 // --- Ban and Block Logic ---
 
