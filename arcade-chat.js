@@ -563,23 +563,24 @@ function buildWorkshopEditDirective(workshopContext = null) {
     return lines.join('\n');
 }
 
-function buildProtocolAwareUserMessage(userPrompt = "", workshopContext = null) {
-    const text = `${userPrompt || ''}`.trim();
-    if (!text) return text;
+function buildProtocolAwareUserMessage(userPrompt = "") {
+    return `${userPrompt || ''}`.trim();
+}
+
+function getProtocolDirectives(userPrompt = "", workshopContext = null) {
+    const text = `${userPrompt || ''}`.trim().toLowerCase();
     const directives = [];
     if (isWorkshopPublishIntentPrompt(text)) {
         directives.push(buildWorkshopPublishDirective());
     }
     
     // If we are in the workshop editor, ALWAYS provide the edit directive regardless of detected intent.
-    // This allows the AI to "see" the page context naturally as the user requested.
     if (workshopContext?.workshopEditor?.activeGameId) {
         directives.push(buildWorkshopEditDirective(workshopContext));
     } else if (isWorkshopEditIntentPrompt(text, workshopContext)) {
         directives.push(buildWorkshopEditDirective(workshopContext));
     }
-    if (directives.length === 0) return text;
-    return `${text}\n\n${directives.join('\n\n')}`;
+    return directives.join('\n\n');
 }
 
 function getBridgeTargetAddressSpace(baseUrl = "") {
@@ -2193,11 +2194,8 @@ window.sendChatMessage = async function() {
                 attachment: arcadeChatHistory[arcadeChatHistory.length - 1]?.attachment || null
             })
             : '';
-        let developerCapabilities = '';
-        if (richContext.workshopEditor) {
-            developerCapabilities = '\n\n[DEVELOPER_MODE_ACTIVE]: You can edit workshop files using [FILE_REWRITE: {"gameId": "string", "fileName": "string", "content": "string", "save": boolean}].';
-        }
-        const fullPageContext = `${pageContext} (Visible text: ${pageText})${sharedAiContext ? `\n\n${sharedAiContext}` : ''}${developerCapabilities}`;
+        const protocolDirectives = getProtocolDirectives(text, richContext);
+        const fullPageContext = `${pageContext} (Visible text: ${pageText})${sharedAiContext ? `\n\n${sharedAiContext}` : ''}${protocolDirectives ? `\n\n${protocolDirectives}` : ''}`;
 
         try {
             const modelSelect = document.getElementById('chat-model-select');
@@ -2220,10 +2218,10 @@ window.sendChatMessage = async function() {
                 }
             }
 
-            const protocolAwareMessage = buildProtocolAwareUserMessage(text, richContext);
+            const protocolAwareMessage = buildProtocolAwareUserMessage(text);
             const attachment = arcadeChatHistory[arcadeChatHistory.length - 1].attachment;
             const compactHistory = Array.isArray(normalizedHistory) ? normalizedHistory.slice(-14) : [];
-            const compactPageContext = `${fullPageContext || ''}`.slice(0, 2400);
+            const compactPageContext = `${fullPageContext || ''}`.slice(0, 25000);
             const payloadVariants = [
                 {
                     label: 'full',
