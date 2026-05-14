@@ -476,6 +476,15 @@ function isWorkshopPublishIntentPrompt(message = "") {
     return target && (publishVerb || (buildVerb && gameMention));
 }
 
+function isWorkshopEditIntentPrompt(message = "") {
+    const text = `${message || ''}`.trim().toLowerCase();
+    if (!text) return false;
+    const editVerb = /\b(edit|update|rewrite|refactor|fix|modify|change|patch|improve|adjust|tweak)\b/.test(text);
+    const target = /\b(workshop|editor|library)\b/.test(text);
+    const codeMention = /\b(game|file|html|css|js|javascript|json|code)\b/.test(text);
+    return editVerb && target && codeMention;
+}
+
 function buildWorkshopPublishDirective() {
     return [
         '[WORKSHOP_PROTOCOL]',
@@ -489,10 +498,53 @@ function buildWorkshopPublishDirective() {
     ].join('\n');
 }
 
-function buildProtocolAwareUserMessage(userPrompt = "") {
+function buildWorkshopEditDirective(workshopContext = null) {
+    const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
+    const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
+    const workshopGames = Array.isArray(workshopContext?.workshop) ? workshopContext.workshop : [];
+    const compactTargets = workshopGames
+        .slice(0, 6)
+        .map((game) => {
+            const gameId = `${game?.id || ''}`.trim();
+            const files = Array.isArray(game?.files) ? game.files : [];
+            const names = files.slice(0, 4).map((file) => `${file?.name || ''}`.trim()).filter(Boolean);
+            if (!gameId || names.length === 0) return '';
+            return `${gameId}:${names.join(',')}`;
+        })
+        .filter(Boolean)
+        .join(' | ');
+
+    const lines = [
+        '[WORKSHOP_FILE_EDIT_PROTOCOL]',
+        'If the user asks to edit/fix/update Workshop code, you MUST include exactly one [FILE_REWRITE:{...}] tag.',
+        'Tag schema: {"gameId":"string","fileName":"string","content":"string","save":true}.',
+        'Use save:true unless the user explicitly asks for draft-only changes.',
+        'content must be the full updated file text, not a diff.',
+        'Do not use [PUBLISH] for edit-only requests.'
+    ];
+
+    if (activeGameId && activeFileName) {
+        lines.push(`Default target gameId is "${activeGameId}" and default fileName is "${activeFileName}" when the user does not specify a target.`);
+    }
+    if (compactTargets) {
+        lines.push(`Valid editable targets: ${compactTargets}.`);
+    }
+    lines.push('[/WORKSHOP_FILE_EDIT_PROTOCOL]');
+    return lines.join('\n');
+}
+
+function buildProtocolAwareUserMessage(userPrompt = "", workshopContext = null) {
     const text = `${userPrompt || ''}`.trim();
-    if (!isWorkshopPublishIntentPrompt(text)) return text;
-    return `${text}\n\n${buildWorkshopPublishDirective()}`;
+    if (!text) return text;
+    const directives = [];
+    if (isWorkshopPublishIntentPrompt(text)) {
+        directives.push(buildWorkshopPublishDirective());
+    }
+    if (isWorkshopEditIntentPrompt(text)) {
+        directives.push(buildWorkshopEditDirective(workshopContext));
+    }
+    if (directives.length === 0) return text;
+    return `${text}\n\n${directives.join('\n\n')}`;
 }
 
 function getBridgeTargetAddressSpace(baseUrl = "") {
@@ -2128,7 +2180,7 @@ window.sendChatMessage = async function() {
                 }
             }
 
-            const protocolAwareMessage = buildProtocolAwareUserMessage(text);
+            const protocolAwareMessage = buildProtocolAwareUserMessage(text, richContext);
             const attachment = arcadeChatHistory[arcadeChatHistory.length - 1].attachment;
             const compactHistory = Array.isArray(normalizedHistory) ? normalizedHistory.slice(-14) : [];
             const compactPageContext = `${fullPageContext || ''}`.slice(0, 2400);
@@ -2283,6 +2335,9 @@ window.sendChatMessage = async function() {
             const actionResult = await executeArcadeChatActions(reply, { userPrompt: text });
             if (isWorkshopPublishIntentPrompt(text) && !actionResult?.workshopPublishAttempted) {
                 await tryAutoPublishWorkshopFromReply(reply, text);
+            }
+            if (isWorkshopEditIntentPrompt(text) && !actionResult?.workshopFileRewriteAttempted) {
+                await tryAutoWorkshopFileRewriteFromReply(reply, text);
             }
         } else {
             if (workshopPublishIntent) {
@@ -2618,7 +2673,9 @@ async function executeArcadeChatActions(text, options = {}) {
         handled: false,
         publishTagDetected: false,
         workshopPublishAttempted: false,
-        workshopPublishSucceeded: false
+        workshopPublishSucceeded: false,
+        workshopFileRewriteAttempted: false,
+        workshopFileRewriteSucceeded: false
     };
     if (!text) return actionResult;
 
@@ -2792,15 +2849,92 @@ async function executeArcadeChatActions(text, options = {}) {
         try {
             actionResult.handled = true;
             const data = JSON.parse(fileRewritePayload.jsonText);
-            const { gameId, fileName, content, save } = data;
+            const editorState = typeof window.getWorkshopEditorState === 'function'
+                ? window.getWorkshopEditorState()
+                : null;
+            const gameId = `${data?.gameId || editorState?.activeGameId || ''}`.trim();
+            const fileName = `${data?.fileName || editorState?.activeFileName || ''}`.trim();
+            const content = typeof data?.content === 'string' ? data.content : '';
+            const save = data?.save !== false;
+            if (!gameId || !fileName || !content) {
+                if (window.showFeedback) {
+                    window.showFeedback('AI file rewrite missing gameId, fileName, or content.', true);
+                }
+                return actionResult;
+            }
             if (typeof window.applyAiFileEdit === 'function') {
-                void window.applyAiFileEdit(gameId, fileName, content, { save: !!save });
+                actionResult.workshopFileRewriteAttempted = true;
+                const applyResult = await window.applyAiFileEdit(gameId, fileName, content, { save: !!save });
+                if (applyResult?.ok) {
+                    actionResult.workshopFileRewriteSucceeded = true;
+                } else if (window.showFeedback) {
+                    window.showFeedback(applyResult?.message || `Failed to apply AI edit to ${fileName}.`, true);
+                }
             }
         } catch (e) {
             console.error("[Arcade Chat] Failed to execute [FILE_REWRITE] action:", e);
         }
     }
     return actionResult;
+}
+
+async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '') {
+    const result = {
+        attempted: false,
+        ok: false,
+        reason: ''
+    };
+    if (!isWorkshopEditIntentPrompt(userPrompt)) return result;
+    if (extractBalancedJsonTagPayload(replyText, 'FILE_REWRITE')) return result;
+    if (typeof window.applyAiFileEdit !== 'function') {
+        result.reason = 'file-rewrite-unavailable';
+        return result;
+    }
+
+    const editorState = typeof window.getWorkshopEditorState === 'function'
+        ? window.getWorkshopEditorState()
+        : null;
+    const gameId = `${editorState?.activeGameId || ''}`.trim();
+    const fileName = `${editorState?.activeFileName || ''}`.trim();
+    if (!gameId || !fileName) {
+        result.reason = 'editor-target-missing';
+        return result;
+    }
+
+    const parsedFiles = buildAiWorkshopFilesFromText(replyText);
+    if (!Array.isArray(parsedFiles) || parsedFiles.length === 0) {
+        result.reason = 'no-code-candidate';
+        return result;
+    }
+
+    const lowerFileName = fileName.toLowerCase();
+    const matchingFile = parsedFiles.find((file) => {
+        const name = `${file?.name || ''}`.toLowerCase();
+        const type = `${file?.type || ''}`.toLowerCase();
+        if (lowerFileName.endsWith('.html')) return name.endsWith('.html') || type.includes('text/html');
+        if (lowerFileName.endsWith('.css')) return name.endsWith('.css') || type.includes('text/css');
+        if (lowerFileName.endsWith('.js') || lowerFileName.endsWith('.mjs') || lowerFileName.endsWith('.cjs')) {
+            return name.endsWith('.js') || type.includes('javascript');
+        }
+        if (lowerFileName.endsWith('.json')) return name.endsWith('.json') || type.includes('json');
+        if (lowerFileName.endsWith('.txt') || lowerFileName.endsWith('.md')) return name.endsWith('.txt') || name.endsWith('.md') || type.includes('text/plain');
+        return false;
+    }) || parsedFiles[0];
+
+    const content = typeof matchingFile?.content === 'string' ? matchingFile.content : '';
+    if (!content.trim()) {
+        result.reason = 'empty-code-candidate';
+        return result;
+    }
+
+    result.attempted = true;
+    const applyResult = await window.applyAiFileEdit(gameId, fileName, content, { save: true });
+    if (!applyResult?.ok) {
+        result.reason = 'apply-failed';
+        return result;
+    }
+    result.ok = true;
+    return result;
 }
 
 async function tryAutoPublishWorkshopFromReply(replyText, userPrompt = '') {
