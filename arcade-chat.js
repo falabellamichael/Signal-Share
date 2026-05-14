@@ -483,7 +483,7 @@ function isWorkshopEditIntentPrompt(message = "", context = null) {
     if (!text) return false;
     
     // Core edit verbs
-    const editVerb = /\b(edit|update|rewrite|refactor|fix|modify|change|patch|improve|adjust|tweak|rewrite|add|remove|implement|style|color|speed|movement|gravity|score)\b/.test(text);
+    const editVerb = /\b(edit|update|rewrite|refactor|fix|modify|change|patch|improve|adjust|tweak|add|remove|implement|style|color|background|ui|interface|look|feel|design|vibe|text|label|speed|movement|gravity|score)\b/.test(text);
     
     // Check if we are currently in the workshop editor via context
     const inEditor = !!(context?.workshopEditor?.activeGameId);
@@ -541,6 +541,12 @@ function buildWorkshopEditDirective(workshopContext = null) {
 
     if (activeGameId && activeFileName) {
         lines.push(`Default target gameId is "${activeGameId}" and default fileName is "${activeFileName}" when the user does not specify a target.`);
+        const content = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
+        if (content) {
+            lines.push(`CURRENT CONTENT OF "${activeFileName}":\n\`\`\`\n${content}\n\`\`\``);
+        } else {
+            lines.push(`The file "${activeFileName}" is currently empty.`);
+        }
     }
     if (compactTargets) {
         lines.push(`Valid editable targets: ${compactTargets}.`);

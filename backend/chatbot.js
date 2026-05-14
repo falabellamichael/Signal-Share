@@ -768,7 +768,6 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         const mode = hasPinnedModel ? "selected" : "auto";
         return `🧠 [Model Status]: Using ${activeRuntimeModel} via ${activeRuntimeProvider} (${mode} mode).`;
     }
-
     if (lmResponse) {
         const hasTools = lmResponse.includes('[SEARCH:') || 
                          lmResponse.includes('[FETCH:') || 
@@ -783,8 +782,16 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                          lmResponse.includes('[LAUNCH:') ||
                          lmResponse.includes('[CLOSE:');
 
+        // Protocol tags are handled by the frontend; they should NOT trigger a backend tool iteration loop
+        const isProtocolTag = lmResponse.includes('[FILE_REWRITE:') || 
+                              lmResponse.includes('[PUBLISH:') || 
+                              lmResponse.includes('[ARCADE:') || 
+                              lmResponse.includes('[COMPOSE:');
+        
+        const effectiveHasTools = hasTools && !isProtocolTag;
         const shouldForceSearchTool = iteration === 0 && isLiveWebInfoRequest(message || "");
-        if (shouldForceSearchTool && !hasTools) {
+
+        if (shouldForceSearchTool && !effectiveHasTools) {
             console.log("[Chatbot] Enforcing SEARCH tool for live-web info request...");
             return getChatResponse(null, [
                 ...conversation,
@@ -797,7 +804,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                                    lmResponse.toLowerCase().includes('pulling up') ||
                                    lmResponse.toLowerCase().includes('checking');
         
-        if (isClaimingToSearch && !hasTools && iteration === 0) {
+        if (isClaimingToSearch && !effectiveHasTools && iteration === 0) {
             console.log("[Chatbot] Auto-correcting missing search tag...");
             return getChatResponse(null, [
                 ...conversation,
@@ -806,7 +813,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
             ], pageContext, iteration + 1, null, preferredModel, customInstructions);
         }
 
-        if (hasTools) {
+        if (effectiveHasTools) {
             console.log(`[Chatbot] Tool detected (Iteration ${iteration + 1}). Executing...`);
             const toolResult = await executeWebTools(lmResponse);
             
@@ -845,6 +852,11 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
 
     if (!lmResponse && iteration === 0) return getOfflineResponse(message);
     if (!lmResponse && iteration > 0) {
+        // Fallback: If the model failed to summarize, return the last tool observation if available
+        const lastObservation = history.findLast(h => h.role === "user" && h.content.includes("[SYSTEM OBSERVATION]"));
+        if (lastObservation) {
+            return `I've processed the system tools, but I encountered an issue while generating my final summary. Here is the raw result:\n\n${lastObservation.content}`;
+        }
         return "I've processed your request but my logic core returned an empty result. Please try again or rephrase!";
     }
 
