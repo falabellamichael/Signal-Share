@@ -1005,6 +1005,23 @@ function hasBalancedCssBraces(css = '') {
     return depth === 0;
 }
 
+function hasWorkshopPlaceholderCode(content = '') {
+    const source = `${content || ''}`;
+    const comments = [
+        ...source.matchAll(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm)
+    ].map((match) => match[0]).join('\n');
+
+    if (/\b(?:TODO|FIXME|placeholder|your code here|implementation here|rest of (?:the )?code|existing code|pseudo(?:code)?)\b/i.test(comments)) {
+        return true;
+    }
+
+    const withoutUiPlaceholderUsage = source
+        .replace(/\splaceholder\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, ' ')
+        .replace(/::placeholder\b/gi, ' ');
+
+    return /\b(?:TODO|FIXME|your code here|implementation here|rest of (?:the )?code|existing code|pseudo(?:code)?|placeholder\s+(?:code|implementation|logic|content)|replace\s+(?:this|with\s+(?:real|actual|your))|not\s+implemented)\b/i.test(withoutUiPlaceholderUsage);
+}
+
 function validateWorkshopGameFiles(files = [], options = {}) {
     const result = { ok: true, message: '', warnings: [] };
     const fileList = Array.isArray(files) ? files : [];
@@ -1035,7 +1052,7 @@ function validateWorkshopGameFiles(files = [], options = {}) {
     }));
 
     const placeholderFile = decodedFiles.find(({ content }) => {
-        return /\b(?:TODO|FIXME|placeholder|your code here|implementation here|rest of (?:the )?code|existing code|pseudo(?:code)?)\b/i.test(content);
+        return hasWorkshopPlaceholderCode(content);
     });
     if (placeholderFile) {
         return { ok: false, message: `${placeholderFile.name} still contains placeholder code.`, warnings: [] };
