@@ -580,17 +580,8 @@ async function checkBridgeConnectivity({ signal, timeoutMs = 1800 } = {}) {
                 suppressNetworkErrors: true
             });
             if (res?.ok) {
-                if (path.endsWith("/models")) {
-                    const payload = await res.json().catch(() => null);
-                    const models = Array.isArray(payload?.models) ? payload.models : [];
-                    if (models.length > 0) return true;
-                    continue;
-                }
-                if (path.endsWith("/health")) {
-                    const payload = await res.json().catch(() => null);
-                    if (payload?.ok === true) return true;
-                    continue;
-                }
+                // If we get a 200 OK from any endpoint, the bridge is alive. 
+                // No need to keep probing other paths.
                 return true;
             }
 
@@ -643,7 +634,7 @@ function startDesktopBridgePolling() {
     if (bridgePollTimer) clearInterval(bridgePollTimer);
     bridgePollTimer = setInterval(() => {
         pollDesktopBridge();
-    }, 4000);
+    }, 10000);
 }
 
 /**

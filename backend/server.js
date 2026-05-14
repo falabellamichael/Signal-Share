@@ -147,8 +147,9 @@ app.use((req, res, next) => {
     return res.status(401).json({ error: "Unauthorized: Invalid or missing X-Bridge-Secret." });
   }
 
-  // 4. Rate Limiting Check
-  if (!security.checkRateLimit(req.ip, MAX_ACTIONS_PER_MINUTE)) {
+  // 4. Rate Limiting Check (Bypass for loopback/local development)
+  const isLoopback = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+  if (!isLoopback && !security.checkRateLimit(req.ip, MAX_ACTIONS_PER_MINUTE)) {
     return res.status(429).json({ error: "Too many requests. Please wait a minute." });
   }
 
