@@ -725,12 +725,28 @@ async function pollDesktopBridge() {
     }
 }
 
-function startArcadeDictation() {
+async function startArcadeDictation() {
     if (isArcadeDictating) return;
     initArcadeSpeech();
     if (!arcadeSpeechRecognition) return;
 
     try {
+        // Request microphone permission explicitly for Android/Mobile
+        // This forces the system prompt if it hasn't appeared yet.
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // Immediately stop the tracks, we just needed the permission
+                stream.getTracks().forEach(track => track.stop());
+            } catch (permErr) {
+                console.warn('[Voice] Microphone permission denied or failed:', permErr);
+                if (permErr.name === 'NotAllowedError') {
+                    alert('Microphone access is required for dictation. Please allow it in your browser/app settings.');
+                }
+                return;
+            }
+        }
+
         isArcadeDictating = true;
         isVoiceSessionActive = true;
         arcadeSpeechRecognition.start();
