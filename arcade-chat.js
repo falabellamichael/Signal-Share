@@ -545,26 +545,27 @@ function getProtocolDirectives(userPrompt = "", workshopContext = null) {
 
     // 1. COMMAND PRIORITY
     if (commandMode === '/edit' || commandMode === '/fix') {
-        directives.push(buildWorkshopEditDirective(workshopContext, commandMode === '/fix'));
+        directives.push(buildWorkshopEditDirective(workshopContext, commandMode === '/fix', userPrompt));
     } else if (commandMode === '/publish') {
         directives.push(buildWorkshopPublishDirective());
     } else {
         // 2. AUTO-DETECTION (Fallback)
         if (editorIsActive && !isExplicitWorkshopPublishIntentPrompt(text)) {
-            directives.push(buildWorkshopEditDirective(workshopContext));
+            directives.push(buildWorkshopEditDirective(workshopContext, false, userPrompt));
         } else if (isWorkshopPublishIntentPrompt(text)) {
             directives.push(buildWorkshopPublishDirective());
         } else if (editorIsActive && isWorkshopEditIntentPrompt(text, workshopContext)) {
-            directives.push(buildWorkshopEditDirective(workshopContext));
+            directives.push(buildWorkshopEditDirective(workshopContext, false, userPrompt));
         }
     }
 
     return directives.join('\n\n');
 }
 
-function buildWorkshopEditDirective(workshopContext = null, isFixMode = false) {
+function buildWorkshopEditDirective(workshopContext = null, isFixMode = false, userPrompt = '') {
     const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
     const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
+    const styleEditMode = isStyleEditPrompt(userPrompt);
     
     const lines = [
         '[SURGICAL_EDIT_PROTOCOL]',
@@ -583,10 +584,21 @@ function buildWorkshopEditDirective(workshopContext = null, isFixMode = false) {
         '- NEVER use [PUBLISH] for edits to the active editor file.',
         '- Do not return full-file code fences unless the user explicitly asks for a full file.',
         '- Your actionable output should be the [EDIT] block, not a rewritten file.',
+        '- For style-only edits, if SEARCH/REPLACE is difficult, return one fenced css block with only CSS to insert.',
         '- If you cannot find a safe SEARCH block in the provided content, ask the user to select the relevant file/section.',
         '- Be precise with whitespace/indentation in SEARCH.',
         '[/SURGICAL_EDIT_PROTOCOL]'
     ];
+
+    if (styleEditMode) {
+        lines.splice(5, 0,
+            'STYLE_EDIT_MODE:',
+            '- Return exactly one fenced css code block when the request is only about style/design/CSS.',
+            '- Do not return a full HTML file for style-only edits.',
+            '- Do not invent external frameworks or classes; write real CSS selectors for the existing markup.',
+            '- The editor will insert the css block into the active HTML/CSS file as a targeted patch.'
+        );
+    }
 
     if (activeGameId && activeFileName) {
         const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
@@ -2572,6 +2584,32 @@ function extractWorkshopEditBlocks(text = "") {
     return blocks;
 }
 
+function extractAiCodeBlocks(rawText = '') {
+    const blocks = [];
+    const sourceText = `${rawText || ''}`;
+    const blockRegex = /```([a-z0-9_+-]*)\s*\n([\s\S]*?)```/gi;
+    let blockMatch;
+    while ((blockMatch = blockRegex.exec(sourceText)) !== null) {
+        const lang = `${blockMatch[1] || ''}`.trim().toLowerCase();
+        const code = `${blockMatch[2] || ''}`.trim();
+        if (code) blocks.push({ lang, code });
+    }
+    return blocks;
+}
+
+function inferAiCodeKind(lang = '', code = '') {
+    const language = `${lang || ''}`.trim().toLowerCase();
+    const source = `${code || ''}`.trim();
+    const lower = source.toLowerCase();
+    if (language.includes('html')) return 'html';
+    if (language.includes('css')) return 'css';
+    if (language.includes('js') || language.includes('javascript') || language.includes('ts')) return 'js';
+    if (lower.includes('<!doctype html') || lower.includes('<html')) return 'html';
+    if (/^<style[\s>]/i.test(source) || /^[.#:a-z0-9_*@[\]-][^{\n]*\{[\s\S]*\}/i.test(source)) return 'css';
+    if (looksLikeExecutableCode(source)) return 'js';
+    return 'txt';
+}
+
 function looksLikeExecutableCode(value) {
     const text = `${value || ''}`.trim();
     if (text.length < 80) return false;
@@ -2604,18 +2642,10 @@ function buildAiWorkshopFilesFromText(rawText) {
     };
 
     const sourceText = `${rawText || ''}`;
-    const blockRegex = /```([a-z0-9_+-]*)\s*\n([\s\S]*?)```/gi;
-    let blockMatch;
-    while ((blockMatch = blockRegex.exec(sourceText)) !== null) {
-        const lang = `${blockMatch[1] || ''}`.trim().toLowerCase();
-        const code = `${blockMatch[2] || ''}`.trim();
-        if (!code) continue;
-        let kind = 'txt';
-        if (lang.includes('html')) kind = 'html';
-        else if (lang.includes('css')) kind = 'css';
-        else if (lang.includes('js') || lang.includes('javascript') || lang.includes('ts')) kind = 'js';
-        else if (code.toLowerCase().includes('<!doctype html') || code.toLowerCase().includes('<html')) kind = 'html';
-        else if (looksLikeExecutableCode(code)) kind = 'js';
+    const codeBlocks = extractAiCodeBlocks(sourceText);
+    for (const block of codeBlocks) {
+        const code = block.code;
+        const kind = inferAiCodeKind(block.lang, code);
         files.push({
             name: nextName(kind),
             type: kind === 'html' ? 'text/html' : kind === 'css' ? 'text/css' : kind === 'js' ? 'text/javascript' : 'text/plain',
@@ -2726,6 +2756,204 @@ function buildAiWorkshopPublishFiles(data, rawReplyText) {
             };
         })
         .filter((file) => typeof file.content === 'string' && file.content.trim());
+}
+
+function getWorkshopFileKindFromName(fileName = '') {
+    const lower = `${fileName || ''}`.trim().toLowerCase();
+    if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html';
+    if (lower.endsWith('.css')) return 'css';
+    if (lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.cjs')) return 'js';
+    if (lower.endsWith('.json')) return 'json';
+    return 'txt';
+}
+
+function stripStyleWrapperFromCss(value = '') {
+    let css = `${value || ''}`.trim();
+    const styleMatch = css.match(/^<style\b[^>]*>([\s\S]*?)<\/style>$/i);
+    if (styleMatch) css = styleMatch[1].trim();
+    return css;
+}
+
+function looksLikeCssPatchContent(value = '') {
+    const css = stripStyleWrapperFromCss(value);
+    if (!css || /<\/?(?:html|body|head|script|main|div|button|input)\b/i.test(css)) return false;
+    return /[{}]/.test(css) && /[.#:a-z0-9_*@[\]-][^{]*\{[\s\S]*?\}/i.test(css);
+}
+
+function removeGeneratedWorkshopStylePatch(content = '') {
+    return `${content || ''}`
+        .replace(/\n?\s*<style\s+id=["']ai-generated-workshop-style["'][\s\S]*?<\/style>\s*/gi, '\n')
+        .replace(/\n?\s*\/\* AI generated style patch \*\/[\s\S]*?\/\* End AI generated style patch \*\/\s*/gi, '\n');
+}
+
+function upsertGeneratedWorkshopStylePatch(content = '', fileName = '', cssPatch = '') {
+    const css = stripStyleWrapperFromCss(cssPatch);
+    if (!looksLikeCssPatchContent(css)) return content;
+
+    const withoutOld = removeGeneratedWorkshopStylePatch(content).trimEnd();
+    const cssBlock = `/* AI generated style patch */\n${css}\n/* End AI generated style patch */`;
+    const fileKind = getWorkshopFileKindFromName(fileName);
+
+    if (fileKind === 'css') {
+        return `${withoutOld}\n\n${cssBlock}\n`;
+    }
+
+    if (fileKind === 'html') {
+        const styleBlock = `<style id="ai-generated-workshop-style">\n${cssBlock}\n</style>`;
+        if (/<\/head>/i.test(withoutOld)) {
+            return withoutOld.replace(/<\/head>/i, `  ${styleBlock}\n</head>`);
+        }
+        if (/<\/body>/i.test(withoutOld)) {
+            return withoutOld.replace(/<\/body>/i, `${styleBlock}\n</body>`);
+        }
+        return `${styleBlock}\n${withoutOld}`;
+    }
+
+    return content;
+}
+
+function looksLikeFullActiveFileContent(fileName = '', generatedContent = '', oldContent = '') {
+    const kind = getWorkshopFileKindFromName(fileName);
+    const generated = `${generatedContent || ''}`.trim();
+    const current = `${oldContent || ''}`.trim();
+    if (!generated || !current) return false;
+
+    if (kind === 'html') {
+        return /<!doctype html|<html[\s>]/i.test(generated);
+    }
+
+    const minReasonableLength = Math.max(80, Math.floor(current.length * 0.45));
+    if (generated.length < minReasonableLength || generated.length > current.length * 2.5) return false;
+    if (kind === 'css') return looksLikeCssPatchContent(generated);
+    if (kind === 'js') return looksLikeExecutableCode(generated);
+    return false;
+}
+
+function buildChangedRegionPatch(oldContent = '', newContent = '') {
+    if (oldContent === newContent) return null;
+
+    const lineEnding = oldContent.includes('\r\n') ? '\r\n' : '\n';
+    const oldLines = `${oldContent || ''}`.replace(/\r\n/g, '\n').split('\n');
+    const newLines = `${newContent || ''}`.replace(/\r\n/g, '\n').split('\n');
+
+    let start = 0;
+    while (start < oldLines.length && start < newLines.length && oldLines[start] === newLines[start]) {
+        start += 1;
+    }
+
+    let oldEnd = oldLines.length - 1;
+    let newEnd = newLines.length - 1;
+    while (oldEnd >= start && newEnd >= start && oldLines[oldEnd] === newLines[newEnd]) {
+        oldEnd -= 1;
+        newEnd -= 1;
+    }
+
+    let searchLines = oldLines.slice(start, oldEnd + 1);
+    let replaceLines = newLines.slice(start, newEnd + 1);
+
+    if (searchLines.length === 0) {
+        if (start > 0) {
+            searchLines = [oldLines[start - 1]];
+            replaceLines = [oldLines[start - 1], ...replaceLines];
+        } else if (oldLines.length > 0) {
+            searchLines = [oldLines[0]];
+            replaceLines = [...replaceLines, oldLines[0]];
+        }
+    }
+
+    const search = searchLines.join(lineEnding).trimEnd();
+    const replace = replaceLines.join(lineEnding).trimEnd();
+    if (!search) return null;
+    return { search, replace };
+}
+
+async function tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt = '', richContext = null, target = {}) {
+    const result = { attempted: false, ok: false, reason: '', message: '' };
+    if (typeof window.getWorkshopFileContent !== 'function'
+        || typeof window.internalApplyWorkshopFileEdit !== 'function') {
+        result.reason = 'workshop-edit-functions-unavailable';
+        return result;
+    }
+
+    const editorState = getActiveWorkshopEditorContext(richContext);
+    const gameId = `${target.gameId || editorState?.activeGameId || ''}`.trim();
+    const fileName = `${target.fileName || editorState?.activeFileName || ''}`.trim();
+    if (!gameId || !fileName) {
+        result.reason = 'no-active-editor-file';
+        return result;
+    }
+
+    const oldContent = window.getWorkshopFileContent(gameId, fileName);
+    if (typeof oldContent !== 'string' || !oldContent.trim()) {
+        result.reason = 'active-file-content-unavailable';
+        return result;
+    }
+
+    const generatedFiles = buildAiWorkshopFilesFromText(replyText);
+    if (generatedFiles.length === 0) {
+        result.reason = 'no-generated-code-blocks';
+        return result;
+    }
+
+    const activeKind = getWorkshopFileKindFromName(fileName);
+    if (isStyleEditPrompt(userPrompt) && (activeKind === 'html' || activeKind === 'css')) {
+        const cssFile = generatedFiles.find((file) => {
+            const kind = getWorkshopFileKindFromName(file.name) || inferAiCodeKind('', file.content);
+            return kind === 'css' || looksLikeCssPatchContent(file.content);
+        });
+
+        if (cssFile?.content && looksLikeCssPatchContent(cssFile.content)) {
+            const nextContent = upsertGeneratedWorkshopStylePatch(oldContent, fileName, cssFile.content);
+            result.attempted = true;
+            if (nextContent === oldContent) {
+                result.reason = 'generated-css-made-no-change';
+                result.message = 'Generated CSS did not change the active file.';
+                return result;
+            }
+
+            const applyResult = await window.internalApplyWorkshopFileEdit(gameId, fileName, nextContent, { save: true });
+            result.ok = !!applyResult?.ok;
+            result.reason = result.ok ? '' : (applyResult?.message || 'generated-css-apply-failed');
+            result.message = result.ok
+                ? `Applied AI-generated CSS patch to ${fileName}.`
+                : result.reason;
+            if (window.showFeedback) window.showFeedback(result.message, !result.ok);
+            return result;
+        }
+
+        result.reason = 'style-edit-no-css-block';
+        return result;
+    }
+
+    const activeLower = fileName.toLowerCase();
+    const generatedActiveFile = generatedFiles.find((file) => `${file.name || ''}`.toLowerCase() === activeLower)
+        || generatedFiles.find((file) => looksLikeFullActiveFileContent(fileName, file.content, oldContent));
+
+    if (!generatedActiveFile?.content || !looksLikeFullActiveFileContent(fileName, generatedActiveFile.content, oldContent)) {
+        result.reason = 'no-safe-generated-active-file';
+        return result;
+    }
+
+    const nextContent = `${generatedActiveFile.content || ''}`.trim();
+    const patch = buildChangedRegionPatch(oldContent, nextContent);
+    if (!patch) {
+        result.reason = 'generated-file-made-no-change';
+        return result;
+    }
+
+    result.attempted = true;
+    let applyResult = null;
+    if (typeof window.applyAiFilePatch === 'function') {
+        applyResult = await window.applyAiFilePatch(gameId, fileName, patch.search, patch.replace, { save: true });
+    }
+
+    result.ok = !!applyResult?.ok;
+    result.reason = result.ok ? '' : (applyResult?.message || 'generated-file-apply-failed');
+    result.message = result.ok
+        ? `Applied AI-generated changed-region patch to ${fileName}.`
+        : result.reason;
+    if (window.showFeedback) window.showFeedback(result.message, !result.ok);
+    return result;
 }
 
 function shouldRoutePublishToWorkshop(data, rawReplyText, userPrompt) {
@@ -3053,9 +3281,19 @@ async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '', r
 
     const editBlocks = extractWorkshopEditBlocks(replyText);
     if (editBlocks.length === 0) {
-        result.reason = 'no-edit-blocks';
+        const generatedPatchResult = await tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt, richContext, { gameId, fileName });
+        if (generatedPatchResult.attempted) {
+            return {
+                attempted: true,
+                ok: generatedPatchResult.ok,
+                reason: generatedPatchResult.reason || '',
+                message: generatedPatchResult.message || ''
+            };
+        }
+
+        result.reason = generatedPatchResult.reason || 'no-edit-blocks';
         if (window.showFeedback && looksLikeExecutableCode(replyText)) {
-            window.showFeedback('AI returned a full file. Use /edit and ask for SEARCH/REPLACE blocks so the editor can apply a targeted patch.', true);
+            window.showFeedback('AI returned code, but it was not safe to apply as a targeted Workshop edit.', true);
         }
         return result;
     }
@@ -3165,7 +3403,7 @@ function upsertLocalStyleEnhancement(content = '', fileName = '') {
 }
 
 function removeLocalStyleEnhancement(content = '') {
-    return `${content || ''}`
+    return removeGeneratedWorkshopStylePatch(`${content || ''}`)
         .replace(/\/\* AI style enhancement \*\/[\s\S]*$/i, '')
         .replace(/\n?\s*<style\s+id=["']ai-style-enhancement["'][\s\S]*?<\/style>\s*/gi, '\n')
         .trimEnd();

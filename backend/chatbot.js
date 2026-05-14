@@ -796,6 +796,11 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 // DeepSeek R1 / Reasoning model cleanup: Strip <think> blocks
                 if (lmResponse.includes("<think>")) {
                     lmResponse = lmResponse.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+                    if (!lmResponse) {
+                        lastEndpointError = `${endpoint.provider}:${model} returned only reasoning text`;
+                        console.warn(`[Chatbot] Ignoring empty response after reasoning cleanup from ${endpoint.provider}:${model}`);
+                        continue;
+                    }
                 }
                 
                 lastSuccessfulModelByProvider[endpoint.provider] = `${model}`.trim();
@@ -819,6 +824,9 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         }
         if (lastEndpointError.includes("timeout")) {
             return `🕒 [Intelligence Core Timeout]: The local AI model took too long to respond. This can happen if the context (file size/history) is too large for your hardware.`;
+        }
+        if (workshopEditActive) {
+            return buildWorkshopEmptyEditReply();
         }
         return `❌ [Intelligence Core Error]: The local AI failed to generate a response. (Last Error: ${lastEndpointError || "Model returned empty text"}). Try refreshing your local LLM server or simplifying your request.`;
     }
