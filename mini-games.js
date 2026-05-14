@@ -303,6 +303,7 @@ let isCurrentMasterAdmin = false;
 let workshopTileMode = 'library';
 let workshopEditActiveGameId = '';
 let workshopEditActiveFileName = '';
+let workshopEditToolsExpanded = false;
 const workshopEditDraftCache = new Map();
 const workshopEditPendingFilesByGame = new Map();
 const workshopEditCoverDraftByGame = new Map();
@@ -1260,6 +1261,21 @@ function renderWorkshopEditPendingFiles(gameId) {
     });
 }
 
+function syncWorkshopEditToolsPanel() {
+    const toolsPanel = document.getElementById('workshop-edit-tools-panel');
+    const toolsToggle = document.getElementById('workshop-edit-tools-toggle');
+    if (!toolsPanel || !toolsToggle) return;
+
+    toolsPanel.hidden = !workshopEditToolsExpanded;
+    toolsToggle.textContent = workshopEditToolsExpanded ? 'Hide Asset Tools' : 'Show Asset Tools';
+    toolsToggle.setAttribute('aria-expanded', workshopEditToolsExpanded ? 'true' : 'false');
+}
+
+function toggleWorkshopEditToolsPanel() {
+    workshopEditToolsExpanded = !workshopEditToolsExpanded;
+    syncWorkshopEditToolsPanel();
+}
+
 function refreshWorkshopEditMeta() {
     const metaEl = document.getElementById('workshop-edit-file-meta');
     if (!metaEl) return;
@@ -1353,6 +1369,7 @@ async function handleWorkshopEditAddFiles(event) {
 
     setWorkshopPendingFiles(gameId, Array.from(pendingMap.values()));
     renderWorkshopEditPendingFiles(gameId);
+    refreshWorkshopEditMeta();
 
     if (appliedCount > 0) {
         setWorkshopEditStatus(`Queued ${appliedCount} file${appliedCount === 1 ? '' : 's'} for save.`);
@@ -1370,6 +1387,7 @@ function removeWorkshopEditPendingFile(encodedName) {
     const nextFiles = getWorkshopPendingFiles(gameId).filter((file) => normalizeWorkshopFileName(file?.name || '') !== decodedName);
     setWorkshopPendingFiles(gameId, nextFiles);
     renderWorkshopEditPendingFiles(gameId);
+    refreshWorkshopEditMeta();
     setWorkshopEditStatus(`Removed queued file "${decodedName}".`);
 }
 
@@ -1397,6 +1415,7 @@ function setWorkshopTileMode(nextMode) {
 
 function syncWorkshopEditOverlay() {
     syncWorkshopModeToggleButtons();
+    syncWorkshopEditToolsPanel();
 
     const overlay = document.getElementById('workshop-edit-overlay');
     if (!overlay) return;
@@ -2405,6 +2424,7 @@ window.handleWorkshopEditCoverFileChange = handleWorkshopEditCoverFileChange;
 window.triggerWorkshopEditAddFilesPicker = triggerWorkshopEditAddFilesPicker;
 window.handleWorkshopEditAddFiles = handleWorkshopEditAddFiles;
 window.removeWorkshopEditPendingFile = removeWorkshopEditPendingFile;
+window.toggleWorkshopEditToolsPanel = toggleWorkshopEditToolsPanel;
 window.revertWorkshopEditCurrentFile = revertWorkshopEditCurrentFile;
 window.saveWorkshopEditPanel = saveWorkshopEditPanel;
 window.getWorkshopGamesForAi = function() {
