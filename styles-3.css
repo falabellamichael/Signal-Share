@@ -2251,11 +2251,12 @@
 
     .message-row.is-self .message-bubble {
       background: var(--icon-gradient-outgoing) !important;
-      border-color: transparent !important;
+      border: none !important;
       color: #ffffff !important;
     }
 
     .message-row.is-self .message-bubble p,
     .message-row.is-self .message-bubble span {
       color: #ffffff !important;
+      border: none !important;
     }

@@ -407,12 +407,13 @@ body[data-theme="midnight"] .open-button {
 
 body[data-theme="midnight"] .message-bubble {
   background: rgba(17, 26, 36, 0.9);
-  border-color: rgba(164, 184, 201, 0.14);
+  border: none !important;
 }
 
 body[data-theme="midnight"] .message-row.is-self .message-bubble {
   background: linear-gradient(135deg, rgba(125, 211, 252, 0.9), rgba(52, 211, 153, 0.84));
-  color: #000000;
+  color: #000000 !important;
+  border: none !important;
 }
 
 body[data-theme="midnight"] .message-row.is-self .message-bubble span,
@@ -511,7 +512,8 @@ body[data-theme="contrast"] .emoji-category-tab.is-active {
 
 body[data-theme="midnight"] .message-row.is-self .message-bubble span,
 body[data-theme="midnight"] .message-row.is-self .message-bubble p {
-  color: #000000;
+  color: #000000 !important;
+  border: none !important;
 }
 
 body[data-theme="contrast"] .button:disabled,
@@ -775,8 +777,9 @@ body[data-theme="contrast"] .button-primary {
 
 body[data-theme="midnight"] .message-row.is-self .message-bubble span,
 body[data-theme="midnight"] .message-row.is-self .message-bubble p {
-  color: #000000;
+  color: #000000 !important;
   font-weight: 700;
+  border: none !important;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
 }
 
