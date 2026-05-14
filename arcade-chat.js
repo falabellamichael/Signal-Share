@@ -76,9 +76,13 @@ function resolveBridgeBaseCandidates() {
     );
     const configuredHttpFallback = resolveHttpFallbackBridgeBaseUrl(configured);
     const lastWorking = normalizeBridgeBaseUrl(localStorage.getItem(BRIDGE_LAST_WORKING_BASE_KEY) || "");
-    pushBridgeBaseCandidate(candidates, seen, lastWorking);
+    
+    // PRIORITY 1: User Configured URL
     pushBridgeBaseCandidate(candidates, seen, configured);
     pushBridgeBaseCandidate(candidates, seen, configuredHttpFallback);
+    
+    // PRIORITY 2: Last Known Working URL
+    pushBridgeBaseCandidate(candidates, seen, lastWorking);
 
     const isLoopbackOrigin = protocol === 'file:'
         || !host
