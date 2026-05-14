@@ -304,6 +304,8 @@ let workshopTileMode = 'library';
 let workshopEditActiveGameId = '';
 let workshopEditActiveFileName = '';
 const workshopEditDraftCache = new Map();
+const workshopEditPendingFilesByGame = new Map();
+const workshopEditCoverDraftByGame = new Map();
 
 function isCurrentUserGameOwner(game) {
     if (!game || !currentUser) return false;
@@ -1174,6 +1176,203 @@ function decodeWorkshopFileContent(file) {
     return rawContent;
 }
 
+function normalizeWorkshopFileName(fileName, fallbackName = 'file.txt') {
+    const rawName = typeof fileName === 'string' && fileName.trim() ? fileName.trim() : fallbackName;
+    return rawName.replace(/[/\\]+/g, '_');
+}
+
+function getWorkshopPendingFiles(gameId) {
+    if (!gameId) return [];
+    const files = workshopEditPendingFilesByGame.get(gameId);
+    return Array.isArray(files) ? files : [];
+}
+
+function setWorkshopPendingFiles(gameId, files) {
+    if (!gameId) return;
+    const normalized = (Array.isArray(files) ? files : []).filter((file) => file && typeof file === 'object');
+    if (normalized.length === 0) {
+        workshopEditPendingFilesByGame.delete(gameId);
+        return;
+    }
+    workshopEditPendingFilesByGame.set(gameId, normalized);
+}
+
+function getWorkshopCoverDraftValue(game) {
+    if (!game || !game.id) return DEFAULT_CUSTOM_GAME_POSTER_DATA_URL;
+    const draft = workshopEditCoverDraftByGame.get(game.id);
+    if (typeof draft === 'string' && draft.trim()) return draft.trim();
+    if (typeof game.poster === 'string' && game.poster.trim()) return game.poster.trim();
+    return DEFAULT_CUSTOM_GAME_POSTER_DATA_URL;
+}
+
+function formatByteSize(size) {
+    if (!Number.isFinite(size) || size <= 0) return '0 B';
+    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+    if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${Math.round(size)} B`;
+}
+
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+        reader.onerror = () => reject(reader.error || new Error('file-read-failed'));
+        reader.readAsDataURL(file);
+    });
+}
+
+function updateWorkshopCoverPreview(coverUrl) {
+    const coverPreview = document.getElementById('workshop-edit-cover-preview');
+    if (!coverPreview) return;
+    const normalized = typeof coverUrl === 'string' ? coverUrl.trim() : '';
+    if (normalized) {
+        coverPreview.src = normalized;
+        coverPreview.classList.add('visible');
+    } else {
+        coverPreview.src = '';
+        coverPreview.classList.remove('visible');
+    }
+}
+
+function renderWorkshopEditPendingFiles(gameId) {
+    const listEl = document.getElementById('workshop-edit-upload-list');
+    if (!listEl) return;
+    const pendingFiles = getWorkshopPendingFiles(gameId);
+    listEl.innerHTML = '';
+    if (pendingFiles.length === 0) {
+        listEl.innerHTML = '<div class="workshop-edit-upload-meta">No additional files queued.</div>';
+        return;
+    }
+
+    pendingFiles.forEach((file) => {
+        const item = document.createElement('div');
+        item.className = 'workshop-edit-upload-item';
+        const fileName = normalizeWorkshopFileName(file.name, 'file.txt');
+        const fileSize = formatByteSize(Number(file.size) || 0);
+        item.innerHTML = `
+            <div style="min-width: 0;">
+                <strong>${escapeHtml(fileName)}</strong>
+                <div class="workshop-edit-upload-meta">${escapeHtml(file.type || inferFileTypeFromName(fileName))} • ${escapeHtml(fileSize)}</div>
+            </div>
+            <button type="button" class="workshop-edit-remove-file" aria-label="Remove ${escapeHtml(fileName)}" onclick="removeWorkshopEditPendingFile('${encodeURIComponent(fileName)}')">×</button>
+        `;
+        listEl.appendChild(item);
+    });
+}
+
+function refreshWorkshopEditMeta() {
+    const metaEl = document.getElementById('workshop-edit-file-meta');
+    if (!metaEl) return;
+    const games = getWorkshopManageableGames();
+    const activeGame = games.find((game) => game.id === workshopEditActiveGameId) || null;
+    if (!activeGame) {
+        metaEl.textContent = '';
+        return;
+    }
+
+    const activeFile = (Array.isArray(activeGame.files) ? activeGame.files : []).find((file) => `${file?.name || ''}` === workshopEditActiveFileName) || null;
+    const fileName = activeFile?.name || workshopEditActiveFileName || 'No file selected';
+    const fileTypeLabel = activeFile ? (activeFile.type || inferFileTypeFromName(activeFile.name)) : 'n/a';
+    const pendingCount = getWorkshopPendingFiles(activeGame.id).length;
+    const pendingLabel = pendingCount > 0 ? `  •  ${pendingCount} file${pendingCount === 1 ? '' : 's'} queued` : '';
+    metaEl.textContent = `${activeGame.title}  •  ${fileName}  •  ${fileTypeLabel}${pendingLabel}`;
+}
+
+function triggerWorkshopEditCoverFilePicker() {
+    const input = document.getElementById('workshop-edit-cover-file');
+    if (input) input.click();
+}
+
+function triggerWorkshopEditAddFilesPicker() {
+    const input = document.getElementById('workshop-edit-add-files');
+    if (input) input.click();
+}
+
+function handleWorkshopEditCoverInput() {
+    if (!workshopEditActiveGameId) return;
+    const coverInput = document.getElementById('workshop-edit-cover-url');
+    if (!coverInput) return;
+    const nextValue = `${coverInput.value || ''}`.trim();
+    workshopEditCoverDraftByGame.set(workshopEditActiveGameId, nextValue || DEFAULT_CUSTOM_GAME_POSTER_DATA_URL);
+    updateWorkshopCoverPreview(nextValue || DEFAULT_CUSTOM_GAME_POSTER_DATA_URL);
+    setWorkshopEditStatus('Unsaved cover changes.');
+}
+
+async function handleWorkshopEditCoverFileChange(event) {
+    if (!workshopEditActiveGameId) return;
+    const input = event?.target;
+    const file = input?.files?.[0];
+    if (!file) return;
+    try {
+        const dataUrl = await readFileAsDataUrl(file);
+        workshopEditCoverDraftByGame.set(workshopEditActiveGameId, dataUrl);
+        const coverInput = document.getElementById('workshop-edit-cover-url');
+        if (coverInput) coverInput.value = dataUrl;
+        updateWorkshopCoverPreview(dataUrl);
+        setWorkshopEditStatus(`Queued cover image: ${file.name}`);
+    } catch (error) {
+        console.error('[Mini-Games] Failed to read cover image file:', error);
+        setWorkshopEditStatus('Failed to read cover image file.', true);
+    } finally {
+        if (input) input.value = '';
+    }
+}
+
+async function handleWorkshopEditAddFiles(event) {
+    const input = event?.target;
+    const files = Array.from(input?.files || []);
+    if (!workshopEditActiveGameId || files.length === 0) return;
+    const gameId = workshopEditActiveGameId;
+    const activeGame = getWorkshopManageableGames().find((game) => game.id === gameId) || null;
+    if (!activeGame) return;
+
+    const pendingFiles = [...getWorkshopPendingFiles(gameId)];
+    const existingFileMap = new Map((Array.isArray(activeGame.files) ? activeGame.files : []).map((file) => [normalizeWorkshopFileName(file?.name || ''), file]));
+    const pendingMap = new Map(pendingFiles.map((file) => [normalizeWorkshopFileName(file?.name || ''), file]));
+
+    let appliedCount = 0;
+    for (const file of files) {
+        const fileName = normalizeWorkshopFileName(file.name, `file-${Date.now()}.txt`);
+        try {
+            const dataUrl = await readFileAsDataUrl(file);
+            const nextRecord = {
+                name: fileName,
+                type: file.type || inferFileTypeFromName(fileName),
+                content: dataUrl,
+                size: file.size || 0
+            };
+            pendingMap.set(fileName, nextRecord);
+            if (existingFileMap.has(fileName)) {
+                setWorkshopEditStatus(`Replaced existing file "${fileName}" in pending changes.`);
+            }
+            appliedCount += 1;
+        } catch (error) {
+            console.error('[Mini-Games] Failed to read workshop file:', fileName, error);
+        }
+    }
+
+    setWorkshopPendingFiles(gameId, Array.from(pendingMap.values()));
+    renderWorkshopEditPendingFiles(gameId);
+
+    if (appliedCount > 0) {
+        setWorkshopEditStatus(`Queued ${appliedCount} file${appliedCount === 1 ? '' : 's'} for save.`);
+    } else {
+        setWorkshopEditStatus('No files were added.', true);
+    }
+
+    if (input) input.value = '';
+}
+
+function removeWorkshopEditPendingFile(encodedName) {
+    const gameId = workshopEditActiveGameId;
+    if (!gameId) return;
+    const decodedName = decodeURIComponent(`${encodedName || ''}`);
+    const nextFiles = getWorkshopPendingFiles(gameId).filter((file) => normalizeWorkshopFileName(file?.name || '') !== decodedName);
+    setWorkshopPendingFiles(gameId, nextFiles);
+    renderWorkshopEditPendingFiles(gameId);
+    setWorkshopEditStatus(`Removed queued file "${decodedName}".`);
+}
+
 function setWorkshopEditStatus(message = '', isError = false) {
     const statusEl = document.getElementById('workshop-edit-status');
     if (!statusEl) return;
@@ -1213,20 +1412,33 @@ function syncWorkshopEditOverlay() {
     const editor = document.getElementById('workshop-edit-file-content');
     const saveButton = document.getElementById('workshop-edit-save-btn');
     const metaEl = document.getElementById('workshop-edit-file-meta');
-    if (!gameSelect || !fileSelect || !editor || !saveButton || !metaEl) return;
+    const coverInput = document.getElementById('workshop-edit-cover-url');
+    const coverFileInput = document.getElementById('workshop-edit-cover-file');
+    const addFilesInput = document.getElementById('workshop-edit-add-files');
+    if (!gameSelect || !fileSelect || !editor || !saveButton || !metaEl || !coverInput || !coverFileInput || !addFilesInput) return;
+
+    const disableEditorUi = (message = '') => {
+        gameSelect.disabled = true;
+        fileSelect.disabled = true;
+        editor.value = '';
+        editor.disabled = true;
+        saveButton.disabled = true;
+        coverInput.value = '';
+        coverInput.disabled = true;
+        coverFileInput.disabled = true;
+        addFilesInput.disabled = true;
+        metaEl.textContent = '';
+        updateWorkshopCoverPreview('');
+        renderWorkshopEditPendingFiles('');
+        if (message) setWorkshopEditStatus(message, true);
+    };
 
     if (!currentUser) {
         workshopEditActiveGameId = '';
         workshopEditActiveFileName = '';
         gameSelect.innerHTML = '<option value="">Sign in required</option>';
         fileSelect.innerHTML = '<option value="">No files</option>';
-        gameSelect.disabled = true;
-        fileSelect.disabled = true;
-        editor.value = '';
-        editor.disabled = true;
-        saveButton.disabled = true;
-        metaEl.textContent = '';
-        setWorkshopEditStatus('Sign in to access workshop file editing.', true);
+        disableEditorUi('Sign in to access workshop file editing.');
         return;
     }
 
@@ -1235,13 +1447,7 @@ function syncWorkshopEditOverlay() {
         workshopEditActiveFileName = '';
         gameSelect.innerHTML = '<option value="">No editable games</option>';
         fileSelect.innerHTML = '<option value="">No files</option>';
-        gameSelect.disabled = true;
-        fileSelect.disabled = true;
-        editor.value = '';
-        editor.disabled = true;
-        saveButton.disabled = true;
-        metaEl.textContent = '';
-        setWorkshopEditStatus('No workshop games are available to edit yet.', true);
+        disableEditorUi('No workshop games are available to edit yet.');
         return;
     }
 
@@ -1266,6 +1472,14 @@ function syncWorkshopEditOverlay() {
     }
 
     const editableFiles = (Array.isArray(activeGame.files) ? activeGame.files : []).filter(isWorkshopFileEditable);
+    const activeCover = getWorkshopCoverDraftValue(activeGame);
+    coverInput.value = activeCover;
+    coverInput.disabled = false;
+    coverFileInput.disabled = false;
+    addFilesInput.disabled = false;
+    updateWorkshopCoverPreview(activeCover);
+    renderWorkshopEditPendingFiles(activeGame.id);
+
     if (editableFiles.length === 0) {
         workshopEditActiveFileName = '';
         fileSelect.innerHTML = '<option value="">No editable files</option>';
@@ -1304,7 +1518,9 @@ function syncWorkshopEditOverlay() {
     editor.disabled = false;
     saveButton.disabled = false;
     const fileTypeLabel = activeFile.type || inferFileTypeFromName(activeFile.name);
-    metaEl.textContent = `${activeGame.title}  •  ${activeFile.name}  •  ${fileTypeLabel}`;
+    const pendingCount = getWorkshopPendingFiles(activeGame.id).length;
+    const pendingLabel = pendingCount > 0 ? `  •  ${pendingCount} file${pendingCount === 1 ? '' : 's'} queued` : '';
+    metaEl.textContent = `${activeGame.title}  •  ${activeFile.name}  •  ${fileTypeLabel}${pendingLabel}`;
 
     if (!cachedDraft) {
         setWorkshopEditStatus('Edit the file and click Save Changes.');
@@ -1350,19 +1566,18 @@ async function saveWorkshopEditPanel() {
         return;
     }
 
-    const fileName = `${workshopEditActiveFileName || ''}`.trim();
-    if (!fileName) {
-        setWorkshopEditStatus('Select a file before saving.', true);
-        return;
-    }
-
     const editor = document.getElementById('workshop-edit-file-content');
     const saveButton = document.getElementById('workshop-edit-save-btn');
-    if (!editor || !saveButton) return;
+    const coverInput = document.getElementById('workshop-edit-cover-url');
+    if (!editor || !saveButton || !coverInput) return;
 
-    const updatedFiles = (Array.isArray(activeGame.files) ? activeGame.files : []).map((file) => {
+    const fileName = `${workshopEditActiveFileName || ''}`.trim();
+    const editableFiles = (Array.isArray(activeGame.files) ? activeGame.files : []).filter((file) => file && typeof file === 'object');
+    const pendingFiles = getWorkshopPendingFiles(activeGame.id);
+
+    const updatedFiles = editableFiles.map((file) => {
         if (!file || typeof file !== 'object') return file;
-        if (`${file.name || ''}` !== fileName) return file;
+        if (!fileName || `${file.name || ''}` !== fileName) return file;
         const mimeType = typeof file.type === 'string' && file.type.trim() ? file.type.trim() : inferFileTypeFromName(file.name);
         return {
             ...file,
@@ -1371,33 +1586,71 @@ async function saveWorkshopEditPanel() {
         };
     });
 
-    setWorkshopEditStatus('Saving workshop file...');
+    const mergedByName = new Map();
+    updatedFiles.forEach((file) => {
+        if (!file || typeof file !== 'object') return;
+        const name = normalizeWorkshopFileName(file.name, 'file.txt');
+        mergedByName.set(name, {
+            ...file,
+            name
+        });
+    });
+    pendingFiles.forEach((file) => {
+        if (!file || typeof file !== 'object') return;
+        const name = normalizeWorkshopFileName(file.name, 'file.txt');
+        const type = file.type || inferFileTypeFromName(name);
+        let content = typeof file.content === 'string' ? file.content : '';
+        if (content && !content.startsWith('data:')) {
+            content = encodeTextAsDataUrl(content, type);
+        }
+        if (!content) return;
+        mergedByName.set(name, {
+            name,
+            type,
+            content
+        });
+    });
+
+    const finalFiles = Array.from(mergedByName.values());
+    if (finalFiles.length === 0) {
+        setWorkshopEditStatus('Add at least one file before saving.', true);
+        return;
+    }
+
+    const normalizedCover = `${coverInput.value || ''}`.trim() || getWorkshopCoverDraftValue(activeGame);
+    workshopEditCoverDraftByGame.set(activeGame.id, normalizedCover);
+
+    setWorkshopEditStatus('Saving workshop changes...');
     saveButton.disabled = true;
 
     try {
         const result = await publishProcessedGameFiles({
-            processedFiles: updatedFiles,
+            processedFiles: finalFiles,
             title: activeGame.title,
             category: activeGame.category,
             description: activeGame.description,
-            thumbnail: activeGame.poster,
+            thumbnail: normalizedCover,
             tags: activeGame.tags,
             existingGameId: activeGame.id
         });
         if (!result.ok) {
-            throw new Error(result.message || 'Failed to save workshop file.');
+            throw new Error(result.message || 'Failed to save workshop changes.');
         }
 
-        const draftKey = `${activeGame.id}::${fileName}`;
-        workshopEditDraftCache.delete(draftKey);
+        if (fileName) {
+            const draftKey = `${activeGame.id}::${fileName}`;
+            workshopEditDraftCache.delete(draftKey);
+        }
+        setWorkshopPendingFiles(activeGame.id, []);
+        workshopEditCoverDraftByGame.set(activeGame.id, normalizedCover);
 
         renderPublishedGames();
         syncWorkshopEditOverlay();
         const savedTime = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        setWorkshopEditStatus(`Saved ${fileName} at ${savedTime}.`);
+        setWorkshopEditStatus(`Saved workshop changes at ${savedTime}.`);
     } catch (error) {
         console.error('[Mini-Games] Workshop edit save failed:', error);
-        setWorkshopEditStatus(error?.message || 'Failed to save workshop file.', true);
+        setWorkshopEditStatus(error?.message || 'Failed to save workshop changes.', true);
     } finally {
         saveButton.disabled = false;
     }
@@ -2146,6 +2399,12 @@ window.setWorkshopTileMode = setWorkshopTileMode;
 window.handleWorkshopEditGameChange = handleWorkshopEditGameChange;
 window.handleWorkshopEditFileChange = handleWorkshopEditFileChange;
 window.handleWorkshopEditContentInput = handleWorkshopEditContentInput;
+window.handleWorkshopEditCoverInput = handleWorkshopEditCoverInput;
+window.triggerWorkshopEditCoverFilePicker = triggerWorkshopEditCoverFilePicker;
+window.handleWorkshopEditCoverFileChange = handleWorkshopEditCoverFileChange;
+window.triggerWorkshopEditAddFilesPicker = triggerWorkshopEditAddFilesPicker;
+window.handleWorkshopEditAddFiles = handleWorkshopEditAddFiles;
+window.removeWorkshopEditPendingFile = removeWorkshopEditPendingFile;
 window.revertWorkshopEditCurrentFile = revertWorkshopEditCurrentFile;
 window.saveWorkshopEditPanel = saveWorkshopEditPanel;
 window.getWorkshopGamesForAi = function() {

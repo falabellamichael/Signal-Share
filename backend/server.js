@@ -8,6 +8,7 @@ import dotenv from "dotenv";
 import { getChatResponse, getLocalModelCatalog } from "./chatbot.js";
 import { SecurityEngine } from "./security-v3.js";
 import { isMasterAdmin, hasPermission, ADMIN_ROLES } from "./roles-v3.js";
+import { registerModerationRoutes } from "./moderation-api-v3.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -174,6 +175,9 @@ app.post('/api/llm/chat', async (req, res) => {
     res.status(500).json({ error: 'LLM processing failed' });
   }
 });
+
+// Moderation Routes
+registerModerationRoutes(app, getChatResponse);
 
 app.get('/api/llm/models', async (req, res) => {
   try {
