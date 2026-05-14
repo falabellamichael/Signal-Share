@@ -2227,8 +2227,13 @@
       color: rgba(255, 255, 255, 0.75) !important;
     }
 
-    /* Icon gradient overrides from user reference swatch */
+    /* Theme-aware icon/button gradients. Sunset keeps the tan reference swatch. */
     :root {
+      --icon-gradient-main: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      --icon-gradient-outgoing: linear-gradient(135deg, var(--accent) 0%, var(--surface-dark) 100%);
+    }
+
+    body[data-theme='sunset'] {
       --icon-gradient-main: linear-gradient(135deg, #aa7d64 0%, #6b8c78 100%);
       --icon-gradient-outgoing: linear-gradient(135deg, #aa7d64 0%, #111111 100%);
     }

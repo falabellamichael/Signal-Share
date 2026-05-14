@@ -48,7 +48,7 @@ html.platform-android {
     min-height: 100% !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    background-color: var(--bg-android) !important;
+    background-color: transparent !important;
     overscroll-behavior-y: auto !important;
 }
 
@@ -62,9 +62,7 @@ html.platform-android body:not(.questions-page) {
     -webkit-overflow-scrolling: touch !important;
     touch-action: auto !important;
 
-    /* Theme-aware solid background to avoid Shader Compilation failures */
-    background: var(--bg-android) !important;
-    background-image: none !important;
+    /* Keep PC theme colors on Android; layout fixes stay Android-specific. */
 }
 
 /* Revert scroll resets for Steam Shell and Apps */
