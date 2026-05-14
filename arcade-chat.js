@@ -76,11 +76,11 @@ function resolveBridgeBaseCandidates() {
     );
     const configuredHttpFallback = resolveHttpFallbackBridgeBaseUrl(configured);
     const lastWorking = normalizeBridgeBaseUrl(localStorage.getItem(BRIDGE_LAST_WORKING_BASE_KEY) || "");
-    
+
     // PRIORITY 1: User Configured URL
     pushBridgeBaseCandidate(candidates, seen, configured);
     pushBridgeBaseCandidate(candidates, seen, configuredHttpFallback);
-    
+
     // PRIORITY 2: Last Known Working URL
     pushBridgeBaseCandidate(candidates, seen, lastWorking);
 
@@ -105,9 +105,7 @@ function resolveBridgeBaseCandidates() {
     }
 
     if (isAndroidRuntime()) {
-        // ALWAYS prioritize the LAN address and ADB tunnel on Android
-        const obfuscatedIp = atob("aHR0cDovLzE5Mi4xNjguMi4xMTozMDAw"); // http://192.168.2.11:3000
-        pushBridgeBaseCandidate(candidates, seen, obfuscatedIp); 
+        // ALWAYS prioritize the ADB tunnel on Android
         pushBridgeBaseCandidate(candidates, seen, "http://localhost:3000");
         pushBridgeBaseCandidate(candidates, seen, "http://127.0.0.1:3000");
         pushBridgeBaseCandidate(candidates, seen, "http://10.0.2.2:3000");
@@ -154,14 +152,14 @@ let arcadeSpeechSynth = window.speechSynthesis;
 
 function initArcadeSpeech() {
     if (arcadeSpeechRecognition) return;
-    
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition;
     if (!SpeechRecognition) {
         console.error('[Voice] Speech Recognition API not supported in this browser.');
         window.isSpeechSupported = false;
         return;
     }
-    
+
     // Check for Secure Context (Required for Mic in most browsers)
     if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
         console.warn('[Voice] Warning: Insecure context detected. Microphone might be blocked.');
@@ -189,7 +187,7 @@ function initArcadeSpeech() {
         arcadeSpeechRecognition.onresult = (event) => {
             const input = document.getElementById('arc-chat-input');
             if (!input) return;
-            
+
             let finalTranscript = '';
             let interimTranscript = '';
 
@@ -233,7 +231,7 @@ function initArcadeSpeech() {
 
 function speakArcadeText(text) {
     if (!arcadeSpeechSynth) return;
-    
+
     // On some Androids, we need to wait for voices to load or handle empty list
     const voices = arcadeSpeechSynth.getVoices();
     if (voices.length === 0) {
@@ -243,28 +241,28 @@ function speakArcadeText(text) {
             speakArcadeText(text);
         };
         // Also try a silent speak to "prime" the engine on Android
-        try { arcadeSpeechSynth.speak(new SpeechSynthesisUtterance("")); } catch(e){}
+        try { arcadeSpeechSynth.speak(new SpeechSynthesisUtterance("")); } catch (e) { }
         return;
     }
 
     arcadeSpeechSynth.cancel(); // Stop current speech
-    
+
     const cleanText = text.replace(/\[[\s\S]*?\]/g, "").trim();
     if (!cleanText) return;
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     // Find best English voice, or fallback to any
-    const voice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) 
-               || voices.find(v => v.lang.startsWith('en')) 
-               || voices[0];
-               
+    const voice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google'))
+        || voices.find(v => v.lang.startsWith('en'))
+        || voices[0];
+
     if (voice) utterance.voice = voice;
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
-    
+
     // ERROR HANDLING: If it fails, log it for debugging
     utterance.onerror = (e) => console.error('[Voice] TTS Error:', e);
-    
+
     arcadeSpeechSynth.speak(utterance);
 }
 
@@ -339,7 +337,8 @@ function extractBalancedJsonTagPayload(text, tagName) {
 
             let endCursor = i + 1;
             while (endCursor < source.length && /\s/.test(source[endCursor])) endCursor += 1;
-            if (source[endCursor] !== ']') {
+            const hasClosingBracket = source[endCursor] === ']';
+            if (!hasClosingBracket && `${tagName || ''}`.trim().toUpperCase() !== 'PUBLISH') {
                 searchFrom = i + 1;
                 break;
             }
@@ -347,7 +346,7 @@ function extractBalancedJsonTagPayload(text, tagName) {
             return {
                 jsonText: source.slice(cursor, i + 1),
                 start: markerIndex,
-                end: endCursor + 1
+                end: hasClosingBracket ? endCursor + 1 : i + 1
             };
         }
 
@@ -372,7 +371,7 @@ function stripArcadeProtocolTags(content = "") {
         hadTags = true;
         try {
             if (!publishData) publishData = JSON.parse(pub.jsonText);
-        } catch(e){}
+        } catch (e) { }
         text = text.substring(0, pub.start) + text.substring(pub.end);
     }
 
@@ -591,7 +590,7 @@ function isWorkshopPublishIntentPrompt(message = "") {
     const buildVerb = /\b(write|create|build|make|generate|code|new)\b/.test(text);
     const target = /\b(library|workshop|arcade|store)\b/.test(text);
     const gameMention = /\b(game|mini[-\s]?game|arcade game|app|utility)\b/.test(text);
-    
+
     // Allow either (target + publish) OR (build + gameMention) OR (publish + gameMention)
     return (target && publishVerb) || (buildVerb && gameMention) || (publishVerb && gameMention);
 }
@@ -667,7 +666,7 @@ function getProtocolDirectives(userPrompt = "", workshopContext = null) {
     const directives = [];
     const commandMode = window.activeArcadeCommandMode;
     const editorIsActive = hasActiveWorkshopEditor(workshopContext);
-    
+
     // Clear flag so it doesn't persist to next message
     window.activeArcadeCommandMode = null;
 
@@ -696,7 +695,7 @@ function buildWorkshopEditDirective(workshopContext = null, isFixMode = false, u
     const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
     const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
     const styleEditMode = isStyleEditPrompt(userPrompt);
-    
+
     const lines = [
         '[SURGICAL_EDIT_PROTOCOL]',
         isFixMode ? 'FOCUS: Bug Fix / Error Resolution.' : 'FOCUS: Feature Update / Refactoring.',
@@ -927,7 +926,7 @@ function isBridgeLightweightOfflineReply(replyText) {
     const normalized = `${replyText || ""}`.trim().toLowerCase();
     if (!normalized) return false;
     return (
-        normalized.includes("lightweight offline mode") 
+        normalized.includes("lightweight offline mode")
         || normalized.includes("currently in lightweight mode")
         || (normalized.includes("connect my logic core") && !normalized.includes("intelligence core offline"))
     );
@@ -1123,6 +1122,7 @@ async function bridgeFetch(path, options = {}) {
 
             lastHttpResponse = response;
         } catch (error) {
+            console.error(`[Bridge Fetch] Failed to reach ${endpoint}:`, error.message || error);
             networkFailures.push({ baseUrl, error });
             lastNetworkError = error;
             if (externalSignal?.aborted) break;
@@ -1137,7 +1137,7 @@ async function bridgeFetch(path, options = {}) {
     }
 
     if (lastHttpResponse) return lastHttpResponse;
-    
+
     if (!suppressNetworkErrors && networkFailures.length > 0) {
         const hasNonAbortFailure = networkFailures.some(({ error }) => {
             const name = `${error?.name || ""}`.toLowerCase();
@@ -1177,7 +1177,7 @@ async function getDesktopBridgeSnapshot({ suppressNetworkErrors = false } = {}) 
     return res.json();
 }
 
-async function checkBridgeConnectivity({ signal, timeoutMs = 1800 } = {}) {
+async function checkBridgeConnectivity({ signal, timeoutMs = 3500 } = {}) {
     const probes = [
         "/api/local-llm/models",
         "/api/llm/models",
@@ -1240,10 +1240,10 @@ function startDesktopBridgePolling() {
         updateEngineStatus(false);
         return;
     }
-    
+
     bridgeEnabled = true;
     pollDesktopBridge();
-    
+
     // Lightweight live refresh for bridge status.
     if (bridgePollTimer) clearInterval(bridgePollTimer);
     bridgePollTimer = setInterval(() => {
@@ -1299,7 +1299,7 @@ async function pollDesktopBridge() {
 async function startArcadeDictation() {
     if (isArcadeDictating) return;
     initArcadeSpeech();
-    
+
     if (window.isSpeechSupported === false) {
         alert("Speech-to-Text is not supported by your current browser. Please use Chrome or Edge for voice features!");
         return;
@@ -1310,7 +1310,7 @@ async function startArcadeDictation() {
         alert("MICROPHONE BLOCKED: Chrome blocks microphones on IP addresses (like 192.168...) unless they use HTTPS. \n\nFIX: Please use 'http://localhost:3000' on this PC instead!");
         return;
     }
-    
+
     if (!arcadeSpeechRecognition) return;
 
     try {
@@ -1426,16 +1426,16 @@ function isEngineStatusOffline() {
 /**
  * Toggles the Security Dashboard view in the sidebar.
  */
-window.toggleChatSecurity = function() {
+window.toggleChatSecurity = function () {
     const messages = document.getElementById('chat-messages');
     const history = document.getElementById('chat-history');
     const security = document.getElementById('chat-security');
     const inputArea = document.querySelector('.chat-input-area');
-    
+
     if (!security) return;
 
     const isShowing = security.style.display !== 'none';
-    
+
     // Hide others
     if (messages) messages.style.display = isShowing ? 'flex' : 'none';
     if (history) history.style.display = 'none';
@@ -1449,10 +1449,10 @@ window.toggleChatSecurity = function() {
             inputArea.style.display = 'none';
         }
     }
-    
+
     // Toggle security
     security.style.display = isShowing ? 'none' : 'flex';
-    
+
     // Update button visual state if possible
     const secBtn = document.querySelector('button[onclick="toggleChatSecurity()"]');
     if (secBtn) {
@@ -1465,7 +1465,7 @@ window.toggleChatSecurity = function() {
         const deviceInput = document.getElementById('sidebar-device-id');
         const bridgeUrlInput = document.getElementById('sidebar-bridge-url');
         const localLlmTokenInput = document.getElementById('sidebar-local-llm-token');
-        
+
         if (secretInput) secretInput.value = getBridgeSecret();
         if (deviceInput) deviceInput.value = getDeviceId();
         if (bridgeUrlInput) {
@@ -1473,7 +1473,7 @@ window.toggleChatSecurity = function() {
                 || `${localStorage.getItem('signal-share-bridge-url') || ''}`.trim();
         }
         if (localLlmTokenInput) localLlmTokenInput.value = getLocalLlmToken();
-        
+
         // Refresh IP bans
         refreshBannedIps();
     }
@@ -1482,20 +1482,20 @@ window.toggleChatSecurity = function() {
 /**
  * Saves the security settings to localStorage.
  */
-window.saveSecurityDashboard = function() {
+window.saveSecurityDashboard = function () {
     const secretInput = document.getElementById('sidebar-bridge-secret');
     const deviceInput = document.getElementById('sidebar-device-id');
     const bridgeUrlInput = document.getElementById('sidebar-bridge-url');
     const localLlmTokenInput = document.getElementById('sidebar-local-llm-token');
     const status = document.getElementById('security-save-status');
-    
+
     if (!secretInput || !deviceInput) return;
-    
+
     const secret = secretInput.value.trim();
     const deviceId = deviceInput.value.trim();
     const bridgeUrl = bridgeUrlInput ? bridgeUrlInput.value.trim() : "";
     const localLlmToken = localLlmTokenInput ? localLlmTokenInput.value.trim() : "";
-    
+
     localStorage.setItem('SIGNAL_SHARE_BRIDGE_SECRET', secret);
     localStorage.setItem('SIGNAL_SHARE_DEVICE_ID', deviceId);
     if (window.SignalShareLocalLlm?.setBridgeBaseUrl) {
@@ -1521,13 +1521,13 @@ window.saveSecurityDashboard = function() {
     // Refresh bridge candidate ordering immediately after settings save.
     resolveBridgeBaseCandidates();
     void hydrateChatModelSelect({ forceRefresh: true });
-    
+
     if (status) {
         status.textContent = '✅ Security settings saved!';
         status.style.color = '#75b022';
         setTimeout(() => { status.textContent = ''; }, 3000);
     }
-    
+
     // Notify user via AI if open
     console.log('[Security] Keys updated. Bridge handshake will now use these credentials.');
 };
@@ -1535,16 +1535,16 @@ window.saveSecurityDashboard = function() {
 /**
  * Generates a persistent fingerprint for this browser/device.
  */
-window.lockToThisDevice = function() {
+window.lockToThisDevice = function () {
     const deviceInput = document.getElementById('sidebar-device-id');
     if (!deviceInput) return;
-    
+
     let existingId = localStorage.getItem('SIGNAL_SHARE_DEVICE_ID');
     if (!existingId || existingId.length < 8) {
         // Generate a new random ID if none exists
         existingId = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     }
-    
+
     deviceInput.value = existingId;
     deviceInput.style.color = '#67c1f5';
 };
@@ -1552,26 +1552,26 @@ window.lockToThisDevice = function() {
 /**
  * Fetches the current list of banned IPs from the bridge.
  */
-window.refreshBannedIps = async function() {
+window.refreshBannedIps = async function () {
     const list = document.getElementById('banned-ips-list');
     if (!list) return;
-    
+
     list.innerHTML = '<span style="color: rgba(255,255,255,0.3)">Refreshing...</span>';
-    
+
     try {
-        const res = await bridgeFetch('/api/security/audit', { 
+        const res = await bridgeFetch('/api/security/audit', {
             method: 'GET',
-            timeoutMs: 3000 
+            timeoutMs: 5000
         });
-        
+
         if (!res.ok) {
             list.innerHTML = '<span style="color: #ff5555">Failed to fetch audit log.</span>';
             return;
         }
-        
+
         const data = await res.json();
         const bans = data.bannedIps || [];
-        
+
         if (bans.length === 0) {
             list.innerHTML = '<span style="color: #75b022">No IPs currently banned.</span>';
         } else {
@@ -1579,15 +1579,15 @@ window.refreshBannedIps = async function() {
             bans.forEach(ip => {
                 const item = document.createElement('div');
                 item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid rgba(255,0,0,0.1); padding: 4px 0;';
-                
+
                 const ipSpan = document.createElement('span');
                 ipSpan.style.fontFamily = 'monospace';
                 ipSpan.textContent = ip;
-                
+
                 const statusSpan = document.createElement('span');
                 statusSpan.style.cssText = 'font-size: 0.6rem; color: #ff5555; text-transform: uppercase; font-weight: 800;';
                 statusSpan.textContent = 'BANNED';
-                
+
                 item.appendChild(ipSpan);
                 item.appendChild(statusSpan);
                 list.appendChild(item);
@@ -1616,13 +1616,13 @@ function readArcadeChats() {
 /**
  * Handles image, video, or file selection for the chat.
  */
-window.handleChatFileSelect = function(event) {
+window.handleChatFileSelect = function (event) {
     const file = event.target.files[0];
     if (!file) return;
 
     currentChatAttachmentName = file.name;
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         currentChatAttachment = e.target.result;
         const preview = document.getElementById('chat-attachment-preview');
         const img = document.getElementById('chat-preview-img');
@@ -1664,7 +1664,7 @@ window.handleChatFileSelect = function(event) {
 /**
  * Clears the current chat attachment.
  */
-window.clearChatAttachment = function() {
+window.clearChatAttachment = function () {
     currentChatAttachment = null;
     currentChatAttachmentType = null;
     currentChatAttachmentName = null;
@@ -1706,12 +1706,12 @@ function cleanupOldChats() {
     const chats = readArcadeChats();
     const now = Date.now();
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-    
+
     const filteredChats = chats.filter(chat => {
         const lastUsed = chat.lastUsed || 0;
         return (now - lastUsed) < sevenDaysMs;
     });
-    
+
     if (filteredChats.length !== chats.length) {
         localStorage.setItem('arcade-chats', JSON.stringify(filteredChats));
         console.log(`[Arcade Chat] Cleaned up ${chats.length - filteredChats.length} old chats.`);
@@ -1763,7 +1763,7 @@ function applySteamShellCollapsedColumns(shellElement) {
  * Synchronizes the position of external UI elements (Messenger, Toggle, Runner)
  * based on the current sidebar width and state.
  */
-window.syncArcadeSidebarOffsets = function() {
+window.syncArcadeSidebarOffsets = function () {
     const sidebar = document.querySelector('.steam-chat-sidebar');
     if (!sidebar) return;
 
@@ -1778,16 +1778,16 @@ window.syncArcadeSidebarOffsets = function() {
     if (!isCollapsed) {
         // Use offsetWidth for current real-time geometry, fallback to style width, then default 380
         const currentWidth = sidebar.offsetWidth || parseInt(sidebar.style.width) || 380;
-        
+
         // Messenger/Floating UI offset (Sidebar width + 20px gutter)
         const gapWidth = currentWidth + 20;
 
         if (toggleBtn) toggleBtn.style.right = `${gapWidth}px`;
         if (messengerBtn) messengerBtn.style.setProperty('right', `${gapWidth}px`, 'important');
-        
+
         if (messengerSection) {
             messengerSection.style.setProperty('right', `${gapWidth}px`, 'important');
-            
+
             // Dynamically limit messenger width if it's expanded to prevent screen cutoff
             if (messengerSection.classList.contains('is-expanded')) {
                 const availableWidth = window.innerWidth - gapWidth - 20; // 20px left margin
@@ -1805,7 +1805,7 @@ window.syncArcadeSidebarOffsets = function() {
         if (appRunner) {
             // Shift right to accommodate the companion sidebar
             appRunner.style.setProperty('right', `${currentWidth}px`, 'important');
-            
+
             // In Steam Shell mode, also shift left to accommodate the navigation sidebar
             if (isSteamShell && !window.matchMedia('(max-width: 768px)').matches) {
                 appRunner.style.setProperty('left', '240px', 'important');
@@ -1848,10 +1848,10 @@ function startNewChat() {
 
 function saveCurrentChat() {
     if (!currentChatId) return;
-    
+
     const chats = readArcadeChats();
     const existingIdx = chats.findIndex(c => c.id === currentChatId);
-    
+
     const chatObj = {
         id: currentChatId,
         name: arcadeChatHistory.length > 0 ? arcadeChatHistory[0].content.substring(0, 30) + (arcadeChatHistory[0].content.length > 30 ? '...' : '') : 'New Session',
@@ -1882,23 +1882,23 @@ function loadChat(id) {
                     Hello! I'm your local arcade assistant. How can I help you optimize your gameplay today?
                 </div>
             `;
-            
+
             arcadeChatHistory.forEach(msg => {
                 addChatMessage(msg.role === 'assistant' ? 'ai' : 'user', msg.content);
             });
             container.scrollTop = container.scrollHeight;
         }
-        
+
         updateChatStatus('idle');
         showChatView();
-        
+
         chat.lastUsed = Date.now();
         localStorage.setItem('arcade-chats', JSON.stringify(chats));
     }
 }
 window.loadChat = loadChat;
 
-window.toggleChatHistory = function() {
+window.toggleChatHistory = function () {
     const messages = document.getElementById('chat-messages');
     const historyView = document.getElementById('chat-history');
     const title = document.getElementById('chat-mode-title');
@@ -1939,7 +1939,7 @@ function renderHistoryList() {
     const container = document.getElementById('chat-history');
     const chats = readArcadeChats();
     if (!container) return;
-    
+
     if (chats.length === 0) {
         container.innerHTML = '<div style="text-align: center; padding: 40px; opacity: 0.3; font-size: 0.8rem;">No chat history yet.</div>';
         return;
@@ -1949,24 +1949,24 @@ function renderHistoryList() {
     chats.forEach(chat => {
         const date = new Date(chat.lastUsed).toLocaleDateString();
         const time = new Date(chat.lastUsed).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
+
         const item = document.createElement('div');
         item.className = 'chat-history-item';
         item.onclick = () => loadChat(chat.id);
-        
+
         const nameDiv = document.createElement('div');
         nameDiv.className = 'history-name';
         nameDiv.textContent = chat.name;
-        
+
         const metaDiv = document.createElement('div');
         metaDiv.className = 'history-meta';
-        
+
         const countSpan = document.createElement('span');
         countSpan.textContent = `${chat.messages.length} messages`;
-        
+
         const dateSpan = document.createElement('span');
         dateSpan.textContent = `${date} ${time}`;
-        
+
         metaDiv.appendChild(countSpan);
         metaDiv.appendChild(dateSpan);
         item.appendChild(nameDiv);
@@ -1980,7 +1980,7 @@ function addChatMessage(role, content) {
     if (!container) return;
     const msgDiv = document.createElement('div');
     msgDiv.className = `chat-message message-${role === 'ai' ? 'ai' : 'user'}`;
-    
+
     // Use robust protocol tag stripping to prevent leaking raw JSON/Tags into UI
     const protocolInfo = stripArcadeProtocolTags(content);
     const cleanContent = protocolInfo.text;
@@ -2001,15 +2001,15 @@ function addChatMessage(role, content) {
                 const lines = part.split('\n');
                 const lang = lines[0].trim();
                 const code = lines.slice(1).join('\n').trim();
-                
+
                 const codeWrapper = document.createElement('div');
                 codeWrapper.className = 'code-block-wrapper';
-                
+
                 const pre = document.createElement('pre');
                 pre.className = 'chat-code-block';
                 pre.setAttribute('data-lang', lang || 'code');
                 pre.textContent = code;
-                
+
                 const copyBtn = document.createElement('button');
                 copyBtn.className = 'copy-code-btn';
                 copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
@@ -2025,7 +2025,7 @@ function addChatMessage(role, content) {
                         }, 2000);
                     });
                 };
-                
+
                 codeWrapper.appendChild(pre);
                 codeWrapper.appendChild(copyBtn);
                 msgDiv.appendChild(codeWrapper);
@@ -2033,7 +2033,7 @@ function addChatMessage(role, content) {
         });
     } else {
         msgDiv.textContent = cleanContent;
-        
+
         // If the AI is publishing a game but forgot to include markdown code blocks, 
         // automatically generate a snippet box for the main file so the user sees it.
         if (protocolInfo.publishData?.files && protocolInfo.publishData.files.length > 0) {
@@ -2045,11 +2045,11 @@ function addChatMessage(role, content) {
                 pre.className = 'chat-code-block';
                 pre.setAttribute('data-lang', mainFile.name.split('.').pop() || 'code');
                 pre.textContent = mainFile.content;
-                
+
                 const label = document.createElement('div');
                 label.style.cssText = 'font-size: 0.6rem; opacity: 0.5; margin-bottom: 4px; font-family: monospace;';
                 label.textContent = `Attached Project: ${mainFile.name}`;
-                
+
                 msgDiv.appendChild(label);
                 codeWrapper.appendChild(pre);
                 msgDiv.appendChild(codeWrapper);
@@ -2063,7 +2063,7 @@ function addChatMessage(role, content) {
 
     // Handle multimedia attachments if present
     const msgObj = arcadeChatHistory.find(m => m.content === content && m.role === (role === 'ai' ? 'assistant' : 'user') && m.attachment);
-    
+
     let attachmentToRender = null;
     if (msgObj && msgObj.attachment) {
         attachmentToRender = msgObj.attachment;
@@ -2122,13 +2122,13 @@ function addChatMessage(role, content) {
     }
 }
 
-window.executeArcadeAction = function(action) {
+window.executeArcadeAction = function (action) {
     console.log(`[Arcade Chat] Executing Protocol Action: ${action}`);
     const rawAction = `${action || ""}`.trim();
     const [actionKeyRaw, ...argParts] = rawAction.split(/\s+/);
     const actionKey = (actionKeyRaw || "").toLowerCase();
     const actionArg = argParts.join(" ").trim();
-    
+
     const triggerClick = (sel) => document.querySelector(sel)?.click();
     const navigate = (hash, fallback) => {
         if (hash.startsWith('#')) {
@@ -2411,13 +2411,13 @@ function setChatSendButtonMode(mode = 'send') {
     button.title = 'Send message';
 }
 
-window.sendChatMessage = async function() {
+window.sendChatMessage = async function () {
     if (isSendingChatMessage) {
         if (typeof window.stopArcadeAi === 'function') window.stopArcadeAi();
         return;
     }
     isSendingChatMessage = true;
-    
+
     const input = document.getElementById('arc-chat-input');
     if (!input) {
         isSendingChatMessage = false;
@@ -2487,8 +2487,8 @@ window.sendChatMessage = async function() {
         const workshopPublishIntent = isWorkshopPublishIntentPrompt(text);
 
         // Add to history with attachment if present
-        arcadeChatHistory.push({ 
-            role: 'user', 
+        arcadeChatHistory.push({
+            role: 'user',
             content: text,
             attachment: currentChatAttachment ? {
                 data: currentChatAttachment,
@@ -2496,7 +2496,7 @@ window.sendChatMessage = async function() {
                 name: currentChatAttachmentName
             } : null
         });
-        
+
         input.value = '';
         clearChatAttachment();
 
@@ -2513,18 +2513,18 @@ window.sendChatMessage = async function() {
             isSendingChatMessage = false;
             return;
         }
-        
+
         // Refresh bridge context on demand so AI has latest info
         if (typeof pollDesktopBridge === 'function') {
             await pollDesktopBridge();
         }
-        
+
         const typingId = addTypingIndicator();
         let activeAiAbortController = new AbortController();
         const { signal } = activeAiAbortController;
         setChatSendButtonMode('stop');
 
-        window.stopArcadeAi = function() {
+        window.stopArcadeAi = function () {
             if (activeAiAbortController) {
                 activeAiAbortController.abort();
                 activeAiAbortController = null;
@@ -2582,7 +2582,7 @@ window.sendChatMessage = async function() {
         // Keep only the most recent messages to prevent context window overflow on small local models
         const maxHistory = editRequestActive ? 2 : 6;
         const recentHistory = arcadeChatHistory.slice(-maxHistory);
-        
+
         const normalizedHistory = window.SignalShareAiCore
             ? window.SignalShareAiCore.normalizeHistory(recentHistory, { aiSenderId: 'assistant' })
             : recentHistory.map(m => ({ role: m.role, content: m.content }));
@@ -2626,8 +2626,7 @@ window.sendChatMessage = async function() {
                     // Preflight failed, the bridge is unreachable. 
                     // Stop here and fall through to the offline protocol.
                     reply = null;
-                    const bridgeHint = atob("aHR0cDovLzE5Mi4xNjguMi4xMTozMDAw"); // http://192.168.2.11:3000
-                    lastError = `Bridge unreachable. Ensure your PC is running the Bridge and your phone is on the same Wi-Fi. (Try: ${bridgeHint})`;
+                    lastError = "Bridge is unreachable. Ensure the PC bridge is running and reachable.";
                     throw new Error(lastError);
                 }
             }
@@ -2637,7 +2636,7 @@ window.sendChatMessage = async function() {
             const compactHistory = Array.isArray(normalizedHistory) ? normalizedHistory.slice(editRequestActive ? -4 : -10) : [];
             const maxContextChars = editRequestActive ? 9000 : 12000;
             const compactPageContext = `${fullPageContext || ''}`.slice(0, maxContextChars); // Keep small local models responsive
-            
+
             const payloadVariants = [
                 {
                     label: 'compact',
@@ -2748,7 +2747,7 @@ window.sendChatMessage = async function() {
                             : '';
                         nextError = `Failed to fetch bridge at ${configuredBridge}. Ensure phone and PC are on the same Wi-Fi and port 3000 is allowed.${hint}`;
                     } else {
-                        nextError = 'Failed to fetch bridge. Set Bridge URL to your PC\'s IP (Example: http://192.168.2.11:3000) in settings.';
+                        nextError = 'Failed to fetch bridge. Set Bridge URL (PC IP) in settings (example: http://192.168.x.x:3000).';
                     }
                 }
                 const topLevelErrorLocation = extractStackLocation(err);
@@ -2795,10 +2794,10 @@ window.sendChatMessage = async function() {
             arcadeChatHistory.push({ role: 'assistant', content: reply });
             saveCurrentChat();
             updateChatStatus('active');
-            
+
             // Execute any tags in the reply
             const actionResult = await executeArcadeChatActions(reply, { userPrompt: text });
-            
+
             // MUTUAL EXCLUSION: If an edit was attempted/performed, do not also try to publish a new game.
             // This prevents "Double Actioning" when the prompt is ambiguous.
             if (actionResult?.workshopFileRewriteAttempted) {
@@ -2823,21 +2822,14 @@ window.sendChatMessage = async function() {
 
             if (lastError !== 'Bridge disabled' && lastError !== 'Request cancelled by user') {
                 console.warn(`[Arcade Chat] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
-                
+
                 // NEW: Add a specific error prompt to the chat for the user
                 const container = document.getElementById('chat-messages');
                 if (container && lastError) {
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'chat-message system-error';
-                    errorDiv.style.cssText = 'align-self: center; background: rgba(231, 76, 60, 0.1); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.2); font-size: 0.7rem; padding: 8px 12px; border-radius: 8px; margin: 8px 0; font-family: monospace; opacity: 0.9; display: flex; flex-direction: column; gap: 8px; align-items: center;';
-                    
-                    let errorHtml = `<span>A.I. Bridge Error: ${lastError}</span>`;
-                    const bridgeHint = atob("aHR0cDovLzE5Mi4xNjguMi4xMTozMDAw"); // http://192.168.2.11:3000
-                    if (lastError.includes(bridgeHint) || lastError.includes('192.168.2.11')) {
-                        errorHtml += `<button onclick="localStorage.setItem('ss_bridge_url', '${bridgeHint}'); window.location.reload();" style="background: #e74c3c; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.6rem; cursor: pointer; font-weight: bold; text-transform: uppercase;">Use ${bridgeHint.replace('http://', '')}</button>`;
-                    }
-                    
-                    errorDiv.innerHTML = errorHtml;
+                    errorDiv.style.cssText = 'align-self: center; background: rgba(231, 76, 60, 0.1); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.2); font-size: 0.7rem; padding: 4px 10px; border-radius: 4px; margin: 8px 0; font-family: monospace; opacity: 0.8;';
+                    errorDiv.textContent = `A.I. Bridge Error: ${lastError}`;
                     container.appendChild(errorDiv);
                     container.scrollTop = container.scrollHeight;
                 }
@@ -2857,7 +2849,7 @@ window.sendChatMessage = async function() {
                 offlineReply = getArcadeProtocolOfflineResponse(text);
             }
             addChatMessage('ai', offlineReply);
-            
+
             arcadeChatHistory.push({ role: 'assistant', content: offlineReply });
             saveCurrentChat();
             updateChatStatus('offline');
@@ -3023,7 +3015,7 @@ function buildAiWorkshopFilesFromText(rawText) {
                     content: f.content || f.code || ""
                 })).filter(f => f.content);
             }
-        } catch(e){}
+        } catch (e) { }
     }
 
     let fallback = sourceText.split(/\[PUBLISH:\s*/i)[0] || '';
@@ -3597,7 +3589,7 @@ async function executeArcadeChatActions(text, options = {}) {
                 }
                 return actionResult;
             }
-            
+
             if (window.publishPostToSupabase) {
                 actionResult.handled = true;
                 // Determine what to publish. 
@@ -3617,41 +3609,41 @@ async function executeArcadeChatActions(text, options = {}) {
                     // Check if there's an external URL to publish instead
                     const urlMatch = text.match(/https?:\/\/[^\s\]]+/);
                     if (urlMatch && window.buildExternalPost && window.parseExternalMediaUrl) {
-                         const externalUrl = urlMatch[0];
-                         const parsedExternal = window.parseExternalMediaUrl(externalUrl);
-                         if (parsedExternal) {
-                             const basePost = { 
-                                 id: `ai-${crypto.randomUUID()}`, 
-                                 creator: window.getDefaultProfileName ? window.getDefaultProfileName() : "AI Assistant", 
-                                 title: title || "AI Shared Content", 
-                                 caption: caption || "Check this out!", 
-                                 tags: tags || [], 
-                                 likes: 0, 
-                                 createdAt: new Date().toISOString() 
-                             };
-                             const post = window.buildExternalPost(basePost, parsedExternal);
-                             const inserted = await window.publishPostToSupabase(post);
-                             if (window.state && window.state.userPosts) {
-                                 window.state.userPosts = [inserted, ...window.state.userPosts];
-                                 if (window.render) window.render();
-                             }
-                             if (window.showFeedback) window.showFeedback("Post published successfully via AI!");
-                             return actionResult;
-                          }
-                     }
+                        const externalUrl = urlMatch[0];
+                        const parsedExternal = window.parseExternalMediaUrl(externalUrl);
+                        if (parsedExternal) {
+                            const basePost = {
+                                id: `ai-${crypto.randomUUID()}`,
+                                creator: window.getDefaultProfileName ? window.getDefaultProfileName() : "AI Assistant",
+                                title: title || "AI Shared Content",
+                                caption: caption || "Check this out!",
+                                tags: tags || [],
+                                likes: 0,
+                                createdAt: new Date().toISOString()
+                            };
+                            const post = window.buildExternalPost(basePost, parsedExternal);
+                            const inserted = await window.publishPostToSupabase(post);
+                            if (window.state && window.state.userPosts) {
+                                window.state.userPosts = [inserted, ...window.state.userPosts];
+                                if (window.render) window.render();
+                            }
+                            if (window.showFeedback) window.showFeedback("Post published successfully via AI!");
+                            return actionResult;
+                        }
+                    }
                     if (window.showFeedback) window.showFeedback("AI wanted to publish but no file/link was found.", true);
                     return actionResult;
                 }
 
                 // Prepare the post object
-                const basePost = { 
-                    id: `ai-${crypto.randomUUID()}`, 
-                    creator: window.getDefaultProfileName ? window.getDefaultProfileName() : "AI Assistant", 
-                    title: title || "AI Shared Content", 
-                    caption: caption || "Check this out!", 
-                    tags: tags || [], 
-                    likes: 0, 
-                    createdAt: new Date().toISOString() 
+                const basePost = {
+                    id: `ai-${crypto.randomUUID()}`,
+                    creator: window.getDefaultProfileName ? window.getDefaultProfileName() : "AI Assistant",
+                    title: title || "AI Shared Content",
+                    caption: caption || "Check this out!",
+                    tags: tags || [],
+                    likes: 0,
+                    createdAt: new Date().toISOString()
                 };
 
                 if (window.buildUploadPost) {
@@ -3659,7 +3651,7 @@ async function executeArcadeChatActions(text, options = {}) {
                     const inserted = await window.publishPostToSupabase(post, (p) => {
                         console.log(`[AI Publish] Uploading: ${p}%`);
                     });
-                    
+
                     if (window.state && window.state.userPosts) {
                         window.state.userPosts = [inserted, ...window.state.userPosts];
                         if (window.render) window.render();
@@ -3715,7 +3707,7 @@ async function executeArcadeChatActions(text, options = {}) {
 
     // 6. WORKSHOP ACTIONS (Re-enabled for Commands)
     const editBlocks = extractWorkshopEditBlocks(text);
-    
+
     if (editBlocks.length > 0) {
         actionResult.handled = true;
         for (const editBlock of editBlocks) {
@@ -4418,7 +4410,7 @@ function setupResizing() {
             }
             localStorage.setItem(ARCADE_CHAT_SIDEBAR_WIDTH_KEY, `${Math.round(newWidth)}`);
         }
-        
+
         if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets();
     }
 
@@ -4432,13 +4424,13 @@ function setupResizing() {
 }
 
 
-window.toggleChat = function() {
+window.toggleChat = function () {
     const sidebar = document.querySelector('.steam-chat-sidebar');
     const handle = document.querySelector('.chat-resize-handle');
     const shell = document.querySelector('.steam-shell');
-    
+
     if (!sidebar) return;
-    
+
     const isCollapsed = sidebar.classList.toggle('collapsed');
     document.body.classList.toggle('chat-collapsed', isCollapsed);
 
@@ -4449,7 +4441,7 @@ window.toggleChat = function() {
             pollDesktopBridge();
         }
     }
-    
+
     // Update grid if in integrated desktop mode
     if (shell && isDesktopCompanionLayout()) {
         if (isCollapsed) {
@@ -4458,17 +4450,17 @@ window.toggleChat = function() {
             applySteamShellOpenColumns(shell, getStoredSteamSidebarWidth(shell));
         }
     }
-    
+
     const toggleBtn = document.querySelector('.chat-toggle-btn');
     const messengerBtn = document.querySelector('.messenger-launcher');
     const messengerSection = document.querySelector('.messenger-section');
-    
+
     if (toggleBtn) toggleBtn.style.right = '';
     if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets();
     if (messengerSection) messengerSection.style.setProperty('right', '', '');
-    
+
     if (handle) handle.classList.toggle('collapsed', isCollapsed);
-    
+
     localStorage.setItem('arcade-chat-collapsed', isCollapsed);
 };
 
@@ -4478,7 +4470,7 @@ function isChatOpen() {
     return !sidebar.classList.contains('collapsed');
 }
 
-window.closeArcadeChat = function(options = {}) {
+window.closeArcadeChat = function (options = {}) {
     const { restoreFocus = true } = options;
     if (!isChatOpen()) return false;
     window.toggleChat();
@@ -4494,7 +4486,7 @@ function setupToggle() {
     // Create toggle button regardless of mode, CSS will handle visibility
     if (!document.querySelector('.chat-toggle-btn')) {
         const btn = document.createElement('button');
-        
+
         // Unified Tab Mode for all pages
         btn.className = 'chat-toggle-btn chat-tab-mode';
         btn.innerHTML = `
@@ -4503,7 +4495,7 @@ function setupToggle() {
                 <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2z"></path>
             </svg>
         `;
-        
+
         btn.onclick = window.toggleChat;
         document.body.appendChild(btn);
     }
@@ -4553,12 +4545,12 @@ function setupCloseParityHandlers() {
     setupChatModelSelect();
     startDesktopBridgePolling();
     updateChatStatus('idle');
-    
+
     // Restore collapsed state
     const isSteamShell = document.querySelector('.steam-shell') || document.documentElement.classList.contains('is-steam-shell');
     const isAndroidPlatform = document.documentElement.classList.contains('platform-android');
     let wasCollapsed = localStorage.getItem('arcade-chat-collapsed');
-    
+
     // Default to collapsed (tab mode) on steam-shell pages if no preference exists
     if (wasCollapsed === null && isSteamShell) {
         wasCollapsed = 'true';
@@ -4575,11 +4567,11 @@ function setupCloseParityHandlers() {
         const sidebar = document.querySelector('.steam-chat-sidebar');
         const handle = document.querySelector('.chat-resize-handle');
         const shell = document.querySelector('.steam-shell');
-        
+
         if (sidebar) sidebar.classList.add('collapsed');
         if (handle) handle.classList.add('collapsed');
         document.body.classList.add('chat-collapsed');
-        
+
         if (shell && isDesktopCompanionLayout()) {
             applySteamShellCollapsedColumns(shell);
         }
@@ -4607,9 +4599,9 @@ function setupCloseParityHandlers() {
     // Ensure Enter key sends the message
     const arcInput = document.getElementById('arc-chat-input');
     const arcSendBtn = getChatSendButton();
-    
+
     setChatSendButtonMode('send');
-    
+
     if (arcInput) {
         arcInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
@@ -4627,7 +4619,7 @@ function setupCloseParityHandlers() {
 
         arcSendBtn.addEventListener('pointerdown', (e) => {
             if (isSendingChatMessage) return;
-            
+
             // Prime the speech engine on the very first interaction (Required for Android)
             if (!speechPrimed && arcadeSpeechSynth) {
                 try {
@@ -4636,7 +4628,7 @@ function setupCloseParityHandlers() {
                     arcadeSpeechSynth.speak(silent);
                     speechPrimed = true;
                     console.log("[Voice] Speech engine primed for Android.");
-                } catch(e){}
+                } catch (e) { }
             }
 
             holdTimer = setTimeout(() => {
@@ -4666,31 +4658,31 @@ function setupCloseParityHandlers() {
  */
 function getArcadeProtocolOfflineResponse(message) {
     const input = message.toLowerCase();
-    
+
     const responses = [
-        { 
-            keywords: ["pinball", "gravity"], 
-            answer: "🕹️ [Arcade Protocol]: In Neon Pinball, keep your eyes on the top bumpers. Hitting them in sequence triggers the 'Gravity Shift' multiplier, which can triple your score in seconds!" 
+        {
+            keywords: ["pinball", "gravity"],
+            answer: "🕹️ [Arcade Protocol]: In Neon Pinball, keep your eyes on the top bumpers. Hitting them in sequence triggers the 'Gravity Shift' multiplier, which can triple your score in seconds!"
         },
-        { 
-            keywords: ["basketball", "hoops", "shot"], 
-            answer: "🏀 [Arcade Protocol]: For Neon Hoops, consistency is key. Try to release the ball at the peak of your swipe for a 'Perfect' shot bonus. The net gets smaller as your streak increases!" 
+        {
+            keywords: ["basketball", "hoops", "shot"],
+            answer: "🏀 [Arcade Protocol]: For Neon Hoops, consistency is key. Try to release the ball at the peak of your swipe for a 'Perfect' shot bonus. The net gets smaller as your streak increases!"
         },
-        { 
-            keywords: ["snake", "wrap", "trap"], 
-            answer: "🐍 [Arcade Protocol]: In Neon Snake, the board is edge-wrapped. If you're about to crash, move through the wall to appear on the other side. Use this to surprise high-value fruit!" 
+        {
+            keywords: ["snake", "wrap", "trap"],
+            answer: "🐍 [Arcade Protocol]: In Neon Snake, the board is edge-wrapped. If you're about to crash, move through the wall to appear on the other side. Use this to surprise high-value fruit!"
         },
-        { 
-            keywords: ["hello", "hi", "hey"], 
-            answer: "👋 [Arcade Protocol]: Intelligence core is currently offline, but I am standing by for tactical support. Ask me about the games or how to improve your high score!" 
+        {
+            keywords: ["hello", "hi", "hey"],
+            answer: "👋 [Arcade Protocol]: Intelligence core is currently offline, but I am standing by for tactical support. Ask me about the games or how to improve your high score!"
         },
-        { 
-            keywords: ["help", "what can you do"], 
-            answer: "🎮 [Arcade Protocol]: I am your tactical game assistant. Even in offline mode, I can provide tips for Pinball, Hoops, and Snake. Just ask about a specific game!" 
+        {
+            keywords: ["help", "what can you do"],
+            answer: "🎮 [Arcade Protocol]: I am your tactical game assistant. Even in offline mode, I can provide tips for Pinball, Hoops, and Snake. Just ask about a specific game!"
         },
-        { 
-            keywords: ["thank", "thanks"], 
-            answer: "🕹️ [Arcade Protocol]: You're welcome, player. Now get back in there and break that record!" 
+        {
+            keywords: ["thank", "thanks"],
+            answer: "🕹️ [Arcade Protocol]: You're welcome, player. Now get back in there and break that record!"
         }
     ];
 
