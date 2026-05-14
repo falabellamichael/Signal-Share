@@ -425,7 +425,7 @@ async function callLocalAI({
         const response = await window.bridgeFetch(chatPath, {
           method: "POST",
           signal: abortController.signal,
-          timeoutMs: 45000,
+          timeoutMs: 0,
           body: bridgePayload
         });
 

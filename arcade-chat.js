@@ -546,10 +546,16 @@ async function bridgeFetch(path, options = {}) {
     for (const baseUrl of candidates) {
         const endpoint = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
         const requestController = new AbortController();
-        const timeoutDuration = Number.isFinite(timeoutMs)
-            ? Math.max(250, Number(timeoutMs))
+        const hasExplicitTimeout = Number.isFinite(timeoutMs);
+        const rawTimeoutDuration = hasExplicitTimeout
+            ? Number(timeoutMs)
             : (method === "POST" ? 45000 : 3500);
-        const timeout = setTimeout(() => requestController.abort(), timeoutDuration);
+        const timeoutDuration = rawTimeoutDuration > 0
+            ? Math.max(250, rawTimeoutDuration)
+            : 0;
+        const timeout = timeoutDuration > 0
+            ? setTimeout(() => requestController.abort(), timeoutDuration)
+            : null;
         const targetAddressSpace = getBridgeTargetAddressSpace(baseUrl);
         const handleExternalAbort = () => requestController.abort();
 
@@ -602,7 +608,9 @@ async function bridgeFetch(path, options = {}) {
             lastNetworkError = error;
             if (externalSignal?.aborted) break;
         } finally {
-            clearTimeout(timeout);
+            if (timeout) {
+                clearTimeout(timeout);
+            }
             if (externalSignal) {
                 externalSignal.removeEventListener("abort", handleExternalAbort);
             }
@@ -2059,6 +2067,7 @@ window.sendChatMessage = async function() {
             for (const chatPath of chatPaths) {
                 const nextResponse = await bridgeFetch(chatPath, {
                     method: 'POST',
+                    timeoutMs: 0,
                     signal,
                     body: payload
                 });
