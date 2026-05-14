@@ -700,9 +700,19 @@ body[data-theme="aurora"] #chat-model-select {
     opacity: 1 !important;
 }
 
-.chat-message p { margin: 8px 0; }
+.chat-message p { 
+    margin: 8px 0; 
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
 .chat-message p:first-child { margin-top: 0; }
 .chat-message p:last-child { margin-bottom: 0; }
+.chat-message span {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
 
 /* Resize Handle */
 .chat-resize-handle {

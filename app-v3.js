@@ -1,5 +1,5 @@
 import { createSupabaseClient, loadPostsFromSupabase, loadLikedPostsFromSupabase, publishPostToSupabase, compressImageFile, uploadFileToSupabase, uploadMessageAttachment, deleteHostedPost, normalizeSupabasePost, parseYouTubeUrl, openDatabase, loadPostsFromDatabase, savePostToDatabase, deletePostFromDatabase, setApiContext } from './api-v3.js';
-import { createAppUi } from './app-v3-ui.js?v=1.4';
+import { createAppUi } from './app-v3-ui.js?v=1.5';
 import {
   getMessageAttachmentKind, isPlayablePost, formatTimestamp, 
   formatFileSize, formatKind, formatProviderName,
@@ -17,7 +17,7 @@ import {
   appendAiThreadFromLocalHistory,
   handleAiOpenOrCreateThread,
   handleAiThreadMessageSubmit
-} from "./app-v3-ai.js?v=1.1";
+} from "./app-v3-ai.js?v=1.2";
 import {
   DEFAULT_BLOCKED_TERMS,
   POST_MODERATION_ERROR,

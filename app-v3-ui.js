@@ -1,6 +1,7 @@
 import { createHeroMediaPlayerController } from "./hero-media-player.js?v=1.4";
 import { createPreviewCard, createActivePlayerStage, createActivePlayerDescriptor, resolveAppPreviewArtwork, resolveYouTubePreviewId } from "./hero-media-player-preview.js";
 import { EMOJI_PACK, EMOJI_CATEGORIES } from "./emojis.js";
+import { isDirectMessengerAiEnabled, isDirectMessengerAiProfile } from "./direct-messenger-ai-config.js";
 
 export function createAppUi(context) {
   const {
@@ -1136,11 +1137,15 @@ export function createAppUi(context) {
     return maskEmailForProfileView(normalized);
   }
 
+  function shouldHideMessengerProfile(profile) {
+    return !isDirectMessengerAiEnabled() && isDirectMessengerAiProfile(profile);
+  }
+
   function renderPeopleList(isReady) {
     const currentKey = `${isReady}-${state.availableProfiles.length}-${state.peopleSearch}-${state.messengerBusy}-${state.blockedUserIds.length}-${state.bannedUserIds.length}-${state.pendingBlockUserId}-${state.preferences.showEmail}`;
     if (currentKey === lastPeopleRenderKey) return;
     lastPeopleRenderKey = currentKey;
-    elements.peopleList.innerHTML = ""; const visibleProfiles = getFilteredPeopleProfiles();
+    elements.peopleList.innerHTML = ""; const visibleProfiles = getFilteredPeopleProfiles().filter((profile) => !shouldHideMessengerProfile(profile));
     if (!isReady) { elements.peopleEmpty.hidden = false; elements.peopleEmpty.textContent = "Sign in with an activated account to see other members."; return; }
     // Removed early return for empty availableProfiles to allow AI Companion to show
     if (visibleProfiles.length === 0) { elements.peopleEmpty.hidden = false; elements.peopleEmpty.textContent = "No people match this search."; return; }
@@ -1168,7 +1173,7 @@ export function createAppUi(context) {
     const currentKey = `${isReady}-${state.activeThreadId}-${state.conversationSearch}-${state.messengerBusy}-${state.pendingDeleteThreadId}-${threadsHash}`;
     if (currentKey === lastConversationRenderKey) return;
     lastConversationRenderKey = currentKey;
-    elements.conversationList.innerHTML = ""; const visibleThreads = getFilteredConversationThreads();
+    elements.conversationList.innerHTML = ""; const visibleThreads = getFilteredConversationThreads().filter((thread) => !shouldHideMessengerProfile(getThreadPartnerProfile(thread)));
     if (!isReady) { elements.conversationEmpty.hidden = false; elements.conversationEmpty.textContent = "Your inbox appears here after you sign in."; return; }
     if (state.directThreads.length === 0) { elements.conversationEmpty.hidden = false; elements.conversationEmpty.textContent = "Start a new conversation from the member list."; return; }
     if (visibleThreads.length === 0) { elements.conversationEmpty.hidden = false; elements.conversationEmpty.textContent = "No conversations match this search."; return; }
@@ -1194,6 +1199,15 @@ export function createAppUi(context) {
   function renderActiveThread(isReady) {
     const activeThread = getActiveThread();
     const partner = activeThread ? getThreadPartnerProfile(activeThread) : null;
+
+    if (activeThread && shouldHideMessengerProfile(partner)) {
+      elements.activeThreadLabel.textContent = "Choose a member";
+      elements.activeThreadMeta.textContent = "AI Direct Messenger is temporarily disabled.";
+      elements.messageList.innerHTML = "";
+      elements.messageEmpty.hidden = false;
+      elements.messageEmpty.textContent = "Start a conversation with a member from the list.";
+      return;
+    }
 
     if (!isReady) {
       elements.activeThreadLabel.textContent = "Sign in to open inbox";

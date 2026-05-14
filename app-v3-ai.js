@@ -1,3 +1,5 @@
+import { isDirectMessengerAiEnabled } from "./direct-messenger-ai-config.js";
+
 export const AI_COMPANION_ID = "ai-companion";
 export const AI_THREAD_ID = "thread-ai-companion";
 const AI_CREATED_AT = new Date("2026-05-01").toISOString();
@@ -115,6 +117,11 @@ export function buildAiThread(userId, { createdAt = AI_CREATED_AT, updatedAt = "
 }
 
 export function appendAiThreadFromLocalHistory({ state, threads }) {
+  if (!isDirectMessengerAiEnabled()) {
+    const safeThreads = Array.isArray(threads) ? threads : [];
+    const filtered = safeThreads.filter((thread) => thread?.id !== AI_THREAD_ID && !thread?.isAi);
+    return { threads: filtered, aiHistory: [] };
+  }
   const aiHistory = loadAiMessagesLocally(state);
   if (!Array.isArray(threads)) return { threads: [], aiHistory };
   if (aiHistory.length === 0) return { threads: [...threads], aiHistory };
@@ -135,6 +142,7 @@ export function handleAiOpenOrCreateThread({
   clearMessageAttachmentSelection,
   showMessengerFeedback
 }) {
+  if (!isDirectMessengerAiEnabled()) return false;
   if (partnerId !== AI_COMPANION_ID) return false;
   const nowIso = new Date().toISOString();
   const aiThread = buildAiThread(state?.currentUser?.id || "", {
@@ -165,6 +173,7 @@ export async function handleAiThreadMessageSubmit({
   showMessengerFeedback,
   playIncomingMessageSound
 }) {
+  if (!isDirectMessengerAiEnabled()) return false;
   const activeThread = getActiveThread();
   if (!activeThread?.isAi) return false;
 

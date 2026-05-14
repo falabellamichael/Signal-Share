@@ -418,7 +418,9 @@ body[data-theme="midnight"] .message-row.is-self .message-bubble {
 
 body[data-theme="midnight"] .message-row.is-self .message-bubble span,
 body[data-theme="midnight"] .message-row.is-self .message-bubble p {
-  color: #000000;
+  color: #000000 !important;
+  background: none !important;
+  border: none !important;
 }
 
 body[data-theme="midnight"] .profile-view-dialog {
