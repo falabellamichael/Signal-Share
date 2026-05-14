@@ -297,7 +297,8 @@ export async function handlePlayPauseAction(context, forcePlay) {
     NATIVE_ACTION_PLAY_PAUSE, desktopSnapshot,
     performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE, isNativeCapacitorApp,
     companionPromptDismissed, showCompanionPrompt,
-    toggleLocalPlayback, playHeroMedia, getNativeBridge, target
+    toggleLocalPlayback, playHeroMedia, getNativeBridge, target,
+    getActivePlayerMediaElement, normalizePlaybackState
   } = context;
 
   // 1. AUTHORITATIVE COOLDOWN
@@ -322,7 +323,33 @@ export async function handlePlayPauseAction(context, forcePlay) {
 
   let localState = "none";
   if (mode === "app") {
-    localState = target === "mini" ? state.miniPlayerPlaybackState : state.heroPlayerPlaybackState;
+    const targetHint = target === "mini" ? "mini" : (target === "hero" ? "hero" : "any");
+    const activeLocalMedia = typeof getActivePlayerMediaElement === "function"
+      ? getActivePlayerMediaElement(targetHint)
+      : null;
+
+    if (activeLocalMedia instanceof HTMLMediaElement) {
+      localState = activeLocalMedia.paused ? "paused" : "playing";
+    } else if (activeLocalMedia instanceof HTMLIFrameElement) {
+      const framePlaybackState = typeof normalizePlaybackState === "function"
+        ? normalizePlaybackState(activeLocalMedia.dataset?.playbackState || "")
+        : ((activeLocalMedia.dataset?.playbackState || "").trim().toLowerCase() || "none");
+      if (framePlaybackState === "playing" || framePlaybackState === "paused") {
+        localState = framePlaybackState;
+      }
+    }
+
+    if (localState === "none") {
+      localState = target === "mini" ? state.miniPlayerPlaybackState : state.heroPlayerPlaybackState;
+    }
+
+    if (typeof normalizePlaybackState === "function") {
+      localState = normalizePlaybackState(localState);
+    } else {
+      localState = `${localState || ""}`.trim().toLowerCase();
+      if (localState !== "playing" && localState !== "paused") localState = "none";
+    }
+
     shouldPlay = (typeof forcePlay === "boolean") ? forcePlay : (localState !== "playing");
   } else {
     // System state check with Source Isolation
@@ -372,7 +399,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
         handledLocally = true;
       }
     } else if (typeof playHeroMedia === "function") {
-      playHeroMedia();
+      playHeroMedia(shouldPlay);
       handledLocally = true;
     }
   }

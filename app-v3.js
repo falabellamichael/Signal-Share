@@ -49,12 +49,12 @@ import {
   handleAdminSettingsSubmit
 } from './admin-v3.js';
 import {
-  loadProfilesFromSupabase,
-  loadUserBansFromSupabase,
-  loadCurrentUserBanFromSupabase,
-  loadBlockedUsersFromSupabase,
-  loadSiteSettingsFromSupabase,
-  loadOwnProfileFromSupabase,
+  loadDirectThreadsFromSupabase,
+  loadMessagesFromSupabase,
+  loadThreadAttachmentPaths,
+  getOrCreateDirectThread,
+  sendMessageToSupabase,
+  syncCurrentProfileToSupabase,
   normalizeProfile,
   normalizeUserBlock,
   normalizeUserBan,
@@ -1394,37 +1394,7 @@ function mergeActiveMessage(message) {
 }
 function canonicalizeThreadPair(l, r) { return [l, r].sort((a, b) => a.localeCompare(b)); }
 
-async function syncCurrentProfileToSupabase(displayNameOverride = "") {
-  const rawDisplayName = (displayNameOverride || state.profileRecord?.displayName || getDefaultProfileName()).trim().slice(0, 40);
-  if (rawDisplayName.length < 2) throw new Error("Use a display name with at least 2 characters.");
-
-  const payload = {
-    id: state.currentUser.id,
-    email: getCurrentUserEmail(),
-    display_name: rawDisplayName
-  };
-
-  try {
-    const fullPayload = {
-      ...payload,
-      theme: state.preferences.theme, density: state.preferences.density, motion: state.preferences.motion, status_bar_strip: state.preferences.statusBarStrip, notification_hide_sender: state.preferences.notificationHideSender,
-      notification_hide_body: state.preferences.notificationHideBody, show_email: state.preferences.showEmail
-    };
-    const { data, error } = await state.supabase.from("profiles").upsert(fullPayload, { onConflict: "id" }).select().single();
-    if (error) {
-      if (error.message?.includes("column") || error.code === "PGRST204" || error.code === "42703") {
-        console.warn("[Profiles] Privacy columns missing, falling back to basic sync");
-        const { data: fallbackData, error: fallbackError } = await state.supabase.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
-        if (fallbackError) throw fallbackError;
-        return finalizeProfileSync(fallbackData);
-      }
-      throw error;
-    }
-    return finalizeProfileSync(data);
-  } catch (error) {
-    throw error;
-  }
-}
+// Profile sync logic moved to api-v3.js
 
 function finalizeProfileSync(data) {
   const profile = normalizeProfile(data);
@@ -1438,9 +1408,7 @@ function finalizeProfileSync(data) {
 
 // refreshCurrentUserBanState moved to admin-v3.js
 
-async function loadDirectThreadsFromSupabase() { const userId = state.currentUser.id; const { data, error } = await state.supabase.from("direct_threads").select("*").or(`user_one_id.eq.${userId},user_two_id.eq.${userId}`).order("updated_at", { ascending: false }); if (error) throw error; return data.map(normalizeDirectThread); }
-async function loadMessagesFromSupabase(threadId) { const { data, error } = await state.supabase.from("messages").select("*").eq("thread_id", threadId).order("created_at", { ascending: true }); if (error) throw error; return data.map(normalizeMessage); }
-async function loadThreadAttachmentPaths(threadId) { const { data, error } = await state.supabase.from("messages").select("attachment_file_path").eq("thread_id", threadId).not("attachment_file_path", "is", null); if (error) throw error; return data.map((row) => row.attachment_file_path).filter((path) => typeof path === "string" && path.trim()); }
+// Messenger API functions moved to api-v3.js
 
 function isBlobUrl(value) {
   return typeof value === "string" && /^blob:/i.test(value.trim());
@@ -1712,20 +1680,7 @@ async function openOrCreateThread(partnerId) {
   try {
     state.messengerBusy++;
     renderMessenger();
-    const [userOneId, userTwoId] = canonicalizeThreadPair(state.currentUser.id, partnerId);
-    const { data: existingThread, error: existingError } = await state.supabase.from("direct_threads").select("*").eq("user_one_id", userOneId).eq("user_two_id", userTwoId).maybeSingle();
-    if (existingError) throw existingError;
-    let thread = existingThread ? normalizeDirectThread(existingThread) : null;
-    if (!thread) {
-      const { data: insertedThread, error: insertError } = await state.supabase.from("direct_threads").insert({ user_one_id: userOneId, user_two_id: userTwoId }).select().single();
-      if (insertError) {
-        if (insertError.code === "23505") {
-          const { data: duplicateThread, error: duplicateError } = await state.supabase.from("direct_threads").select("*").eq("user_one_id", userOneId).eq("user_two_id", userTwoId).single();
-          if (duplicateError) throw duplicateError;
-          thread = normalizeDirectThread(duplicateThread);
-        } else throw insertError;
-      } else thread = normalizeDirectThread(insertedThread);
-    }
+    const thread = await getOrCreateDirectThread(partnerId);
     mergeThread(thread);
     state.activeThreadId = thread.id;
 
@@ -1835,28 +1790,15 @@ async function handleMessageSubmit(event) {
     mergeActiveMessage(optimisticMessage);
     renderMessenger();
 
-    let attachmentPayload = {};
-    if (attachmentFile) {
-      attachmentPayload = await uploadMessageAttachment(state.activeThreadId, messageId, attachmentFile, (percentage) => {
-        showMessengerFeedback(`Uploading attachment: ${percentage}%...`);
-      });
-    }
-
-    const { data, error } = await state.supabase
-      .from("messages")
-      .insert({
-        id: messageId,
-        thread_id: state.activeThreadId,
-        sender_id: state.currentUser.id,
-        body: body || null,
-        ...attachmentPayload,
-      });
-
-    if (error) throw error;
+    const sentMessage = await sendMessageToSupabase(state.activeThreadId, body, attachmentFile, (percentage) => {
+      showMessengerFeedback(`Uploading attachment: ${percentage}%...`);
+    });
+       mergeActiveMessage(sentMessage);
+    renderMessenger();
 
     if (state.messagesChannel) {
       const recipientId = getThreadPartnerId(state.directThreads.find(t => t.id === state.activeThreadId));
-      const targetChannelName = `messenger_live_${recipientId.slice(0, 8)}`;
+      const targetChannelName = `messenger_live_${recipientId.slice(0, 8)}`; 
 
       const tempChannel = state.supabase.channel(targetChannelName);
       tempChannel.subscribe((status) => {
@@ -1866,12 +1808,17 @@ async function handleMessageSubmit(event) {
             event: "new-message",
             payload: {
               payload: {
-                id: messageId,
-                thread_id: state.activeThreadId,
-                sender_id: state.currentUser.id,
-                body: body || null,
-                created_at: new Date().toISOString(),
-                ...attachmentPayload
+                id: sentMessage.id,
+                thread_id: sentMessage.threadId,
+                sender_id: sentMessage.senderId,
+                body: sentMessage.body,
+                attachment_url: sentMessage.attachmentUrl,
+                attachment_file_path: sentMessage.attachmentFilePath,
+                attachment_name: sentMessage.attachmentName,
+                attachment_type: sentMessage.attachmentType,
+                attachment_size: sentMessage.attachmentSize,
+                attachment_kind: sentMessage.attachmentKind,
+                created_at: sentMessage.createdAt
               }
             }
           }).then(() => {
@@ -1881,7 +1828,8 @@ async function handleMessageSubmit(event) {
       });
     }
 
-    const notificationDispatch = await triggerMessageNotificationDispatch(messageId);
+    const notificationDispatch = await triggerMessageNotificationDispatch(sentMessage.id);
+;
     if (notificationDispatch && notificationDispatch.skipped !== true && Number(notificationDispatch.sent ?? 0) === 0) {
       console.warn("Message notification was not confirmed by any target", notificationDispatch);
     }

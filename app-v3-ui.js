@@ -2212,7 +2212,7 @@ export function createAppUi(context) {
     applyPlayerVolumeToActiveElement();
   }
 
-  function playHeroMedia() {
+  function playHeroMedia(forcePlay) {
     const post = getHeroPost();
     if (!post) return;
 
@@ -2236,7 +2236,8 @@ export function createAppUi(context) {
           : state.heroPlayerElement.querySelector("video, audio, iframe"));
 
       if (media instanceof HTMLMediaElement) {
-        if (media.paused) {
+        const shouldPlay = typeof forcePlay === "boolean" ? forcePlay : media.paused;
+        if (shouldPlay) {
           console.log("[HeroUI] Local media: Play");
           media.play().catch((err) => { console.error("[HeroUI] Play failed", err); });
           state.heroPlayerPlaybackState = "playing";
@@ -2248,13 +2249,20 @@ export function createAppUi(context) {
         heroMediaPlayerController.render();
         return;
       } else if (media instanceof HTMLIFrameElement && post.sourceKind === "youtube") {
-        const isPlaying = state.heroPlayerPlaybackState === "playing";
+        const isPlaying = (media.dataset.playbackState === "playing") || state.heroPlayerPlaybackState === "playing";
+        const shouldPlay = typeof forcePlay === "boolean" ? forcePlay : !isPlaying;
         console.log(`[HeroUI] YouTube media: ${isPlaying ? "Pause" : "Play"}`);
-        postMessageToYouTubePlayer(media, isPlaying ? "pauseVideo" : "playVideo");
-        state.heroPlayerPlaybackState = isPlaying ? "paused" : "playing";
+        postMessageToYouTubePlayer(media, shouldPlay ? "playVideo" : "pauseVideo");
+        state.heroPlayerPlaybackState = shouldPlay ? "playing" : "paused";
+        media.dataset.playbackState = shouldPlay ? "playing" : "paused";
         heroMediaPlayerController.render();
         return;
       } else if (post.sourceKind === "spotify") {
+        if (forcePlay === true) {
+          state.heroPlayerPlaybackState = "playing";
+          heroMediaPlayerController.render();
+          return;
+        }
         // SPECIAL CASE: For Spotify in Feed mode, "Pause" unmounts the active player and returns to preview
         console.log("[HeroUI] Spotify media: Reverting to preview (pause)");
         if (state.heroPlayerElement) {

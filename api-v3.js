@@ -78,6 +78,123 @@ export async function loadSiteSettingsFromSupabase() {
   return data ? normalizeSiteSettings(data) : null;
 }
 
+export async function syncCurrentProfileToSupabase(displayNameOverride = "") {
+  const { state } = apiContext;
+  if (!state.currentUser) throw new Error("Authentication required to sync profile.");
+  
+  const displayName = (displayNameOverride || state.currentUser.displayName || "").trim().slice(0, 40);
+  if (displayName.length < 2) throw new Error("Use a display name with at least 2 characters.");
+
+  const payload = {
+    id: state.currentUser.id,
+    email: state.currentUser.email,
+    display_name: displayName,
+    theme: state.preferences?.theme || "",
+    density: state.preferences?.density || "",
+    motion: state.preferences?.motion || "",
+    status_bar_strip: state.preferences?.statusBarStrip ?? null,
+    notification_hide_sender: Boolean(state.preferences?.notificationHideSender),
+    notification_hide_body: Boolean(state.preferences?.notificationHideBody),
+    show_email: state.preferences?.showEmail ?? null,
+    updated_at: new Date().toISOString()
+  };
+
+  const { data, error } = await state.supabase.from("profiles").upsert(payload, { onConflict: "id" }).select().single();
+  if (error) throw error;
+  return normalizeProfile(data);
+}
+
+export async function loadDirectThreadsFromSupabase() {
+  if (!apiContext.state.currentUser) return [];
+  const userId = apiContext.state.currentUser.id;
+  const { data, error } = await apiContext.state.supabase
+    .from("direct_threads")
+    .select("*")
+    .or(`user_one_id.eq.${userId},user_two_id.eq.${userId}`)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return data.map(normalizeDirectThread);
+}
+
+export async function loadMessagesFromSupabase(threadId) {
+  const { data, error } = await apiContext.state.supabase
+    .from("messages")
+    .select("*")
+    .eq("thread_id", threadId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data.map(normalizeMessage);
+}
+
+export async function loadThreadAttachmentPaths(threadId) {
+  const { data, error } = await apiContext.state.supabase
+    .from("messages")
+    .select("attachment_file_path")
+    .eq("thread_id", threadId)
+    .not("attachment_file_path", "is", null);
+  if (error) throw error;
+  return data.map((row) => row.attachment_file_path).filter((path) => typeof path === "string" && path.trim());
+}
+
+export async function getOrCreateDirectThread(partnerId) {
+  if (!apiContext.state.currentUser || !partnerId) throw new Error("Missing requirements for thread creation.");
+  const [userOneId, userTwoId] = [apiContext.state.currentUser.id, partnerId].sort();
+  const { data: existing, error: existingError } = await apiContext.state.supabase
+    .from("direct_threads")
+    .select("*")
+    .eq("user_one_id", userOneId)
+    .eq("user_two_id", userTwoId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (existing) return normalizeDirectThread(existing);
+
+  const { data: inserted, error: insertError } = await apiContext.state.supabase
+    .from("direct_threads")
+    .insert({ user_one_id: userOneId, user_two_id: userTwoId })
+    .select()
+    .single();
+  if (insertError) {
+    if (insertError.code === "23505") {
+      const { data: duplicate, error: duplicateError } = await apiContext.state.supabase
+        .from("direct_threads")
+        .select("*")
+        .eq("user_one_id", userOneId)
+        .eq("user_two_id", userTwoId)
+        .single();
+      if (duplicateError) throw duplicateError;
+      return normalizeDirectThread(duplicate);
+    }
+    throw insertError;
+  }
+  return normalizeDirectThread(inserted);
+}
+
+export async function sendMessageToSupabase(threadId, text, attachmentFile, onProgress) {
+  if (!apiContext.state.currentUser || !threadId) throw new Error("Missing requirements for message delivery.");
+  const messageId = crypto.randomUUID();
+  let attachment = null;
+  if (attachmentFile) {
+    attachment = await uploadMessageAttachment(threadId, messageId, attachmentFile, onProgress);
+  }
+
+  const payload = {
+    id: messageId,
+    thread_id: threadId,
+    sender_id: apiContext.state.currentUser.id,
+    body: text || "",
+    attachment_url: attachment?.attachment_url ?? null,
+    attachment_file_path: attachment?.attachment_file_path ?? null,
+    attachment_name: attachment?.attachment_name ?? null,
+    attachment_type: attachment?.attachment_type ?? null,
+    attachment_size: attachment?.attachment_size ?? null,
+    attachment_kind: attachment?.attachment_kind ?? null
+  };
+
+  const { data, error } = await apiContext.state.supabase.from("messages").insert(payload).select().single();
+  if (error) throw error;
+  return normalizeMessage(data);
+}
+
 
 
 export async function publishPostToSupabase(post, onProgress) {
@@ -299,8 +416,8 @@ export function normalizeMessage(row) {
   return {
     id: row.id,
     threadId: row.thread_id,
-    authorId: row.author_id,
-    text: row.text ?? "",
+    senderId: row.sender_id,
+    body: row.body ?? "",
     attachmentUrl: row.attachment_url ?? null,
     attachmentFilePath: row.attachment_file_path ?? null,
     attachmentName: row.attachment_name ?? null,

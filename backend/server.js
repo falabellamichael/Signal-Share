@@ -1379,8 +1379,15 @@ async function syncToSupabase() {
       device_name: "Desktop PC",
       updated_at: new Date().toISOString(),
     });
-    if (!error) lastSupabaseSyncKey = syncKey;
-  } catch (error) { }
+    if (!error) {
+      lastSupabaseSyncKey = syncKey;
+      console.log(`[Bridge] Snapshot synced to Supabase: ${payload.title || "Idle"}`);
+    } else {
+      console.error(`[Bridge] Supabase sync error:`, error.message);
+    }
+  } catch (error) {
+    console.error(`[Bridge] Unexpected sync error:`, error);
+  }
 }
 
 function subscribeToMediaActions() {
@@ -1390,7 +1397,7 @@ function subscribeToMediaActions() {
     event: 'INSERT', schema: 'public', table: 'system_media_actions', filter: `user_id=eq.${userId}`
   }, async (payload) => {
     const { action, app_package } = payload.new;
-    console.log(`[Bridge] Remote action: ${action}`);
+    console.log(`[Bridge] Remote action received from Supabase: ${action}`);
     if (action === "open_uri") {
       if (payload.new.uri) {
         try {
