@@ -13,6 +13,10 @@ export function setApiContext(context) {
   apiContext = { ...apiContext, ...context };
 }
 
+export function getApiContext() {
+  return apiContext;
+}
+
 export function createSupabaseClient() {
   if (window.__supabaseClient) return window.__supabaseClient;
   const client = window.supabase.createClient(apiContext.APP_CONFIG.supabaseUrl, apiContext.APP_CONFIG.supabaseAnonKey, {
@@ -34,6 +38,44 @@ export async function loadLikedPostsFromSupabase() {
   const { data, error } = await apiContext.state.supabase.from(apiContext.POST_LIKES_TABLE).select("post_id").eq("user_id", apiContext.state.currentUser.id); 
   if (error) throw error; 
   return data.map((row) => row.post_id).filter((id) => typeof id === "string" && id.trim()); 
+}
+
+export async function loadProfilesFromSupabase() {
+  const { data, error } = await apiContext.state.supabase.from("profiles").select("*").order("display_name", { ascending: true });
+  if (error) throw error;
+  return data.map(normalizeProfile);
+}
+
+export async function loadOwnProfileFromSupabase() {
+  if (!apiContext.state.currentUser) return null;
+  const { data, error } = await apiContext.state.supabase.from("profiles").select("*").eq("id", apiContext.state.currentUser.id).maybeSingle();
+  if (error) throw error;
+  return data ? normalizeProfile(data) : null;
+}
+
+export async function loadUserBansFromSupabase() {
+  const { data, error } = await apiContext.state.supabase.from("user_bans").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data.map(normalizeUserBan);
+}
+
+export async function loadCurrentUserBanFromSupabase() {
+  if (!apiContext.state.supabase || !apiContext.state.currentUser) return null;
+  const { data, error } = await apiContext.state.supabase.from("user_bans").select("*").eq("banned_id", apiContext.state.currentUser.id).maybeSingle();
+  if (error) throw error;
+  return data ? normalizeUserBan(data) : null;
+}
+
+export async function loadBlockedUsersFromSupabase() {
+  const { data, error } = await apiContext.state.supabase.from("user_blocks").select("*").eq("blocker_id", apiContext.state.currentUser.id);
+  if (error) throw error;
+  return data.map(normalizeUserBlock);
+}
+
+export async function loadSiteSettingsFromSupabase() {
+  const { data, error } = await apiContext.state.supabase.from("site_settings").select("*").eq("id", "global").maybeSingle();
+  if (error) throw error;
+  return data ? normalizeSiteSettings(data) : null;
 }
 
 export async function publishPostToSupabase(post, onProgress) {
@@ -214,6 +256,52 @@ export function normalizeSupabasePost(row) {
   }
   
   return post;
+}
+
+export function normalizeProfile(row) {
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    theme: typeof row.theme === "string" ? row.theme : "",
+    density: typeof row.density === "string" ? row.density : "",
+    motion: typeof row.motion === "string" ? row.motion : "",
+    statusBarStrip: typeof row.status_bar_strip === "boolean" ? row.status_bar_strip : null,
+    notificationHideSender: Boolean(row.notification_hide_sender),
+    notificationHideBody: Boolean(row.notification_hide_body),
+    showEmail: typeof row.show_email === "boolean" ? row.show_email : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+export function normalizeUserBlock(row) {
+  return { blockerId: row.blocker_id, blockedId: row.blocked_id, createdAt: row.created_at };
+}
+
+export function normalizeUserBan(row) {
+  return { bannedId: row.banned_id, bannedBy: row.banned_by, reason: row.reason ?? "", createdAt: row.created_at };
+}
+
+export function normalizeSiteSettings(row = {}) {
+  const defaults = {
+    shellWidth: 1200,
+    sectionGap: 24,
+    surfaceRadius: 32,
+    mediaFit: "cover"
+  };
+  
+  const clampNumber = (val, min, max, def) => {
+    const num = Number(val);
+    return Number.isFinite(num) ? Math.min(max, Math.max(min, num)) : def;
+  };
+
+  return {
+    shellWidth: clampNumber(row.shell_width, 960, 1440, defaults.shellWidth),
+    sectionGap: clampNumber(row.section_gap, 16, 40, defaults.sectionGap),
+    surfaceRadius: clampNumber(row.surface_radius, 22, 44, defaults.surfaceRadius),
+    mediaFit: row.media_fit === "contain" ? "contain" : defaults.mediaFit
+  };
 }
 
 export function parseYouTubeUrl(raw) {

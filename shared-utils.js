@@ -246,3 +246,24 @@ export function isNative() {
   if (typeof window === "undefined") return false;
   return Boolean(window.Capacitor && window.Capacitor.isNativePlatform?.());
 }
+
+/**
+ * Formats an email address into a friendly display name.
+ */
+export function formatDisplayNameFromEmail(email) {
+  if (!email || typeof email !== "string") return "";
+  const [localPart] = email.split("@");
+  if (!localPart) return "";
+  // Capitalize first letter and replace dots/dashes with spaces
+  return localPart.charAt(0).toUpperCase() + localPart.slice(1).replace(/[._-]+/g, " ");
+}
+
+/**
+ * Resolves a member's display name from their profile or email.
+ */
+export function resolveMemberDisplayName(profile, fallback = "Member") {
+  if (!profile) return fallback;
+  const displayName = profile.displayName;
+  const prettyEmailName = formatDisplayNameFromEmail(profile.email);
+  return prettyEmailName || (displayName ? displayName.slice(0, 40) : fallback);
+}

@@ -5,7 +5,7 @@ import {
   formatFileSize, formatKind, formatProviderName,
   formatPostBadge, formatPostMeta,
   clampNumber, parseTags, getMediaKind, compareByNewest,
-  getLatestPostedPostId
+  getLatestPostedPostId, resolveMemberDisplayName, formatDisplayNameFromEmail
 } from './shared-utils.js';
 import {
   AI_COMPANION_ID,
@@ -17,40 +17,50 @@ import {
   handleAiOpenOrCreateThread,
   handleAiThreadMessageSubmit
 } from "./app-v3-ai.js?v=1.1";
+import {
+  DEFAULT_BLOCKED_TERMS,
+  POST_MODERATION_ERROR,
+  DEFAULT_SITE_SETTINGS,
+  setAdminUiContext,
+  normalizeEmailForMatch,
+  getCurrentUserEmailCandidates,
+  isCurrentUserAdmin,
+  isCurrentUserMasterAdmin,
+  canRevealMemberEmails,
+  canAccessAdminBanPanel,
+  canDeletePost,
+  canCurrentUserUploadMediaKind,
+  getRestrictedUploadMessage,
+  normalizeModerationText,
+  getActiveBlockedTerms,
+  findBlockedPostTerm,
+  isPostModerationError,
+  isCurrentUserBanned,
+  isUserBanned,
+  isUserBlocked,
+  isBlockingBackendUnavailable,
+  isBanningBackendUnavailable,
+  refreshAdminBanState,
+  toggleUserBan,
+  toggleProfileBlock,
+  refreshCurrentUserBanState,
+  getSiteSettingsPayload,
+  handleAdminSettingsSubmit
+} from './admin-v3.js';
+import {
+  loadProfilesFromSupabase,
+  loadUserBansFromSupabase,
+  loadCurrentUserBanFromSupabase,
+  loadBlockedUsersFromSupabase,
+  loadSiteSettingsFromSupabase,
+  loadOwnProfileFromSupabase,
+  normalizeProfile,
+  normalizeUserBlock,
+  normalizeUserBan,
+  normalizeSiteSettings
+} from './api-v3.js';
 
-// Ban Helper Functions
-
-/**
- * Check if current user is banned
- * @param {object} state - The application state
- * @returns {boolean} True if user is banned, false otherwise
- */
-function isCurrentUserBanned(state) {
-  try {
-    return state.currentUserBanned || false;
-  } catch (error) {
-    console.error("Error in isCurrentUserBanned:", error);
-    return false;
-  }
-}
-
-/**
- * Check if a specific user is banned
- * @param {object} state - The application state
- * @param {string} userId - The user ID to check
- * @returns {boolean} True if user is banned, false otherwise
- */
-function isUserBanned(state, userId) {
-  try {
-    if (!Array.isArray(state.bannedUserIds)) {
-      return false;
-    }
-    return state.bannedUserIds.includes(userId);
-  } catch (error) {
-    console.error("Error in isUserBanned:", error);
-    return false;
-  }
-}
+// User helper functions moved to admin-v3.js
 
 /**
  * Check if messaging is enabled
@@ -70,23 +80,10 @@ function canPublishToLiveFeed(state) {
   return Boolean(state.currentUser) && !isCurrentUserBanned(state);
 }
 
-/**
- * Check if user is blocked
- * @param {object} state - The application state
- * @param {string} userId - The user ID to check
- * @returns {boolean} True if user is blocked, false otherwise
- */
-function isUserBlocked(state, userId) {
-  return Array.isArray(state.blockedUserIds) && state.blockedUserIds.includes(userId);
-}
+// Visibility and access checks moved to admin-v3.js
 
-/**
- * Check if user can access admin ban panel
- * @param {object} state - The application state
- * @returns {boolean} True if user has admin privileges
- */
-function canAccessAdminBanPanel(state) {
-  return Boolean(state.currentUser) && isCurrentUserAdmin();
+function canAccessAdminBanPanelLocal(state) {
+  return canAccessAdminBanPanel(state, APP_CONFIG);
 }
 
 const DEMO_POSTS = [
@@ -178,7 +175,7 @@ const MAX_MESSAGE_LENGTH = 2000;
 const DEFAULT_MESSAGE_NOTIFICATION_TITLE = "Signal Share";
 const FEED_POSTS_PER_PAGE = 12;
 
-const POST_MODERATION_ERROR = "Content blocked. Please revise your text to meet community standards.";
+// Constants moved to admin-v3.js
 
 const LIKED_POSTS_KEY = "signal-share-liked";
 const POST_LIKES_TABLE = "post_likes";
@@ -195,17 +192,7 @@ const EXTERNAL_PROVIDERS = Object.freeze(["youtube", "spotify"]);
 const DEFAULT_PLAYER_VOLUME = 0.8;
 const DEFAULT_AUTH_REDIRECT_URL = "https://falabellamichael.github.io/Signal-Share/";
 
-const DEFAULT_BLOCKED_TERMS = Object.freeze([
-  "scam", "spam", "fraud", "phish", "buy cheap", "guaranteed win",
-  "cryptocurrency", "nft whitelist", "airdrop", "ponzi"
-]);
-
-const DEFAULT_SITE_SETTINGS = Object.freeze({
-  shellWidth: 1200,
-  sectionGap: 24,
-  surfaceRadius: 32,
-  mediaFit: "cover"
-});
+// Constants moved to admin-v3.js
 
 const DEFAULT_USER_PREFERENCES = Object.freeze({
   theme: "sunset",
@@ -1141,7 +1128,7 @@ async function initialize() {
       const { data: { session } } = await state.supabase.auth.getSession();
       state.currentUser = session?.user ?? null;
       state.authRestoring = false;
-      await refreshCurrentUserBanState();
+      await refreshCurrentUserBanState(state, APP_CONFIG);
       if (isMessagingEnabled(state)) {
         await refreshMessengerState();
         await flushPendingNotificationThread();
@@ -1176,6 +1163,14 @@ async function initialize() {
   elements.viewer.removeAttribute("hidden");
   hydrateRememberedCreator();
   attachEventListeners();
+  
+  // Initialize Admin Module
+  setAdminUiContext({
+    render, showOverlay, hideOverlay, showAuthFeedback, showMessengerFeedback,
+    renderMessenger, renderAdminBanPanel, showAdminBanFeedback, refreshMessengerState,
+    isMessagingEnabled, elements
+  });
+
   void safelyInitializeMessengerLifecycleSync();
   void safelyInitializeNativeBackHandling();
   void safelyInitializeNativePushNotifications();
@@ -1201,7 +1196,7 @@ async function handleAuthStateChange(event, session) {
     state.bannedUserIds = [];
     state.adminBanPanelOpen = false;
   } else {
-    await refreshCurrentUserBanState();
+    await refreshCurrentUserBanState(state, APP_CONFIG);
   }
   if (event === "INITIAL_SESSION") {
     await refreshLikedPostsState();
@@ -1294,7 +1289,7 @@ function handleSelectedFile(file) {
   const mediaKind = getMediaKind(file.type);
   const sizeLimit = mediaKind === "image" ? MAX_IMAGE_FILE_SIZE : MAX_VIDEO_FILE_SIZE;
   if (file.size > sizeLimit) { clearSelectedMedia(); showFeedback(`Choose a ${mediaKind} smaller than ${mediaKind === "image" ? "50 MB" : "15 MB"}.`, true); return; }
-  if (!canCurrentUserUploadMediaKind(mediaKind)) { clearSelectedMedia(); showFeedback(getRestrictedUploadMessage(mediaKind), true); return; }
+  if (!canCurrentUserUploadMediaKind(mediaKind, state, APP_CONFIG)) { clearSelectedMedia(); showFeedback(getRestrictedUploadMessage(mediaKind), true); return; }
   if (elements.externalUrlInput.value.trim()) { elements.externalUrlInput.value = ""; state.previewExternal = null; }
   state.selectedFile = file;
   updateSourceHelp("upload");
@@ -1331,7 +1326,7 @@ async function handleFormSubmit(event) {
   if (!state.selectedFile && !parsedExternal) { showFeedback("Add either an uploaded file or a YouTube / Spotify link.", true); return; }
   if (elements.externalUrlInput.value.trim() && !parsedExternal) { showFeedback("That external link is not a supported YouTube or Spotify URL.", true); return; }
   if (findBlockedPostTerm({ creator, title, caption, tags })) { showFeedback(POST_MODERATION_ERROR, true); return; }
-  if (state.selectedFile) { const mediaKind = getMediaKind(state.selectedFile.type); if (!canCurrentUserUploadMediaKind(mediaKind)) { showFeedback(getRestrictedUploadMessage(mediaKind), true); return; } }
+  if (state.selectedFile) { const mediaKind = getMediaKind(state.selectedFile.type); if (!canCurrentUserUploadMediaKind(mediaKind, state, APP_CONFIG)) { showFeedback(getRestrictedUploadMessage(mediaKind), true); return; } }
   const basePost = { id: `user-${crypto.randomUUID()}`, creator, title, caption, tags, likes: 0, createdAt: new Date().toISOString() };
   try {
     let post;
@@ -1366,45 +1361,16 @@ function clearMessengerState() {
   clearMessageAttachmentSelection({ preserveFeedback: true });
 }
 
-async function refreshAdminBanState() {
-  if (!canAccessAdminBanPanel(state)) { renderAdminBanPanel(); return; }
-  state.adminBanBusy = true; state.adminBanFeedback = ""; state.adminBanFeedbackIsError = false; renderAdminBanPanel();
-  try {
-    const [profilesResult, bansResult] = await Promise.allSettled([loadProfilesFromSupabase(), loadUserBansFromSupabase()]);
-    if (profilesResult.status !== "fulfilled") throw profilesResult.reason;
-    let bans = []; state.banningAvailable = true;
-    if (bansResult.status === "fulfilled") bans = bansResult.value;
-    else if (isBanningBackendUnavailable(bansResult.reason)) { state.banningAvailable = false; state.bannedUserIds = []; state.adminBanFeedback = "Run the latest Supabase schema to enable account bans."; state.adminBanFeedbackIsError = true; }
-    else throw bansResult.reason;
-    state.availableProfiles = profilesResult.value.filter((profile) => profile.id !== state.currentUser.id);
-    if (state.banningAvailable) state.bannedUserIds = bans.map((ban) => ban.bannedId);
-  } catch (error) { console.error("Admin ban state could not be loaded", error); state.adminBanFeedback = "Ban controls could not be loaded."; state.adminBanFeedbackIsError = true; }
-  finally { state.adminBanBusy = false; renderAdminBanPanel(); }
+async function refreshAdminBanStateLocal() {
+  return refreshAdminBanState(state, APP_CONFIG);
 }
 
-async function toggleUserBan(profile) {
-  if (!canAccessAdminBanPanel(state) || !profile?.id || !state.currentUser) { showAdminBanFeedback("Only live admin accounts can ban members.", true); return; }
-  if (!state.banningAvailable) { showAdminBanFeedback("Run the latest Supabase schema to enable account bans.", true); return; }
-  const displayName = resolveMemberDisplayName(profile); const banned = isUserBanned(state, profile.id);
-  try {
-    state.adminBanBusy = true; state.pendingBanUserId = ""; renderAdminBanPanel();
-    if (banned) { const { error } = await state.supabase.from("user_bans").delete().eq("banned_id", profile.id); if (error) throw error; }
-    else { const { error } = await state.supabase.from("user_bans").insert({ banned_id: profile.id, banned_by: state.currentUser.id }); if (error && error.code !== "23505") throw error; }
-    const successMessage = `${displayName} is ${banned ? "unbanned" : "banned"}.`; await refreshAdminBanState(); state.adminBanFeedback = successMessage; state.adminBanFeedbackIsError = false; renderAdminBanPanel();
-    if (isMessagingEnabled(state)) await refreshMessengerState({ preserveActiveThread: true });
-  } catch (error) { console.error("User ban update failed", error); state.adminBanBusy = false; const details = formatBackendError(error); showAdminBanFeedback(details ? `That member could not be ${banned ? "unbanned" : "banned"}. ${details}` : `That member could not be ${banned ? "unbanned" : "banned"}.`, true); }
+function toggleUserBanLocal(profile) {
+  return toggleUserBan(profile, state, APP_CONFIG);
 }
 
-async function toggleProfileBlock(profile) {
-  if (!isMessagingEnabled(state) || !profile?.id || !state.currentUser) { showMessengerFeedback("Sign in with an activated account before blocking members.", true); return; }
-  if (!state.blockingAvailable) { showMessengerFeedback("Blocking needs the latest Supabase messenger schema.", true); return; }
-  const displayName = resolveMemberDisplayName(profile); const blocked = isUserBlocked(state, profile.id);
-  try {
-    state.messengerBusy++; state.pendingBlockUserId = ""; state.pendingDeleteThreadId = ""; renderMessenger();
-    if (blocked) { const { error } = await state.supabase.from("user_blocks").delete().eq("blocker_id", state.currentUser.id).eq("blocked_id", profile.id); if (error) throw error; }
-    else { const { error } = await state.supabase.from("user_blocks").insert({ blocker_id: state.currentUser.id, blocked_id: profile.id }); if (error && error.code !== "23505") throw error; }
-    await refreshMessengerState({ preserveActiveThread: true }); showMessengerFeedback(`${displayName} is ${blocked ? "unblocked" : "blocked"}.`);
-  } catch (error) { console.error("Member block update failed", error); state.messengerBusy = Math.max(0, state.messengerBusy - 1); const details = formatBackendError(error); showMessengerFeedback(details ? `That member could not be ${blocked ? "unblocked" : "blocked"}. ${details}` : `That member could not be ${blocked ? "unblocked" : "blocked"}.`, true); renderMessenger(); }
+function toggleProfileBlockLocal(profile) {
+  return toggleProfileBlock(profile, state);
 }
 
 function getDefaultProfileName() {
@@ -1428,26 +1394,8 @@ function resolveMemberDisplayName(profile, fallback = "Member") {
   const prettyEmailName = formatDisplayNameFromEmail(profile.email); 
   return prettyEmailName || (displayName ? displayName.slice(0, 40) : fallback); 
 }
-function normalizeProfile(row) {
-  return {
-    id: row.id,
-    email: row.email,
-    displayName: row.display_name,
-    theme: typeof row.theme === "string" ? row.theme : "",
-    density: typeof row.density === "string" ? row.density : "",
-    motion: typeof row.motion === "string" ? row.motion : "",
-    statusBarStrip: typeof row.status_bar_strip === "boolean" ? row.status_bar_strip : null,
-    notificationHideSender: Boolean(row.notification_hide_sender),
-    notificationHideBody: Boolean(row.notification_hide_body),
-    showEmail: typeof row.show_email === "boolean" ? row.show_email : null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
-function normalizeUserBlock(row) { return { blockerId: row.blocker_id, blockedId: row.blocked_id, createdAt: row.created_at }; }
-function normalizeUserBan(row) { return { bannedId: row.banned_id, bannedBy: row.banned_by, reason: row.reason ?? "", createdAt: row.created_at }; }
-function normalizeDirectThread(row) { return { id: row.id, userOneId: row.user_one_id, userTwoId: row.user_two_id, createdAt: row.created_at, updatedAt: row.updated_at }; }
-function normalizeMessage(row) { return { id: row.id, threadId: row.thread_id, senderId: row.sender_id, body: row.body ?? "", attachmentUrl: row.attachment_url ?? "", attachmentFilePath: row.attachment_file_path ?? "", attachmentName: row.attachment_name ?? "", attachmentType: row.attachment_type ?? "", attachmentSize: Number(row.attachment_size ?? 0), attachmentKind: row.attachment_kind ?? "", createdAt: row.created_at }; }
+// Data normalization moved to api-v3.js and admin-v3.js
+// Data normalization moved to api-v3.js
 function getThreadPartnerId(thread) { if (!thread || !state.currentUser) return ""; return thread.userOneId === state.currentUser.id ? thread.userTwoId : thread.userOneId; }
 function getThreadPartnerProfile(thread) { 
   const partnerId = getThreadPartnerId(thread); 
@@ -1528,35 +1476,9 @@ function finalizeProfileSync(data) {
   return profile;
 }
 
-async function loadOwnProfileFromSupabase() { const { data, error } = await state.supabase.from("profiles").select("*").eq("id", state.currentUser.id).maybeSingle(); if (error) throw error; return data ? normalizeProfile(data) : null; }
-async function loadProfilesFromSupabase() { const { data, error } = await state.supabase.from("profiles").select("*").order("display_name", { ascending: true }); if (error) throw error; return data.map(normalizeProfile); }
-async function loadBlockedUsersFromSupabase() { const { data, error } = await state.supabase.from("user_blocks").select("*").eq("blocker_id", state.currentUser.id); if (error) throw error; return data.map(normalizeUserBlock); }
-async function loadUserBansFromSupabase() { const { data, error } = await state.supabase.from("user_bans").select("*").order("created_at", { ascending: false }); if (error) throw error; return data.map(normalizeUserBan); }
-async function loadCurrentUserBanFromSupabase() { if (!state.supabase || !state.currentUser) return null; const { data, error } = await state.supabase.from("user_bans").select("*").eq("banned_id", state.currentUser.id).maybeSingle(); if (error) throw error; return data ? normalizeUserBan(data) : null; }
+// Data loaders moved to api-v3.js
 
-async function refreshCurrentUserBanState() {
-  state.currentUserBanned = false;
-  if (!state.supabase || state.backendMode !== "supabase" || !state.currentUser) { hideOverlay(); return; }
-  try {
-    const profile = await loadOwnProfileFromSupabase();
-    if (profile) {
-      state.profileRecord = profile;
-      updateUserPreferences({
-        ...state.preferences,
-        theme: profile.theme || state.preferences.theme,
-        density: profile.density || state.preferences.density,
-        motion: profile.motion || state.preferences.motion,
-        statusBarStrip: typeof profile.statusBarStrip === "boolean" ? profile.statusBarStrip : state.preferences.statusBarStrip,
-        notificationHideSender: profile.notificationHideSender,
-        notificationHideBody: profile.notificationHideBody,
-        showEmail: typeof profile.showEmail === "boolean" ? profile.showEmail : state.preferences.showEmail
-      });
-    }
-    state.currentUserBanned = Boolean(await loadCurrentUserBanFromSupabase());
-    if (state.currentUserBanned) { state.adminBanPanelOpen = false; state.messengerOpen = false; state.messengerExpanded = false; state.activeThreadId = null; state.activeMessages = []; showAuthFeedback("This account has been banned from posting and Direct Messenger.", true); showOverlay(); }
-    else { hideOverlay(); }
-  } catch (error) { if (isBanningBackendUnavailable(error)) { state.banningAvailable = false; console.warn("Account ban checks are unavailable on the current Supabase schema.", error); return; } throw error; }
-}
+// refreshCurrentUserBanState moved to admin-v3.js
 
 async function loadDirectThreadsFromSupabase() { const userId = state.currentUser.id; const { data, error } = await state.supabase.from("direct_threads").select("*").or(`user_one_id.eq.${userId},user_two_id.eq.${userId}`).order("updated_at", { ascending: false }); if (error) throw error; return data.map(normalizeDirectThread); }
 async function loadMessagesFromSupabase(threadId) { const { data, error } = await state.supabase.from("messages").select("*").eq("thread_id", threadId).order("created_at", { ascending: true }); if (error) throw error; return data.map(normalizeMessage); }
@@ -1648,8 +1570,8 @@ async function subscribeMessagingChannels(options = {}) {
       }
 
       if (state.banningAvailable) {
-        state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState().then(() => {
-          if (canAccessAdminBanPanel(state)) void refreshAdminBanState();
+        state.threadsChannel.on("postgres_changes", { event: "*", schema: "public", table: "user_bans" }, () => void refreshCurrentUserBanState(state, APP_CONFIG).then(() => {
+          if (canAccessAdminBanPanel(state, APP_CONFIG)) void refreshAdminBanState(state, APP_CONFIG);
           if (isMessagingEnabled(state)) void refreshMessengerState({ preserveActiveThread: true });
           else { clearMessengerState(); render(); }
         }));
@@ -2058,26 +1980,7 @@ function updateUserPreferences(nextPreferences) {
 function isCurrentUserActivated() { if (!state.currentUser) return false; return Boolean(state.currentUser.email_confirmed_at || state.currentUser.confirmed_at); }
 function getCurrentUserEmail() { return state.currentUser?.email?.trim().toLowerCase() ?? ""; }
 
-function normalizeEmailForMatch(value) {
-  if (typeof value !== "string") return "";
-  const normalized = value.trim().toLowerCase(); if (!normalized || !normalized.includes("@")) return normalized;
-  const [localPart, domainPart] = normalized.split("@"); if (!localPart || !domainPart) return normalized;
-  if (domainPart === "gmail.com" || domainPart === "googlemail.com") { const localWithoutAlias = localPart.split("+")[0].replace(/\./g, ""); return `${localWithoutAlias}@gmail.com`; }
-  return normalized;
-}
-
-function getCurrentUserEmailCandidates() {
-  if (!state.currentUser) return [];
-  const candidates = new Set(); const addEmail = (v) => { if (typeof v === "string") { const n = normalizeEmailForMatch(v); if (n) candidates.add(n); } };
-  addEmail(state.currentUser.email); addEmail(state.currentUser.new_email);
-  if (state.currentUser.user_metadata) addEmail(state.currentUser.user_metadata.email);
-  if (Array.isArray(state.currentUser.identities)) state.currentUser.identities.forEach((i) => { if (i?.identity_data) addEmail(i.identity_data.email); else if (i?.email) addEmail(i.email); });
-  return Array.from(candidates);
-}
-
-function isCurrentUserAdmin() { const emails = getCurrentUserEmailCandidates(); return emails.some((email) => APP_CONFIG.adminEmails.includes(email)); }
-function isCurrentUserMasterAdmin() { const emails = getCurrentUserEmailCandidates(); return emails.some((email) => APP_CONFIG.masterAdminEmails.includes(email)); }
-function canRevealMemberEmails() { return isCurrentUserAdmin(); }
+// Email and admin checks moved to admin-v3.js
 function canUseLiveLikesForPost(post) { return Boolean(state.supabase && state.backendMode === "supabase" && state.currentUser && post && !post.isLocal); }
 function getPersonalStateScope() { return state.currentUser?.id ? `user:${state.currentUser.id}` : "guest"; }
 function getScopedStorageKey(baseKey, scope = getPersonalStateScope()) { return `${baseKey}:${scope}`; }
@@ -2090,45 +1993,10 @@ async function refreshLikedPostsState() {
   state.likedPosts = loadLikedPosts();
 }
 
-function canCurrentUserUploadMediaKind(mediaKind) { 
-  if (state.backendMode !== "supabase") return true; 
-  if (!["image", "video", "audio"].includes(mediaKind)) return true; 
-  return isCurrentUserAdmin(); 
-}
-
-function getRestrictedUploadMessage(mediaKind) { 
-  if (mediaKind === "image") return "Only admin accounts can publish uploaded images to the live feed. YouTube and Spotify links stay open."; 
-  if (mediaKind === "video") return "Only admin accounts can publish uploaded videos to the live feed. YouTube links stay available to everyone."; 
-  if (mediaKind === "audio") return "Only admin accounts can publish uploaded audio to the live feed. Spotify and YouTube links stay open."; 
-  return "Only admin accounts can publish that upload type to the live feed."; 
-}
-
-function canDeletePost(post) { if (!post) return false; if (post.isLocal) return true; if (state.backendMode !== "supabase" || !state.currentUser) return false; return isCurrentUserAdmin() || post.authorId === state.currentUser.id; }
+// Visibility and access checks moved to admin-v3.js
 function getAuthRedirectUrl() { if (APP_CONFIG.authRedirectUrl) { try { return new URL(APP_CONFIG.authRedirectUrl).toString(); } catch (error) { console.warn("Configured auth redirect URL is invalid", error); } } if (/^https?:$/.test(window.location.protocol)) return new URL(window.location.pathname, window.location.origin).toString(); return DEFAULT_AUTH_REDIRECT_URL; }
 
-function normalizeModerationText(value) { 
-  const curlyApostrophe = String.fromCharCode(8217);
-  return String(value ?? "").toLowerCase().normalize("NFKC").split("'").join("").split(curlyApostrophe).join("").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim(); 
-}
-
-function getActiveBlockedTerms() { return [...DEFAULT_BLOCKED_TERMS]; }
-
-function findBlockedPostTerm({ creator = "", title = "", caption = "", tags = [] }) { 
-  const normalizedPostText = normalizeModerationText([creator, title, caption, ...(Array.isArray(tags) ? tags : [])].join(" ")); 
-  if (!normalizedPostText) return ""; 
-  const haystack = ` ${normalizedPostText} `; 
-  return getActiveBlockedTerms().find((term) => { 
-    const normalizedTerm = normalizeModerationText(term); 
-    return normalizedTerm && haystack.includes(` ${normalizedTerm} `); 
-  }) ?? ""; 
-}
-
-function isPostModerationError(error) { 
-  const message = formatBackendError(error).toLowerCase(); 
-  return message.includes("blocked language"); 
-}
-function getSiteSettingsPayload() { return { id: "global", shell_width: state.siteSettings.shellWidth, section_gap: state.siteSettings.sectionGap, surface_radius: state.siteSettings.surfaceRadius, media_fit: state.siteSettings.mediaFit, updated_at: new Date().toISOString() }; }
-function normalizeSiteSettings(row = {}) { return { shellWidth: clampNumber(row.shell_width, 960, 1440, DEFAULT_SITE_SETTINGS.shellWidth), sectionGap: clampNumber(row.section_gap, 16, 40, DEFAULT_SITE_SETTINGS.sectionGap), surfaceRadius: clampNumber(row.surface_radius, 22, 44, DEFAULT_SITE_SETTINGS.surfaceRadius), mediaFit: row.media_fit === "contain" ? "contain" : DEFAULT_SITE_SETTINGS.mediaFit }; }
+// Moderation and site settings logic moved to admin-v3.js and api-v3.js
 
 function loadPlayerPosition() {
   try {
@@ -2145,8 +2013,7 @@ function savePlayerPosition(position) { try { if (!position) { localStorage.remo
 function getPlayerViewportPadding() { return window.innerWidth <= 760 ? 12 : 20; }
 function clampPlayerPosition(position) { if (!position) return null; const padding = getPlayerViewportPadding(); const width = elements.miniPlayer.offsetWidth || Math.min(360, Math.max(240, window.innerWidth - padding * 2)); const height = elements.miniPlayer.offsetHeight || 280; const maxX = Math.max(padding, window.innerWidth - width - padding); const maxY = Math.max(padding, window.innerHeight - height - padding); return { x: Math.min(maxX, Math.max(padding, Math.round(position.x))), y: Math.min(maxY, Math.max(padding, Math.round(position.y))) }; }
 
-async function loadSiteSettingsFromSupabase() { const { data, error } = await state.supabase.from("site_settings").select("*").eq("id", "global").maybeSingle(); if (error) throw error; return data ? normalizeSiteSettings(data) : { ...DEFAULT_SITE_SETTINGS }; }
-async function handleAdminSettingsSubmit(event) { event.preventDefault(); if (state.backendMode !== "supabase" || !state.supabase || !isCurrentUserMasterAdmin()) { elements.adminSettingsFeedback.textContent = "Only master admin accounts can save site settings."; elements.adminSettingsFeedback.classList.add("is-error"); return; } const { error } = await state.supabase.from("site_settings").upsert(getSiteSettingsPayload()); if (error) { console.error("Failed to save site settings", error); elements.adminSettingsFeedback.textContent = "The layout settings could not be saved."; elements.adminSettingsFeedback.classList.add("is-error"); return; } elements.adminSettingsFeedback.textContent = "Layout settings saved for the live site."; elements.adminSettingsFeedback.classList.remove("is-error"); }
+// Admin settings submit moved to admin-v3.js
 
 function getAllPosts() { if (state.backendMode === "local" && state.userPosts.length === 0) return [...DEMO_POSTS]; return [...state.userPosts]; }
 function getVisiblePosts() {
@@ -2202,7 +2069,7 @@ function sortPosts(posts) { return posts.sort((l, r) => { if (state.sort === "po
 
 
 async function deletePost(postId) {
-  const post = getPostById(postId); if (!post || !canDeletePost(post)) { showFeedback("You do not have permission to delete that post.", true); return; }
+  const post = getPostById(postId); if (!post || !canDeletePost(post, state, APP_CONFIG)) { showFeedback("You do not have permission to delete that post.", true); return; }
   if (state.backendMode === "supabase" && state.supabase && !post.isLocal) { try { await deleteHostedPost(post); state.userPosts = state.userPosts.filter((item) => item.id !== postId); } catch (error) { console.error("Failed to delete hosted post", error); showFeedback("The post could not be deleted from the live feed.", true); return; } }
   else if (state.db) { await deletePostFromDatabase(postId); state.userPosts = await loadPostsFromDatabase(); }
   else { state.userPosts = state.userPosts.filter((p) => p.id !== postId); }
@@ -2397,23 +2264,37 @@ export const {
   ensurePushNotificationRegistration, unlinkPushNotificationRegistration, formatBackendError, isBlockingBackendUnavailable, isBanningBackendUnavailable,
   initialize, bindAuthStateListener, handleAuthStateChange, handleSignInSubmit, handleSignUpClick,
   handleSignOutClick, handleResendActivationClick, handleSelectedFile, handleExternalUrlInput, handleFormSubmit,
-  clearMessengerState, refreshAdminBanState, toggleUserBan, toggleProfileBlock, getDefaultProfileName,
+  clearMessengerState, 
+  refreshAdminBanState: () => refreshAdminBanState(state, APP_CONFIG), 
+  toggleUserBan: (p) => toggleUserBan(p, state, APP_CONFIG), 
+  toggleProfileBlock: (p) => toggleProfileBlock(p, state), 
+  getDefaultProfileName,
   formatDisplayNameFromEmail, resolveMemberDisplayName, normalizeProfile, normalizeUserBlock, normalizeUserBan,
   normalizeDirectThread, normalizeMessage, getThreadPartnerId, getThreadPartnerProfile, normalizeMessengerListSearch,
   getFilteredPeopleProfiles, getFilteredConversationThreads, isThreadBlocked, getActiveThread, sortThreads,
   mergeThread, mergeActiveMessage, canonicalizeThreadPair, syncCurrentProfileToSupabase, finalizeProfileSync,
   loadOwnProfileFromSupabase, loadProfilesFromSupabase, loadBlockedUsersFromSupabase, loadUserBansFromSupabase, loadCurrentUserBanFromSupabase,
-  refreshCurrentUserBanState, loadDirectThreadsFromSupabase, loadMessagesFromSupabase, loadThreadAttachmentPaths, refreshMessengerState,
+  refreshCurrentUserBanState: (s, c) => refreshCurrentUserBanState(state, APP_CONFIG), 
+  loadDirectThreadsFromSupabase, loadMessagesFromSupabase, loadThreadAttachmentPaths, refreshMessengerState,
   unsubscribeMessagingChannels, subscribeMessagingChannels, playIncomingMessageSound, handleProfileSave, openExistingThread,
   deleteConversation, openOrCreateThread, handleMessageSubmit, formatMessageTimestamp, loadUserPreferences,
   normalizeUserPreferences, saveUserPreferences, updateUserPreferences, isCurrentUserActivated, getCurrentUserEmail,
-  normalizeEmailForMatch, getCurrentUserEmailCandidates, isCurrentUserAdmin, isCurrentUserMasterAdmin, canRevealMemberEmails, canUseLiveLikesForPost,
+  normalizeEmailForMatch, getCurrentUserEmailCandidates: () => getCurrentUserEmailCandidates(state.currentUser), 
+  isCurrentUserAdmin: () => isCurrentUserAdmin(state, APP_CONFIG), 
+  isCurrentUserMasterAdmin: () => isCurrentUserMasterAdmin(state, APP_CONFIG), 
+  canRevealMemberEmails: () => canRevealMemberEmails(state, APP_CONFIG), 
+  canUseLiveLikesForPost,
   getPersonalStateScope, getScopedStorageKey, parseStoredPostIds, loadScopedPostIds, persistScopedPostIds,
-  refreshLikedPostsState, canCurrentUserUploadMediaKind, getRestrictedUploadMessage, canDeletePost,
+  refreshLikedPostsState, 
+  canCurrentUserUploadMediaKind: (k) => canCurrentUserUploadMediaKind(k, state, APP_CONFIG), 
+  getRestrictedUploadMessage, 
+  canDeletePost: (p) => canDeletePost(p, state, APP_CONFIG),
   getAuthRedirectUrl, normalizeModerationText, getActiveBlockedTerms,
   findBlockedPostTerm, isPostModerationError, getSiteSettingsPayload, normalizeSiteSettings, clampNumber,
   loadPlayerPosition, normalizePlayerVolume, loadPlayerVolume, savePlayerVolume, savePlayerPosition,
-  getPlayerViewportPadding, clampPlayerPosition, loadSiteSettingsFromSupabase, handleAdminSettingsSubmit, getAllPosts,
+  getPlayerViewportPadding, clampPlayerPosition, loadSiteSettingsFromSupabase, 
+  handleAdminSettingsSubmit: (e) => handleAdminSettingsSubmit(e, state, APP_CONFIG), 
+  getAllPosts,
   getVisiblePosts, getKnownProfiles, getKnownProfileById, getProfileKeyForUser, getProfileKeyForCreator,
   getProfileKeyForPost, getOwnProfileKey, getProfileSummaryForPost, getPostsForProfileKey, getProfileSummaryByKey,
   getProfileBoardEntries, sortPosts, isPlayablePost, deletePost, toggleLike,
