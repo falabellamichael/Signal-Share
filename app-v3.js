@@ -58,7 +58,9 @@ import {
   normalizeProfile,
   normalizeUserBlock,
   normalizeUserBan,
-  normalizeSiteSettings
+  normalizeSiteSettings,
+  normalizeDirectThread,
+  normalizeMessage
 } from './api-v3.js';
 
 // User helper functions moved to admin-v3.js

@@ -78,6 +78,8 @@ export async function loadSiteSettingsFromSupabase() {
   return data ? normalizeSiteSettings(data) : null;
 }
 
+
+
 export async function publishPostToSupabase(post, onProgress) {
   let mediaUrl = post.mediaUrl ?? null, filePath = post.filePath ?? null, fileType = post.fileType ?? null, fileSize = post.fileSize ?? null;
   if (post.sourceKind === "upload" && post.blob) { const uploaded = await uploadFileToSupabase(post.id, post.blob, onProgress); mediaUrl = uploaded.mediaUrl; filePath = uploaded.filePath; fileType = post.fileType; fileSize = post.fileSize; }
@@ -281,6 +283,32 @@ export function normalizeUserBlock(row) {
 
 export function normalizeUserBan(row) {
   return { bannedId: row.banned_id, bannedBy: row.banned_by, reason: row.reason ?? "", createdAt: row.created_at };
+}
+
+export function normalizeDirectThread(row) {
+  return {
+    id: row.id,
+    userOneId: row.user_one_id,
+    userTwoId: row.user_two_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+export function normalizeMessage(row) {
+  return {
+    id: row.id,
+    threadId: row.thread_id,
+    authorId: row.author_id,
+    text: row.text ?? "",
+    attachmentUrl: row.attachment_url ?? null,
+    attachmentFilePath: row.attachment_file_path ?? null,
+    attachmentName: row.attachment_name ?? null,
+    attachmentType: row.attachment_type ?? null,
+    attachmentSize: row.attachment_size ?? null,
+    attachmentKind: row.attachment_kind ?? null,
+    createdAt: row.created_at
+  };
 }
 
 export function normalizeSiteSettings(row = {}) {
