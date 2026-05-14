@@ -160,6 +160,17 @@ function isModelIdentityRequest(value = "") {
     );
 }
 
+function isLiveWebInfoRequest(value = "") {
+    const text = `${value || ""}`.trim().toLowerCase();
+    if (!text) return false;
+    return (
+        /\b(search|look\s*up|find|web|online)\b/.test(text)
+        || /\b(weather|forecast|temperature|rain|snow)\b/.test(text)
+        || /\b(latest|news|headline|headlines|update|updates)\b/.test(text)
+        || /\b(price|stock|stocks|score|scores)\b/.test(text)
+    );
+}
+
 function normalizeModelKey(value = "") {
     return `${value || ""}`.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
@@ -770,6 +781,16 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                          lmResponse.includes('[WRITE_FILE:') ||
                          lmResponse.includes('[LAUNCH:') ||
                          lmResponse.includes('[CLOSE:');
+
+        const shouldForceSearchTool = iteration === 0 && isLiveWebInfoRequest(message || "");
+        if (shouldForceSearchTool && !hasTools) {
+            console.log("[Chatbot] Enforcing SEARCH tool for live-web info request...");
+            return getChatResponse(null, [
+                ...conversation,
+                { role: "assistant", content: lmResponse },
+                { role: "system", content: "The user asked for live web information. Emit exactly one [SEARCH: concise query] tag now. Do not add extra text." }
+            ], pageContext, iteration + 1, attachment, preferredModel, customInstructions);
+        }
 
         const isClaimingToSearch = lmResponse.toLowerCase().includes('search') || 
                                    lmResponse.toLowerCase().includes('pulling up') ||
