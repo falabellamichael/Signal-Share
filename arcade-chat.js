@@ -2043,6 +2043,7 @@ window.sendChatMessage = async function() {
         return;
     }
 
+    try {
         const isCommand = text.startsWith('/');
         if (isCommand) {
             const cmdHandled = await handleArcadeSlashCommand(text, input);
