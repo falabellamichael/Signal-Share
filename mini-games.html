@@ -741,6 +741,37 @@
             overflow-y: hidden;
         }
 
+        .workshop-edit-resize-handle {
+            height: 14px;
+            margin-top: 6px;
+            border: 1px solid rgba(102, 192, 244, 0.28);
+            border-radius: 8px;
+            background: linear-gradient(90deg, rgba(102, 192, 244, 0.18), rgba(102, 192, 244, 0.08));
+            cursor: ns-resize;
+            position: relative;
+        }
+
+        .workshop-edit-resize-handle::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 42px;
+            height: 3px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.56);
+            transform: translate(-50%, -50%);
+        }
+
+        body.workshop-editor-resizing {
+            cursor: ns-resize;
+            user-select: none;
+        }
+
+        body.workshop-editor-resizing .workshop-edit-content {
+            pointer-events: none;
+        }
+
         .workshop-edit-content:focus {
             border-color: rgba(102, 192, 244, 0.55);
             box-shadow: 0 0 0 2px rgba(102, 192, 244, 0.15);
@@ -1678,6 +1709,7 @@
                     </div>
 
                     <textarea id="workshop-edit-file-content" class="workshop-edit-content" spellcheck="false" oninput="handleWorkshopEditContentInput()"></textarea>
+                    <div id="workshop-edit-resize-handle" class="workshop-edit-resize-handle" onmousedown="startWorkshopEditorResize(event)" role="separator" aria-label="Drag to resize code editor" aria-orientation="horizontal"></div>
 
                     <div class="workshop-edit-actions">
                         <button type="button" class="play-btn" id="workshop-edit-save-btn" onclick="saveWorkshopEditPanel()" style="font-size: 0.85rem; padding: 12px 22px; margin: 0; letter-spacing: 1px;">Save Changes</button>

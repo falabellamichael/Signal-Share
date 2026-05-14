@@ -305,6 +305,8 @@ let workshopLastLibraryCategory = 'all';
 let workshopEditActiveGameId = '';
 let workshopEditActiveFileName = '';
 let workshopEditToolsExpanded = false;
+let workshopEditorManualHeight = 0;
+let workshopEditorResizeSession = null;
 let workshopEditorAutosizeRaf = 0;
 const workshopEditDraftCache = new Map();
 const workshopEditPendingFilesByGame = new Map();
@@ -1281,6 +1283,48 @@ function toggleWorkshopEditToolsPanel() {
     queueWorkshopEditorAutosize();
 }
 
+function getWorkshopEditorMinHeight() {
+    return window.innerWidth <= 860 ? 220 : 260;
+}
+
+function clampWorkshopEditorHeight(height) {
+    const minHeight = getWorkshopEditorMinHeight();
+    const maxHeight = Math.max(minHeight, Math.floor(window.innerHeight * (window.innerWidth <= 860 ? 0.72 : 0.82)));
+    return Math.min(maxHeight, Math.max(minHeight, Math.floor(Number(height) || minHeight)));
+}
+
+function startWorkshopEditorResize(event) {
+    if (!event || (typeof event.button === 'number' && event.button !== 0)) return;
+    const editor = document.getElementById('workshop-edit-file-content');
+    if (!editor || editor.disabled) return;
+    event.preventDefault();
+
+    workshopEditorResizeSession = {
+        startY: event.clientY,
+        startHeight: editor.getBoundingClientRect().height
+    };
+
+    const onMouseMove = (moveEvent) => {
+        if (!workshopEditorResizeSession) return;
+        const deltaY = moveEvent.clientY - workshopEditorResizeSession.startY;
+        const nextHeight = clampWorkshopEditorHeight(workshopEditorResizeSession.startHeight + deltaY);
+        workshopEditorManualHeight = nextHeight;
+        editor.style.height = `${nextHeight}px`;
+        editor.style.overflowY = editor.scrollHeight > nextHeight ? 'auto' : 'hidden';
+    };
+
+    const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.body.classList.remove('workshop-editor-resizing');
+        workshopEditorResizeSession = null;
+        queueWorkshopEditorAutosize();
+    };
+
+    document.body.classList.add('workshop-editor-resizing');
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp, { once: true });
+}
+
 function queueWorkshopEditorAutosize() {
     if (workshopEditorAutosizeRaf) return;
     workshopEditorAutosizeRaf = window.requestAnimationFrame(() => {
@@ -1295,7 +1339,7 @@ function autoSizeWorkshopEditor() {
     if (!overlay || !editor) return;
     if (overlay.hidden || editor.disabled) return;
 
-    const minHeight = window.innerWidth <= 860 ? 220 : 260;
+    const minHeight = getWorkshopEditorMinHeight();
     const reservedBottomSpace = 130;
     const overlayRect = overlay.getBoundingClientRect();
     const editorRect = editor.getBoundingClientRect();
@@ -1304,8 +1348,15 @@ function autoSizeWorkshopEditor() {
     editor.style.height = 'auto';
     const desiredHeight = Math.max(minHeight, editor.scrollHeight + 2);
     const nextHeight = Math.min(desiredHeight, availableHeight);
-    editor.style.height = `${Math.max(minHeight, nextHeight)}px`;
-    editor.style.overflowY = desiredHeight > availableHeight ? 'auto' : 'hidden';
+    let appliedHeight = Math.max(minHeight, nextHeight);
+
+    if (workshopEditorManualHeight > 0) {
+        workshopEditorManualHeight = clampWorkshopEditorHeight(workshopEditorManualHeight);
+        appliedHeight = Math.max(appliedHeight, workshopEditorManualHeight);
+    }
+
+    editor.style.height = `${appliedHeight}px`;
+    editor.style.overflowY = desiredHeight > appliedHeight ? 'auto' : 'hidden';
 }
 
 function refreshWorkshopEditMeta() {
@@ -2488,6 +2539,7 @@ window.triggerWorkshopEditAddFilesPicker = triggerWorkshopEditAddFilesPicker;
 window.handleWorkshopEditAddFiles = handleWorkshopEditAddFiles;
 window.removeWorkshopEditPendingFile = removeWorkshopEditPendingFile;
 window.toggleWorkshopEditToolsPanel = toggleWorkshopEditToolsPanel;
+window.startWorkshopEditorResize = startWorkshopEditorResize;
 window.revertWorkshopEditCurrentFile = revertWorkshopEditCurrentFile;
 window.saveWorkshopEditPanel = saveWorkshopEditPanel;
 window.getWorkshopGamesForAi = function() {
