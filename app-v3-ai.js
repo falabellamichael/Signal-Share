@@ -389,37 +389,54 @@ async function callLocalAI({
   if (typeof window.bridgeFetch !== "function") {
     lastError = "Bridge fetch unavailable";
   } else {
-    try {
-      const response = await window.bridgeFetch("/api/llm/chat", {
-        method: "POST",
-        signal: abortController.signal,
-        timeoutMs: 45000,
-        body: JSON.stringify({
-          message: text,
-          model: requestModel,
-          customInstructions,
-          attachment,
-          history: Array.isArray(history) ? history : [],
-          pageContext: pageContext || "Signal Share"
-        })
-      });
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}));
-        reply = data.reply;
-      } else {
+    const bridgePayload = JSON.stringify({
+      message: text,
+      model: requestModel,
+      customInstructions,
+      attachment,
+      history: Array.isArray(history) ? history : [],
+      pageContext: pageContext || "Signal Share"
+    });
+    const candidateChatPaths = ["/api/local-llm/chat", "/api/llm/chat"];
+
+    for (const chatPath of candidateChatPaths) {
+      try {
+        const response = await window.bridgeFetch(chatPath, {
+          method: "POST",
+          signal: abortController.signal,
+          timeoutMs: 45000,
+          body: bridgePayload
+        });
+
+        if (response.ok) {
+          const data = await response.json().catch(() => ({}));
+          reply = data.reply;
+          break;
+        }
+
+        if (response.status === 404 && chatPath !== candidateChatPaths[candidateChatPaths.length - 1]) {
+          continue;
+        }
+
         lastError = `Bridge returned ${response.status}`;
+        if (response.status === 401 || response.status === 403) {
+          // Auth/permission failures will not recover by trying older routes.
+          break;
+        }
+      } catch (error) {
+        if (stopRequested) {
+          return "🛑 [Signal Protocol] AI request stopped.";
+        }
+        const bridgeDisabled = error?.name === "BridgeDisabledError";
+        lastError = bridgeDisabled
+          ? "Bridge disabled"
+          : (error?.message || "Connection refused or blocked by browser");
+        if (!bridgeDisabled) {
+          console.warn(`[AI Messenger] Bridge request failed (${chatPath}):`, error);
+        }
       }
-    } catch (error) {
-      if (stopRequested) {
-        return "🛑 [Signal Protocol] AI request stopped.";
-      }
-      const bridgeDisabled = error?.name === "BridgeDisabledError";
-      lastError = bridgeDisabled
-        ? "Bridge disabled"
-        : (error?.message || "Connection refused or blocked by browser");
-      if (!bridgeDisabled) {
-        console.warn("[AI Messenger] Bridge request failed:", error);
-      }
+
+      if (reply !== null) break;
     }
   }
 

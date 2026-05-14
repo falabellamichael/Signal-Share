@@ -23,10 +23,12 @@ $files = @(
   
   # Core Logic
   "config.js",
+  "local-llm-connectivity.js",
   "api-v3.js",
   "app-v3.js",
   "app-v3-ui.js",
   "app-v3-ai.js",
+  "admin-v3.js",
   "shared-utils.js",
   "notifications.js",
   "profiles.js",
@@ -159,6 +161,7 @@ $criticalDistFiles = @(
   "mini-games.html",
   "mini-games.js",
   "app-v3.js",
+  "admin-v3.js",
   "app-v3-ui.js",
   "arcade-chat.js",
   "companion-ai-core.js",

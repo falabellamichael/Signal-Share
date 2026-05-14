@@ -230,12 +230,20 @@ The bridge acts as the secure tunnel between the website and your computer.
   ```env
   SIGNAL_SHARE_BRIDGE_SECRET=your_secure_passphrase
   SIGNAL_SHARE_DEVICE_ID=your_hardware_fingerprint
+  SIGNAL_SHARE_LOCAL_LLM_TOKEN=shared_phone_token
+  # Optional LAN mode for phone access:
+  SIGNAL_SHARE_BRIDGE_LAN=true
+  # Optional explicit bind override:
+  # SIGNAL_SHARE_BRIDGE_BIND=0.0.0.0
   ```
 - Install dependencies and start the bridge:
   ```powershell
   npm install
   node backend/server.js
   ```
+- In the app settings, set:
+  - `Bridge URL (PC IP)` to your computer bridge URL, for example `http://192.168.1.50:3000`
+  - `Local LLM Token` to the same value as `SIGNAL_SHARE_LOCAL_LLM_TOKEN`
 
 #### 2. Secure with Fortress Mode
 Fortress Mode protects your computer from unauthorized remote access:

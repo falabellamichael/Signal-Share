@@ -102,6 +102,8 @@ export function createAppUi(context) {
     notificationHideBodyToggle: document.getElementById("notificationHideBodyToggle"),
     showEmailToggle: document.getElementById("showEmailToggle"),
     bridgeSecretInput: document.getElementById("bridgeSecretInput"),
+    bridgeUrlInput: document.getElementById("bridgeUrlInput"),
+    localLlmTokenInput: document.getElementById("localLlmTokenInput"),
     aiCustomInstructionsInput: document.getElementById("aiCustomInstructionsInput"),
     resetPlayerPositionButton: document.getElementById("resetPlayerPositionButton"),
     resetPreferencesButton: document.querySelector("#resetPreferencesButton"),
@@ -472,16 +474,62 @@ export function createAppUi(context) {
     elements.notificationHideBodyToggle.addEventListener("change", handleNotificationHideBodyToggle);
     elements.showEmailToggle.addEventListener("change", handleShowEmailToggle);
 
+    const syncBridgeEnabledToggle = () => {
+      const hasSecret = `${localStorage.getItem("ss_bridge_secret") || ""}`.trim().length > 0
+        || `${localStorage.getItem("signal-share-bridge-secret") || ""}`.trim().length > 0;
+      const hasBridgeUrl = `${window.SignalShareLocalLlm?.getBridgeBaseUrl?.() || localStorage.getItem("signal-share-bridge-url") || ""}`.trim().length > 0;
+      const hasLocalToken = `${window.SignalShareLocalLlm?.getLocalLlmToken?.() || localStorage.getItem("ss_local_llm_token") || ""}`.trim().length > 0;
+      if (hasSecret || hasBridgeUrl || hasLocalToken) {
+        localStorage.setItem("ss_bridge_enabled", "1");
+      } else {
+        localStorage.removeItem("ss_bridge_enabled");
+      }
+    };
+
     if (elements.bridgeSecretInput) {
       elements.bridgeSecretInput.value = localStorage.getItem("ss_bridge_secret") || "";
       elements.bridgeSecretInput.addEventListener("input", (event) => {
         const secret = event.target.value.trim();
         localStorage.setItem("ss_bridge_secret", secret);
-        if (secret) {
-          localStorage.setItem("ss_bridge_enabled", "1");
+        syncBridgeEnabledToggle();
+      });
+    }
+
+    if (elements.bridgeUrlInput) {
+      elements.bridgeUrlInput.value = window.SignalShareLocalLlm?.getBridgeBaseUrl?.()
+        || `${localStorage.getItem("signal-share-bridge-url") || ""}`.trim();
+      elements.bridgeUrlInput.addEventListener("input", (event) => {
+        const raw = `${event.target.value || ""}`;
+        if (window.SignalShareLocalLlm?.setBridgeBaseUrl) {
+          window.SignalShareLocalLlm.setBridgeBaseUrl(raw);
         } else {
-          localStorage.removeItem("ss_bridge_enabled");
+          const normalized = raw.trim();
+          if (normalized) {
+            localStorage.setItem("signal-share-bridge-url", normalized);
+          } else {
+            localStorage.removeItem("signal-share-bridge-url");
+          }
         }
+        syncBridgeEnabledToggle();
+      });
+    }
+
+    if (elements.localLlmTokenInput) {
+      elements.localLlmTokenInput.value = window.SignalShareLocalLlm?.getLocalLlmToken?.()
+        || `${localStorage.getItem("ss_local_llm_token") || ""}`.trim();
+      elements.localLlmTokenInput.addEventListener("input", (event) => {
+        const token = `${event.target.value || ""}`;
+        if (window.SignalShareLocalLlm?.setLocalLlmToken) {
+          window.SignalShareLocalLlm.setLocalLlmToken(token);
+        } else {
+          const normalized = token.trim();
+          if (normalized) {
+            localStorage.setItem("ss_local_llm_token", normalized);
+          } else {
+            localStorage.removeItem("ss_local_llm_token");
+          }
+        }
+        syncBridgeEnabledToggle();
       });
     }
 

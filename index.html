@@ -309,6 +309,28 @@
                 />
               </label>
 
+              <label class="settings-field" style="margin-top: 10px;">
+                <span>Bridge URL (PC IP)</span>
+                <span class="settings-field-copy" style="margin-bottom: 8px;">Example: http://192.168.1.50:3000</span>
+                <input
+                  id="bridgeUrlInput"
+                  type="text"
+                  placeholder="http://192.168.x.x:3000"
+                  style="width: 100%;"
+                />
+              </label>
+
+              <label class="settings-field" style="margin-top: 10px;">
+                <span>Local LLM Token</span>
+                <span class="settings-field-copy" style="margin-bottom: 8px;">Optional shared token for secure LAN access.</span>
+                <input
+                  id="localLlmTokenInput"
+                  type="password"
+                  placeholder="Optional local LLM token"
+                  style="width: 100%;"
+                />
+              </label>
+
 
               <label class="settings-field" style="margin-top: 10px;">
                 <span>AI Custom Instructions</span>
@@ -1420,6 +1442,7 @@
     </section>
 
     <script src="config.js?v=1.5"></script>
+    <script src="local-llm-connectivity.js?v=1.0"></script>
     <script src="api-v3.js?v=1.20" type="module"></script>
     <script src="messenger-realtime.js?v=1.5"></script>
     <script src="companion-ai-core.js?v=1.4"></script>
@@ -1559,6 +1582,16 @@
                 <div style="display: flex; flex-direction: column; gap: 6px;">
                     <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Bridge Handshake Secret</label>
                     <input type="password" id="sidebar-bridge-secret" placeholder="Optional secret key" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Bridge URL (PC IP)</label>
+                    <input type="text" id="sidebar-bridge-url" placeholder="http://192.168.x.x:3000" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Local LLM Token</label>
+                    <input type="password" id="sidebar-local-llm-token" placeholder="Optional LAN auth token" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none;">
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 6px;">

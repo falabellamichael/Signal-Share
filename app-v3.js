@@ -256,13 +256,29 @@ let localNetworkPermissionProbePromise = null;
 const externalPreviewCache = new Map();
 function getLocalNetworkPermissionProbeUrls() {
   if (!shouldAttemptBridgeRequests()) return [];
-  const urls = [
-    "http://localhost:3000/api/llm/chat",
-    "http://127.0.0.1:3000/api/llm/chat",
-  ];
+  const urls = [];
+  const pushUnique = (url) => {
+    if (!url || urls.includes(url)) return;
+    urls.push(url);
+  };
+  const configuredBase = normalizeBridgeBaseUrl(
+    window.SignalShareLocalLlm?.getBridgeBaseUrl?.()
+    || localStorage.getItem("signal-share-bridge-url")
+    || ""
+  );
+  if (configuredBase) {
+    pushUnique(`${configuredBase}/api/local-llm/health`);
+    pushUnique(`${configuredBase}/api/llm/chat`);
+  }
+
+  pushUnique("http://localhost:3000/api/local-llm/health");
+  pushUnique("http://127.0.0.1:3000/api/local-llm/health");
+  pushUnique("http://localhost:3000/api/llm/chat");
+  pushUnique("http://127.0.0.1:3000/api/llm/chat");
   const isSecureHostedPage = window.location.protocol === "https:";
   if (!isSecureHostedPage || isNativeCapacitorApp()) {
-    urls.push("http://10.0.2.2:3000/api/llm/chat");
+    pushUnique("http://10.0.2.2:3000/api/local-llm/health");
+    pushUnique("http://10.0.2.2:3000/api/llm/chat");
   }
   return urls;
 }
@@ -423,7 +439,7 @@ function isBridgeFeatureEnabled() {
   );
   if (explicitFlag !== null) return explicitFlag;
 
-  const customBridgeUrl = `${localStorage.getItem("signal-share-bridge-url") || ""}`.trim();
+  const customBridgeUrl = `${window.SignalShareLocalLlm?.getBridgeBaseUrl?.() || localStorage.getItem("signal-share-bridge-url") || ""}`.trim();
   if (customBridgeUrl) return true;
 
   const bridgeSecret = `${localStorage.getItem("ss_bridge_secret") || ""}`.trim()
@@ -505,7 +521,11 @@ function resolveBridgeBaseCandidates() {
   const host = `${window.location.hostname || ""}`.trim().toLowerCase();
   const protocol = `${window.location.protocol || ""}`.toLowerCase();
 
-  const configured = normalizeBridgeBaseUrl(localStorage.getItem("signal-share-bridge-url") || "");
+  const configured = normalizeBridgeBaseUrl(
+    window.SignalShareLocalLlm?.getBridgeBaseUrl?.()
+    || localStorage.getItem("signal-share-bridge-url")
+    || ""
+  );
   const lastWorking = normalizeBridgeBaseUrl(localStorage.getItem("ss_bridge_last_working_base") || "");
   const configuredLlmEndpoint = normalizeBridgeBaseUrl(
     typeof window.SIGNAL_SHARE_LLM_ENDPOINT === "string" ? window.SIGNAL_SHARE_LLM_ENDPOINT : ""
@@ -1878,7 +1898,7 @@ function updateUserPreferences(nextPreferences) {
   applyUserPreferences(state.preferences);
   saveUserPreferences();
   if (state.supabase && state.currentUser) {
-    void syncCurrentProfileToSupabase(getDefaultProfileName()).catch(err => {
+    void syncCurrentProfileToSupabase().catch(err => {
       const message = String(err?.message || "");
       if (message.includes("display name with at least 2 characters")) {
         console.warn("[Preferences] Sync skipped due to display name validation.", err);

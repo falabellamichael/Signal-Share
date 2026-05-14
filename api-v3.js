@@ -92,9 +92,6 @@ export async function syncCurrentProfileToSupabase(displayNameOverride = "") {
     || "";
 
   let displayName = (explicitDisplayName || fallbackDisplayName || "").trim().slice(0, 40);
-  if (explicitDisplayName && displayName.length < 2) {
-    throw new Error("Use a display name with at least 2 characters.");
-  }
   if (displayName.length < 2) {
     displayName = "Member";
   }

@@ -9,6 +9,7 @@ import { getChatResponse, getLocalModelCatalog } from "./chatbot.js";
 import { SecurityEngine } from "./security-v3.js";
 import { isMasterAdmin, hasPermission, ADMIN_ROLES } from "./roles-v3.js";
 import { registerModerationRoutes } from "./moderation-api-v3.js";
+import { registerLocalLlmGatewayRoutes, resolveBridgeListenHost } from "./local-llm-gateway.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,6 +53,8 @@ const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "
 const ALLOW_OPEN_URI = process.env.SIGNAL_SHARE_ALLOW_OPEN_URI === "true";
 const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
 const DEVICE_ID = process.env.SIGNAL_SHARE_DEVICE_ID || "";
+const LOCAL_LLM_TOKEN = process.env.SIGNAL_SHARE_LOCAL_LLM_TOKEN || "";
+const BRIDGE_HOST = resolveBridgeListenHost(process.env);
 
 const security = new SecurityEngine(BRIDGE_SECRET, DEVICE_ID);
 console.log(`[Bridge] Security Core v3 initialized.`);
@@ -102,7 +105,7 @@ app.use((req, res, next) => {
   }
 
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, Authorization, Target-Address-Space, target-address-space, X-Requested-With, x-requested-with, Access-Control-Allow-Private-Network, *");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, X-Local-LLM-Token, x-local-llm-token, Authorization, Target-Address-Space, target-address-space, X-Requested-With, x-requested-with, Access-Control-Allow-Private-Network, *");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
   res.setHeader("Access-Control-Allow-Local-Network", "true");
   res.setHeader("Access-Control-Max-Age", "86400");
@@ -177,6 +180,13 @@ app.post('/api/llm/chat', async (req, res) => {
     console.error('[Bridge] LLM chat error:', err);
     res.status(500).json({ error: 'LLM processing failed' });
   }
+});
+
+registerLocalLlmGatewayRoutes(app, {
+  getChatResponse,
+  getLocalModelCatalog,
+  bridgeSecret: BRIDGE_SECRET,
+  localLlmToken: LOCAL_LLM_TOKEN
 });
 
 // Moderation Routes
@@ -1424,8 +1434,13 @@ function subscribeToMediaActions() {
   }).subscribe();
 }
 
-app.listen(port, "127.0.0.1", () => {
-  console.log(`[Bridge] Server secured. Listening ONLY on localhost (127.0.0.1) at port ${port}`);
+app.listen(port, BRIDGE_HOST, () => {
+  if (BRIDGE_HOST === "127.0.0.1") {
+    console.log(`[Bridge] Server secured. Listening ONLY on localhost (127.0.0.1) at port ${port}`);
+  } else {
+    console.warn(`[Bridge] LAN mode active. Listening on ${BRIDGE_HOST}:${port}.`);
+    console.warn("[Bridge] Ensure SIGNAL_SHARE_LOCAL_LLM_TOKEN and/or SIGNAL_SHARE_BRIDGE_SECRET are set before exposing this host.");
+  }
   if (isWindows && enableRemoteMediaSync && userId) {
     console.log(`[Bridge] Remote media sync enabled for ${userId}.`);
     setInterval(syncToSupabase, SUPABASE_SYNC_INTERVAL_MS);

@@ -52,7 +52,11 @@ function resolveBridgeBaseCandidates() {
     const host = `${window.location.hostname || ""}`.trim().toLowerCase();
     const protocol = `${window.location.protocol || ""}`.toLowerCase();
 
-    const configured = normalizeBridgeBaseUrl(localStorage.getItem('signal-share-bridge-url') || "");
+    const configured = normalizeBridgeBaseUrl(
+        window.SignalShareLocalLlm?.getBridgeBaseUrl?.()
+        || localStorage.getItem('signal-share-bridge-url')
+        || ""
+    );
     const lastWorking = normalizeBridgeBaseUrl(localStorage.getItem(BRIDGE_LAST_WORKING_BASE_KEY) || "");
     pushBridgeBaseCandidate(candidates, seen, lastWorking);
     pushBridgeBaseCandidate(candidates, seen, configured);
@@ -137,7 +141,7 @@ function isBridgeFeatureEnabled() {
     );
     if (explicitFlag !== null) return explicitFlag;
 
-    const customBridgeUrl = `${localStorage.getItem('signal-share-bridge-url') || ''}`.trim();
+    const customBridgeUrl = `${window.SignalShareLocalLlm?.getBridgeBaseUrl?.() || localStorage.getItem('signal-share-bridge-url') || ''}`.trim();
     if (customBridgeUrl) return true;
 
     const bridgeSecret = `${localStorage.getItem('signal-share-bridge-secret') || ''}`.trim()
@@ -168,11 +172,21 @@ async function hydrateChatModelSelect({ forceRefresh = false } = {}) {
     if (!isBridgeFeatureEnabled()) return;
 
     try {
-        const response = await bridgeFetch(`/api/llm/models${forceRefresh ? '?force=true' : ''}`, {
-            method: 'GET',
-            timeoutMs: 2200
-        });
-        if (!response.ok) return;
+        const querySuffix = forceRefresh ? '?force=true' : '';
+        const modelCatalogPaths = [`/api/local-llm/models${querySuffix}`, `/api/llm/models${querySuffix}`];
+        let response = null;
+        for (const path of modelCatalogPaths) {
+            const next = await bridgeFetch(path, {
+                method: 'GET',
+                timeoutMs: 2200
+            });
+            if (next.ok || next.status !== 404 || path === modelCatalogPaths[modelCatalogPaths.length - 1]) {
+                response = next;
+                break;
+            }
+        }
+
+        if (!response || !response.ok) return;
         updateEngineStatus(true);
 
         const payload = await response.json().catch(() => null);
@@ -325,6 +339,15 @@ function getBridgeSecret() {
         || "";
 }
 
+function getLocalLlmToken() {
+    const helperToken = window.SignalShareLocalLlm?.getLocalLlmToken?.();
+    if (helperToken) return helperToken;
+    return localStorage.getItem("ss_local_llm_token")
+        || localStorage.getItem("signal-share-local-llm-token")
+        || localStorage.getItem("SIGNAL_SHARE_LOCAL_LLM_TOKEN")
+        || "";
+}
+
 function getDeviceId() {
     return localStorage.getItem("SIGNAL_SHARE_DEVICE_ID")
         || localStorage.getItem("signal-share-device-id")
@@ -349,9 +372,11 @@ async function bridgeFetch(path, options = {}) {
     } = options || {};
 
     const method = optionMethod || "GET";
+    const localLlmHeaders = window.SignalShareLocalLlm?.getRequestHeaders?.() || {};
     const headers = {
         ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
         ...(getBridgeSecret() ? { "X-Bridge-Secret": getBridgeSecret() } : {}),
+        ...(getLocalLlmToken() ? { "X-Local-LLM-Token": getLocalLlmToken() } : localLlmHeaders),
         ...(getDeviceId() ? { "X-Device-Id": getDeviceId() } : {}),
         ...(optionHeaders || {}),
     };
@@ -455,6 +480,9 @@ async function getDesktopBridgeSnapshot({ suppressNetworkErrors = false } = {}) 
 
 async function checkBridgeConnectivity({ signal, timeoutMs = 1800 } = {}) {
     const probes = [
+        { path: "/api/local-llm/models", reachableStatuses: [401, 403, 422] },
+        { path: "/api/local-llm/health", reachableStatuses: [401, 403, 422] },
+        { path: "/api/local-llm/chat", reachableStatuses: [401, 403, 404, 405, 422] },
         { path: "/api/llm/models", reachableStatuses: [401, 403, 422] },
         // Some bridge builds only allow POST on this route. 404/405 still mean the bridge is reachable.
         { path: "/api/llm/chat", reachableStatuses: [401, 403, 404, 405, 422] }
@@ -673,9 +701,16 @@ window.toggleChatSecurity = function() {
         // Load current values
         const secretInput = document.getElementById('sidebar-bridge-secret');
         const deviceInput = document.getElementById('sidebar-device-id');
+        const bridgeUrlInput = document.getElementById('sidebar-bridge-url');
+        const localLlmTokenInput = document.getElementById('sidebar-local-llm-token');
         
         if (secretInput) secretInput.value = getBridgeSecret();
         if (deviceInput) deviceInput.value = getDeviceId();
+        if (bridgeUrlInput) {
+            bridgeUrlInput.value = window.SignalShareLocalLlm?.getBridgeBaseUrl?.()
+                || `${localStorage.getItem('signal-share-bridge-url') || ''}`.trim();
+        }
+        if (localLlmTokenInput) localLlmTokenInput.value = getLocalLlmToken();
         
         // Refresh IP bans
         refreshBannedIps();
@@ -688,15 +723,42 @@ window.toggleChatSecurity = function() {
 window.saveSecurityDashboard = function() {
     const secretInput = document.getElementById('sidebar-bridge-secret');
     const deviceInput = document.getElementById('sidebar-device-id');
+    const bridgeUrlInput = document.getElementById('sidebar-bridge-url');
+    const localLlmTokenInput = document.getElementById('sidebar-local-llm-token');
     const status = document.getElementById('security-save-status');
     
     if (!secretInput || !deviceInput) return;
     
     const secret = secretInput.value.trim();
     const deviceId = deviceInput.value.trim();
+    const bridgeUrl = bridgeUrlInput ? bridgeUrlInput.value.trim() : "";
+    const localLlmToken = localLlmTokenInput ? localLlmTokenInput.value.trim() : "";
     
     localStorage.setItem('SIGNAL_SHARE_BRIDGE_SECRET', secret);
     localStorage.setItem('SIGNAL_SHARE_DEVICE_ID', deviceId);
+    if (window.SignalShareLocalLlm?.setBridgeBaseUrl) {
+        window.SignalShareLocalLlm.setBridgeBaseUrl(bridgeUrl);
+    } else if (bridgeUrl) {
+        localStorage.setItem('signal-share-bridge-url', bridgeUrl);
+    } else {
+        localStorage.removeItem('signal-share-bridge-url');
+    }
+
+    if (window.SignalShareLocalLlm?.setLocalLlmToken) {
+        window.SignalShareLocalLlm.setLocalLlmToken(localLlmToken);
+    } else if (localLlmToken) {
+        localStorage.setItem('ss_local_llm_token', localLlmToken);
+    } else {
+        localStorage.removeItem('ss_local_llm_token');
+    }
+
+    if (secret || bridgeUrl || localLlmToken) {
+        localStorage.setItem('ss_bridge_enabled', '1');
+    }
+
+    // Refresh bridge candidate ordering immediately after settings save.
+    resolveBridgeBaseCandidates();
+    void hydrateChatModelSelect({ forceRefresh: true });
     
     if (status) {
         status.textContent = '✅ Security settings saved!';
@@ -1735,27 +1797,41 @@ window.sendChatMessage = async function() {
                 }
             }
 
-            const response = await bridgeFetch('/api/llm/chat', {
-                method: 'POST',
-                signal,
-                body: JSON.stringify({ 
-                    message: text,
-                    model: requestModel,
-                    customInstructions,
-                    attachment: arcadeChatHistory[arcadeChatHistory.length - 1].attachment,
-                    history: normalizedHistory,
-                    pageContext: fullPageContext
-                })
+            const payload = JSON.stringify({
+                message: text,
+                model: requestModel,
+                customInstructions,
+                attachment: arcadeChatHistory[arcadeChatHistory.length - 1].attachment,
+                history: normalizedHistory,
+                pageContext: fullPageContext
             });
 
-            if (response.ok) {
+            const chatPaths = ['/api/local-llm/chat', '/api/llm/chat'];
+            let response = null;
+
+            for (const chatPath of chatPaths) {
+                const nextResponse = await bridgeFetch(chatPath, {
+                    method: 'POST',
+                    signal,
+                    body: payload
+                });
+
+                if (nextResponse.status === 404 && chatPath !== chatPaths[chatPaths.length - 1]) {
+                    continue;
+                }
+
+                response = nextResponse;
+                break;
+            }
+
+            if (response?.ok) {
                 const data = await response.json();
                 reply = data.reply;
                 updateEngineStatus(true);
                 bridgePollFailureCount = 0;
                 bridgePollNextAllowedAt = 0;
             } else {
-                lastError = `Bridge returned ${response.status}`;
+                lastError = `Bridge returned ${response?.status ?? "unknown"}`;
                 updateEngineStatus(false);
             }
         } catch (err) {
