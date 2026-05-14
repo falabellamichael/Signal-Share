@@ -22,6 +22,7 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const isWindows = process.platform === "win32";
 const userId = process.env.SIGNAL_SHARE_USER_ID;
+const MEDIA_ACTION_COOLDOWN_MS = 1500;
 
 const MEDIA_KEY_CODES = {
   play_pause: 0xb3,
@@ -48,7 +49,6 @@ const MAX_ARTWORK_BYTES = Number(process.env.SIGNAL_SHARE_MAX_ARTWORK_BYTES || 1
 const SMTC_ERROR_LOG_COOLDOWN_MS = 30000;
 const LAST_GOOD_SNAPSHOT_MAX_AGE_MS = 15000;
 const SNAPSHOT_CACHE_TTL_MS = Number(process.env.SIGNAL_SHARE_SNAPSHOT_CACHE_TTL_MS || 650);
-const MEDIA_ACTION_COOLDOWN_MS = 1500;
 const SUPABASE_SYNC_INTERVAL_MS = Number(process.env.SIGNAL_SHARE_SYNC_INTERVAL_MS || 5000);
 const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true" || process.env.SIGNAL_SHARE_REMOTE_MEDIA === "true";
 const ALLOW_OPEN_URI = process.env.SIGNAL_SHARE_ALLOW_OPEN_URI === "true";
