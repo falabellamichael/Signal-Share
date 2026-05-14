@@ -420,7 +420,11 @@ async function callLocalAI({
 
         lastError = `Bridge returned ${response.status}`;
         if (response.status === 401 || response.status === 403) {
-          // Auth/permission failures will not recover by trying older routes.
+          // If local-llm auth fails, fall back to legacy bridge chat route.
+          // This keeps AI available when token/secret settings are partial.
+          if (chatPath === "/api/local-llm/chat") {
+            continue;
+          }
           break;
         }
       } catch (error) {

@@ -482,10 +482,9 @@ async function getDesktopBridgeSnapshot({ suppressNetworkErrors = false } = {}) 
 
 async function checkBridgeConnectivity({ signal, timeoutMs = 1800 } = {}) {
     const probes = [
-        "/api/local-llm/health",
         "/api/local-llm/models",
         "/api/llm/models",
-        "/api/llm/chat"
+        "/api/local-llm/health"
     ];
     let sawAuthFailure = false;
 
@@ -497,7 +496,15 @@ async function checkBridgeConnectivity({ signal, timeoutMs = 1800 } = {}) {
                 signal,
                 suppressNetworkErrors: true
             });
-            if (res?.ok) return true;
+            if (res?.ok) {
+                if (path.endsWith("/models")) {
+                    const payload = await res.json().catch(() => null);
+                    const models = Array.isArray(payload?.models) ? payload.models : [];
+                    if (models.length > 0) return true;
+                    continue;
+                }
+                return true;
+            }
 
             const status = Number(res?.status || 0);
             if (status === 401 || status === 403) {
@@ -1841,6 +1848,13 @@ window.sendChatMessage = async function() {
                 });
 
                 if (nextResponse.status === 404 && chatPath !== chatPaths[chatPaths.length - 1]) {
+                    continue;
+                }
+
+                if ((nextResponse.status === 401 || nextResponse.status === 403)
+                    && chatPath === '/api/local-llm/chat'
+                    && chatPath !== chatPaths[chatPaths.length - 1]) {
+                    // Token/secret mismatch on strict local-llm route; try legacy chat route.
                     continue;
                 }
 
