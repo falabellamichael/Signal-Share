@@ -1835,7 +1835,6 @@ async function handleMessageSubmit(event) {
     }
 
     const notificationDispatch = await triggerMessageNotificationDispatch(sentMessage.id);
-;
     if (notificationDispatch && notificationDispatch.skipped !== true && Number(notificationDispatch.sent ?? 0) === 0) {
       console.warn("Message notification was not confirmed by any target", notificationDispatch);
     }

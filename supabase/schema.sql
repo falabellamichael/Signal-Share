@@ -671,6 +671,24 @@ as $$
   );
 $$;
 
+create or replace function public.sanitize_text(input_text text)
+returns text
+language plpgsql
+security definer
+as $$
+declare
+  term text;
+  result text := coalesce(input_text, '');
+begin
+  if result = '' then return result; end if;
+  foreach term in array public.get_signal_share_blocked_terms() loop
+    -- Simple word boundary replacement in SQL with matching star length
+    result := regexp_replace(result, '\y' || term || '\y', repeat('*', length(term)), 'gi');
+  end loop;
+  return result;
+end;
+$$;
+
 create or replace function public.enforce_post_language_moderation()
 returns trigger
 language plpgsql
@@ -678,9 +696,16 @@ security definer
 set search_path = public
 as $$
 begin
-  if public.post_contains_blocked_language(new.creator, new.title, new.caption, new.tags) then
-    raise exception 'This post contains blocked language and cannot be published.'
-      using errcode = 'P0001';
+  -- Instead of raising exception, we sanitize the content
+  new.title := public.sanitize_text(new.title);
+  new.caption := public.sanitize_text(new.caption);
+  new.creator := public.sanitize_text(new.creator);
+  
+  -- Also sanitize tags if any
+  if new.tags is not null then
+    for i in 1 .. array_upper(new.tags, 1) loop
+      new.tags[i] := public.sanitize_text(new.tags[i]);
+    end loop;
   end if;
 
   return new;

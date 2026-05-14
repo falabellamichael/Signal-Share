@@ -2,13 +2,29 @@
 # One term per line. Lines beginning with "#" are ignored.
 # Keep this list focused on severe profanity/abuse terms.
 
+asshole
+beaner
+bitch
+chink
+cunt
+fag
+faggot
 fuck
 fucking
+gook
+kike
 motherfucker
+nigga
+nigger
+paki
+raghead
+retard
 shit
 bullshit
-asshole
-bitch
-cunt
+slut
+spic
+tranny
+wetback
+whore
 dickhead
 bastard
