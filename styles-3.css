@@ -2224,3 +2224,38 @@
     body[data-theme='ember'] .message-bubble span {
       color: rgba(255, 255, 255, 0.75) !important;
     }
+
+    /* Icon gradient overrides from user reference swatch */
+    :root {
+      --icon-gradient-main: linear-gradient(135deg, #aa7d64 0%, #6b8c78 100%);
+      --icon-gradient-outgoing: linear-gradient(135deg, #aa7d64 0%, #111111 100%);
+    }
+
+    .button-primary,
+    .open-button,
+    .filter-chip.is-active,
+    .tag-chip.is-active,
+    .like-button.is-liked,
+    .feed-page-button.is-active,
+    .mode-toggle-button.is-active,
+    .source-toggle-button.is-active,
+    .hero-companion-download-btn {
+      background: var(--icon-gradient-main) !important;
+      color: #ffffff !important;
+      border-color: transparent !important;
+    }
+
+    .settings-switch-ui::after {
+      background: var(--icon-gradient-main) !important;
+    }
+
+    .message-row.is-self .message-bubble {
+      background: var(--icon-gradient-outgoing) !important;
+      border-color: transparent !important;
+      color: #ffffff !important;
+    }
+
+    .message-row.is-self .message-bubble p,
+    .message-row.is-self .message-bubble span {
+      color: #ffffff !important;
+    }
