@@ -62,15 +62,19 @@ SYSTEM TOOLS:
 5. [LAUNCH/CLOSE: app_id] (spotify, chrome, notepad, calculator)
 6. [SCREENSHOT] | 7. [LIST_TABS] | 8. [LIST_APPS]
 9. [LIST_FILES/READ_FILE/WRITE_FILE: path]
-10.    - EDITING: If user says "edit" or "change", use [EDIT] SEARCH: <old block> REPLACE: <new block> [/EDIT]
-    - REWRITING: If user says "rewrite" or "refactor", use [REWRITE] <full file content> [/REWRITE]
+10.    - EDITING: If user says "edit", "change", or "rewrite", use ONLY the surgical [EDIT] tag:
+      [EDIT]
+      SEARCH: exact code block to find
+      REPLACE: new code block
+      [/EDIT]
+    - Produce multiple [EDIT] blocks if multiple changes are needed.
     - DO NOT use JSON for Workshop files. DO NOT use conversational filler.
     - Output only the tag.
 11. [SYS_INFO] | 12. [PROCESS: list|kill] | 13. [SHELL: {cmd, shell}]
 
 PROTOCOLS:
 - Use [SEARCH] for all factual/live info (news, scores, weather).
-- Use [FILE_REWRITE] for all Workshop code edits. Include FULL file content.
+- Use [EDIT] for all Workshop code edits. Do NOT use full-file rewrites.
 - Be proactive with lifestyle tips. Keep responses concise but worldly.
 - Privacy: Do not access private LANs.
 `.trim();
@@ -779,8 +783,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                          lmResponse.includes('[CLOSE:');
 
         // Protocol tags are handled by the frontend; they should NOT trigger a backend tool iteration loop
-        const isProtocolTag = lmResponse.includes('[FILE_REWRITE:') || 
-                              lmResponse.includes('[PUBLISH:') || 
+        const isProtocolTag = lmResponse.includes('[PUBLISH:') || 
                               lmResponse.includes('[ARCADE:') || 
                               lmResponse.includes('[COMPOSE:');
         

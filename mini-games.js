@@ -2616,7 +2616,7 @@ window.getWorkshopFileContent = function(gameId, fileName) {
  * Can optionally trigger a save to Supabase.
  */
 window.applyAiFilePatch = async function(gameId, fileName, search, replace, options = {}) {
-    console.log(`[AI Workshop] Applying surgical patch to ${fileName} for game ${gameId}`);
+    console.log(`[AI Workshop] Applying strengthened surgical patch to ${fileName} for game ${gameId}`);
     const { save = false, silent = false } = options;
 
     const oldContent = (typeof window.getWorkshopFileContent === 'function') ? window.getWorkshopFileContent(gameId, fileName) : "";
@@ -2624,51 +2624,77 @@ window.applyAiFilePatch = async function(gameId, fileName, search, replace, opti
         return { ok: false, message: "Could not read original file for patching." };
     }
 
-    // --- SMART FUZZY MATCHING ---
-    let matchFound = false;
-    let targetSearch = search;
-    
-    // 1. Exact match (fastest)
-    if (oldContent.includes(targetSearch)) {
-        matchFound = true;
-    } 
-    // 2. Trimmed match (handles trailing newlines/spaces)
-    else if (oldContent.includes(targetSearch.trim())) {
-        targetSearch = targetSearch.trim();
-        matchFound = true;
+    // 1. Direct Search/Replace (Exact)
+    if (oldContent.includes(search)) {
+        const newContent = oldContent.replace(search, replace);
+        return window.internalApplyWorkshopFileEdit(gameId, fileName, newContent, options);
     }
-    // 3. Normalized whitespace match (aggressive)
-    else {
-        const normalize = (str) => str.replace(/\s+/g, ' ').trim();
-        const normalizedOld = normalize(oldContent);
-        const normalizedSearch = normalize(targetSearch);
-        
-        if (normalizedOld.includes(normalizedSearch)) {
-            console.warn(`[AI Workshop] Found fuzzy match for ${fileName}. Applying with caution.`);
-            // Note: We can't easily replace back into the original with normalized matching 
-            // without a diff library, so we'll try one more 'middle ground' approach:
-            // Find the most likely block by splitting into lines.
-            matchFound = false; 
+
+    // 2. Line-by-Line Robust Normalization
+    const fileLines = oldContent.split(/\r?\n/);
+    const searchLines = search.trim().split(/\r?\n/).map(l => l.trim());
+    const searchLen = searchLines.length;
+    
+    if (searchLen === 0) return { ok: false, message: "Search block is empty." };
+
+    let bestMatchIndex = -1;
+    let bestMatchScore = 0; // In case we want to do true fuzzy, for now we want "near-exact"
+
+    for (let i = 0; i <= fileLines.length - searchLen; i++) {
+        let matchCount = 0;
+        for (let j = 0; j < searchLen; j++) {
+            const fLine = fileLines[i + j].trim();
+            const sLine = searchLines[j];
+            
+            // Indifferent to quotes and internal whitespace normalization
+            const normalize = (s) => s.replace(/['"]/g, '"').replace(/\s+/g, ' ').trim();
+            if (normalize(fLine) === normalize(sLine)) {
+                matchCount++;
+            } else {
+                break;
+            }
+        }
+        if (matchCount === searchLen) {
+            bestMatchIndex = i;
+            break; // Found perfect normalized match
         }
     }
 
-    if (!matchFound) {
-        console.error(`[AI Workshop] Patch failed: Search string not found in ${fileName}.`);
-        console.log(`[AI Workshop] Search string attempted: "${search.substring(0, 50)}..."`);
+    if (bestMatchIndex !== -1) {
+        console.log(`[AI Workshop] Found robust normalized match at line ${bestMatchIndex + 1}`);
         
-        // If surgical edit fails, we could fallback to rewrite if we had the full content...
-        // But for now, let's just report the failure clearly.
-        return { 
-            ok: false, 
-            message: `Surgical edit failed: I couldn't find the exact code block you wanted to change in ${fileName}. Try using 'rewrite' for larger changes or be more specific about the code snippet.` 
-        };
+        // Reconstruct content by replacing the specific line range
+        // We preserve the file's original line endings
+        const lineEnding = oldContent.includes('\r\n') ? '\r\n' : '\n';
+        
+        const before = fileLines.slice(0, bestMatchIndex);
+        const after = fileLines.slice(bestMatchIndex + searchLen);
+        
+        // We use the replacement as provided, but try to detect if it needs indentation
+        // If the first line of the match had indentation, we can try to apply it to the replacement
+        const originalFirstLine = fileLines[bestMatchIndex];
+        const indentMatch = originalFirstLine.match(/^(\s*)/);
+        const indent = indentMatch ? indentMatch[1] : "";
+        
+        let finalReplace = replace;
+        // If replacement is multi-line and not indented, apply the original indentation
+        if (replace.includes('\n') && !replace.startsWith(' ') && !replace.startsWith('\t')) {
+            finalReplace = replace.split('\n').map(line => indent + line).join('\n');
+        }
+
+        const newContent = [...before, finalReplace, ...after].join(lineEnding);
+        return window.internalApplyWorkshopFileEdit(gameId, fileName, newContent, options);
     }
 
-    const newContent = oldContent.replace(targetSearch, replace);
-    return window.applyAiFileEdit(gameId, fileName, newContent, options);
+    console.error(`[AI Workshop] Patch failed: Could not find code block in ${fileName} even with robust matching.`);
+    return { 
+        ok: false, 
+        message: `Surgical edit failed. I couldn't find the exact code block in ${fileName}.\n\n` +
+                 `TIP: Ensure your SEARCH block is a exact copy-paste from the file, including all punctuation.` 
+    };
 };
 
-window.applyAiFileEdit = async function(gameId, fileName, content, options = {}) {
+window.internalApplyWorkshopFileEdit = async function(gameId, fileName, content, options = {}) {
     console.log(`[AI Workshop] Applying edit to ${fileName} for game ${gameId}`);
     const { save = false, silent = false } = options;
 

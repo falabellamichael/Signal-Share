@@ -37,8 +37,7 @@
         DUCKDUCKGO: "[DUCKDUCKGO:<query>]",
         COMPOSE: "[COMPOSE:<text>]",
         PUBLISH: "[PUBLISH:{json}]",
-        FILE_REWRITE: "[FILE_REWRITE]...[/FILE_REWRITE]",
-        PATCH_SUGGESTION: "[PATCH_SUGGESTION]...[/PATCH_SUGGESTION]",
+        EDIT: "[EDIT]...[/EDIT]",
         SCREENSHOT: "[SCREENSHOT]",
         LIST_TABS: "[LIST_TABS]",
         LIST_APPS: "[LIST_APPS]",
@@ -424,7 +423,6 @@
                 "Never use [COMPOSE:<text>] for coding requests, debugging, or general Q&A.",
                 "For Arcade Library/Workshop publishing, use [PUBLISH:{...}] with target:\"workshop\" and include code/files payload when possible.",
                 "For improving an existing workshop game, set mode:\"update\" and include gameId when available.",
-                "Prefer [PATCH_SUGGESTION] for risky edits spanning many files.",
                 "Ask for explicit user confirmation before destructive operations."
             ],
             bridgeBoundaries: [
@@ -435,18 +433,14 @@
         };
     }
 
-    function buildFileRewriteContract() {
+    function buildFileEditContract() {
         return [
-            "When the user asks to edit or rewrite code for the Workshop, use these simple text tags:",
-            "1) Surgical EDIT (For small changes):",
+            "When the user asks to edit Workshop code, you MUST use exactly one surgical [EDIT] tag:",
             "[EDIT]",
             "SEARCH: exact code block to find",
             "REPLACE: new code block",
             "[/EDIT]",
-            "2) Full REWRITE (For large changes or when 'rewrite' is requested):",
-            "[REWRITE]",
-            "full updated file content here",
-            "[/REWRITE]"
+            "You MUST provide the exact SEARCH block from the file. Do not rewrite the whole file."
         ].join("\n");
     }
 
@@ -466,9 +460,9 @@
                     "Use filename, mime type, and metadata for unsupported formats."
                 ],
                 coding: [
-                    "Generate full rewrites for HTML, CSS, JavaScript, JSON, and text files.",
-                    "Produce targeted patch suggestions for safer incremental changes.",
-                    "Explain why each rewrite is needed and highlight risk before destructive edits.",
+                    "Perform targeted surgical edits using SEARCH/REPLACE blocks.",
+                    "Produce precise patch suggestions for safe incremental changes.",
+                    "Explain why each change is needed and highlight risk before destructive edits.",
                     "Design modular refactors with explicit boundaries for UI, state, API, and utility layers."
                 ],
                 pcAndMediaControl: [
@@ -505,7 +499,7 @@
                 "Include exact action tags when direct execution is intended.",
                 "When debugging, include likely root cause and one minimal safe fix."
             ],
-            fileRewriteContract: buildFileRewriteContract()
+            fileEditContract: buildFileEditContract()
         };
     }
 
@@ -577,7 +571,7 @@
         describeAttachment,
         buildCapabilitiesManifest,
         buildCompanionContext,
-        buildFileRewriteContract
+        buildFileEditContract
     };
 
     global.SignalShareAiCore = api;

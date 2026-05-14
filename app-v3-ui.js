@@ -1467,13 +1467,13 @@ export function createAppUi(context) {
     
     // Strip internal protocol tags from display
     const cleanText = sourceText
-      .replace(/\[(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\][\s\S]*?\[\/(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\]/gi, "")
-      .replace(/\[(?:\/)?(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\]/gi, "")
+      .replace(/\[(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT)\][\s\S]*?\[\/(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT)\]/gi, "")
+      .replace(/\[(?:\/)?(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT)\]/gi, "")
       .replace(/\[COMPOSE:\s*([\s\S]*?)\]/gi, "$1")
       .replace(/\[(?:ARCADE|DUCKDUCKGO|OPEN):\s*[^\]]+\]/gi, "")
       .replace(/\[PUBLISH:\s*({[\s\S]*?})\]/gi, "")
       .trim();
-    if (!cleanText && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|\/?(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION))(?::|\])/i.test(sourceText)) {
+    if (!cleanText && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|\/?(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT))(?::|\])/i.test(sourceText)) {
         container.hidden = true; 
         container.innerHTML = ""; 
         return; 

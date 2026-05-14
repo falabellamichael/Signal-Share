@@ -536,15 +536,16 @@ function buildWorkshopEditDirective(workshopContext = null) {
 
     const lines = [
         '[WORKSHOP_FILE_EDIT_PROTOCOL]',
-        'If the user asks to edit/fix/update Workshop code, you MUST include exactly one [FILE_REWRITE:{...}] tag.',
-        'Tag schema: {"gameId":"string","fileName":"string","content":"string","save":true}.',
-        'Use save:true unless the user explicitly asks for draft-only changes.',
-        'content must be the full updated file text, not a diff.',
-        'Do not use [PUBLISH] for edit-only requests.',
+        'If the user asks to edit/fix/update Workshop code, you MUST use the [EDIT] tag with SEARCH/REPLACE format.',
+        'Tag format:',
+        '[EDIT]',
+        'SEARCH: exact code block to find (must be exact match)',
+        'REPLACE: new code block',
+        '[/EDIT]',
         'You are now in Arcade Edit Mode. skip conversational greetings. DO NOT explain steps.',
         'Fast Mode: Provide concise, direct technical answers. Do not repeat my instructions.',
-        'CRITICAL: You MUST use the [FILE_REWRITE] tag. If you do not use it, the edit will fail.',
-        'EXAMPLE: [FILE_REWRITE: {"gameId": "id", "fileName": "game.js", "content": "code...", "save": true}]'
+        'CRITICAL: You MUST use the [EDIT] tag. Full rewrites are NOT allowed and will fail.',
+        'EXAMPLE: [EDIT]\nSEARCH: const x = 1;\nREPLACE: const x = 2;\n[/EDIT]'
     ];
 
     if (activeGameId && activeFileName) {
@@ -1693,14 +1694,14 @@ function addChatMessage(role, content) {
     } else {
         // Strip internal protocol tags from display
         const cleanContent = content
-            .replace(/\[(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\][\s\S]*?\[\/(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\]/gi, "")
-            .replace(/\[(?:\/)?(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION)\]/gi, "")
+            .replace(/\[(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT)\][\s\S]*?\[\/(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT)\]/gi, "")
+            .replace(/\[(?:\/)?(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT)\]/gi, "")
             .replace(/\[COMPOSE:\s*([\s\S]*?)\]/gi, "$1")
             .replace(/\[(?:ARCADE|DUCKDUCKGO|OPEN):\s*[^\]]+\]/gi, "")
             .replace(/\[PUBLISH:\s*({[\s\S]*?})\]/gi, "")
             .trim();
         msgDiv.textContent = cleanContent;
-        if (!cleanContent && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|\/?(?:IMPLEMENTATION_PLAN|TEST_PLAN|FILE_REWRITE|PATCH_SUGGESTION))(?::|\])/i.test(content)) {
+        if (!cleanContent && /\[(?:ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|\/?(?:IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT))(?::|\])/i.test(content)) {
             msgDiv.style.display = 'none';
         }
     }
@@ -2881,48 +2882,57 @@ async function executeArcadeChatActions(text, options = {}) {
         window.open(url, '_blank');
     }
 
-    // 6. SIMPLE TEXT-BASED WORKSHOP ACTIONS (Replaces old JSON logic)
-    const workshopMatch = text.match(/\[(REWRITE|EDIT|REWRITE_FILE|EDIT_FILE|FILE_REWRITE|FILE_EDIT)\]([\s\S]+?)\[\/\1\]/i);
+    // 6. RESILIENT WORKSHOP ACTIONS (Surgical Only)
+    const workshopActionRegex = /\[(EDIT|EDIT_FILE|FILE_EDIT|Workshop\/Edit)(?::\s*([\s\S]*?))?\]([\s\S]*?)(?:\[\/\1\]|$)/i;
+    const workshopMatch = text.match(workshopActionRegex);
+    
     if (workshopMatch) {
         try {
             actionResult.handled = true;
             const tagType = workshopMatch[1].toUpperCase();
-            const rawContent = workshopMatch[2].trim();
+            let rawContent = workshopMatch[3].trim();
+            
+            // If it's the old JSON format [TAG: {json}], we need to extract the 'content' or 'replace' field
+            let gameId = null;
+            let fileName = null;
+            let search = null;
+            let replace = null;
+
+            if (rawContent.startsWith('{') && rawContent.includes('}')) {
+                try {
+                    const json = JSON.parse(rawContent);
+                    gameId = json.gameId;
+                    fileName = json.fileName;
+                    search = json.search;
+                    replace = json.replace;
+                    rawContent = json.content || json.replace || rawContent;
+                } catch (e) {
+                    // Not valid JSON, treat as raw text
+                }
+            }
+
+            // SMART TARGETING: If not in JSON, get from editor state or context
             const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
-            const gameId = editorState?.activeGameId;
-            const fileName = editorState?.activeFileName;
+            gameId = gameId || editorState?.activeGameId || window.lastPlayedGameId || "";
+            fileName = fileName || editorState?.activeFileName || "index.html";
 
             if (gameId && fileName && rawContent) {
-                if (tagType.includes('REWRITE')) {
-                    // FULL REWRITE
-                    const sanitized = rawContent
-                        .replace(/---BEGIN_CONTENT---/g, '')
-                        .replace(/---END_CONTENT---/g, '')
-                        .trim();
-
-                    if (typeof window.applyAiFileEdit === 'function') {
-                        actionResult.workshopFileRewriteAttempted = true;
-                        await window.applyAiFileEdit(gameId, fileName, sanitized, { save: true });
-                        actionResult.workshopFileRewriteSucceeded = true;
-                    }
-                } else {
-                    // SURGICAL EDIT (Expects SEARCH: ... REPLACE: ... format inside the tag)
-                    const searchMatch = rawContent.match(/SEARCH:\s*([\s\S]+?)\s*REPLACE:\s*([\s\S]+)/i);
-                    if (searchMatch && typeof window.applyAiFilePatch === 'function') {
-                        actionResult.workshopFileRewriteAttempted = true;
-                        const patchResult = await window.applyAiFilePatch(gameId, fileName, searchMatch[1].trim(), searchMatch[2].trim(), { save: true });
-                        if (patchResult?.ok) {
-                            actionResult.workshopFileRewriteSucceeded = true;
-                        } else if (window.showFeedback) {
-                            window.showFeedback(patchResult?.message || "Surgical edit failed to find the code block.", true);
-                        }
-                    } else if (typeof window.applyAiFileEdit === 'function') {
-                        // If it's not in SEARCH/REPLACE format, fallback to full rewrite just in case
-                        actionResult.workshopFileRewriteAttempted = true;
-                        await window.applyAiFileEdit(gameId, fileName, rawContent, { save: true });
-                        actionResult.workshopFileRewriteSucceeded = true;
-                    }
+            // SURGICAL EDIT (Try Search/Replace format or use JSON fields)
+            const searchMatch = rawContent.match(/SEARCH:\s*([\s\S]+?)\s*REPLACE:\s*([\s\S]+)/i);
+            const finalSearch = search || (searchMatch ? searchMatch[1].trim() : "");
+            const finalReplace = replace || (searchMatch ? searchMatch[2].trim() : "");
+            
+            if (finalSearch && typeof window.applyAiFilePatch === 'function') {
+                actionResult.workshopFileRewriteAttempted = true;
+                const patchResult = await window.applyAiFilePatch(gameId, fileName, finalSearch, finalReplace, { save: true });
+                if (patchResult?.ok) {
+                    actionResult.workshopFileRewriteSucceeded = true;
+                } else if (window.showFeedback) {
+                    window.showFeedback(patchResult?.message || "Surgical edit failed to find the code block.", true);
                 }
+            } else if (window.showFeedback) {
+                window.showFeedback("Surgical [EDIT] tag missing SEARCH/REPLACE blocks.", true);
+            }
             }
         } catch (e) {
             console.error("[Arcade Chat] Workshop action failed:", e);
@@ -2932,63 +2942,6 @@ async function executeArcadeChatActions(text, options = {}) {
     return actionResult;
 }
 
-async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt, context = null) {
-    const result = {
-        attempted: false,
-        ok: false,
-        reason: ''
-    };
-    if (!isWorkshopEditIntentPrompt(userPrompt, context)) return result;
-    if (extractBalancedJsonTagPayload(replyText, 'FILE_REWRITE')) return result;
-    if (typeof window.applyAiFileEdit !== 'function') {
-        result.reason = 'file-rewrite-unavailable';
-        return result;
-    }
-
-    const editorState = typeof window.getWorkshopEditorState === 'function'
-        ? window.getWorkshopEditorState()
-        : null;
-    const gameId = `${editorState?.activeGameId || ''}`.trim();
-    const fileName = `${editorState?.activeFileName || ''}`.trim();
-    if (!gameId || !fileName) {
-        result.reason = 'editor-target-missing';
-        return result;
-    }
-
-    const parsedFiles = buildAiWorkshopFilesFromText(replyText);
-    if (!Array.isArray(parsedFiles) || parsedFiles.length === 0) {
-        result.reason = 'no-code-candidate';
-        return result;
-    }
-
-    const lowerFileName = fileName.toLowerCase();
-    const matchingFile = parsedFiles.find((file) => {
-        const name = `${file?.name || ''}`.toLowerCase();
-        const type = `${file?.type || ''}`.toLowerCase();
-        if (lowerFileName.endsWith('.html')) return name.endsWith('.html') || type.includes('text/html');
-        if (lowerFileName.endsWith('.css')) return name.endsWith('.css') || type.includes('text/css');
-        if (lowerFileName.endsWith('.js') || lowerFileName.endsWith('.mjs') || lowerFileName.endsWith('.cjs')) {
-            return name.endsWith('.js') || type.includes('javascript');
-        }
-        if (lowerFileName.endsWith('.json')) return name.endsWith('.json') || type.includes('json');
-        if (lowerFileName.endsWith('.txt') || lowerFileName.endsWith('.md')) return name.endsWith('.txt') || name.endsWith('.md') || type.includes('text/plain');
-        return false;
-    }) || parsedFiles[0];
-
-    const content = typeof matchingFile?.content === 'string' ? matchingFile.content : '';
-    if (!content.trim()) {
-        result.reason = 'empty-code-candidate';
-        return result;
-    }
-
-    result.attempted = true;
-    const applyResult = await window.applyAiFileEdit(gameId, fileName, content, { save: true });
-    if (!applyResult?.ok) {
-        result.reason = 'apply-failed';
-        return result;
-    }
-    result.ok = true;
-    return result;
 }
 
 async function tryAutoPublishWorkshopFromReply(replyText, userPrompt = '') {
