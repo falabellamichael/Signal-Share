@@ -2222,20 +2222,10 @@ window.sendChatMessage = async function() {
 
             const protocolAwareMessage = buildProtocolAwareUserMessage(text);
             const attachment = arcadeChatHistory[arcadeChatHistory.length - 1].attachment;
-            const compactHistory = Array.isArray(normalizedHistory) ? normalizedHistory.slice(-14) : [];
-            const compactPageContext = `${fullPageContext || ''}`.slice(0, 25000);
+            const compactHistory = Array.isArray(normalizedHistory) ? normalizedHistory.slice(-10) : [];
+            const compactPageContext = `${fullPageContext || ''}`.slice(0, 12000); // Reduced from 25k to improve stability on small local models
+            
             const payloadVariants = [
-                {
-                    label: 'full',
-                    body: JSON.stringify({
-                        message: protocolAwareMessage,
-                        model: requestModel,
-                        customInstructions,
-                        attachment,
-                        history: normalizedHistory,
-                        pageContext: fullPageContext
-                    })
-                },
                 {
                     label: 'compact',
                     body: JSON.stringify({
