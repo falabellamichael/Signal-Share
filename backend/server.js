@@ -48,6 +48,7 @@ const MAX_ARTWORK_BYTES = Number(process.env.SIGNAL_SHARE_MAX_ARTWORK_BYTES || 1
 const SMTC_ERROR_LOG_COOLDOWN_MS = 30000;
 const LAST_GOOD_SNAPSHOT_MAX_AGE_MS = 15000;
 const SNAPSHOT_CACHE_TTL_MS = Number(process.env.SIGNAL_SHARE_SNAPSHOT_CACHE_TTL_MS || 650);
+const MEDIA_ACTION_COOLDOWN_MS = 1500;
 const SUPABASE_SYNC_INTERVAL_MS = Number(process.env.SIGNAL_SHARE_SYNC_INTERVAL_MS || 5000);
 const enableRemoteMediaSync = process.env.SIGNAL_SHARE_ENABLE_REMOTE_MEDIA === "true" || process.env.SIGNAL_SHARE_REMOTE_MEDIA === "true";
 const ALLOW_OPEN_URI = process.env.SIGNAL_SHARE_ALLOW_OPEN_URI === "true";
@@ -1130,10 +1131,13 @@ app.get("/api/system-media/current", (req, res) => {
   }
 });
 
-app.post("/api/system-media/action", (req, res) => {
-  const action = `${req.body?.action || ""}`.trim().toLowerCase();
-  const appPackage = `${req.body?.appPackage || ""}`.trim();
-  const preferredSource = normalizePreferredSource(req.body?.preferredSource || req.query.source || "");
+app.all("/api/system-media/action", (req, res) => {
+  let action = `${req.body?.action || req.query?.action || ""}`.trim().toLowerCase();
+  const appPackage = `${req.body?.appPackage || req.query?.appPackage || ""}`.trim();
+  const preferredSource = normalizePreferredSource(req.body?.preferredSource || req.query?.source || req.query?.target || "");
+
+  // If we have a target but no action, assume play_pause (common for Hero Player syncs)
+  if (!action && preferredSource) action = "play_pause";
 
   if (action === "open_uri") {
     if (!ALLOW_OPEN_URI) {
