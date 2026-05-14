@@ -2095,6 +2095,20 @@ window.sendChatMessage = async function() {
             }
         }
 
+        if (isWorkshopStyleRevertPrompt(text)) {
+            addChatMessage('user', text);
+            input.value = '';
+            const revertResult = await tryRevertLocalWorkshopStyleEnhancement();
+            const revertReply = revertResult.message || 'No AI style enhancement block was found to revert.';
+            addChatMessage('ai', `[Workshop Edit]: ${revertReply}`);
+            arcadeChatHistory.push({ role: 'user', content: text, attachment: null });
+            arcadeChatHistory.push({ role: 'assistant', content: `[Workshop Edit]: ${revertReply}` });
+            saveCurrentChat();
+            updateChatStatus(revertResult.ok ? 'active' : 'idle');
+            isSendingChatMessage = false;
+            return;
+        }
+
         addChatMessage('user', text);
 
         const directSteamTarget = parseDirectSteamCommand(text);
@@ -2384,7 +2398,7 @@ window.sendChatMessage = async function() {
         }
 
         if (reply !== null) {
-            if (editRequestActive && isUnhelpfulWorkshopEditReply(reply)) {
+            if (editRequestActive && isUnhelpfulWorkshopEditReply(reply) && allowsLocalStyleFallback(text)) {
                 const localStyleFallback = await tryLocalWorkshopStyleFallback(text, richContext);
                 if (localStyleFallback?.ok) {
                     const fallbackReply = `[Workshop Edit]: ${localStyleFallback.message}`;
@@ -3055,6 +3069,15 @@ function isStyleEditPrompt(prompt = '') {
     return /\b(style|styles|css|design|visual|theme|color|colour|pretty|background|polish|make it look)\b/i.test(`${prompt || ''}`);
 }
 
+function allowsLocalStyleFallback(prompt = '') {
+    return /\b(local fallback|quick style fallback|apply local style|fallback style)\b/i.test(`${prompt || ''}`);
+}
+
+function isWorkshopStyleRevertPrompt(prompt = '') {
+    return /\b(revert|undo|remove|delete|back out)\b/i.test(`${prompt || ''}`)
+        && /\b(style|styles|css|design|visual|ai style enhancement)\b/i.test(`${prompt || ''}`);
+}
+
 function buildLocalStyleEnhancementCss() {
     return `/* AI style enhancement */
 :root {
@@ -3122,6 +3145,13 @@ function upsertLocalStyleEnhancement(content = '', fileName = '') {
     return `${styleBlock}\n${withoutOld}`;
 }
 
+function removeLocalStyleEnhancement(content = '') {
+    return `${content || ''}`
+        .replace(/\/\* AI style enhancement \*\/[\s\S]*$/i, '')
+        .replace(/\n?\s*<style\s+id=["']ai-style-enhancement["'][\s\S]*?<\/style>\s*/gi, '\n')
+        .trimEnd();
+}
+
 async function tryLocalWorkshopStyleFallback(userPrompt = '', richContext = null) {
     const result = { attempted: false, ok: false, message: '' };
     if (!isStyleEditPrompt(userPrompt)) return result;
@@ -3152,6 +3182,63 @@ async function tryLocalWorkshopStyleFallback(userPrompt = '', richContext = null
 
     result.ok = true;
     result.message = `Applied a local style enhancement to ${fileName}.`;
+    return result;
+}
+
+async function tryRevertLocalWorkshopStyleEnhancement() {
+    const result = { attempted: false, ok: false, count: 0, message: '' };
+    if (typeof window.internalApplyWorkshopFileEdit !== 'function'
+        || typeof window.getWorkshopFileContent !== 'function') {
+        result.message = 'Workshop edit functions are unavailable.';
+        return result;
+    }
+
+    const targets = [];
+    const activeEditor = getActiveWorkshopEditorContext();
+    if (activeEditor?.activeGameId && activeEditor?.activeFileName) {
+        targets.push({ gameId: activeEditor.activeGameId, fileName: activeEditor.activeFileName });
+    }
+
+    if (typeof window.getWorkshopManageableGames === 'function') {
+        const games = window.getWorkshopManageableGames();
+        if (Array.isArray(games)) {
+            for (const game of games) {
+                const files = Array.isArray(game?.files) ? game.files : [];
+                for (const file of files) {
+                    const fileName = `${file?.name || ''}`.trim();
+                    if (!fileName || !/\.(html?|css)$/i.test(fileName)) continue;
+                    targets.push({ gameId: game.id, fileName });
+                }
+            }
+        }
+    }
+
+    const seen = new Set();
+    for (const target of targets) {
+        const key = `${target.gameId}::${target.fileName}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const oldContent = window.getWorkshopFileContent(target.gameId, target.fileName);
+        if (typeof oldContent !== 'string' || !oldContent.trim()) continue;
+
+        const nextContent = removeLocalStyleEnhancement(oldContent);
+        if (nextContent === oldContent) continue;
+
+        result.attempted = true;
+        const applyResult = await window.internalApplyWorkshopFileEdit(target.gameId, target.fileName, nextContent, { save: true, silent: true });
+        if (applyResult?.ok) {
+            result.count += 1;
+        } else {
+            result.message = applyResult?.message || `Failed to revert ${target.fileName}.`;
+            return result;
+        }
+    }
+
+    result.ok = result.count > 0;
+    result.message = result.ok
+        ? `Reverted AI style enhancement in ${result.count} file${result.count === 1 ? '' : 's'}.`
+        : 'No AI style enhancement block was found to revert.';
     return result;
 }
 
