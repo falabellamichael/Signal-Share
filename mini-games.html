@@ -539,7 +539,9 @@
             padding: 16px;
             box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
             min-height: 0;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: auto;
+            padding-bottom: 22px;
         }
 
         .workshop-edit-overlay[hidden] {
@@ -627,19 +629,12 @@
             display: none;
         }
 
-        .workshop-edit-cover-row {
+        .workshop-edit-controls-row {
             display: grid;
-            grid-template-columns: minmax(0, 1fr);
+            grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
             gap: 12px;
             margin-bottom: 10px;
             align-items: end;
-        }
-
-        .workshop-edit-asset-actions-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 12px;
-            margin-bottom: 10px;
         }
 
         .workshop-edit-asset-block {
@@ -647,6 +642,10 @@
             flex-direction: column;
             gap: 8px;
             min-width: 0;
+        }
+
+        .workshop-edit-asset-block .workshop-edit-secondary-btn {
+            width: 100%;
         }
 
         .workshop-edit-assets-grid {
@@ -727,6 +726,7 @@
         .workshop-edit-content {
             width: 100%;
             min-height: 360px;
+            height: 360px;
             resize: vertical;
             background: rgba(0, 0, 0, 0.35);
             border: 1px solid rgba(255, 255, 255, 0.08);
@@ -737,7 +737,8 @@
             font-size: 0.8rem;
             line-height: 1.45;
             outline: none;
-            flex: 1 1 auto;
+            flex: 0 0 auto;
+            max-height: none;
         }
 
         .workshop-edit-content:focus {
@@ -778,20 +779,17 @@
                 grid-template-columns: 1fr;
             }
 
-            .workshop-edit-asset-actions-grid {
-                grid-template-columns: 1fr;
-            }
-
             .workshop-edit-assets-grid {
                 grid-template-columns: 1fr;
             }
 
-            .workshop-edit-cover-row {
+            .workshop-edit-controls-row {
                 grid-template-columns: 1fr;
             }
 
             .workshop-edit-content {
-                min-height: 180px;
+                min-height: 220px;
+                height: 220px;
             }
         }
 
@@ -1653,14 +1651,11 @@
                 </div>
 
                 <div id="workshop-edit-tools-panel" class="workshop-edit-tools-panel" hidden>
-                    <div class="workshop-edit-cover-row">
+                    <div class="workshop-edit-controls-row">
                         <div class="workshop-edit-field">
                             <label class="setting-label" for="workshop-edit-cover-url">Cover Image URL</label>
                             <input id="workshop-edit-cover-url" type="text" class="form-input" placeholder="https://example.com/cover.png or data:image/..." oninput="handleWorkshopEditCoverInput()">
                         </div>
-                    </div>
-
-                    <div class="workshop-edit-asset-actions-grid">
                         <div class="workshop-edit-asset-block">
                             <label class="setting-label" for="workshop-edit-cover-file">Upload Cover</label>
                             <button type="button" class="workshop-edit-secondary-btn" onclick="triggerWorkshopEditCoverFilePicker()">Choose Image</button>
