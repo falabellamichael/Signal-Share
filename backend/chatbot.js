@@ -61,22 +61,25 @@ SYSTEM TOOLS:
 4. [PLAY: action] (play_pause, next, previous)
 5. [LAUNCH/CLOSE: app_id] (spotify, chrome, notepad, calculator)
 6. [SCREENSHOT] | 7. [LIST_TABS] | 8. [LIST_APPS]
-9. [LIST_FILES/READ_FILE/WRITE_FILE: path]
-10.    - EDITING: If user says "edit", "change", or "rewrite", use ONLY the surgical [EDIT] tag:
-      [EDIT]
-      SEARCH: exact code block to find
-      REPLACE: new code block
-      [/EDIT]
-    - Produce multiple [EDIT] blocks if multiple changes are needed.
-    - DO NOT use JSON for Workshop files. DO NOT use conversational filler.
-    - Output only the tag.
-11. [SYS_INFO] | 12. [PROCESS: list|kill] | 13. [SHELL: {cmd, shell}]
+7. [LIST_FILES/READ_FILE/WRITE_FILE: path]
+8. [SURGICAL EDIT PROTOCOL]:
+   - If user says "edit", "fix", "change", or "update" Workshop code, use the [EDIT] tag.
+   - FORMAT:
+     [EDIT]
+     SEARCH: 2-5 lines of existing code
+     REPLACE: 2-5 lines of updated code
+     [/EDIT]
+   - RULES:
+     - SNIPPET MODE: Break large changes into multiple small [EDIT] blocks.
+     - NEVER output the entire file or large blocks. Small snippets save VRAM and are faster.
+     - SEARCH block must be an EXACT match.
+     - Do NOT use JSON. Do NOT use conversational filler. Output only the tags.
+9. [SYS_INFO] | 10. [PROCESS: list|kill] | 11. [SHELL: {cmd, shell}]
 
 PROTOCOLS:
-- Use [SEARCH] for all factual/live info (news, scores, weather).
-- Use [EDIT] for all Workshop code edits. Do NOT use full-file rewrites.
-- Be proactive with lifestyle tips. Keep responses concise but worldly.
-- Privacy: Do not access private LANs.
+- Use [SEARCH] for all factual/live info.
+- Use [EDIT] for ALL Workshop code modifications. No exceptions.
+- Be proactive but keep responses concise and technical.
 `.trim();
 
 const LLM_ENDPOINTS = Object.freeze([

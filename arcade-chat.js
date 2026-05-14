@@ -469,6 +469,10 @@ function isComposeDraftIntent(message = "") {
 function isWorkshopPublishIntentPrompt(message = "") {
     const text = `${message || ''}`.trim().toLowerCase();
     if (!text) return false;
+    const isEdit = /\b(edit|update|fix|modify|patch|change|tweak|adjust|improve)\b/.test(text);
+    const explicitPublish = /\b(publish|upload|submit|post|share)\b/.test(text);
+    if (isEdit && !explicitPublish) return false;
+
     const publishVerb = /\b(publish|upload|save|add|ship|submit|post|share)\b/.test(text);
     const buildVerb = /\b(write|create|build|make|generate|code|new)\b/.test(text);
     const target = /\b(library|workshop|arcade|store)\b/.test(text);
@@ -514,7 +518,9 @@ function buildWorkshopPublishDirective() {
         'Preferred payload format: files:[{name,type,content}, ...].',
         'Alternative payload fields allowed: html, css, js, or code.',
         'Do not output placeholder/offline guidance when generation is available.',
-        '[/WORKSHOP_PROTOCOL]'
+        '[/WORKSHOP_PROTOCOL]',
+        'CRITICAL: Use [PUBLISH] ONLY for new games or if the user explicitly asks to "publish" or "upload" the entire project.',
+        'DO NOT use [PUBLISH] for editing active files. Use [EDIT] instead.'
     ].join('\n');
 }
 
@@ -539,12 +545,16 @@ function buildWorkshopEditDirective(workshopContext = null) {
         'If the user asks to edit/fix/update Workshop code, you MUST use the [EDIT] tag with SEARCH/REPLACE format.',
         'Tag format:',
         '[EDIT]',
-        'SEARCH: exact code block to find (must be exact match)',
+        'SEARCH: exact code block to find (include unique context lines if needed)',
         'REPLACE: new code block',
         '[/EDIT]',
+        'SNIPPET RULES:',
+        '- Break large changes into multiple small [EDIT] blocks.',
+        '- Keep blocks to 5-10 lines max. This saves VRAM and is much faster.',
+        '- SEARCH must be an EXACT match (precision is key).',
+        '- Full file rewrites are strictly PROHIBITED and will FAIL.',
         'You are now in Arcade Edit Mode. skip conversational greetings. DO NOT explain steps.',
-        'Fast Mode: Provide concise, direct technical answers. Do not repeat my instructions.',
-        'CRITICAL: You MUST use the [EDIT] tag. Full rewrites are NOT allowed and will fail.',
+        'Fast Mode: Provide direct technical snippets only.',
         'EXAMPLE: [EDIT]\nSEARCH: const x = 1;\nREPLACE: const x = 2;\n[/EDIT]'
     ];
 
@@ -573,15 +583,20 @@ function buildProtocolAwareUserMessage(userPrompt = "") {
 function getProtocolDirectives(userPrompt = "", workshopContext = null) {
     const text = `${userPrompt || ''}`.trim().toLowerCase();
     const directives = [];
-    if (isWorkshopPublishIntentPrompt(text)) {
-        directives.push(buildWorkshopPublishDirective());
-    }
-    
-    // If we are in the workshop editor, ALWAYS provide the edit directive regardless of detected intent.
+    // 1. EDIT DIRECTIVE (Highest Priority for Workshop Context)
     if (workshopContext?.workshopEditor?.activeGameId) {
         directives.push(buildWorkshopEditDirective(workshopContext));
     } else if (isWorkshopEditIntentPrompt(text, workshopContext)) {
         directives.push(buildWorkshopEditDirective(workshopContext));
+    }
+
+    // 2. PUBLISH DIRECTIVE (Only if not already covered by Edit or if explicitly requested)
+    if (isWorkshopPublishIntentPrompt(text)) {
+        // If we are in the editor, we only add publish if the user actually said "publish" or "upload"
+        const explicitPublish = /\b(publish|upload|submit|post|share)\b/.test(text);
+        if (!workshopContext?.workshopEditor?.activeGameId || explicitPublish) {
+            directives.push(buildWorkshopPublishDirective());
+        }
     }
     return directives.join('\n\n');
 }
@@ -2882,66 +2897,61 @@ async function executeArcadeChatActions(text, options = {}) {
         window.open(url, '_blank');
     }
 
-    // 6. RESILIENT WORKSHOP ACTIONS (Surgical Only)
-    const workshopActionRegex = /\[(EDIT|EDIT_FILE|FILE_EDIT|Workshop\/Edit)(?::\s*([\s\S]*?))?\]([\s\S]*?)(?:\[\/\1\]|$)/i;
-    const workshopMatch = text.match(workshopActionRegex);
+    // 6. RESILIENT WORKSHOP ACTIONS (Surgical Multi-Patch Support)
+    const workshopActionRegex = /\[(EDIT|EDIT_FILE|FILE_EDIT|Workshop\/Edit)(?::\s*([\s\S]*?))?\]([\s\S]*?)(?:\[\/\1\]|$)/gi;
+    const matches = Array.from(text.matchAll(workshopActionRegex));
     
-    if (workshopMatch) {
-        try {
-            actionResult.handled = true;
-            const tagType = workshopMatch[1].toUpperCase();
-            let rawContent = workshopMatch[3].trim();
-            
-            // If it's the old JSON format [TAG: {json}], we need to extract the 'content' or 'replace' field
-            let gameId = null;
-            let fileName = null;
-            let search = null;
-            let replace = null;
+    if (matches.length > 0) {
+        actionResult.handled = true;
+        for (const workshopMatch of matches) {
+            try {
+                const tagType = workshopMatch[1].toUpperCase();
+                let rawContent = workshopMatch[3].trim();
+                
+                let gameId = null;
+                let fileName = null;
+                let search = null;
+                let replace = null;
 
-            if (rawContent.startsWith('{') && rawContent.includes('}')) {
-                try {
-                    const json = JSON.parse(rawContent);
-                    gameId = json.gameId;
-                    fileName = json.fileName;
-                    search = json.search;
-                    replace = json.replace;
-                    rawContent = json.content || json.replace || rawContent;
-                } catch (e) {
-                    // Not valid JSON, treat as raw text
+                if (rawContent.startsWith('{') && rawContent.includes('}')) {
+                    try {
+                        const json = JSON.parse(rawContent);
+                        gameId = json.gameId;
+                        fileName = json.fileName;
+                        search = json.search;
+                        replace = json.replace;
+                        rawContent = json.content || json.replace || rawContent;
+                    } catch (e) {}
                 }
-            }
 
-            // SMART TARGETING: If not in JSON, get from editor state or context
-            const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
-            gameId = gameId || editorState?.activeGameId || window.lastPlayedGameId || "";
-            fileName = fileName || editorState?.activeFileName || "index.html";
+                const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
+                gameId = gameId || editorState?.activeGameId || window.lastPlayedGameId || "";
+                fileName = fileName || editorState?.activeFileName || "index.html";
 
-            if (gameId && fileName && rawContent) {
-            // SURGICAL EDIT (Try Search/Replace format or use JSON fields)
-            const searchMatch = rawContent.match(/SEARCH:\s*([\s\S]+?)\s*REPLACE:\s*([\s\S]+)/i);
-            const finalSearch = search || (searchMatch ? searchMatch[1].trim() : "");
-            const finalReplace = replace || (searchMatch ? searchMatch[2].trim() : "");
-            
-            if (finalSearch && typeof window.applyAiFilePatch === 'function') {
-                actionResult.workshopFileRewriteAttempted = true;
-                const patchResult = await window.applyAiFilePatch(gameId, fileName, finalSearch, finalReplace, { save: true });
-                if (patchResult?.ok) {
-                    actionResult.workshopFileRewriteSucceeded = true;
-                } else if (window.showFeedback) {
-                    window.showFeedback(patchResult?.message || "Surgical edit failed to find the code block.", true);
+                if (gameId && fileName && rawContent) {
+                    const searchMatch = rawContent.match(/SEARCH:\s*([\s\S]+?)\s*REPLACE:\s*([\s\S]+)/i);
+                    const finalSearch = search || (searchMatch ? searchMatch[1].trim() : "");
+                    const finalReplace = replace || (searchMatch ? searchMatch[2].trim() : "");
+                    
+                    if (finalSearch && typeof window.applyAiFilePatch === 'function') {
+                        actionResult.workshopFileRewriteAttempted = true;
+                        const patchResult = await window.applyAiFilePatch(gameId, fileName, finalSearch, finalReplace, { save: true });
+                        if (patchResult?.ok) {
+                            actionResult.workshopFileRewriteSucceeded = true;
+                        } else if (window.showFeedback) {
+                            window.showFeedback(patchResult?.message || "Surgical edit failed.", true);
+                        }
+                    } else if (window.showFeedback) {
+                        window.showFeedback("Surgical [EDIT] block missing SEARCH/REPLACE fields.", true);
+                    }
                 }
-            } else if (window.showFeedback) {
-                window.showFeedback("Surgical [EDIT] tag missing SEARCH/REPLACE blocks.", true);
+            } catch (e) {
+                console.error("[Arcade Chat] Workshop action failed:", e);
             }
-            }
-        } catch (e) {
-            console.error("[Arcade Chat] Workshop action failed:", e);
         }
     }
 
     return actionResult;
-}
-
 }
 
 async function tryAutoPublishWorkshopFromReply(replyText, userPrompt = '') {
