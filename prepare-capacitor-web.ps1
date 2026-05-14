@@ -24,7 +24,7 @@ $excludeFiles = @(
 )
 
 # Specific directories to copy entirely
-$directories = @("icons")
+$directories = @("icons", "arcade-commands")
 
 # Clean and recreate dist
 if (Test-Path -LiteralPath $dist) {
@@ -69,7 +69,13 @@ $criticalDistFiles = @(
   "companion-ai-core.js",
   "hero-media-player.js",
   "config.js",
-  "notifications.js"
+  "notifications.js",
+  "arcade-commands/manager.js",
+  "arcade-commands/edit.js",
+  "arcade-commands/fix.js",
+  "arcade-commands/publish.js",
+  "arcade-commands/clear.js",
+  "arcade-commands/help.js"
 )
 
 foreach ($file in $criticalDistFiles) {
