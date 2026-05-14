@@ -14,6 +14,7 @@ const MIN_SIDEBAR_WIDTH = 280;
 const MIN_GAME_PANEL_WIDTH = 320;
 let lastResolvedBridgeCandidatesSignature = "";
 let lastResolvedBridgePrimary = "";
+let lastBridgeStatusWasOnline = false;
 
 function normalizeBridgeBaseUrl(baseUrl = "") {
     const raw = `${baseUrl || ""}`.trim();
@@ -54,6 +55,7 @@ function resolveBridgeBaseCandidates() {
 
     const configured = normalizeBridgeBaseUrl(
         window.SignalShareLocalLlm?.getBridgeBaseUrl?.()
+        || localStorage.getItem('ss_bridge_url')
         || localStorage.getItem('signal-share-bridge-url')
         || ""
     );
@@ -639,6 +641,21 @@ function updateEngineStatus(online) {
         }
         statusText.dataset.bridgeStatus = statusKey;
     }
+
+    // NEW: Add a prompt when connection is first established
+    if (online && !lastBridgeStatusWasOnline) {
+        console.log("[Arcade Chat] Bridge connection established. Showing prompt.");
+        const container = document.getElementById('chat-messages');
+        if (container) {
+            const promptDiv = document.createElement('div');
+            promptDiv.className = 'chat-message system-prompt';
+            promptDiv.style.cssText = 'align-self: center; background: rgba(117, 176, 34, 0.1); color: #75b022; border: 1px solid rgba(117, 176, 34, 0.2); font-size: 0.75rem; padding: 6px 12px; border-radius: 20px; margin: 10px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;';
+            promptDiv.textContent = 'Bridge Connection Established! 🤖';
+            container.appendChild(promptDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+    }
+    lastBridgeStatusWasOnline = online;
 }
 
 function isEngineStatusOffline() {
@@ -1666,8 +1683,9 @@ window.sendChatMessage = async function() {
             return;
         }
 
-        // Check for local intents/actions via the Chatbot Engine
-        if (window.ArcadeChatbotEngine) {
+        // Check for local intents/actions via the Chatbot Engine (ONLY IF BRIDGE IS OFFLINE)
+        const bridgeIsActuallyOffline = isEngineStatusOffline();
+        if (window.ArcadeChatbotEngine && bridgeIsActuallyOffline) {
             const intentReply = window.ArcadeChatbotEngine.processIntent(text);
             if (intentReply) {
                 const typingId = addTypingIndicator();
