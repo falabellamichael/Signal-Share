@@ -314,10 +314,42 @@ const workshopEditCoverDraftByGame = new Map();
 
 function isCurrentUserGameOwner(game) {
     if (!game || !currentUser) return false;
-    if (currentUser.id && game.authorId) {
-        return `${game.authorId}` === `${currentUser.id}`;
+    const currentUserId = `${currentUser.id || ''}`.trim();
+    const gameAuthorId = `${game.authorId || ''}`.trim();
+    if (currentUserId && gameAuthorId) {
+        return gameAuthorId === currentUserId;
     }
-    return game.author === currentUser.name;
+    const currentUserName = `${currentUser.name || ''}`.trim();
+    const gameAuthor = `${game.author || ''}`.trim();
+    return !!(currentUserName && gameAuthor && gameAuthor === currentUserName);
+}
+
+function isAiPublishedWorkshopGame(game) {
+    if (!game || typeof game !== 'object') return false;
+    const gameId = `${game.id || ''}`.trim().toLowerCase();
+    const title = `${game.title || ''}`.trim().toLowerCase();
+    const author = `${game.author || ''}`.trim().toLowerCase();
+    const tags = `${game.tags || ''}`.trim().toLowerCase();
+    const description = `${game.description || ''}`.trim().toLowerCase();
+
+    if (/\bai\b/.test(author) || /\bassistant\b/.test(author) || /\bcompanion\b/.test(author) || /\bbot\b/.test(author)) return true;
+    if (/(^|[,\s])ai([,\s]|$)/i.test(tags)) return true;
+    if (description.includes('ai-generated workshop game')) return true;
+    if (description.includes('generated when remote ai routing is unavailable')) return true;
+    if (gameId.startsWith('ai-') || gameId.startsWith('ai_')) return true;
+    if (title.startsWith('ai ')) return true;
+    return false;
+}
+
+function canCurrentSessionEditWorkshopGame(game) {
+    if (!game || !currentUser) return false;
+    if (isCurrentMasterAdmin || isCurrentUserGameOwner(game)) return true;
+
+    const currentUserId = `${currentUser.id || ''}`.trim();
+    const gameAuthorId = `${game.authorId || ''}`.trim();
+    if (currentUserId && gameAuthorId && gameAuthorId !== currentUserId) return false;
+
+    return isAiPublishedWorkshopGame(game);
 }
 
 // Detection
@@ -929,8 +961,8 @@ async function publishProcessedGameFiles(options = {}) {
     const existingGame = requestedExistingId
         ? customGames.find((game) => game.id === requestedExistingId) || null
         : null;
-    if (existingGame && !isCurrentMasterAdmin && !isCurrentUserGameOwner(existingGame)) {
-        return { ok: false, error: 'not-owner', message: 'Only the original publisher can edit this workshop game.' };
+    if (existingGame && !canCurrentSessionEditWorkshopGame(existingGame)) {
+        return { ok: false, error: 'not-owner', message: 'Only your own or AI-published workshop games can be edited.' };
     }
 
     const title = typeof options.title === 'string' && options.title.trim()
@@ -1122,7 +1154,7 @@ function renderPublishedGames() {
 
 function getWorkshopManageableGames() {
     return customGames
-        .filter((game) => isCurrentMasterAdmin || isCurrentUserGameOwner(game))
+        .filter((game) => canCurrentSessionEditWorkshopGame(game))
         .sort((a, b) => {
             const aTime = Date.parse(a?.publishedAt || '') || 0;
             const bTime = Date.parse(b?.publishedAt || '') || 0;
@@ -2544,7 +2576,7 @@ window.revertWorkshopEditCurrentFile = revertWorkshopEditCurrentFile;
 window.saveWorkshopEditPanel = saveWorkshopEditPanel;
 window.getWorkshopGamesForAi = function() {
     return customGames
-        .filter((game) => isCurrentUserGameOwner(game))
+        .filter((game) => canCurrentSessionEditWorkshopGame(game))
         .map((game) => {
             const editableFiles = (Array.isArray(game.files) ? game.files : [])
                 .filter(isWorkshopFileEditable)
@@ -2567,7 +2599,7 @@ window.getWorkshopGamesForAi = function() {
  */
 window.getWorkshopFileContent = function(gameId, fileName) {
     const game = customGames.find(g => g.id === gameId);
-    if (!game || !isCurrentUserGameOwner(game)) return null;
+    if (!game || !canCurrentSessionEditWorkshopGame(game)) return null;
 
     const file = (Array.isArray(game.files) ? game.files : []).find(f => f.name === fileName);
     if (!file) return null;
