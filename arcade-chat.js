@@ -126,6 +126,55 @@ function resolveBridgeBaseCandidates() {
     return candidates;
 }
 
+// --- VOICE ENGINE (TTS / STT) ---
+let arcadeSpeechRecognition = null;
+let isArcadeDictating = false;
+let isVoiceSessionActive = false;
+let arcadeSpeechSynth = window.speechSynthesis;
+
+function initArcadeSpeech() {
+    if (arcadeSpeechRecognition) return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    arcadeSpeechRecognition = new SpeechRecognition();
+    arcadeSpeechRecognition.continuous = true;
+    arcadeSpeechRecognition.interimResults = true;
+    arcadeSpeechRecognition.lang = 'en-US';
+
+    arcadeSpeechRecognition.onresult = (event) => {
+        const input = document.getElementById('arc-chat-input');
+        if (!input) return;
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
+        }
+        input.value = transcript;
+        input.focus();
+    };
+
+    arcadeSpeechRecognition.onerror = (event) => {
+        console.error('[Voice] Recognition error:', event.error);
+        stopArcadeDictation();
+    };
+}
+
+function speakArcadeText(text) {
+    if (!arcadeSpeechSynth) return;
+    arcadeSpeechSynth.cancel(); // Stop current speech
+    
+    const cleanText = text.replace(/\[[\s\S]*?\]/g, "").trim();
+    if (!cleanText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const voices = arcadeSpeechSynth.getVoices();
+    // Try to find a nice English voice
+    utterance.voice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    arcadeSpeechSynth.speak(utterance);
+}
+
 function parseBridgeBoolean(value) {
     const normalized = `${value ?? ''}`.trim().toLowerCase();
     if (!normalized) return null;
@@ -642,6 +691,30 @@ async function pollDesktopBridge() {
     }
 }
 
+function startArcadeDictation() {
+    if (isArcadeDictating) return;
+    initArcadeSpeech();
+    if (!arcadeSpeechRecognition) return;
+
+    try {
+        isArcadeDictating = true;
+        isVoiceSessionActive = true;
+        arcadeSpeechRecognition.start();
+        const btn = getChatSendButton();
+        if (btn) btn.classList.add('recording');
+    } catch (e) {
+        console.warn('[Voice] Failed to start recognition:', e);
+    }
+}
+
+function stopArcadeDictation() {
+    if (!isArcadeDictating) return;
+    isArcadeDictating = false;
+    if (arcadeSpeechRecognition) arcadeSpeechRecognition.stop();
+    const btn = getChatSendButton();
+    if (btn) btn.classList.remove('recording');
+}
+
 /**
  * Updates the chat input placeholder with a random suggestion.
  */
@@ -650,7 +723,7 @@ function updateChatPlaceholder() {
     if (!input) return;
 
     const suggestions = window.arcadeChatSuggestions || ["Ask for gaming advice..."];
-
+
 
     const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)];
     input.placeholder = randomSuggestion;
@@ -1377,6 +1450,24 @@ function addChatMessage(role, content) {
 
     container.appendChild(msgDiv);
     container.scrollTop = container.scrollHeight;
+
+    // Add Speak button for AI messages on all platforms
+    if (role === 'ai') {
+        const speakBtn = document.createElement('button');
+        speakBtn.className = 'msg-speak-btn';
+        speakBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+        speakBtn.onclick = (e) => {
+            e.stopPropagation();
+            speakArcadeText(content);
+        };
+        msgDiv.appendChild(speakBtn);
+
+        // Auto-speak if it was a voice session
+        if (isVoiceSessionActive) {
+            speakArcadeText(content);
+            isVoiceSessionActive = false; // Reset for next interaction
+        }
+    }
 }
 
 window.executeArcadeAction = function(action) {
@@ -2624,12 +2715,43 @@ function setupCloseParityHandlers() {
 
     // Ensure Enter key sends the message
     const arcInput = document.getElementById('arc-chat-input');
+    const arcSendBtn = getChatSendButton();
+    
     setChatSendButtonMode('send');
+    
     if (arcInput) {
         arcInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
+                isVoiceSessionActive = false; // Regular typing reset
                 sendChatMessage();
+            }
+        });
+    }
+
+    if (arcSendBtn) {
+        let holdTimer = null;
+        const HOLD_THRESHOLD = 400;
+
+        arcSendBtn.addEventListener('pointerdown', (e) => {
+            if (isSendingChatMessage) return;
+            holdTimer = setTimeout(() => {
+                startArcadeDictation();
+                holdTimer = null;
+            }, HOLD_THRESHOLD);
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            if (holdTimer) {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+                // Short click -> Regular send
+                isVoiceSessionActive = false;
+                sendChatMessage();
+            } else if (isArcadeDictating) {
+                // Long hold release -> Stop and send
+                stopArcadeDictation();
+                setTimeout(() => sendChatMessage(), 100);
             }
         });
     }
