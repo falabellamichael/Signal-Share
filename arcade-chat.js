@@ -618,10 +618,20 @@ function hasActiveWorkshopEditor(workshopContext = null) {
     return !!(`${editor?.activeGameId || ''}`.trim() && `${editor?.activeFileName || ''}`.trim());
 }
 
+function isWorkshopEditorReferencePrompt(message = "") {
+    const text = `${message || ''}`.trim().toLowerCase();
+    if (!text) return false;
+    return /\b(?:file|code|game|it|that|this)\b.{0,80}\b(?:open|opened|loaded|selected|showing|visible)\b.{0,80}\b(?:editor|workshop editor)\b/.test(text)
+        || /\b(?:editor|workshop editor)\b.{0,80}\b(?:open|opened|loaded|selected|showing|visible)\b/.test(text)
+        || /\b(?:the\s+)?(?:file|code|game)\s+is\s+(?:already\s+)?(?:in|inside|on)\s+the\s+(?:workshop\s+)?editor\b/.test(text)
+        || /\bi\s+(?:have|got)\s+(?:it|the\s+(?:file|code|game))\s+(?:open|opened|loaded|selected)\s+in\s+the\s+(?:workshop\s+)?editor\b/.test(text);
+}
+
 function isWorkshopEditIntentPrompt(message = "", workshopContext = null) {
     const text = `${message || ''}`.trim().toLowerCase();
     if (!text) return false;
     if (/^\/(?:edit|fix|rewrite)\b/.test(text) || /^\[(?:edit|fix|rewrite)\]/.test(text)) return true;
+    if (isWorkshopEditorReferencePrompt(text) && hasActiveWorkshopEditor(workshopContext)) return true;
 
     const editVerb = /\b(edit|fix|repair|change|update|modify|replace|remove|delete|add|insert|improve|tweak|adjust|refactor|rename|debug|rewrite)\b/.test(text);
     if (!editVerb) return false;
@@ -2565,8 +2575,30 @@ window.sendChatMessage = async function () {
             }
         };
 
+        const editorReferenceActive = isWorkshopEditorReferencePrompt(text);
         const rewriteRequestActive = isWorkshopRewriteIntentPrompt(text, richContext);
         const editRequestActive = rewriteRequestActive || isWorkshopEditIntentPrompt(text, richContext);
+        const activeEditorForRequest = getActiveWorkshopEditorContext(richContext);
+        const activeEditorHasSource = !!`${activeEditorForRequest?.activeFileContent || ''}`.trim();
+        if (editRequestActive && hasActiveWorkshopEditor(richContext) && !activeEditorHasSource) {
+            const editorName = `${activeEditorForRequest?.activeFileName || 'selected file'}`.trim();
+            const replyText = `[Workshop Edit]: I can see ${editorName} selected in the editor, but its source content is not readable yet. Re-select the file in Workshop Edit Mode, then send the edit request again.`;
+            removeTypingIndicator(typingId);
+            addChatMessage('ai', replyText);
+            arcadeChatHistory.push({ role: 'assistant', content: replyText });
+            saveCurrentChat();
+            updateChatStatus('idle');
+            return;
+        }
+        if (editorReferenceActive && !hasActiveWorkshopEditor(richContext)) {
+            const replyText = '[Workshop Edit]: I cannot read an active Workshop editor file yet. Open Workshop Edit Mode, select the game and file, then send the edit request again.';
+            removeTypingIndicator(typingId);
+            addChatMessage('ai', replyText);
+            arcadeChatHistory.push({ role: 'assistant', content: replyText });
+            saveCurrentChat();
+            updateChatStatus('idle');
+            return;
+        }
         const contextForModel = {
             ...richContext,
             workshopEditor: richContext.workshopEditor ? {
@@ -2580,7 +2612,7 @@ window.sendChatMessage = async function () {
         // Omit visible page text if we are in the editor to save tokens
         const pageText = richContext.workshopEditor ? "" : document.body.innerText.substring(0, 300);
         // Keep only the most recent messages to prevent context window overflow on small local models
-        const maxHistory = editRequestActive ? 2 : 6;
+        const maxHistory = editRequestActive ? (editorReferenceActive ? 6 : 2) : 6;
         const recentHistory = arcadeChatHistory.slice(-maxHistory);
 
         const normalizedHistory = window.SignalShareAiCore
@@ -2803,7 +2835,7 @@ window.sendChatMessage = async function () {
             if (actionResult?.workshopFileRewriteAttempted) {
                 // Edit was handled (either via tag or fallback was skipped because tag handled it)
                 // No further action needed for this message.
-            } else if (isWorkshopEditIntentPrompt(text, richContext)) {
+            } else if (editRequestActive) {
                 // Attempt automated edit fallback if no tag was found
                 await tryAutoWorkshopFileRewriteFromReply(reply, text, richContext);
             } else if (isWorkshopPublishIntentPrompt(text) && !actionResult?.workshopPublishAttempted) {
@@ -3878,6 +3910,10 @@ function isUnhelpfulWorkshopEditReply(replyText = '') {
         || text.includes('empty edit response')
         || text.includes('please provide the source')
         || text.includes('please provide the content')
+        || text.includes('please paste the code')
+        || text.includes('actual source code')
+        || text.includes('specific file you would like me to edit')
+        || text.includes('which file contains')
         || text.includes('i still require the source')
         || text.includes('i do not have the current code');
 }
