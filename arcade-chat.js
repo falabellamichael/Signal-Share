@@ -1905,6 +1905,17 @@ window.sendChatMessage = async function() {
         } else {
             if (lastError !== 'Bridge disabled') {
                 console.warn(`[Arcade Chat] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
+                
+                // NEW: Add a specific error prompt to the chat for the user
+                const container = document.getElementById('chat-messages');
+                if (container && lastError) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'chat-message system-error';
+                    errorDiv.style.cssText = 'align-self: center; background: rgba(231, 76, 60, 0.1); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.2); font-size: 0.7rem; padding: 4px 10px; border-radius: 4px; margin: 8px 0; font-family: monospace; opacity: 0.8;';
+                    errorDiv.textContent = `A.I. Bridge Error: ${lastError}`;
+                    container.appendChild(errorDiv);
+                    container.scrollTop = container.scrollHeight;
+                }
             }
             const offlineReply = getArcadeProtocolOfflineResponse(text);
             addChatMessage('ai', offlineReply);
