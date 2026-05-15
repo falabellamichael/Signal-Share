@@ -86,9 +86,13 @@
             }
 
             let data = null;
+            const jsonToParse = publishPayload?.jsonText || '';
+            
             try {
                 // Attempt to parse the JSON payload first using robust parser
-                data = window.ArcadeWorkshopManager.robustParseJson(publishPayload.jsonText);
+                if (jsonToParse) {
+                    data = window.ArcadeWorkshopManager.robustParseJson(jsonToParse);
+                }
             } catch (e) {
                 console.error('[Arcade: Publish] Critical error during JSON parsing:', e);
                 actionResult.errorReason = 'Failed to process AI response due to malformed data.';
@@ -99,10 +103,10 @@
             if (!data) {
                 console.warn('[Arcade: Publish] Robust parse failed, attempting greedy field recovery.');
                 data = {
-                    title: publishPayload.jsonText.match(/"title"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
-                    category: publishPayload.jsonText.match(/"category"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || 'GAME',
-                    description: publishPayload.jsonText.match(/"description"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
-                    mode: publishPayload.jsonText.match(/"mode"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || ''
+                    title: jsonToParse.match(/"title"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
+                    category: jsonToParse.match(/"category"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || 'GAME',
+                    description: jsonToParse.match(/"description"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
+                    mode: jsonToParse.match(/"mode"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || ''
                 };
             }
 
