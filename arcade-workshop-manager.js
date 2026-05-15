@@ -551,61 +551,67 @@ window.ArcadeWorkshopManager = {
     },
 
     getProtocolDirectives: function(userPrompt = "", workshopContext = null, attachment = null) {
-        const text = `${userPrompt || ''}`.trim().toLowerCase();
-        const directives = [];
-        const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
-        if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
+        try {
+            const text = `${userPrompt || ''}`.trim().toLowerCase();
+            const directives = [];
+            const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
+            if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
 
-        const editorIsActive = this.hasActiveWorkshopEditor(workshopContext);
-        
-        // 1. COMMAND PRIORITY
-        if (modes.has('/rewrite')) {
-            directives.push(this.buildWorkshopRewriteDirective(workshopContext, userPrompt));
-        }
-        if (modes.has('/idea')) {
-            directives.push(this.getIdeaDirective(userPrompt));
-        }
-        
-        if (modes.has('/edit') || modes.has('/fix')) {
-            const isFixMode = modes.has('/fix');
-            directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
-                ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
-                : this.buildWorkshopEditDirective(workshopContext, isFixMode, userPrompt));
-        }
+            const editorIsActive = this.hasActiveWorkshopEditor(workshopContext);
+            const editor = this.getActiveWorkshopEditorContext(workshopContext);
 
-        if (modes.has('/publish') || (text.includes('publish') && text.includes('workshop')) || text.includes('upload to workshop')) {
-            directives.push(this.getPublishDirective());
-        }
-
-        if (modes.has('/deep')) {
-            directives.push('[DEEP_REASONING_MODE]');
-            directives.push('The user has requested a DEEP reasoning session.');
-            directives.push('You MUST provide an exhaustive [PLANNING] block before any implementation.');
-            directives.push('Focus on edge cases, performance bottlenecks, and architectural integrity.');
-        }
-
-        // 2. AUTO-DETECTION
-        if (directives.length === 0) {
-            if (editorIsActive && !this.isExplicitWorkshopPublishIntentPrompt(text)) {
-                directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
-                    ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
-                    : this.buildWorkshopEditDirective(workshopContext, false, userPrompt));
-            } else if (this.isWorkshopPublishIntentPrompt(text)) {
-                directives.push(this.getPublishDirective());
-            } else if (editorIsActive && this.isWorkshopEditIntentPrompt(text, workshopContext)) {
-                directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
-                    ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
-                    : this.buildWorkshopEditDirective(workshopContext, false, userPrompt));
+            // 1. COMMAND PRIORITY
+            if (modes.has('/rewrite')) {
+                directives.push(this.buildWorkshopRewriteDirective(workshopContext, userPrompt));
             }
-        }
-        
-        // 3. VISION ENHANCEMENT
-        if (typeof window.SignalShareWorkshopVision !== 'undefined' 
-            && window.SignalShareWorkshopVision.shouldApplyVisionDirective(text, attachment, workshopContext)) {
-            directives.push(window.SignalShareWorkshopVision.buildWorkshopVisionDirective(workshopContext));
-        }
+            if (modes.has('/idea')) {
+                directives.push(this.getIdeaDirective(userPrompt));
+            }
+            
+            if (modes.has('/edit') || modes.has('/fix')) {
+                const isFixMode = modes.has('/fix');
+                directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
+                    ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
+                    : this.buildWorkshopEditDirective(workshopContext, isFixMode, userPrompt));
+            }
 
-        return directives.join('\n\n');
+            if (modes.has('/publish') || (text.includes('publish') && text.includes('workshop')) || text.includes('upload to workshop')) {
+                directives.push(this.getPublishDirective());
+            }
+
+            if (modes.has('/deep')) {
+                directives.push('[DEEP_REASONING_MODE]');
+                directives.push('The user has requested a DEEP reasoning session.');
+                directives.push('You MUST provide an exhaustive [PLANNING] block before any implementation.');
+                directives.push('Focus on edge cases, performance bottlenecks, and architectural integrity.');
+            }
+
+            // 2. AUTO-DETECTION
+            if (directives.length === 0) {
+                if (editorIsActive && !this.isExplicitWorkshopPublishIntentPrompt(text)) {
+                    directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
+                        ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
+                        : this.buildWorkshopEditDirective(workshopContext, false, userPrompt));
+                } else if (this.isWorkshopPublishIntentPrompt(text)) {
+                    directives.push(this.getPublishDirective());
+                } else if (editorIsActive && this.isWorkshopEditIntentPrompt(text, workshopContext)) {
+                    directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
+                        ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
+                        : this.buildWorkshopEditDirective(workshopContext, false, userPrompt));
+                }
+            }
+            
+            // 3. VISION ENHANCEMENT
+            if (typeof window.SignalShareWorkshopVision !== 'undefined' 
+                && window.SignalShareWorkshopVision.shouldApplyVisionDirective(text, attachment, workshopContext)) {
+                directives.push(window.SignalShareWorkshopVision.buildWorkshopVisionDirective(workshopContext));
+            }
+
+            return directives.join('\n\n');
+        } catch (err) {
+            console.error("[Arcade Manager] Error generating protocol directives:", err);
+            return "";
+        }
     },
 
     buildWorkshopEditDirective: function(workshopContext = null, isFixMode = false, userPrompt = '') {

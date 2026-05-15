@@ -2649,7 +2649,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                 updateEngineStatus(false);
             }
         } finally {
-            removeTypingIndicator(typingId);
+            // Typing indicator is now handled by the global finally block for maximum reliability
         }
 
         if (wasCancelledByUser) {
@@ -2762,7 +2762,24 @@ window.sendChatMessage = async function (promptOverride = '') {
         }
     } catch (e) {
         console.error("[Arcade Chat] Error in sendChatMessage:", e);
+        // Show the error in the chat so the user knows it failed locally
+        try {
+            const container = document.getElementById('chat-messages');
+            if (container) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'chat-message system-error';
+                errorDiv.style.cssText = 'align-self: center; background: rgba(231, 76, 60, 0.1); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.2); font-size: 0.7rem; padding: 4px 10px; border-radius: 4px; margin: 8px 0; font-family: monospace; opacity: 0.8;';
+                errorDiv.textContent = `Local Execution Error: ${e.message || e}`;
+                container.appendChild(errorDiv);
+                container.scrollTop = container.scrollHeight;
+            }
+        } catch (uiErr) {
+            console.error("[Arcade Chat] Failed to show error in UI:", uiErr);
+        }
     } finally {
+        if (typeof typingId !== 'undefined') {
+            removeTypingIndicator(typingId);
+        }
         isSendingChatMessage = false;
         setChatSendButtonMode('send');
         updateChatStatus('idle');
