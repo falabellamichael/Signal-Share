@@ -536,17 +536,6 @@ function isComposeDraftIntent(message = "") {
     return hasMessagingTarget && hasComposeVerb;
 }
 
-function isWorkshopPublishIntentPrompt(message = "") {
-    const text = `${message || ''}`.trim().toLowerCase();
-    if (!text) return false;
-    const publishVerb = /\b(publish|upload|save|add|ship|submit|post|share)\b/.test(text);
-    const buildVerb = /\b(write|create|build|make|generate|code|new)\b/.test(text);
-    const target = /\b(library|workshop|arcade|store)\b/.test(text);
-    const gameMention = /\b(game|mini[-\s]?game|arcade game|app|utility)\b/.test(text);
-
-    // Allow either (target + publish) OR (build + gameMention) OR (publish + gameMention)
-    return (target && publishVerb) || (buildVerb && gameMention) || (publishVerb && gameMention);
-}
 
 
 function getActiveWorkshopEditorContext(workshopContext = null) {
@@ -563,14 +552,6 @@ function hasActiveWorkshopEditor(workshopContext = null) {
     return !!(`${editor?.activeGameId || ''}`.trim() && `${editor?.activeFileName || ''}`.trim());
 }
 
-function isWorkshopEditorReferencePrompt(message = "") {
-    const text = `${message || ''}`.trim().toLowerCase();
-    if (!text) return false;
-    return /\b(?:file|code|game|it|that|this)\b.{0,80}\b(?:open|opened|loaded|selected|showing|visible)\b.{0,80}\b(?:editor|workshop editor)\b/.test(text)
-        || /\b(?:editor|workshop editor)\b.{0,80}\b(?:open|opened|loaded|selected|showing|visible)\b/.test(text)
-        || /\b(?:the\s+)?(?:file|code|game)\s+is\s+(?:already\s+)?(?:in|inside|on)\s+the\s+(?:workshop\s+)?editor\b/.test(text)
-        || /\bi\s+(?:have|got)\s+(?:it|the\s+(?:file|code|game))\s+(?:open|opened|loaded|selected)\s+in\s+the\s+(?:workshop\s+)?editor\b/.test(text);
-}
 
 
 
@@ -581,164 +562,7 @@ function buildProtocolAwareUserMessage(userPrompt = "") {
     return `${userPrompt || ''}`.trim();
 }
 
-    // Clear flags so they don't persist to next message
-    window.activeArcadeCommandMode = null;
-    window.activeArcadeCommandModes = [];
 
-    // 1. COMMAND PRIORITY (Handles stacked commands like /edit /fix)
-    if (modes.has('/rewrite')) {
-        directives.push(buildWorkshopRewriteDirective(workshopContext, userPrompt));
-    }
-    if (modes.has('/idea')) {
-        directives.push(window.ArcadeWorkshopManager.getIdeaDirective(userPrompt));
-    }
-    
-    if (modes.has('/edit') || modes.has('/fix')) {
-        const isFixMode = modes.has('/fix');
-        directives.push(window.ArcadeWorkshopManager.isWorkshopMultiFileEditPrompt(text, workshopContext)
-            ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
-            : buildWorkshopEditDirective(workshopContext, isFixMode, userPrompt));
-    }
-
-    if (modes.has('/publish') || (text.includes('publish') && text.includes('workshop')) || text.includes('upload to workshop')) {
-        directives.push(buildWorkshopPublishDirective());
-    }
-
-    if (modes.has('/deep')) {
-        directives.push('[DEEP_REASONING_MODE]');
-        directives.push('The user has requested a DEEP reasoning session.');
-        directives.push('You MUST provide an exhaustive [PLANNING] block before any implementation.');
-        directives.push('Focus on edge cases, performance bottlenecks, and architectural integrity.');
-    }
-
-    // 2. AUTO-DETECTION (Only if no explicit command modes were set)
-    if (directives.length === 0) {
-        if (editorIsActive && !window.ArcadeWorkshopManager.isExplicitWorkshopPublishIntentPrompt(text)) {
-            directives.push(window.ArcadeWorkshopManager.isWorkshopMultiFileEditPrompt(text, workshopContext)
-                ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
-                : buildWorkshopEditDirective(workshopContext, false, userPrompt));
-        } else if (isWorkshopPublishIntentPrompt(text)) {
-            directives.push(buildWorkshopPublishDirective());
-        } else if (editorIsActive && window.ArcadeWorkshopManager.isWorkshopEditIntentPrompt(text, workshopContext)) {
-            directives.push(window.ArcadeWorkshopManager.isWorkshopMultiFileEditPrompt(text, workshopContext)
-                ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
-                : buildWorkshopEditDirective(workshopContext, false, userPrompt));
-        }
-    }
-    
-    // 3. VISION ENHANCEMENT (Multimodal Analysis)
-    if (typeof SignalShareWorkshopVision !== 'undefined' 
-        && SignalShareWorkshopVision.shouldApplyVisionDirective(text, attachment, workshopContext)) {
-        console.log('[Arcade Chat] Vision Attachment Detected: Injecting Multimodal Edit Protocol.');
-        directives.push(SignalShareWorkshopVision.buildWorkshopVisionDirective(workshopContext));
-    }
-
-    return directives.join('\n\n');
-}
-
-function buildWorkshopEditDirective(workshopContext = null, isFixMode = false, userPrompt = '') {
-    const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
-    const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
-    const styleEditMode = isStyleEditPrompt(userPrompt);
-
-    const lines = [
-        '[SURGICAL_EDIT_PROTOCOL]',
-        isFixMode ? 'FOCUS: Bug Fix / Error Resolution.' : 'FOCUS: Feature Update / Refactoring.',
-        'WORKSHOP FILES ARE VIRTUAL APP RECORDS, NOT DESKTOP FILE PATHS.',
-        'Do NOT use [READ_FILE], [LIST_FILES], [WRITE_FILE], or custom_.../filename paths for this request.',
-        'The file content below is already the current source of truth.',
-        'Format:',
-        '[EDIT]',
-        'SEARCH: 2-5 lines of exact existing code',
-        'REPLACE: updated snippet',
-        '[/EDIT]',
-        'RULES:',
-        '- Use [REASONING_ORCHESTRATOR_V2] for every edit: always output a [PLANNING] block before your [EDIT] tag.',
-        '- You MUST include the [EDIT] tag in the same response as the plan.',
-        '- Keep the plan concise to save tokens.',
-        '- Break changes into multiple [EDIT] blocks for safety.',
-        '- NEVER rewrite the entire file.',
-        '- NEVER use [PUBLISH] for edits to the active editor file.',
-        '- Do not return full-file code fences unless the user explicitly asks for a full file.',
-        '- Your actionable output should be the [EDIT] block, not a rewritten file.',
-        '- For style-only edits, if SEARCH/REPLACE is difficult, return one fenced css block with only CSS to insert.',
-        '- If you cannot find a safe SEARCH block in the provided content, ask the user to select the relevant file/section.',
-        '- Be precise with whitespace/indentation in SEARCH.',
-        '[/SURGICAL_EDIT_PROTOCOL]'
-    ];
-
-    if (styleEditMode) {
-        lines.splice(5, 0,
-            'STYLE_EDIT_MODE:',
-            '- Return exactly one fenced css code block when the request is only about style/design/CSS.',
-            '- Do not return a full HTML file for style-only edits.',
-            '- Do not invent external frameworks or classes; write real CSS selectors for the existing markup.',
-            '- The editor will insert the css block into the active HTML/CSS file as a targeted patch.'
-        );
-    }
-
-    if (activeGameId && activeFileName) {
-        const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
-        
-        let contentToProvide = "";
-        let isSkeleton = false;
-        
-        // Threshold for VRAM optimization: 4000 characters
-        if (rawContent.length > 4000) {
-            isSkeleton = true;
-            contentToProvide = generateCodeSkeleton(rawContent, activeFileName);
-        } else {
-            contentToProvide = rawContent;
-        }
-
-        if (isSkeleton) {
-            lines.push(
-                'VRAM_OPTIMIZATION_ACTIVE: The file is large. I am providing a SKELETON (index) of the code.',
-                'If you need to see the implementation of a specific function or block, output [FIND: exact unique string] in your response.',
-                'The system will automatically find that block and provide it to you in the next turn.',
-                'Use [FIND] to "heavy lift" the context without bloating VRAM.'
-            );
-        }
-
-        lines.push(`Target: ${activeFileName} (${activeGameId})\nContent:\n\`\`\`\n${contentToProvide}\n\`\`\``);
-    }
-
-    return lines.join('\n');
-}
-
-function buildWorkshopRewriteDirective(workshopContext = null, userPrompt = '') {
-    const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
-    const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
-    const fileKind = getWorkshopFileKindFromName(activeFileName);
-    const fenceLang = fileKind === 'js' ? 'javascript' : fileKind === 'css' ? 'css' : fileKind === 'html' ? 'html' : '';
-
-    const lines = [
-        '[FULL_FILE_REWRITE_PROTOCOL]',
-        'FOCUS: Complete replacement of the active Workshop editor file.',
-        'WORKSHOP FILES ARE VIRTUAL APP RECORDS, NOT DESKTOP FILE PATHS.',
-        'Do NOT use [READ_FILE], [LIST_FILES], [WRITE_FILE], [PUBLISH], or custom_.../filename paths for this request.',
-        'The file content below is already the current source of truth.',
-        'Format:',
-        `Return one fenced ${fenceLang || 'text'} code block containing the complete replacement content for the active file.`,
-        'If extra files are useful, add separate fenced code blocks for them and include a filename in the fence info, such as ```css filename=styles.css or ```javascript filename=game.js.',
-        'The editor will add or replace those extra files in the same Workshop game.',
-        'For HTML feature additions that use JavaScript or CSS files, return BOTH the complete updated active HTML file and every named extra file it references.',
-        'The updated HTML must include any required DOM controls/displays and exact <script src="..."></script> or <link href="..."> references for the extra files.',
-        'Do not return a standalone JavaScript/CSS snippet when the active file is HTML.',
-        'Do not wrap the answer in [EDIT] tags.',
-        'Do not ask the user to provide the source file.',
-        'Do not return explanations before or after the code blocks.',
-        '[/FULL_FILE_REWRITE_PROTOCOL]'
-    ];
-
-    if (activeGameId && activeFileName) {
-        const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
-        const content = rawContent.length > 22000 ? rawContent.substring(0, 22000) + '\n\n[TRUNCATED]' : rawContent;
-        lines.push(`Target: ${activeFileName} (${activeGameId})\nUser request: ${userPrompt}\nCurrent content:\n\`\`\`${fenceLang}\n${content}\n\`\`\``);
-    }
-
-    return lines.join('\n');
-}
 
 function buildWorkshopEditRetryContext(userPrompt = '', richContext = null) {
     const latestEditor = typeof window.getWorkshopEditorState === 'function'
@@ -769,7 +593,7 @@ function buildWorkshopEditRetryContext(userPrompt = '', richContext = null) {
         '[WORKSHOP_EDIT_RETRY]',
         'The active editor file content is provided below. Do not ask the user for the file.',
         'Return only an [EDIT] block, or for style-only edits return exactly one fenced css code block.',
-        buildWorkshopEditDirective(context, false, userPrompt),
+        window.ArcadeWorkshopManager.buildWorkshopEditDirective(context, false, userPrompt),
         `[ACTIVE_WORKSHOP_EDITOR]\n${JSON.stringify(strippedEditor)}`
     ].join('\n');
 }
@@ -803,7 +627,7 @@ function buildWorkshopRewriteRetryContext(userPrompt = '', richContext = null) {
         '[WORKSHOP_REWRITE_RETRY]',
         'The active editor file content is provided below. Do not ask the user for the file.',
         'Return fenced code blocks only. The first matching block replaces the active file; extra named blocks are added to the same game.',
-        buildWorkshopRewriteDirective(context, userPrompt),
+        window.ArcadeWorkshopManager.buildWorkshopRewriteDirective(context, userPrompt),
         `[ACTIVE_WORKSHOP_EDITOR]\n${JSON.stringify(strippedEditor)}`
     ].join('\n');
 }
@@ -2521,7 +2345,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             return;
         }
 
-        const workshopPublishIntent = isWorkshopPublishIntentPrompt(text);
+        const workshopPublishIntent = window.ArcadeWorkshopManager.isWorkshopPublishIntentPrompt(text);
 
         if (allowsLocalStyleFallback(text)) {
             window.activeArcadeCommandMode = null;
@@ -2588,7 +2412,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             }
         };
 
-        const editorReferenceActive = isWorkshopEditorReferencePrompt(text);
+        const editorReferenceActive = window.ArcadeWorkshopManager.isWorkshopEditorReferencePrompt(text);
         const multiFileEditActive = window.ArcadeWorkshopManager.isWorkshopMultiFileEditPrompt(text, richContext);
         const rewriteRequestActive = multiFileEditActive || window.ArcadeWorkshopManager.isWorkshopRewriteIntentPrompt(text, richContext);
         const editRequestActive = rewriteRequestActive || window.ArcadeWorkshopManager.isWorkshopEditIntentPrompt(text, richContext);
@@ -2842,7 +2666,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             updateChatStatus('active');
 
             // Execute any tags in the reply
-            if (window.showFeedback && (reply.includes('[PUBLISH]') || isWorkshopPublishIntentPrompt(text))) {
+            if (window.showFeedback && (reply.includes('[PUBLISH]') || window.ArcadeWorkshopManager.isWorkshopPublishIntentPrompt(text))) {
                 window.showFeedback("🕹️ Processing Workshop Assets...", false, 4000);
             }
             const actionResult = await executeArcadeChatActions(reply, { userPrompt: text });
@@ -2870,7 +2694,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             } else if (editRequestActive) {
                 // Attempt automated edit fallback if no tag was found
                 await tryAutoWorkshopFileRewriteFromReply(reply, text, richContext);
-            } else if (isWorkshopPublishIntentPrompt(text) && !actionResult?.workshopPublishAttempted) {
+            } else if (window.ArcadeWorkshopManager.isWorkshopPublishIntentPrompt(text) && !actionResult?.workshopPublishAttempted) {
                 // Only try auto-publish if NOT an edit intent and no publish tag was found
                 await tryAutoPublishWorkshopFromReply(reply, text);
             }
@@ -3536,7 +3360,6 @@ async function executeArcadeChatActions(text, options = {}) {
             if (publishResult.handled) return actionResult;
         }
     }
-    }
 
     // 2. [COMPOSE: text]
     const composeMatch = text.match(/\[COMPOSE:\s*(.+?)\]/);
@@ -3758,13 +3581,6 @@ function isUnhelpfulWorkshopEditReply(replyText = '') {
         || text.includes('i do not have the current code');
 }
 
-function isStyleEditPrompt(prompt = '') {
-    return /\b(style|styles|css|design|visual|theme|color|colour|pretty|background|polish|make it look)\b/i.test(`${prompt || ''}`);
-}
-
-function allowsLocalStyleFallback(prompt = '') {
-    return /\b(local fallback|quick style fallback|apply local style|fallback style)\b/i.test(`${prompt || ''}`);
-}
 
 function isWorkshopStyleRevertPrompt(prompt = '') {
     return /\b(revert|undo|remove|delete|back out)\b/i.test(`${prompt || ''}`)
@@ -3948,7 +3764,7 @@ async function tryAutoPublishWorkshopFromReply(replyText, userPrompt = '') {
         ok: false,
         reason: ''
     };
-    if (!isWorkshopPublishIntentPrompt(userPrompt)) return result;
+    if (!window.ArcadeWorkshopManager.isWorkshopPublishIntentPrompt(userPrompt)) return result;
     if (extractBalancedJsonTagPayload(replyText, 'PUBLISH')) return result;
     if (typeof window.publishCustomGameFromAi !== 'function') {
         result.reason = 'publish-function-unavailable';
@@ -4162,7 +3978,7 @@ body{
 
 async function tryEmergencyWorkshopPublishFromPrompt(userPrompt = '', reason = '') {
     const result = { attempted: false, ok: false, reason: '', title: '', assetCount: 0 };
-    if (!isWorkshopPublishIntentPrompt(userPrompt)) return result;
+    if (!window.ArcadeWorkshopManager.isWorkshopPublishIntentPrompt(userPrompt)) return result;
     result.attempted = true;
     if (typeof window.publishCustomGameFromAi !== 'function') {
         const source = captureClientSourceLocation();

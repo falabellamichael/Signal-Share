@@ -252,6 +252,27 @@ window.ArcadeWorkshopManager = {
             || /\bi\s+(?:have|got)\s+(?:it|the\s+(?:file|code|game))\s+(?:open|opened|loaded|selected)\s+in\s+the\s+(?:workshop\s+)?editor\b/.test(text);
     },
 
+    isStyleEditPrompt: function(prompt = '') {
+        return /\b(style|styles|css|design|visual|theme|color|colour|pretty|background|polish|make it look)\b/i.test(`${prompt || ''}`);
+    },
+
+    allowsLocalStyleFallback: function(prompt = '') {
+        return /\b(local fallback|quick style fallback|apply local style|fallback style)\b/i.test(`${prompt || ''}`);
+    },
+
+    /**
+     * Checks if a prompt indicates an intent to publish to the workshop.
+     */
+    isWorkshopPublishIntentPrompt: function(message = "") {
+        const text = `${message || ''}`.trim().toLowerCase();
+        if (!text) return false;
+        const publishVerb = /\b(publish|upload|save|add|ship|submit|post|share)\b/.test(text);
+        const buildVerb = /\b(write|create|build|make|generate|code|new)\b/.test(text);
+        const target = /\b(library|workshop|arcade|store)\b/.test(text);
+        const gameMention = /\b(game|app|mini-game|project|site)\b/.test(text);
+        return (target && publishVerb) || (buildVerb && gameMention) || (publishVerb && gameMention);
+    },
+
     /**
      * Determines if a prompt indicates an intent to edit a workshop file.
      */
@@ -511,19 +532,195 @@ window.ArcadeWorkshopManager = {
         const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
         if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
 
-        const hasActiveWorkshop = typeof window.hasActiveWorkshopEditor === 'function' ? window.hasActiveWorkshopEditor(workshopContext) : false;
-        const isPublishIntent = modes.has('/publish') || modes.has('/build') || text.includes('/publish') || text.includes('/build');
-        const isEditIntent = modes.has('/edit') || modes.has('/fix') || text.includes('/edit') || text.includes('/fix');
-
-        if (isPublishIntent) directives.push(this.getPublishDirective());
-        if (isEditIntent && hasActiveWorkshop) {
-            directives.push('[SURGICAL_EDIT_PROTOCOL]');
-            directives.push('You are in surgical edit mode. Output exactly one [EDIT] SEARCH/REPLACE block.');
-            directives.push('SEARCH: Exact lines to find. REPLACE: New code to insert.');
-            directives.push('Keep edits minimal and preserve existing logic. Use [FIND: query] if unsure of exact lines.');
-            directives.push('[/SURGICAL_EDIT_PROTOCOL]');
+        const editorIsActive = typeof window.hasActiveWorkshopEditor === 'function' ? window.hasActiveWorkshopEditor(workshopContext) : false;
+        
+        // 1. COMMAND PRIORITY
+        if (modes.has('/rewrite')) {
+            directives.push(this.buildWorkshopRewriteDirective(workshopContext, userPrompt));
         }
+        if (modes.has('/idea')) {
+            directives.push(this.getIdeaDirective(userPrompt));
+        }
+        
+        if (modes.has('/edit') || modes.has('/fix')) {
+            const isFixMode = modes.has('/fix');
+            directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
+                ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
+                : this.buildWorkshopEditDirective(workshopContext, isFixMode, userPrompt));
+        }
+
+        if (modes.has('/publish') || (text.includes('publish') && text.includes('workshop')) || text.includes('upload to workshop')) {
+            directives.push(this.getPublishDirective());
+        }
+
+        if (modes.has('/deep')) {
+            directives.push('[DEEP_REASONING_MODE]');
+            directives.push('The user has requested a DEEP reasoning session.');
+            directives.push('You MUST provide an exhaustive [PLANNING] block before any implementation.');
+            directives.push('Focus on edge cases, performance bottlenecks, and architectural integrity.');
+        }
+
+        // 2. AUTO-DETECTION
+        if (directives.length === 0) {
+            if (editorIsActive && !this.isExplicitWorkshopPublishIntentPrompt(text)) {
+                directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
+                    ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
+                    : this.buildWorkshopEditDirective(workshopContext, false, userPrompt));
+            } else if (this.isWorkshopPublishIntentPrompt(text)) {
+                directives.push(this.getPublishDirective());
+            } else if (editorIsActive && this.isWorkshopEditIntentPrompt(text, workshopContext)) {
+                directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
+                    ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
+                    : this.buildWorkshopEditDirective(workshopContext, false, userPrompt));
+            }
+        }
+        
+        // 3. VISION ENHANCEMENT
+        if (typeof window.SignalShareWorkshopVision !== 'undefined' 
+            && window.SignalShareWorkshopVision.shouldApplyVisionDirective(text, attachment, workshopContext)) {
+            directives.push(window.SignalShareWorkshopVision.buildWorkshopVisionDirective(workshopContext));
+        }
+
         return directives.join('\n\n');
+    },
+
+    buildWorkshopEditDirective: function(workshopContext = null, isFixMode = false, userPrompt = '') {
+        const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
+        const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
+        const isStyleMode = this.isStyleEditPrompt(userPrompt);
+
+        const lines = [
+            '[SURGICAL_EDIT_PROTOCOL]',
+            isFixMode ? 'FOCUS: Bug Fix / Error Resolution.' : 'FOCUS: Feature Update / Refactoring.',
+            'WORKSHOP FILES ARE VIRTUAL APP RECORDS, NOT DESKTOP FILE PATHS.',
+            'Do NOT use [READ_FILE], [LIST_FILES], [WRITE_FILE], or custom_.../filename paths for this request.',
+            'The file content below is already the current source of truth.',
+            'Format:',
+            '[EDIT]',
+            'SEARCH: 2-5 lines of exact existing code',
+            'REPLACE: updated snippet',
+            '[/EDIT]',
+            'RULES:',
+            '- Use [REASONING_ORCHESTRATOR_V2] for every edit: always output a [PLANNING] block before your [EDIT] tag.',
+            '- You MUST include the [EDIT] tag in the same response as the plan.',
+            '- Keep the plan concise to save tokens.',
+            '- Break changes into multiple [EDIT] blocks for safety.',
+            '- NEVER rewrite the entire file.',
+            '- NEVER use [PUBLISH] for edits to the active editor file.',
+            '- Do not return full-file code fences unless the user explicitly asks for a full file.',
+            '- Your actionable output should be the [EDIT] block, not a rewritten file.',
+            '- For style-only edits, if SEARCH/REPLACE is difficult, return one fenced css block with only CSS to insert.',
+            '- If you cannot find a safe SEARCH block in the provided content, ask the user to select the relevant file/section.',
+            '- Be precise with whitespace/indentation in SEARCH.',
+            '[/SURGICAL_EDIT_PROTOCOL]'
+        ];
+
+        if (isStyleMode) {
+            lines.splice(5, 0,
+                'STYLE_EDIT_MODE:',
+                '- Return exactly one fenced css code block when the request is only about style/design/CSS.',
+                '- Do not return a full HTML file for style-only edits.',
+                '- Do not invent external frameworks or classes; write real CSS selectors for the existing markup.',
+                '- The editor will insert the css block into the active HTML/CSS file as a targeted patch.'
+            );
+        }
+
+        if (activeGameId && activeFileName) {
+            const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
+            let contentToProvide = "";
+            let isSkeleton = false;
+            
+            // Threshold for VRAM optimization: 4000 characters
+            if (rawContent.length > 4000) {
+                isSkeleton = true;
+                contentToProvide = this.generateCodeSkeleton(rawContent, activeFileName);
+            } else {
+                contentToProvide = rawContent;
+            }
+
+            if (isSkeleton) {
+                lines.push(
+                    'VRAM_OPTIMIZATION_ACTIVE: The file is large. I am providing a SKELETON (index) of the code.',
+                    'If you need to see the implementation of a specific function or block, output [FIND: exact unique string] in your response.',
+                    'The system will automatically find that block and provide it to you in the next turn.',
+                    'Use [FIND] to "heavy lift" the context without bloating VRAM.'
+                );
+            }
+
+            lines.push(`Target: ${activeFileName} (${activeGameId})\nContent:\n\`\`\`\n${contentToProvide}\n\`\`\``);
+        }
+
+        return lines.join('\n');
+    },
+
+    buildWorkshopRewriteDirective: function(workshopContext = null, userPrompt = '') {
+        const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
+        const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
+        const fileKind = this.getWorkshopFileKindFromName(activeFileName);
+        const fenceLang = fileKind === 'js' ? 'javascript' : fileKind === 'css' ? 'css' : fileKind === 'html' ? 'html' : '';
+
+        const lines = [
+            '[FULL_FILE_REWRITE_PROTOCOL]',
+            'FOCUS: Complete replacement of the active Workshop editor file.',
+            'WORKSHOP FILES ARE VIRTUAL APP RECORDS, NOT DESKTOP FILE PATHS.',
+            'Do NOT use [READ_FILE], [LIST_FILES], [WRITE_FILE], [PUBLISH], or custom_.../filename paths for this request.',
+            'The file content below is already the current source of truth.',
+            'Format:',
+            `Return one fenced ${fenceLang || 'text'} code block containing the complete replacement content for the active file.`,
+            'If extra files are useful, add separate fenced code blocks for them and include a filename in the fence info, such as ```css filename=styles.css or ```javascript filename=game.js.',
+            'The editor will add or replace those extra files in the same Workshop game.',
+            'For HTML feature additions that use JavaScript or CSS files, return BOTH the complete updated active HTML file and every named extra file it references.',
+            'The updated HTML must include any required DOM controls/displays and exact <script src="..."></script> or <link href="..."> references for the extra files.',
+            'Do not return a standalone JavaScript/CSS snippet when the active file is HTML.',
+            'Do not wrap the answer in [EDIT] tags.',
+            'Do not ask the user to provide the source file.',
+            '[/FULL_FILE_REWRITE_PROTOCOL]'
+        ];
+
+        if (activeGameId && activeFileName) {
+            const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
+            const content = rawContent.length > 22000 ? rawContent.substring(0, 22000) + '\n\n[TRUNCATED]' : rawContent;
+            lines.push(`Target: ${activeFileName} (${activeGameId})\nUser request: ${userPrompt}\nCurrent content:\n\`\`\`${fenceLang}\n${content}\n\`\`\``);
+        }
+
+        return lines.join('\n');
+    },
+
+    generateCodeSkeleton: function(content, fileName = '') {
+        const lines = content.split('\n');
+        const kind = this.getWorkshopFileKindFromName(fileName);
+        const skeleton = [];
+
+        if (kind === 'js') {
+            lines.forEach((line, i) => {
+                const trimmed = line.trim();
+                // Match function declarations, arrows, classes
+                if (/^(?:async\s+)?function\s+\w+|^(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?(?:\(.*?\)|[^({]+?)\s*=>|^\w+\s*\(.*?\)\s*\{|^\s*(?:static\s+)?(?:get|set)?\s*\w+\s*\(.*?\)\s*\{|^class\s+\w+/.test(trimmed)) {
+                    skeleton.push(`${i + 1}: ${line} ...`);
+                } else if (trimmed.startsWith('export ') || trimmed.startsWith('import ')) {
+                    skeleton.push(`${i + 1}: ${line}`);
+                }
+            });
+        } else if (kind === 'css') {
+            lines.forEach((line, i) => {
+                const trimmed = line.trim();
+                if (trimmed && !trimmed.startsWith(' ') && !trimmed.startsWith('}') && !trimmed.startsWith('*')) {
+                    skeleton.push(`${i + 1}: ${line} { ... }`);
+                }
+            });
+        } else if (kind === 'html') {
+            lines.forEach((line, i) => {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('<') && !trimmed.startsWith('</') && !trimmed.startsWith('<!--') && (trimmed.includes(' id=') || trimmed.includes(' class=') || trimmed.includes('<h') || trimmed.includes('<section') || trimmed.includes('<div') || trimmed.includes('<button'))) {
+                    skeleton.push(`${i + 1}: ${line.split('>')[0]}> ...`);
+                }
+            });
+        }
+
+        if (skeleton.length === 0) {
+            return `[File is large (${content.length} chars). No clear structural blocks identified for skeleton view.]`;
+        }
+        return skeleton.join('\n');
     }
 };
 
