@@ -307,6 +307,21 @@ window.ArcadeWorkshopManager = {
     },
 
     /**
+     * Determines if a prompt indicates a style-only edit request.
+     */
+    isStyleEditPrompt: function(prompt = "") {
+        const text = `${prompt || ""}`.toLowerCase();
+        return /\b(style|styles|css|design|visual|theme|color|colour|pretty|background|polish|make it look)\b/i.test(text);
+    },
+
+    /**
+     * Determines if a prompt allows for a local style enhancement fallback.
+     */
+    allowsLocalStyleFallback: function(prompt = "") {
+        return /\b(local fallback|quick style fallback|apply local style|fallback style)\b/i.test(`${prompt || ""}`);
+    },
+
+    /**
      * Determines if a prompt indicates an intent to edit a game's code.
      */
     isWorkshopEditIntentPrompt: function(message = "", workshopContext = null) {
@@ -341,6 +356,40 @@ window.ArcadeWorkshopManager = {
         return /\b(?:rewrite|rebuild|recreate|overhaul|start over|clean slate|full replacement)\b/i.test(text)
             && /\b(?:code|file|script|index|logic|game|project|workshop|html|css|javascript|js)\b/i.test(text)
             && this.hasActiveWorkshopEditor(workshopContext);
+    },
+
+    /**
+     * Determines if a prompt refers to the workshop editor being open/visible.
+     */
+    isWorkshopEditorReferencePrompt: function(message = "") {
+        const text = `${message || ''}`.trim().toLowerCase();
+        if (!text) return false;
+        return /\b(?:file|code|game|it|that|this)\b.{0,80}\b(?:open|opened|loaded|selected|showing|visible)\b.{0,80}\b(?:editor|workshop editor)\b/.test(text)
+            || /\b(?:editor|workshop editor)\b.{0,80}\b(?:open|opened|loaded|selected|showing|visible)\b/.test(text)
+            || /\b(?:the\s+)?(?:file|code|game)\s+is\s+(?:already\s+)?(?:in|inside|on)\s+the\s+(?:workshop\s+)?editor\b/.test(text)
+            || /\bi\s+(?:have|got)\s+(?:it|the\s+(?:file|code|game))\s+(?:open|opened|loaded|selected)\s+in\s+the\s+(?:workshop\s+)?editor\b/.test(text);
+    },
+
+    /**
+     * Determines if a prompt indicates a request to edit multiple files in the workshop.
+     */
+    isWorkshopMultiFileEditPrompt: function(message = "", workshopContext = null) {
+        const text = `${message || ''}`.trim().toLowerCase();
+        if (!text || !this.hasActiveWorkshopEditor(workshopContext)) return false;
+        const editor = this.getActiveWorkshopEditorContext(workshopContext);
+        if (this.getWorkshopFileKindFromName(editor?.activeFileName || '') !== 'html') return false;
+
+        const wantsAssetFile = /\b(?:javascript|java\s*script|js|script|module|css|stylesheet|style\s*sheet|separate\s+file|new\s+file|add\s+(?:a\s+)?file|external\s+(?:file|script|stylesheet))\b/.test(text);
+        const wantsImplementation = /\b(?:add|write|create|generate|code|build|make|handle|implement|integrate|wire|connect|need|want|same|also)\b/.test(text);
+        return wantsAssetFile && wantsImplementation;
+    },
+
+    /**
+     * Determines if a prompt is simply asking to enter the Workshop Editor.
+     */
+    isWorkshopEditorModePrompt: function(message = "") {
+        const text = `${message || ''}`.trim().toLowerCase();
+        return /\b(?:enter|open|go to|show|start|use)\b.{0,20}\b(?:workshop|editor|workshop editor|edit mode)\b/i.test(text);
     },
 
     /**
