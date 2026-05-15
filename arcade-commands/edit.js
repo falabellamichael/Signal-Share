@@ -137,6 +137,48 @@
                     name: g.title,
                     description: `Edit files in "${g.title}"`
                 }));
+        },
+        /**
+         * The response handler handles the [EDIT] blocks in the AI reply.
+         * Moves the surgical modification pipeline out of the main chat loop.
+         */
+        handleResponse: async (text, options = {}) => {
+            const actionResult = {
+                handled: false,
+                workshopFileRewriteAttempted: false,
+                workshopFileRewriteSucceeded: false
+            };
+
+            const editBlocks = typeof window.extractWorkshopEditBlocks === 'function' ? window.extractWorkshopEditBlocks(text) : [];
+            if (editBlocks.length === 0) return actionResult;
+
+            actionResult.handled = true;
+            const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
+            const gameId = editorState?.activeGameId || window.lastPlayedGameId || "";
+            const fileName = editorState?.activeFileName || "index.html";
+
+            if (!gameId || !fileName) {
+                console.warn('[Arcade: Edit] No active game/file for surgical edit.');
+                return actionResult;
+            }
+
+            for (const editBlock of editBlocks) {
+                try {
+                    if (editBlock?.search && typeof window.applyAiFilePatch === 'function') {
+                        actionResult.workshopFileRewriteAttempted = true;
+                        const patchResult = await window.applyAiFilePatch(gameId, fileName, editBlock.search, editBlock.replace, { save: true });
+                        if (patchResult?.ok) {
+                            actionResult.workshopFileRewriteSucceeded = true;
+                        } else if (window.showFeedback) {
+                            window.showFeedback(patchResult?.message || "Edit failed.", true);
+                        }
+                    }
+                } catch (e) {
+                    console.error("[Arcade: Edit] Action failed:", e);
+                }
+            }
+
+            return actionResult;
         }
     });
 })();

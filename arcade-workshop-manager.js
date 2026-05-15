@@ -216,12 +216,13 @@ window.ArcadeWorkshopManager = {
         return [
             '[WORKSHOP_PROTOCOL]',
             'REASONING PROTOCOL: [REASONING_ORCHESTRATOR_V2]',
+            'FOLDER CONTEXT: You are working in a dedicated project folder. All files you generate belong to this project.',
             'Before building a game, you MUST output a concise [PLANNING] block.',
             'CRITICAL: Do NOT ask for permission or wait for approval. IMPLEMENT NOW.',
             'IMPORTANT: You MUST include the [PUBLISH] tag in the same response as the plan.',
             'The tag MUST contain a valid JSON object with: { "target": "workshop", "title": "...", "files": [{ "name": "...", "content": "..." }] }.',
-            'Generate a complete, playable, self-contained browser game.',
-            'index.html MUST be the entry point and reference any other files (styles.css, game.js) by their exact name.',
+            'Generate a complete, playable, self-contained browser game package.',
+            'index.html MUST be the entry point and reference any other files (styles.css, game.js) by their relative paths in the folder.',
             'Use plain browser APIs only; no external libraries, CDNs, or module syntax.',
             'VISUALIZATION: In addition to the [PUBLISH] tag, also provide markdown code blocks (```html, ```javascript) for the primary files so the user can see your work.',
             '[/WORKSHOP_PROTOCOL]'
@@ -239,6 +240,69 @@ window.ArcadeWorkshopManager = {
         "STATE-DRIVEN: Use a central 'gameState' object to make debugging and saving easy.",
         "BATTLE-TESTED: Avoid 'theoretical' APIs; stick to well-supported browser features."
     ],
+
+    /**
+     * Checks if the user prompt mentions the workshop editor.
+     */
+    isWorkshopEditorReferencePrompt: function(message = "") {
+        const text = `${message || ''}`.trim().toLowerCase();
+        return /\b(?:file|code|game|it|that|this)\b.{0,80}\b(?:open|opened|loaded|selected|showing|visible)\b.{0,80}\b(?:editor|workshop editor)\b/.test(text)
+            || /\b(?:editor|workshop editor)\b.{0,80}\b(?:open|opened|loaded|selected|showing|visible)\b/.test(text)
+            || /\b(?:the\s+)?(?:file|code|game)\s+is\s+(?:already\s+)?(?:in|inside|on)\s+the\s+(?:workshop\s+)?editor\b/.test(text)
+            || /\bi\s+(?:have|got)\s+(?:it|the\s+(?:file|code|game))\s+(?:open|opened|loaded|selected)\s+in\s+the\s+(?:workshop\s+)?editor\b/.test(text);
+    },
+
+    /**
+     * Determines if a prompt indicates an intent to edit a workshop file.
+     */
+    isWorkshopEditIntentPrompt: function(message = "", workshopContext = null) {
+        const text = `${message || ''}`.trim().toLowerCase();
+        const modes = window.activeArcadeCommandModes || [];
+        const hasExplicitMode = modes.includes('/edit') || modes.includes('/fix') || modes.includes('/rewrite');
+        if (hasExplicitMode) return true;
+
+        if (!text) return false;
+        if (/^\/(?:edit|fix|rewrite)\b/.test(text) || /^\[(?:edit|fix|rewrite)\]/.test(text)) return true;
+        if (this.isWorkshopEditorReferencePrompt(text) && (typeof window.hasActiveWorkshopEditor === 'function' && window.hasActiveWorkshopEditor(workshopContext))) return true;
+
+        const editVerb = /\b(edit|fix|repair|change|update|modify|replace|remove|delete|add|insert|improve|tweak|adjust|refactor|rename|debug|rewrite)\b/.test(text);
+        const activeEditor = (typeof window.hasActiveWorkshopEditor === 'function' && window.hasActiveWorkshopEditor(workshopContext));
+        const editorCodeGenVerb = /\b(write|create|generate|code|build|make|implement|integrate)\b/.test(text);
+        if (!editVerb && !(activeEditor && editorCodeGenVerb)) return false;
+
+        const fileTarget = /\b(editor|website|workshop|file|code|html|css|javascript|js|game|page|button|screen|layout|style)\b/.test(text);
+        return activeEditor || fileTarget;
+    },
+
+    /**
+     * Checks if a prompt is explicitly asking to publish to the workshop.
+     */
+    isExplicitWorkshopPublishIntentPrompt: function(message = "") {
+        const text = `${message || ''}`.trim().toLowerCase();
+        const modes = window.activeArcadeCommandModes || [];
+        if (modes.includes('/publish')) return true;
+
+        if (!text) return false;
+        if (/^\/publish\b/.test(text) || /^\[publish\]/.test(text)) return true;
+        
+        return /\b(?:publish|upload|share|save|update|sync)\b.{0,30}\b(?:workshop|library|game|project)\b/.test(text)
+            || /\b(?:send|put|move)\s+(?:this|the|it|code)\s+(?:to|into)\s+(?:the\s+)?(?:workshop|library)\b/.test(text);
+    },
+
+    /**
+     * Determines if a prompt indicates an intent to rewrite a file entirely.
+     */
+    isWorkshopRewriteIntentPrompt: function(message = "", workshopContext = null) {
+        const text = `${message || ''}`.trim().toLowerCase();
+        const modes = window.activeArcadeCommandModes || [];
+        if (modes.includes('/rewrite')) return true;
+
+        if (!text) return false;
+        if (/^\/rewrite\b/.test(text) || /^\[rewrite\]/.test(text)) return true;
+        return /\brewrite\b/.test(text)
+            && /\b(editor|website|workshop|file|code|html|css|javascript|js|game|page)\b/.test(text)
+            && (typeof window.hasActiveWorkshopEditor === 'function' && window.hasActiveWorkshopEditor(workshopContext));
+    },
 
     /**
      * Curated list of neon-themed game concepts for AI inspiration.

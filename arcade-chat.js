@@ -548,17 +548,6 @@ function isWorkshopPublishIntentPrompt(message = "") {
     return (target && publishVerb) || (buildVerb && gameMention) || (publishVerb && gameMention);
 }
 
-function isExplicitWorkshopPublishIntentPrompt(message = "") {
-    const text = `${message || ''}`.trim().toLowerCase();
-    const modes = window.activeArcadeCommandModes || [];
-    if (modes.includes('/publish')) return true;
-
-    if (!text) return false;
-    if (/^\/publish\b/.test(text) || /^\[publish\]/.test(text)) return true;
-    const publishVerb = /\b(publish|upload|submit|ship|post|share)\b/.test(text);
-    const target = /\b(library|workshop|arcade|store)\b/.test(text);
-    return publishVerb && target;
-}
 
 function getActiveWorkshopEditorContext(workshopContext = null) {
     const providedEditor = workshopContext?.workshopEditor || null;
@@ -583,47 +572,8 @@ function isWorkshopEditorReferencePrompt(message = "") {
         || /\bi\s+(?:have|got)\s+(?:it|the\s+(?:file|code|game))\s+(?:open|opened|loaded|selected)\s+in\s+the\s+(?:workshop\s+)?editor\b/.test(text);
 }
 
-function isWorkshopEditIntentPrompt(message = "", workshopContext = null) {
-    const text = `${message || ''}`.trim().toLowerCase();
-    const modes = window.activeArcadeCommandModes || [];
-    const hasExplicitMode = modes.includes('/edit') || modes.includes('/fix') || modes.includes('/rewrite');
-    if (hasExplicitMode) return true;
 
-    if (!text) return false;
-    if (/^\/(?:edit|fix|rewrite)\b/.test(text) || /^\[(?:edit|fix|rewrite)\]/.test(text)) return true;
-    if (isWorkshopEditorReferencePrompt(text) && hasActiveWorkshopEditor(workshopContext)) return true;
 
-    const editVerb = /\b(edit|fix|repair|change|update|modify|replace|remove|delete|add|insert|improve|tweak|adjust|refactor|rename|debug|rewrite)\b/.test(text);
-    const activeEditor = hasActiveWorkshopEditor(workshopContext);
-    const editorCodeGenVerb = /\b(write|create|generate|code|build|make|implement|integrate)\b/.test(text);
-    if (!editVerb && !(activeEditor && editorCodeGenVerb)) return false;
-
-    const fileTarget = /\b(editor|website|workshop|file|code|html|css|javascript|js|game|page|button|screen|layout|style)\b/.test(text);
-    return activeEditor || fileTarget;
-}
-
-function isWorkshopMultiFileEditPrompt(message = "", workshopContext = null) {
-    const text = `${message || ''}`.trim().toLowerCase();
-    if (!text || !hasActiveWorkshopEditor(workshopContext)) return false;
-    const editor = getActiveWorkshopEditorContext(workshopContext);
-    if (getWorkshopFileKindFromName(editor?.activeFileName || '') !== 'html') return false;
-
-    const wantsAssetFile = /\b(?:javascript|java\s*script|js|script|module|css|stylesheet|style\s*sheet|separate\s+file|new\s+file|add\s+(?:a\s+)?file|external\s+(?:file|script|stylesheet))\b/.test(text);
-    const wantsImplementation = /\b(?:add|write|create|generate|code|build|make|handle|implement|integrate|wire|connect|need|want|same|also)\b/.test(text);
-    return wantsAssetFile && wantsImplementation;
-}
-
-function isWorkshopRewriteIntentPrompt(message = "", workshopContext = null) {
-    const text = `${message || ''}`.trim().toLowerCase();
-    const modes = window.activeArcadeCommandModes || [];
-    if (modes.includes('/rewrite')) return true;
-
-    if (!text) return false;
-    if (/^\/rewrite\b/.test(text) || /^\[rewrite\]/.test(text)) return true;
-    return /\brewrite\b/.test(text)
-        && /\b(editor|website|workshop|file|code|html|css|javascript|js|game|page)\b/.test(text)
-        && hasActiveWorkshopEditor(workshopContext);
-}
 
 
 
@@ -645,7 +595,7 @@ function buildProtocolAwareUserMessage(userPrompt = "") {
     
     if (modes.has('/edit') || modes.has('/fix')) {
         const isFixMode = modes.has('/fix');
-        directives.push(isWorkshopMultiFileEditPrompt(text, workshopContext)
+        directives.push(window.ArcadeWorkshopManager.isWorkshopMultiFileEditPrompt(text, workshopContext)
             ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
             : buildWorkshopEditDirective(workshopContext, isFixMode, userPrompt));
     }
@@ -663,14 +613,14 @@ function buildProtocolAwareUserMessage(userPrompt = "") {
 
     // 2. AUTO-DETECTION (Only if no explicit command modes were set)
     if (directives.length === 0) {
-        if (editorIsActive && !isExplicitWorkshopPublishIntentPrompt(text)) {
-            directives.push(isWorkshopMultiFileEditPrompt(text, workshopContext)
+        if (editorIsActive && !window.ArcadeWorkshopManager.isExplicitWorkshopPublishIntentPrompt(text)) {
+            directives.push(window.ArcadeWorkshopManager.isWorkshopMultiFileEditPrompt(text, workshopContext)
                 ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
                 : buildWorkshopEditDirective(workshopContext, false, userPrompt));
         } else if (isWorkshopPublishIntentPrompt(text)) {
             directives.push(buildWorkshopPublishDirective());
-        } else if (editorIsActive && isWorkshopEditIntentPrompt(text, workshopContext)) {
-            directives.push(isWorkshopMultiFileEditPrompt(text, workshopContext)
+        } else if (editorIsActive && window.ArcadeWorkshopManager.isWorkshopEditIntentPrompt(text, workshopContext)) {
+            directives.push(window.ArcadeWorkshopManager.isWorkshopMultiFileEditPrompt(text, workshopContext)
                 ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
                 : buildWorkshopEditDirective(workshopContext, false, userPrompt));
         }
@@ -2639,9 +2589,9 @@ window.sendChatMessage = async function (promptOverride = '') {
         };
 
         const editorReferenceActive = isWorkshopEditorReferencePrompt(text);
-        const multiFileEditActive = isWorkshopMultiFileEditPrompt(text, richContext);
-        const rewriteRequestActive = multiFileEditActive || isWorkshopRewriteIntentPrompt(text, richContext);
-        const editRequestActive = rewriteRequestActive || isWorkshopEditIntentPrompt(text, richContext);
+        const multiFileEditActive = window.ArcadeWorkshopManager.isWorkshopMultiFileEditPrompt(text, richContext);
+        const rewriteRequestActive = multiFileEditActive || window.ArcadeWorkshopManager.isWorkshopRewriteIntentPrompt(text, richContext);
+        const editRequestActive = rewriteRequestActive || window.ArcadeWorkshopManager.isWorkshopEditIntentPrompt(text, richContext);
         const activeEditorForRequest = getActiveWorkshopEditorContext(richContext);
         const activeEditorHasSource = !!`${activeEditorForRequest?.activeFileContent || ''}`.trim();
         if (editRequestActive && hasActiveWorkshopEditor(richContext) && !activeEditorHasSource) {
@@ -2925,7 +2875,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                 await tryAutoPublishWorkshopFromReply(reply, text);
             }
         } else {
-            if (workshopPublishIntent && !isWorkshopEditIntentPrompt(text, richContext)) {
+            if (workshopPublishIntent && !window.ArcadeWorkshopManager.isWorkshopEditIntentPrompt(text, richContext)) {
                 const publishReply = '🕹️ [Arcade Protocol]: I did not publish anything because the local model did not return a valid game. Please retry with a stronger code model or ask me to generate the files again.';
                 addChatMessage('ai', publishReply);
                 arcadeChatHistory.push({ role: 'assistant', content: publishReply });
@@ -3441,7 +3391,7 @@ async function tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt = '
         }
     }
 
-    if (activeKind === 'html' && !isWorkshopRewriteIntentPrompt(userPrompt, richContext)) {
+    if (activeKind === 'html' && !window.ArcadeWorkshopManager.isWorkshopRewriteIntentPrompt(userPrompt, richContext)) {
         const htmlFragment = generatedFiles.find((file) => {
             const kind = getWorkshopFileKindFromName(file.name) || window.ArcadeWorkshopManager.inferCodeKind('', file.content);
             return kind === 'html' && looksLikeHtmlFragment(file.content);
@@ -3578,147 +3528,14 @@ async function executeArcadeChatActions(text, options = {}) {
     if (!text) return actionResult;
 
     // 1. [PUBLISH: {json}]
-    const publishPayload = extractBalancedJsonTagPayload(text, 'PUBLISH');
-    const editorStateForActions = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
-    const shouldSkipPublishForEditorEdit = publishPayload?.jsonText
-        && isWorkshopEditIntentPrompt(options.userPrompt || '', { workshopEditor: editorStateForActions })
-        && !isExplicitWorkshopPublishIntentPrompt(options.userPrompt || '');
-    if (shouldSkipPublishForEditorEdit) {
-        actionResult.publishTagDetected = true;
-        console.warn('[Arcade Chat] Ignoring [PUBLISH] during active editor edit request; expecting [EDIT] SEARCH/REPLACE blocks.');
-    } else if (publishPayload?.jsonText) {
-        actionResult.publishTagDetected = true;
-        actionResult.publishTagDetected = true;
-        try {
-            let data = robustParseJson(publishPayload.jsonText);
-            
-            // Final fallback: If JSON parsing completely failed, try greedy field extraction
-            if (!data) {
-                console.warn('[Arcade Chat] JSON parse failed, attempting greedy field recovery...');
-                data = {
-                    title: publishPayload.jsonText.match(/"title"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
-                    category: publishPayload.jsonText.match(/"category"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || 'GAME',
-                    description: publishPayload.jsonText.match(/"description"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || ''
-                };
-            }
-            if (!data) {
-                console.warn('[Arcade Chat] Could not parse JSON for PUBLISH tag:', publishPayload.jsonText);
-                return actionResult;
-            }
-            const { title, caption, tags } = data || {};
-
-            const routeToWorkshop = window.ArcadeWorkshopManager.shouldRouteToWorkshop(data, text, options.userPrompt || '');
-            if (routeToWorkshop) {
-                actionResult.handled = true;
-                actionResult.workshopPublishAttempted = true;
-                if (typeof window.publishCustomGameFromAi !== 'function') {
-                    if (window.showFeedback) window.showFeedback("Workshop publishing is available from the Arcade Library page.", true);
-                    return actionResult;
-                }
-
-                const workshopFiles = window.ArcadeWorkshopManager.buildPublishFiles(data, text);
-                if (workshopFiles.length === 0) {
-                    if (window.showFeedback) {
-                        window.showFeedback("Couldn't find game code to publish. Ask the AI to include a code block or code field.", true);
-                    }
-                    return actionResult;
-                }
-
-                const workshopResult = await window.publishCustomGameFromAi({
-                    title: title || data.gameTitle || 'AI Workshop Game',
-                    category: data.category || 'GAME',
-                    description: data.description || caption || '',
-                    thumbnail: data.thumbnail || data.poster || '',
-                    tags: Array.isArray(tags) ? tags.join(', ') : (typeof tags === 'string' ? tags : ''),
-                    files: workshopFiles,
-                    mode: data.mode || data.action || data.operation || '',
-                    gameId: data.gameId || data.id || data.updateId || data.existingGameId || '',
-                    updateTitle: data.updateTitle || data.targetTitle || ''
-                });
-
-                if (workshopResult?.ok) {
-                    actionResult.workshopPublishSucceeded = true;
-                    if (window.showFeedback) {
-                        const actionLabel = workshopResult.updated ? 'Updated' : 'Published';
-                        window.showFeedback(`${actionLabel} "${workshopResult.title}" in Workshop (${workshopResult.assetCount} assets).`);
-                    }
-                } else if (window.showFeedback) {
-                    window.showFeedback(workshopResult?.message || 'Failed to publish game to Workshop.', true);
-                }
-                return actionResult;
-            }
-
-            if (window.publishPostToSupabase) {
-                actionResult.handled = true;
-                // Determine what to publish. 
-                // If there's a recent attachment in history, use it.
-                // Otherwise check if there's a URL in the text.
-                let postFile = null;
-                const lastUserMsg = [...arcadeChatHistory].reverse().find(m => m.role === 'user' && m.attachment);
-                if (lastUserMsg && lastUserMsg.attachment && lastUserMsg.attachment.data) {
-                    // Convert data URL back to Blob
-                    const resp = await fetch(lastUserMsg.attachment.data);
-                    const blob = await resp.blob();
-                    postFile = new File([blob], lastUserMsg.attachment.name || "published-file", { type: lastUserMsg.attachment.type });
-                }
-
-                if (!postFile) {
-                    console.warn("[Arcade Chat] No attachment found to publish.");
-                    // Check if there's an external URL to publish instead
-                    const urlMatch = text.match(/https?:\/\/[^\s\]]+/);
-                    if (urlMatch && window.buildExternalPost && window.parseExternalMediaUrl) {
-                        const externalUrl = urlMatch[0];
-                        const parsedExternal = window.parseExternalMediaUrl(externalUrl);
-                        if (parsedExternal) {
-                            const basePost = {
-                                id: `ai-${crypto.randomUUID()}`,
-                                creator: window.getDefaultProfileName ? window.getDefaultProfileName() : "AI Assistant",
-                                title: title || "AI Shared Content",
-                                caption: caption || "Check this out!",
-                                tags: tags || [],
-                                likes: 0,
-                                createdAt: new Date().toISOString()
-                            };
-                            const post = window.buildExternalPost(basePost, parsedExternal);
-                            const inserted = await window.publishPostToSupabase(post);
-                            if (window.state && window.state.userPosts) {
-                                window.state.userPosts = [inserted, ...window.state.userPosts];
-                                if (window.render) window.render();
-                            }
-                            if (window.showFeedback) window.showFeedback("Post published successfully via AI!");
-                            return actionResult;
-                        }
-                    }
-                    if (window.showFeedback) window.showFeedback("AI wanted to publish but no file/link was found.", true);
-                    return actionResult;
-                }
-
-                const basePost = {
-                    id: `ai-${crypto.randomUUID()}`,
-                    creator: window.getDefaultProfileName ? window.getDefaultProfileName() : "AI Assistant",
-                    title: title || "AI Shared Content",
-                    caption: caption || "Check this out!",
-                    tags: tags || [],
-                    likes: 0,
-                    createdAt: new Date().toISOString()
-                };
-
-                if (window.buildUploadPost) {
-                    const post = window.buildUploadPost(basePost, postFile);
-                    const inserted = await window.publishPostToSupabase(post, (p) => {
-                        console.log(`[AI Publish] Uploading: ${p}%`);
-                    });
-
-                    if (window.state && window.state.userPosts) {
-                        window.state.userPosts = [inserted, ...window.state.userPosts];
-                        if (window.render) window.render();
-                    }
-                    if (window.showFeedback) window.showFeedback("Post published successfully via AI!");
-                }
-            }
-        } catch (e) {
-            console.error("[Arcade Chat] Failed to execute [PUBLISH] action:", e);
+    const publishCmd = window.ArcadeCommandManager.getCommand('publish');
+    if (publishCmd && typeof publishCmd.handleResponse === 'function') {
+        const publishResult = await publishCmd.handleResponse(text, options);
+        if (publishResult.publishTagDetected) {
+            Object.assign(actionResult, publishResult);
+            if (publishResult.handled) return actionResult;
         }
+    }
     }
 
     // 2. [COMPOSE: text]
@@ -3778,31 +3595,12 @@ async function executeArcadeChatActions(text, options = {}) {
     }
 
     // 6. WORKSHOP ACTIONS (Re-enabled for Commands)
-    const editBlocks = extractWorkshopEditBlocks(text);
-
-    if (editBlocks.length > 0) {
-        actionResult.handled = true;
-        for (const editBlock of editBlocks) {
-            try {
-                let gameId = null;
-                let fileName = null;
-
-                const editorState = editorStateForActions || (typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null);
-                gameId = editorState?.activeGameId || window.lastPlayedGameId || "";
-                fileName = editorState?.activeFileName || "index.html";
-
-                if (gameId && fileName && editBlock?.search && typeof window.applyAiFilePatch === 'function') {
-                    actionResult.workshopFileRewriteAttempted = true;
-                    const patchResult = await window.applyAiFilePatch(gameId, fileName, editBlock.search, editBlock.replace, { save: true });
-                    if (patchResult?.ok) {
-                        actionResult.workshopFileRewriteSucceeded = true;
-                    } else if (window.showFeedback) {
-                        window.showFeedback(patchResult?.message || "Edit failed.", true);
-                    }
-                }
-            } catch (e) {
-                console.error("[Arcade Chat] Action failed:", e);
-            }
+    const editCmd = window.ArcadeCommandManager.getCommand('edit');
+    if (editCmd && typeof editCmd.handleResponse === 'function') {
+        const editResult = await editCmd.handleResponse(text, options);
+        if (editResult.handled) {
+            Object.assign(actionResult, editResult);
+            return actionResult;
         }
     }
 
@@ -3811,8 +3609,8 @@ async function executeArcadeChatActions(text, options = {}) {
 
 async function tryApplyWorkshopRewriteFromReply(replyText, userPrompt = '', richContext = null, target = {}) {
     const result = { attempted: false, ok: false, reason: '', message: '' };
-    if (!isWorkshopRewriteIntentPrompt(userPrompt, richContext)
-        && !isWorkshopMultiFileEditPrompt(userPrompt, richContext)) return result;
+    if (!window.ArcadeWorkshopManager.isWorkshopRewriteIntentPrompt(userPrompt, richContext)
+        && !window.ArcadeWorkshopManager.isWorkshopMultiFileEditPrompt(userPrompt, richContext)) return result;
     if (typeof window.getWorkshopFileContent !== 'function'
         || typeof window.internalApplyWorkshopFileEdit !== 'function') {
         result.reason = 'workshop-edit-functions-unavailable';
@@ -3885,7 +3683,7 @@ async function tryApplyWorkshopRewriteFromReply(replyText, userPrompt = '', rich
 
 async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '', richContext = null) {
     const result = { attempted: false, ok: false, reason: '' };
-    if (!isWorkshopEditIntentPrompt(userPrompt, richContext)) return result;
+    if (!window.ArcadeWorkshopManager.isWorkshopEditIntentPrompt(userPrompt, richContext)) return result;
     if (typeof window.applyAiFilePatch !== 'function') {
         result.reason = 'patch-function-unavailable';
         return result;
@@ -3899,8 +3697,8 @@ async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '', r
         return result;
     }
 
-    if (isWorkshopRewriteIntentPrompt(userPrompt, richContext)
-        || isWorkshopMultiFileEditPrompt(userPrompt, richContext)) {
+    if (window.ArcadeWorkshopManager.isWorkshopRewriteIntentPrompt(userPrompt, richContext)
+        || window.ArcadeWorkshopManager.isWorkshopMultiFileEditPrompt(userPrompt, richContext)) {
         const rewriteResult = await tryApplyWorkshopRewriteFromReply(replyText, userPrompt, richContext, { gameId, fileName });
         if (rewriteResult.attempted) {
             return {
