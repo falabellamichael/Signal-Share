@@ -258,6 +258,16 @@ window.ArcadeWorkshopManager = {
     /**
      * Checks if the user prompt mentions the workshop editor.
      */
+    /**
+     * Checks if a prompt indicates an intent to edit multiple files.
+     */
+    isWorkshopMultiFileEditPrompt: function(message = "", workshopContext = null) {
+        const text = `${message || ''}`.trim().toLowerCase();
+        const modes = window.activeArcadeCommandModes || [];
+        if (modes.includes('/multi')) return true;
+        return /\b(multi-file|multiple files|across files|all files)\b/.test(text);
+    },
+
     isWorkshopEditorReferencePrompt: function(message = "") {
         const text = `${message || ''}`.trim().toLowerCase();
         return /\b(?:file|code|game|it|that|this)\b.{0,80}\b(?:open|opened|loaded|selected|showing|visible)\b.{0,80}\b(?:editor|workshop editor)\b/.test(text)
@@ -298,10 +308,10 @@ window.ArcadeWorkshopManager = {
 
         if (!text) return false;
         if (/^\/(?:edit|fix|rewrite)\b/.test(text) || /^\[(?:edit|fix|rewrite)\]/.test(text)) return true;
-        if (this.isWorkshopEditorReferencePrompt(text) && (typeof window.hasActiveWorkshopEditor === 'function' && window.hasActiveWorkshopEditor(workshopContext))) return true;
+        if (this.isWorkshopEditorReferencePrompt(text) && this.hasActiveWorkshopEditor(workshopContext)) return true;
 
         const editVerb = /\b(edit|fix|repair|change|update|modify|replace|remove|delete|add|insert|improve|tweak|adjust|refactor|rename|debug|rewrite)\b/.test(text);
-        const activeEditor = (typeof window.hasActiveWorkshopEditor === 'function' && window.hasActiveWorkshopEditor(workshopContext));
+        const activeEditor = this.hasActiveWorkshopEditor(workshopContext);
         const editorCodeGenVerb = /\b(write|create|generate|code|build|make|implement|integrate)\b/.test(text);
         if (!editVerb && !(activeEditor && editorCodeGenVerb)) return false;
 
@@ -336,7 +346,7 @@ window.ArcadeWorkshopManager = {
         if (/^\/rewrite\b/.test(text) || /^\[rewrite\]/.test(text)) return true;
         return /\brewrite\b/.test(text)
             && /\b(editor|website|workshop|file|code|html|css|javascript|js|game|page)\b/.test(text)
-            && (typeof window.hasActiveWorkshopEditor === 'function' && window.hasActiveWorkshopEditor(workshopContext));
+            && this.hasActiveWorkshopEditor(workshopContext);
     },
 
     /**
