@@ -326,19 +326,7 @@ function isLoopbackSiteOrigin() {
         || host.endsWith('.localhost');
 }
 
-function getActiveWorkshopEditorContext(workshopContext = null) {
-    const providedEditor = workshopContext?.workshopEditor || null;
-    if (providedEditor) return providedEditor;
-    if (typeof window.getWorkshopEditorState === 'function') {
-        return window.getWorkshopEditorState();
-    }
-    return null;
-}
 
-function hasActiveWorkshopEditor(workshopContext = null) {
-    const editor = getActiveWorkshopEditorContext(workshopContext);
-    return !!(`${editor?.activeGameId || ''}`.trim() && `${editor?.activeFileName || ''}`.trim());
-}
 
 function getWorkshop() {
     if (!window.ArcadeWorkshopManager) {
@@ -1476,7 +1464,7 @@ window.handleChatFileSelect = function (event) {
     const reader = new FileReader();
     reader.onload = async function (e) {
         let fileData = e.target.result;
-        
+
         const preview = document.getElementById('chat-attachment-preview');
         const img = document.getElementById('chat-preview-img');
         const video = document.getElementById('chat-preview-video');
@@ -2315,7 +2303,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                 }
                 // Update internal text to stripped version for intent detection
                 text = input.value.trim();
-                
+
                 // CRITICAL FIX: If the command manager cleared the input (e.g. /edit with no args),
                 // but returned false (continue to AI), we must abort if no text remains.
                 if (!text) {
@@ -2717,10 +2705,10 @@ window.sendChatMessage = async function (promptOverride = '') {
             if (actionResult.findTagDetected && actionResult.feedback) {
                 const autoFollowUp = actionResult.feedback;
                 console.log('[Arcade Chat] Auto-refining search result for AI...');
-                
+
                 // Add the retrieval to history so the AI sees it in context
                 arcadeChatHistory.push({ role: 'user', content: autoFollowUp });
-                
+
                 // Trigger a recursive call to sendChatMessage with the new context
                 setTimeout(() => {
                     sendChatMessage(autoFollowUp);
@@ -3417,7 +3405,7 @@ async function executeArcadeChatActions(text, options = {}) {
             if (publishResult.handled) return actionResult;
         }
     }
-    
+
     // 1.5 [REWRITE] or full-file replacements
     const rewriteCmd = window.ArcadeCommandManager.getCommand('rewrite');
     if (rewriteCmd && typeof rewriteCmd.handleResponse === 'function') {
@@ -3486,7 +3474,7 @@ async function executeArcadeChatActions(text, options = {}) {
         actionResult.findTagDetected = true;
         const query = findMatch[1].trim();
         const searchResult = window.handleAiSearchCommand(query);
-        
+
         if (searchResult && searchResult.ok) {
             actionResult.feedback = `[SYSTEM RETRIEVAL]: Found "${searchResult.match}" on line ${searchResult.line}. Context: \`${searchResult.match}\`. You may now apply an [EDIT] using this anchor.`;
         } else {
@@ -3497,7 +3485,7 @@ async function executeArcadeChatActions(text, options = {}) {
     return actionResult;
 }
 
-window.tryApplyWorkshopRewriteFromReply = async function(replyText, userPrompt = '', richContext = null, target = {}) {
+window.tryApplyWorkshopRewriteFromReply = async function (replyText, userPrompt = '', richContext = null, target = {}) {
     const result = { attempted: false, ok: false, reason: '', message: '' };
     if (!getWorkshop().isWorkshopRewriteIntentPrompt(userPrompt, richContext)
         && !getWorkshop().isWorkshopMultiFileEditPrompt(userPrompt, richContext)) return result;
@@ -3571,7 +3559,7 @@ window.tryApplyWorkshopRewriteFromReply = async function(replyText, userPrompt =
     return result;
 }
 
-window.tryAutoWorkshopFileRewriteFromReply = async function(replyText, userPrompt = '', richContext = null) {
+window.tryAutoWorkshopFileRewriteFromReply = async function (replyText, userPrompt = '', richContext = null) {
     const result = { attempted: false, ok: false, reason: '' };
     if (!getWorkshop().isWorkshopEditIntentPrompt(userPrompt, richContext)) return result;
     if (typeof window.applyAiFilePatch !== 'function') {
@@ -4208,7 +4196,7 @@ function setupCloseParityHandlers() {
         }
     }
 
-    window.applyCommandSuggestion = function(id, isTopLevel, commandId) {
+    window.applyCommandSuggestion = function (id, isTopLevel, commandId) {
         const input = document.getElementById('arc-chat-input');
         const panel = document.getElementById('chat-command-suggestions');
         if (!input) return;
@@ -4218,7 +4206,7 @@ function setupCloseParityHandlers() {
         } else {
             input.value = `/${commandId} ${id} `;
         }
-        
+
         input.focus();
         updateCommandSuggestions();
     };
