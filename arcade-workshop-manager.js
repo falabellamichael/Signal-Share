@@ -667,7 +667,7 @@ window.ArcadeWorkshopManager = {
                     '[SURGICAL_EDIT]',
                     `You are editing "${editor.activeFileName}" in the game "${editor.activeGameId}".`,
                     'Provide surgical edits using [EDIT]SEARCH:...REPLACE:...[/EDIT] blocks.',
-                    'Include as much context as needed in the SEARCH block to ensure a unique match.',
+                    'Include as much context as needed in the SEARCH block to ensure a unique match. If the file is empty, use an empty SEARCH block (SEARCH: ) and put the new content in the REPLACE block.',
                     '[/SURGICAL_EDIT]'
                 ].join('\n'));
             }

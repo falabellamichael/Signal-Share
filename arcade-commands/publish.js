@@ -350,10 +350,12 @@
             || window.activeArcadePublishTarget?.id
             || "";
 
+        const isNewGameRequest = /\b(new|create|fresh|brand new)\b/i.test(userPrompt);
+
         const publishMode = data.mode
             || data.action
             || data.operation
-            || (targetGameId ? "update" : "");
+            || (isNewGameRequest ? "create" : (targetGameId ? "update" : ""));
 
         const publishPayload = {
             title: data.title || data.gameTitle || window.activeArcadePublishTarget?.title || "AI Workshop Game",

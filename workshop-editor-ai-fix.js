@@ -142,7 +142,15 @@
         if (!lastWorkshopEditorError) return;
 
         const prompt = buildAiFixPrompt(lastWorkshopEditorError);
-        window.activeArcadeCommandMode = '/fix';
+        const state = getEditorState();
+        
+        // If the file is empty, use rewrite mode instead of fix mode
+        if (!state.activeFileContent || !state.activeFileContent.trim()) {
+            window.activeArcadeCommandMode = '/rewrite';
+        } else {
+            window.activeArcadeCommandMode = '/fix';
+        }
+        
         openCompanionIfCollapsed();
 
         if (typeof window.sendChatMessage === 'function') {
