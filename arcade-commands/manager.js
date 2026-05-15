@@ -23,8 +23,10 @@ window.ArcadeCommandManager = (function() {
         const cleanText = text.trim();
         const isSlash = cleanText.startsWith('/');
         const isBracket = cleanText.startsWith('[') && cleanText.includes(']');
+        const aliasMatch = cleanText.match(/^([a-z][a-z0-9_-]*)\s*\/\s*(.*)$/i);
+        const isAlias = !!(aliasMatch && commands.has(aliasMatch[1].toLowerCase()));
         
-        if (!isSlash && !isBracket) return false;
+        if (!isSlash && !isBracket && !isAlias) return false;
 
         let cmdId = "";
         let args = "";
@@ -33,6 +35,9 @@ window.ArcadeCommandManager = (function() {
             const parts = cleanText.split(/\s+/);
             cmdId = parts[0].substring(1).toLowerCase();
             args = parts.slice(1).join(' ').trim();
+        } else if (isAlias) {
+            cmdId = aliasMatch[1].toLowerCase();
+            args = aliasMatch[2].trim();
         } else {
             const match = cleanText.match(/^\[(.*?)\]\s*(.*)$/);
             if (match) {

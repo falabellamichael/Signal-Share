@@ -2462,7 +2462,9 @@ window.sendChatMessage = async function () {
     }
 
     try {
-        const isCommand = text.startsWith('/');
+        const isCommand = text.startsWith('/')
+            || text.startsWith('[')
+            || /^(?:edit|fix|rewrite|publish|clear|help)\s*\//i.test(text);
         if (isCommand) {
             const cmdHandled = await handleArcadeSlashCommand(text, input);
             if (cmdHandled) {
