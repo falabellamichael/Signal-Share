@@ -3710,7 +3710,14 @@ window.applyAiFilePatch = async function(gameId, fileName, search, replace, opti
     const { save = false, silent = false } = options;
 
     const oldContent = (typeof window.getWorkshopFileContent === 'function') ? window.getWorkshopFileContent(gameId, fileName) : "";
-    if (!oldContent) return { ok: false, message: "Original file content unavailable." };
+    // Allow empty string as valid content for empty files.
+    if (oldContent === null || oldContent === undefined) return { ok: false, message: "Original file content unavailable." };
+
+    // If the file is empty, ignore SEARCH block and replace content directly
+    if (oldContent.trim() === "") {
+        console.log("[AI Workshop] File is empty. Applying replacement directly.");
+        return window.internalApplyWorkshopFileEdit(gameId, fileName, replace, options);
+    }
 
     // 1. Line-by-Line Normalized Matching (High Precision)
     const fileLines = oldContent.split(/\r?\n/);
