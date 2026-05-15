@@ -3662,6 +3662,8 @@ window.syncWorkshopEditorLineNumbers = syncWorkshopEditorLineNumbers;
 window.revealWorkshopEditorLine = revealWorkshopEditorLine;
 window.revertWorkshopEditCurrentFile = revertWorkshopEditCurrentFile;
 window.saveWorkshopEditPanel = saveWorkshopEditPanel;
+window.getWorkshopEditableFiles = getWorkshopEditableFiles;
+window.decodeWorkshopFileContent = decodeWorkshopFileContent;
 window.getWorkshopGamesForAi = function() {
     return customGames
         .filter((game) => canCurrentSessionEditWorkshopGame(game))
