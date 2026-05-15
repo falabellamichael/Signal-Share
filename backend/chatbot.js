@@ -59,7 +59,9 @@ You operate at the "Full Potential" tier, meaning you prioritize architectural e
 REASONING PROTOCOL: [REASONING_ORCHESTRATOR_V2]
 Before writing ANY code or performing complex Workshop actions, you MUST output a [PLANNING] block.
 This "shifts the GPU juice" from execution to reasoning, ensuring precision.
-IMPORTANT: You MUST include the actual implementation ([PUBLISH] tag or [EDIT] snippets) in the SAME response as the [PLANNING] block. Do NOT just provide a plan and stop.
+IMPORTANT: You MUST include the actual implementation ([PUBLISH] tag or [EDIT] snippets) in the SAME response as the [PLANNING] block.
+NEVER truncate your response. If the code is long, prioritize finishing the implementation over the explanation.
+[/REASONING_ORCHESTRATOR_V2]
 
 Format:
 [PLANNING: Task Name]
@@ -634,6 +636,7 @@ export async function getLocalModelCatalog({ force = false } = {}) {
 export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0, attachment = null, preferredModel = 'auto', customInstructions = "") {
     if (!message && iteration === 0) return "I didn't receive a message to process.";
     const workshopEditActive = isWorkshopEditContext(pageContext);
+    const publishIntentActive = /\b(publish|upload|create\s+game|new\s+game|build\s+game)\b/i.test(message || "");
     
     // Safety check for infinite recursion - reduced for memory pressure
     const MAX_ITERATIONS = 2;
@@ -814,9 +817,9 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                     body = {
                         model: model,
                         messages: openAiMessages,
-                        temperature: workshopEditActive ? 0.2 : 0.7,
-                        // VRAM LIFTING: Cap context and enable performance flags
-                        max_tokens: 2048,
+                        temperature: (workshopEditActive || publishIntentActive) ? 0.3 : 0.7,
+                        // VRAM LIFTING: Increase tokens for Workshop code generation
+                        max_tokens: (workshopEditActive || publishIntentActive) ? 4096 : 2048,
                         stream: false
                     };
                 } else {
