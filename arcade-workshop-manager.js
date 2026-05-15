@@ -227,16 +227,16 @@ window.ArcadeWorkshopManager = {
      * Curated list of neon-themed game concepts for AI inspiration.
      */
     seedIdeas: [
-        { title: "Neon Drift", genre: "Racing", concept: "Top-down 2D drifter. Use HSL colors for tire smoke. Glowing gates give speed boosts." },
-        { title: "Cyber Shield", genre: "Action/Rhythm", concept: "Defend a central core from incoming pulses. Time your blocks to the beat for combo multipliers." },
-        { title: "Grid Runner", genre: "Endless Runner", concept: "Isometric grid-based dodging. Jump over 'data corruption' walls and collect 'bit' power-ups." },
-        { title: "Pulse Strike", genre: "Sports/Arcade", concept: "Physics-based Pong variant with 'gravity wells' that bend the ball's trajectory." },
-        { title: "Signal Breach", genre: "Puzzle", concept: "Connect glowing nodes using limited 'bandwidth' lines. Avoid 'firewall' nodes." },
-        { title: "Static Void", genre: "Survival/Horror", concept: "Navigate a maze using only sound pulses (visualized as expanding rings). Avoid the shadow glitches." },
-        { title: "Bit-Shift", genre: "Platformer", concept: "Switch between 0 (low gravity) and 1 (high speed) to navigate binary-themed levels." },
-        { title: "Glow Worm", genre: "Snake Variant", concept: "Snake grows by eating light. Body segments leave temporary trails that hurt enemies but fade over time." },
-        { title: "Pixel Rain", genre: "Catch/Arcade", concept: "Catch falling pixels to rebuild a portrait. Don't let the 'corrupted' red blocks hit your catcher." },
-        { title: "Neon Nexus", genre: "Strategy/Tower Defense", concept: "Place prism towers that split light beams into different colors to destroy matching enemy waves." }
+        { title: "Paper Pilot", genre: "Flight/Arcade", concept: "Sketch-style paper plane flight. Navigate through a hand-drawn office environment with physics-based wind." },
+        { title: "Zen Garden", genre: "Relaxation/Puzzle", concept: "Rake sand to match patterns. Minimalist aesthetic with procedural ripples and calming soundscapes." },
+        { title: "Brutalist Blocks", genre: "Physics/Stacking", concept: "Stack raw concrete slabs in a stark, monochromatic architecture. Focus on weight and brutalist shadows." },
+        { title: "Pixel Pasture", genre: "Farming/Sim", concept: "Lo-fi 8-bit farming. Grow digital crops to trade for better seeds in a vibrant, chunky pixel-art world." },
+        { title: "Glass Void", genre: "Puzzle/Refraction", concept: "Direct light through glass prisms. Use glassmorphism effects and soft blurred gradients." },
+        { title: "Sketch Escape", genre: "Platformer", concept: "A world drawn in a notebook. Erase obstacles or draw paths to help the character reach the exit." },
+        { title: "Cyber Shield", genre: "Action/Rhythm", concept: "Defend a core from pulses. While high-tech, focus on clean vector lines and geometric shapes." },
+        { title: "Signal Breach", genre: "Puzzle/Strategy", concept: "Connect nodes in a data map. Focus on blueprint-style aesthetics and technical diagrams." },
+        { title: "Ink Blot", genre: "Abstract/Arcade", concept: "Control an ink drop on parchment. Absorb other drops to grow while avoiding water spills." },
+        { title: "Monochrome Maze", genre: "Exploration", concept: "A stark black-and-white maze where shadows reveal the path. High contrast, film-noir aesthetic." }
     ],
 
     /**
@@ -249,7 +249,7 @@ window.ArcadeWorkshopManager = {
             `AUTONOMOUS DESIGNER MODE: Suggest 3 unique, high-concept mini-game ideas${hintText}.`,
             'IMPORTANT: These must be REAL, implementable concepts, not "placeholder" ideas.',
             'Each idea MUST have: A catchy Title, Genre, and a 2-sentence Concept.',
-            'Themes: Neon, Cyberpunk, Retrowave, Minimalist, Fluid Animations.',
+            'Themes: Minimalist, Paper-Sketch, Glassmorphism, Brutalist, Lo-Fi Pixel, or High-Contrast Noir.',
             'Constraint: Must follow these WORKING CODE PRINCIPLES:',
             JSON.stringify(this.workingCodePrinciples),
             'Reference these existing seeds for inspiration:',
