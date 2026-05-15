@@ -601,7 +601,7 @@ window.ArcadeWorkshopManager = {
                 }
             }
         }
-        const jsonTags = ['PUBLISH', 'ARCADE', 'COMPOSE', 'SEARCH', 'FETCH', 'LAUNCH', 'SHELL', 'FIND'];
+        const jsonTags = ['PUBLISH', 'ARCADE', 'COMPOSE', 'SEARCH', 'FETCH', 'LAUNCH', 'SHELL', 'FIND', 'REASONING_ORCHESTRATOR_V2', 'PLANNING', 'IMPLEMENTATION_PLAN', 'TEST_PLAN'];
         for (const tag of jsonTags) {
             let pubInner, safetyInner = 0;
             while ((pubInner = this.extractBalancedJsonTagPayload(text, tag)) !== null && safetyInner < 10) {
@@ -610,12 +610,25 @@ window.ArcadeWorkshopManager = {
                 safetyInner++;
             }
         }
-        const simpleRegex = /\[(ARCADE|DUCKDUCKGO|OPEN|COMPOSE|PLANNING|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit):\s*([^\]]+)\]/gi;
+
+        // Strip internal context markers and leaked protocol tags
+        const patternRegex = /\[(?:SignalShare|WORKSHOP|SURGICAL|FULL_FILE|IDEA|DEEP|WORKSHOP_PROTOCOL|WORKSHOP_REWRITE)[\s\S]*?\]/gi;
+        text = text.replace(patternRegex, () => { hadTags = true; return ""; });
+
+        // Strip leaked XML-like tags (e.g. </REPLACE>, </workshop>)
+        const xmlLeakRegex = /<\/?(?:REPLACE|workshop|file|code|content|plan|thought|reasoning|system)[\s\S]*?>/gi;
+        text = text.replace(xmlLeakRegex, () => { hadTags = true; return ""; });
+
+        const simpleRegex = /\[(ARCADE|DUCKDUCKGO|OPEN|COMPOSE|PLANNING|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit|IDEA_PROTOCOL|WORKSHOP_PROTOCOL):\s*([\s\S]*?)\]/gi;
         text = text.replace(simpleRegex, (match, tag, val) => {
             hadTags = true;
             return tag === 'COMPOSE' ? val : "";
         });
-        return text.trim();
+
+        // Final cleanup of trailing brackets or stray colons left by broken tags
+        text = text.replace(/^[:\s\]]+/, '').trim();
+        
+        return text;
     },
 
     getProtocolDirectives: function(userPrompt = "", workshopContext = null, attachment = null) {
