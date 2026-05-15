@@ -452,11 +452,28 @@ function stripArcadeProtocolTags(content = "") {
         text = text.substring(0, pub.start) + text.substring(pub.end);
     }
 
-    // 2. [PLANNING] and [EDIT] blocks with optional labels
-    const editRegex = /\[(PLANNING|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit)(?::\s*[^\]]+)?\][\s\S]*?\[\/\1\]/gi;
-    if (editRegex.test(text)) {
-        hadTags = true;
-        text = text.replace(editRegex, "");
+    // 2. [PLANNING] and [EDIT] blocks with optional labels (Efficient non-regex cleanup for large strings)
+    const blockTypes = ['PLANNING', 'IMPLEMENTATION_PLAN', 'TEST_PLAN', 'EDIT', 'FILE_EDIT', 'Workshop/Edit'];
+    for (const type of blockTypes) {
+        const startTag = `[${type}`;
+        const endTag = `[/${type}]`;
+        const upper = text.toUpperCase();
+        let sIdx = upper.indexOf(startTag);
+        while (sIdx !== -1) {
+            const eTagIdx = upper.indexOf(endTag, sIdx);
+            if (eTagIdx !== -1) {
+                // We found a balanced block
+                text = text.substring(0, sIdx) + text.substring(eTagIdx + endTag.length);
+                hadTags = true;
+                // Re-scan from the beginning of the modified text
+                const nextUpper = text.toUpperCase();
+                sIdx = nextUpper.indexOf(startTag);
+            } else {
+                // Unclosed tag - just strip the opening tag to prevent loop
+                text = text.substring(0, sIdx) + text.substring(sIdx + startTag.length);
+                break;
+            }
+        }
     }
 
     // 3. Simple tags [OPEN: url], [COMPOSE: text], [PLANNING: task] etc.
@@ -1236,7 +1253,7 @@ async function bridgeFetch(path, options = {}) {
         const hasExplicitTimeout = Number.isFinite(timeoutMs);
         const rawTimeoutDuration = hasExplicitTimeout
             ? Number(timeoutMs)
-            : (method === "POST" ? 45000 : 3500);
+            : (method === "POST" ? 180000 : 5000);
         const timeoutDuration = rawTimeoutDuration > 0
             ? Math.max(250, rawTimeoutDuration)
             : 0;
@@ -4343,6 +4360,9 @@ async function tryAutoPublishWorkshopFromReply(replyText, userPrompt = '') {
     const publishResult = await window.publishCustomGameFromAi(publishPayload);
     if (!publishResult?.ok) {
         result.reason = publishResult?.error || 'publish-failed';
+        if (window.showFeedback) {
+            window.showFeedback(`❌ Auto-Publish: ${publishResult?.message || 'Failed to extract code'}`, true);
+        }
         return result;
     }
 
