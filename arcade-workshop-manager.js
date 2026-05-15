@@ -275,16 +275,12 @@ window.ArcadeWorkshopManager = {
     getPublishDirective: function() {
         return [
             '[WORKSHOP_PROTOCOL]',
-            'REASONING PROTOCOL: [REASONING_ORCHESTRATOR_V2]',
-            'FOLDER CONTEXT: You are working in a dedicated project folder. All files you generate belong to this project.',
-            'Before building a game, you MUST output a concise [PLANNING] block.',
             'CRITICAL: Do NOT ask for permission or wait for approval. IMPLEMENT NOW.',
-            'IMPORTANT: You MUST include the [PUBLISH] tag in the same response as the plan.',
+            'IMPORTANT: You MUST output the [PUBLISH] tag containing the JSON payload.',
             'The tag MUST contain a valid JSON object with: { "target": "workshop", "title": "...", "files": [{ "name": "...", "content": "..." }] }.',
             'Generate a functional, playable, self-contained browser game. It could be just a single HTML file or a multi-file package. At least 1 file must be generated (images are always optional).',
-            'If multi-file, index.html MUST be the entry point and reference any other files (styles.css, game.js) by their relative paths in the folder.',
             'Use plain browser APIs only; no external libraries, CDNs, or module syntax.',
-            'VISUALIZATION: In addition to the [PUBLISH] tag, also provide markdown code blocks (```html, ```javascript) for the primary files so the user can see your work.',
+            'DO NOT output any planning blocks, reasoning text, or introductory text. Output ONLY the [PUBLISH] tag. Do NOT provide duplicate markdown code blocks outside the tag.',
             '[/WORKSHOP_PROTOCOL]'
         ].join('\n');
     },
@@ -433,7 +429,7 @@ window.ArcadeWorkshopManager = {
     extractBalancedJsonTagPayload: function(text, tagName) {
         const source = `${text || ''}`;
         if (!tagName) return null;
-        const markerPattern = '\\[' + tagName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':?';
+        const markerPattern = '\\[' + tagName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const markerRegex = new RegExp(markerPattern, 'gi');
 
         let searchFrom = 0;
@@ -445,7 +441,7 @@ window.ArcadeWorkshopManager = {
             const markerIndex = match.index;
             const markerLength = match[0].length;
             let cursor = markerIndex + markerLength;
-            while (cursor < source.length && /\s/.test(source[cursor])) cursor += 1;
+            while (cursor < source.length && /[\s:\]]/.test(source[cursor])) cursor += 1;
             if (source[cursor] !== '{') {
                 searchFrom = markerIndex + markerLength;
                 continue;
