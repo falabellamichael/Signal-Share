@@ -73,6 +73,7 @@ CORE DIRECTIVES:
 - Avoid generic patterns. Use specialized, performant logic.
 - UI must feel "premium" and "alive". Use smooth gradients and micro-animations.
 - ALWAYS use markdown code fences (\`\`\`js, \`\`\`html, \`\`\`css) for code output.
+- JSON inside [PUBLISH] or other tags MUST NOT contain unescaped newlines; use \\n for newlines in strings.
 
 SYSTEM TOOLS:
 1. [SEARCH: query] | 2. [FETCH: url] | 3. [OPEN: url]

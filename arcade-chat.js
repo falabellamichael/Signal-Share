@@ -398,6 +398,38 @@ function extractBalancedJsonTagPayload(text, tagName) {
 }
 
 /**
+ * Attempt to parse JSON that may contain unescaped newlines or other LLM quirks.
+ */
+function robustParseJson(jsonStr) {
+    if (!jsonStr || typeof jsonStr !== 'string') return null;
+    let clean = jsonStr.trim();
+    
+    // 1. Primary Attempt
+    try {
+        return JSON.parse(clean);
+    } catch (e) {
+        // 2. Secondary Attempt: Escape raw newlines inside string values
+        // This is a common LLM mistake: [PUBLISH: { "content": "line1\nline2" }] 
+        // becomes [PUBLISH: { "content": "line1
+        // line2" }] which is invalid JSON.
+        try {
+            // This regex finds string values and escapes newlines/tabs inside them
+            const sanitized = clean.replace(/"([\s\S]*?)(?<!\\)"/g, (match, p1) => {
+                return '"' + p1.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"';
+            });
+            return JSON.parse(sanitized);
+        } catch (e2) {
+            // 3. Last Resort: Try decoding escaped text first
+            try {
+                return JSON.parse(decodeEscapedCodeText(clean));
+            } catch (e3) {
+                return null;
+            }
+        }
+    }
+}
+
+/**
  * Cleans the AI response text for UI display by removing protocol tags.
  * Uses balanced parsing for [PUBLISH:...] to ensure robust removal.
  */
@@ -410,20 +442,9 @@ function stripArcadeProtocolTags(content = "") {
     let pub;
     while ((pub = extractBalancedJsonTagPayload(text, 'PUBLISH')) !== null) {
         hadTags = true;
-        try {
-            if (!publishData) {
-                try {
-                    publishData = JSON.parse(pub.jsonText);
-                } catch (e) {
-                    // Fallback for AI-escaped JSON (common in smaller models)
-                    try {
-                        publishData = JSON.parse(decodeEscapedCodeText(pub.jsonText));
-                    } catch (e2) {
-                        console.warn('[Arcade Chat] Failed to parse [PUBLISH] even with escape fallback:', e2);
-                    }
-                }
-            }
-        } catch (e) { }
+        if (!publishData) {
+            publishData = robustParseJson(pub.jsonText);
+        }
         text = text.substring(0, pub.start) + text.substring(pub.end);
     }
 
@@ -3846,13 +3867,18 @@ async function executeArcadeChatActions(text, options = {}) {
         console.warn('[Arcade Chat] Ignoring [PUBLISH] during active editor edit request; expecting [EDIT] SEARCH/REPLACE blocks.');
     } else if (publishPayload?.jsonText) {
         actionResult.publishTagDetected = true;
+        actionResult.publishTagDetected = true;
         try {
-            let data;
-            try {
-                data = JSON.parse(publishPayload.jsonText);
-            } catch (jsonErr) {
-                // Fallback for AI-escaped JSON
-                data = JSON.parse(decodeEscapedCodeText(publishPayload.jsonText));
+            let data = robustParseJson(publishPayload.jsonText);
+            
+            // Final fallback: If JSON parsing completely failed, try greedy field extraction
+            if (!data) {
+                console.warn('[Arcade Chat] JSON parse failed, attempting greedy field recovery...');
+                data = {
+                    title: publishPayload.jsonText.match(/"title"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
+                    category: publishPayload.jsonText.match(/"category"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || 'GAME',
+                    description: publishPayload.jsonText.match(/"description"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || ''
+                };
             }
             const { title, caption, tags } = data;
 
