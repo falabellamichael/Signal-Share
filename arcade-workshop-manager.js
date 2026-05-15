@@ -281,8 +281,8 @@ window.ArcadeWorkshopManager = {
             'CRITICAL: Do NOT ask for permission or wait for approval. IMPLEMENT NOW.',
             'IMPORTANT: You MUST include the [PUBLISH] tag in the same response as the plan.',
             'The tag MUST contain a valid JSON object with: { "target": "workshop", "title": "...", "files": [{ "name": "...", "content": "..." }] }.',
-            'Generate a functional, playable, self-contained browser game package. Omit any non-essential assets (such as images or decorative files) if they are not strictly required for the core functionality of the game.',
-            'index.html MUST be the entry point and reference any other files (styles.css, game.js) by their relative paths in the folder.',
+            'Generate a functional, playable, self-contained browser game. It could be just a single HTML file or a multi-file package. At least 1 file must be generated (images are always optional).',
+            'If multi-file, index.html MUST be the entry point and reference any other files (styles.css, game.js) by their relative paths in the folder.',
             'Use plain browser APIs only; no external libraries, CDNs, or module syntax.',
             'VISUALIZATION: In addition to the [PUBLISH] tag, also provide markdown code blocks (```html, ```javascript) for the primary files so the user can see your work.',
             '[/WORKSHOP_PROTOCOL]'
