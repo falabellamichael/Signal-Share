@@ -15,6 +15,9 @@ const MIN_GAME_PANEL_WIDTH = 320;
 let lastResolvedBridgeCandidatesSignature = "";
 let lastResolvedBridgePrimary = "";
 let lastBridgeStatusWasOnline = false;
+let currentlySpeakingButton = null;
+const SPEAKER_ICON = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+const STOP_ICON = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2" ry="2" fill="currentColor"></rect></svg>';
 
 function normalizeBridgeBaseUrl(baseUrl = "") {
     const raw = `${baseUrl || ""}`.trim();
@@ -229,8 +232,25 @@ function initArcadeSpeech() {
     }
 }
 
-function speakArcadeText(text) {
+function speakArcadeText(text, btnElement = null) {
     if (!arcadeSpeechSynth) return;
+
+    // TOGGLE LOGIC: If already speaking, stop and return
+    if (arcadeSpeechSynth.speaking) {
+        arcadeSpeechSynth.cancel();
+        // If we clicked the SAME button that was speaking, we just stop.
+        if (currentlySpeakingButton === btnElement && btnElement) {
+            return;
+        }
+        // If we clicked a DIFFERENT button, we stop the old one (done above) 
+        // and continue to start the new one.
+    }
+
+    // Reset old button if exists
+    if (currentlySpeakingButton) {
+        currentlySpeakingButton.innerHTML = SPEAKER_ICON;
+        currentlySpeakingButton.classList.remove('speaking');
+    }
 
     // On some Androids, we need to wait for voices to load or handle empty list
     const voices = arcadeSpeechSynth.getVoices();
@@ -244,8 +264,6 @@ function speakArcadeText(text) {
         try { arcadeSpeechSynth.speak(new SpeechSynthesisUtterance("")); } catch (e) { }
         return;
     }
-
-    arcadeSpeechSynth.cancel(); // Stop current speech
 
     const cleanText = text.replace(/\[[\s\S]*?\]/g, "").trim();
     if (!cleanText) return;
@@ -262,10 +280,29 @@ function speakArcadeText(text) {
 
     // ERROR HANDLING: If it fails, log it for debugging
     utterance.onerror = (e) => {
+        if (currentlySpeakingButton === btnElement) {
+            currentlySpeakingButton.innerHTML = SPEAKER_ICON;
+            currentlySpeakingButton.classList.remove('speaking');
+            currentlySpeakingButton = null;
+        }
         // 'interrupted' is normal when we call .cancel() to start a new message
         if (e.error === 'interrupted') return;
         console.error('[Voice] TTS Error:', e);
     };
+
+    utterance.onend = () => {
+        if (currentlySpeakingButton === btnElement) {
+            currentlySpeakingButton.innerHTML = SPEAKER_ICON;
+            currentlySpeakingButton.classList.remove('speaking');
+            currentlySpeakingButton = null;
+        }
+    };
+
+    if (btnElement) {
+        currentlySpeakingButton = btnElement;
+        currentlySpeakingButton.innerHTML = STOP_ICON;
+        currentlySpeakingButton.classList.add('speaking');
+    }
 
     arcadeSpeechSynth.speak(utterance);
 }
@@ -2143,16 +2180,16 @@ function addChatMessage(role, content) {
     if (role === 'ai') {
         const speakBtn = document.createElement('button');
         speakBtn.className = 'msg-speak-btn';
-        speakBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+        speakBtn.innerHTML = SPEAKER_ICON;
         speakBtn.onclick = (e) => {
             e.stopPropagation();
-            speakArcadeText(content);
+            speakArcadeText(content, speakBtn);
         };
         msgDiv.appendChild(speakBtn);
 
         // Auto-speak if it was a voice session
         if (isVoiceSessionActive) {
-            speakArcadeText(content);
+            speakArcadeText(content, speakBtn);
             isVoiceSessionActive = false; // Reset for next interaction
         }
     }

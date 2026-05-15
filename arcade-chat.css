@@ -962,6 +962,14 @@ body.runner-open .chat-resize-handle {
     height: 12px;
 }
 
+.msg-speak-btn.speaking {
+    opacity: 1 !important;
+    background: var(--arc-accent);
+    color: var(--arc-msg-user-text);
+    border-color: var(--arc-accent);
+    box-shadow: 0 0 10px var(--arc-accent-glow);
+}
+
 /* Ensure user messages don't overlap with speak button from message above */
 .message-user {
     margin-top: 4px;
