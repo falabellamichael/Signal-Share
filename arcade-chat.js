@@ -412,23 +412,46 @@ function robustParseJson(jsonStr) {
     try {
         return JSON.parse(clean);
     } catch (e) {
-        // 2. Secondary Attempt: Escape raw newlines inside string values
-        // This is a common LLM mistake: [PUBLISH: { "content": "line1\nline2" }] 
-        // becomes [PUBLISH: { "content": "line1
-        // line2" }] which is invalid JSON.
+        // 2. Secondary Attempt: Manual character-based sanitization to avoid catastrophic regex backtracking
+        // This handles common LLM errors like unescaped newlines or tabs inside string values.
+        let sanitized = "";
+        let inString = false;
+        let escaped = false;
+        
+        for (let i = 0; i < clean.length; i++) {
+            const char = clean[i];
+            if (char === '"' && !escaped) {
+                inString = !inString;
+                sanitized += char;
+            } else if (inString && !escaped) {
+                if (char === '\n') sanitized += "\\n";
+                else if (char === '\r') sanitized += "\\r";
+                else if (char === '\t') sanitized += "\\t";
+                else if (char === '\\') {
+                    escaped = true;
+                    sanitized += char;
+                } else {
+                    sanitized += char;
+                }
+            } else {
+                sanitized += char;
+                escaped = false;
+            }
+        }
+        
         try {
-            // This regex finds string values and escapes newlines/tabs inside them
-            const sanitized = clean.replace(/"([\s\S]*?)(?<!\\)"/g, (match, p1) => {
-                return '"' + p1.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"';
-            });
             return JSON.parse(sanitized);
         } catch (e2) {
-            // 3. Last Resort: Try decoding escaped text first
+            // 3. Last Resort: Just try to strip it if it's truly broken
             try {
-                return JSON.parse(decodeEscapedCodeText(clean));
+                // If it still fails, it's likely a truncation issue or missing closing brace
+                if (clean.startsWith('{') && !clean.endsWith('}')) {
+                    return JSON.parse(clean + '}');
+                }
             } catch (e3) {
                 return null;
             }
+            return null;
         }
     }
 }
@@ -452,7 +475,7 @@ function stripArcadeProtocolTags(content = "") {
         text = text.substring(0, pub.start) + text.substring(pub.end);
     }
 
-    // 2. [PLANNING] and [EDIT] blocks with optional labels (Efficient non-regex cleanup for large strings)
+    // 2. Block-level tags with closing tags (PLANNING, EDIT, etc.)
     const blockTypes = ['PLANNING', 'IMPLEMENTATION_PLAN', 'TEST_PLAN', 'EDIT', 'FILE_EDIT', 'Workshop/Edit'];
     for (const type of blockTypes) {
         const startTag = `[${type}`;
@@ -462,17 +485,26 @@ function stripArcadeProtocolTags(content = "") {
         while (sIdx !== -1) {
             const eTagIdx = upper.indexOf(endTag, sIdx);
             if (eTagIdx !== -1) {
-                // We found a balanced block
                 text = text.substring(0, sIdx) + text.substring(eTagIdx + endTag.length);
                 hadTags = true;
-                // Re-scan from the beginning of the modified text
                 const nextUpper = text.toUpperCase();
                 sIdx = nextUpper.indexOf(startTag);
             } else {
-                // Unclosed tag - just strip the opening tag to prevent loop
                 text = text.substring(0, sIdx) + text.substring(sIdx + startTag.length);
                 break;
             }
+        }
+    }
+
+    // 3. Balanced JSON tags without explicit closing tags ([PUBLISH:], [ARCADE:], etc.)
+    const jsonTags = ['PUBLISH', 'ARCADE', 'COMPOSE', 'SEARCH', 'FETCH', 'LAUNCH', 'SHELL', 'FIND'];
+    for (const tag of jsonTags) {
+        let pub;
+        let safetyCounter = 0;
+        while ((pub = extractBalancedJsonTagPayload(text, tag)) !== null && safetyCounter < 20) {
+            hadTags = true;
+            text = text.substring(0, pub.start) + text.substring(pub.end);
+            safetyCounter++;
         }
     }
 
@@ -3138,6 +3170,7 @@ window.sendChatMessage = async function (promptOverride = '') {
     } finally {
         isSendingChatMessage = false;
         setChatSendButtonMode('send');
+        updateChatStatus('idle');
         window.stopArcadeAi = null;
     }
 }
@@ -3790,7 +3823,11 @@ async function executeArcadeChatActions(text, options = {}) {
                     description: publishPayload.jsonText.match(/"description"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || ''
                 };
             }
-            const { title, caption, tags } = data;
+            if (!data) {
+                console.warn('[Arcade Chat] Could not parse JSON for PUBLISH tag:', publishPayload.jsonText);
+                return actionResult;
+            }
+            const { title, caption, tags } = data || {};
 
             const routeToWorkshop = window.ArcadeWorkshopManager.shouldRouteToWorkshop(data, text, options.userPrompt || '');
             if (routeToWorkshop) {
