@@ -2842,7 +2842,7 @@ function extractAiCodeBlocks(rawText = '') {
 
 
 
-function buildAiWorkshopFilesFromText(rawText) {
+window.buildAiWorkshopFilesFromText = function buildAiWorkshopFilesFromText(rawText) {
     const files = [];
     const counters = { html: 0, css: 0, js: 0, txt: 0 };
     const nextName = (kind) => {
