@@ -273,5 +273,193 @@ window.ArcadeWorkshopManager = {
             JSON.stringify(this.seedIdeas.slice(0, 5)),
             '[/IDEA_PROTOCOL]'
         ].join('\n');
+    },
+
+    /**
+     * Robustly parses balanced JSON tags like [PUBLISH:{...}]
+     */
+    extractBalancedJsonTagPayload: function(text, tagName) {
+        const source = `${text || ''}`;
+        if (!tagName) return null;
+        const markerPattern = '\\[' + tagName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':';
+        const markerRegex = new RegExp(markerPattern, 'gi');
+
+        let searchFrom = 0;
+        while (searchFrom < source.length) {
+            markerRegex.lastIndex = searchFrom;
+            const match = markerRegex.exec(source);
+            if (!match) return null;
+
+            const markerIndex = match.index;
+            const markerLength = match[0].length;
+            let cursor = markerIndex + markerLength;
+            while (cursor < source.length && /\s/.test(source[cursor])) cursor += 1;
+            if (source[cursor] !== '{') {
+                searchFrom = markerIndex + markerLength;
+                continue;
+            }
+
+            let depth = 0, inString = false, isEscaped = false;
+            for (let i = cursor; i < source.length; i += 1) {
+                const ch = source[i];
+                if (inString) {
+                    if (isEscaped) isEscaped = false;
+                    else if (ch === '\\') isEscaped = true;
+                    else if (ch === '"') inString = false;
+                    continue;
+                }
+                if (ch === '"') { inString = true; continue; }
+                if (ch === '{') { depth += 1; continue; }
+                if (ch !== '}') continue;
+                depth -= 1;
+                if (depth !== 0) continue;
+
+                let endCursor = i + 1;
+                while (endCursor < source.length && /\s/.test(source[endCursor])) endCursor += 1;
+                const hasClosingBracket = source[endCursor] === ']';
+                if (!hasClosingBracket && `${tagName || ''}`.trim().toUpperCase() !== 'PUBLISH') {
+                    searchFrom = i + 1;
+                    break;
+                }
+                return {
+                    jsonText: source.slice(cursor, i + 1),
+                    start: markerIndex,
+                    end: hasClosingBracket ? endCursor + 1 : i + 1
+                };
+            }
+            searchFrom = markerIndex + markerLength;
+        }
+        return null;
+    },
+
+    /**
+     * Safely parses JSON that might contain LLM artifacts like unescaped newlines.
+     */
+    robustParseJson: function(jsonStr) {
+        if (!jsonStr || typeof jsonStr !== 'string') return null;
+        let clean = jsonStr.trim();
+        try { return JSON.parse(clean); } catch (e) {
+            let sanitized = "", inString = false, escaped = false;
+            for (let i = 0; i < clean.length; i++) {
+                const char = clean[i];
+                if (char === '"' && !escaped) { inString = !inString; sanitized += char; }
+                else if (inString && !escaped) {
+                    if (char === '\n') sanitized += "\\n";
+                    else if (char === '\r') sanitized += "\\r";
+                    else if (char === '\t') sanitized += "\\t";
+                    else if (char === '\\') { escaped = true; sanitized += char; }
+                    else sanitized += char;
+                } else { sanitized += char; escaped = false; }
+            }
+            try { return JSON.parse(sanitized); } catch (e2) {
+                try { if (clean.startsWith('{') && !clean.endsWith('}')) return JSON.parse(clean + '}'); } catch (e3) {}
+                return null;
+            }
+        }
+    },
+
+    /**
+     * Extracts surgical edit blocks from AI response.
+     */
+    extractWorkshopEditBlocks: function(text = "") {
+        const source = `${text || ''}`;
+        const blocks = [];
+        const workshopActionRegex = /\[(EDIT|EDIT_FILE|FILE_EDIT|Workshop\/Edit)(?::\s*([\s\S]*?))?\]([\s\S]*?)(?:\[\/\1\]|$)/gi;
+        let match;
+        while ((match = workshopActionRegex.exec(source)) !== null) {
+            const parsed = this.parseWorkshopSearchReplaceBlock(match[3]);
+            if (parsed) blocks.push(parsed);
+        }
+        if (blocks.length === 0 && /SEARCH:\s*[\s\S]+?REPLACE:/i.test(source)) {
+            const parsed = this.parseWorkshopSearchReplaceBlock(source);
+            if (parsed) blocks.push(parsed);
+        }
+        return blocks;
+    },
+
+    parseWorkshopSearchReplaceBlock: function(raw) {
+        const text = `${raw || ""}`;
+        const searchMatch = text.match(/SEARCH:\s*([\s\S]*?)(?=REPLACE:|$)/i);
+        const replaceMatch = text.match(/REPLACE:\s*([\s\S]*?)(?=SEARCH:|$)/i);
+        if (!searchMatch || !replaceMatch) return null;
+        return { search: searchMatch[1].trim(), replace: replaceMatch[1].trim() };
+    },
+
+    decodeEscapedCodeText: function(value) {
+        return `${value || ''}`.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    },
+
+    getWorkshopFileKindFromName: function(fileName = '') {
+        const lower = `${fileName || ''}`.trim().toLowerCase();
+        if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html';
+        if (lower.endsWith('.css')) return 'css';
+        if (lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.cjs')) return 'js';
+        if (lower.endsWith('.json')) return 'json';
+        return 'text';
+    },
+
+    stripArcadeProtocolTags: function(content = "") {
+        let text = `${content || ""}`;
+        let hadTags = false;
+        let pub;
+        let safety = 0;
+        while ((pub = this.extractBalancedJsonTagPayload(text, 'PUBLISH')) !== null && safety < 10) {
+            hadTags = true;
+            text = text.substring(0, pub.start) + text.substring(pub.end);
+            safety++;
+        }
+        const blockTypes = ['PLANNING', 'IMPLEMENTATION_PLAN', 'TEST_PLAN', 'EDIT', 'FILE_EDIT', 'Workshop/Edit'];
+        for (const type of blockTypes) {
+            const startTag = `[${type}`, endTag = `[/${type}]`, upper = text.toUpperCase();
+            let sIdx = upper.indexOf(startTag);
+            while (sIdx !== -1) {
+                const eTagIdx = upper.indexOf(endTag, sIdx);
+                if (eTagIdx !== -1) {
+                    text = text.substring(0, sIdx) + text.substring(eTagIdx + endTag.length);
+                    hadTags = true;
+                    sIdx = text.toUpperCase().indexOf(startTag);
+                } else {
+                    text = text.substring(0, sIdx) + text.substring(sIdx + startTag.length);
+                    break;
+                }
+            }
+        }
+        const jsonTags = ['PUBLISH', 'ARCADE', 'COMPOSE', 'SEARCH', 'FETCH', 'LAUNCH', 'SHELL', 'FIND'];
+        for (const tag of jsonTags) {
+            let pubInner, safetyInner = 0;
+            while ((pubInner = this.extractBalancedJsonTagPayload(text, tag)) !== null && safetyInner < 10) {
+                hadTags = true;
+                text = text.substring(0, pubInner.start) + text.substring(pubInner.end);
+                safetyInner++;
+            }
+        }
+        const simpleRegex = /\[(ARCADE|DUCKDUCKGO|OPEN|COMPOSE|PLANNING|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit):\s*([^\]]+)\]/gi;
+        text = text.replace(simpleRegex, (match, tag, val) => {
+            hadTags = true;
+            return tag === 'COMPOSE' ? val : "";
+        });
+        return text.trim();
+    },
+
+    getProtocolDirectives: function(userPrompt = "", workshopContext = null, attachment = null) {
+        const text = `${userPrompt || ''}`.trim().toLowerCase();
+        const directives = [];
+        const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
+        if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
+
+        const hasActiveWorkshop = typeof window.hasActiveWorkshopEditor === 'function' ? window.hasActiveWorkshopEditor(workshopContext) : false;
+        const isPublishIntent = modes.has('/publish') || modes.has('/build') || text.includes('/publish') || text.includes('/build');
+        const isEditIntent = modes.has('/edit') || modes.has('/fix') || text.includes('/edit') || text.includes('/fix');
+
+        if (isPublishIntent) directives.push(this.getPublishDirective());
+        if (isEditIntent && hasActiveWorkshop) {
+            directives.push('[SURGICAL_EDIT_PROTOCOL]');
+            directives.push('You are in surgical edit mode. Output exactly one [EDIT] SEARCH/REPLACE block.');
+            directives.push('SEARCH: Exact lines to find. REPLACE: New code to insert.');
+            directives.push('Keep edits minimal and preserve existing logic. Use [FIND: query] if unsure of exact lines.');
+            directives.push('[/SURGICAL_EDIT_PROTOCOL]');
+        }
+        return directives.join('\n\n');
     }
 };
+
