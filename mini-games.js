@@ -11,8 +11,15 @@ const GAMES = [
     { id: 'sudoku', title: 'Neon Sudoku', category: 'ARCADE', poster: 'neon_sudoku_poster.png', tag: 'ARCADE • PUZZLE', type: 'game', trackedStats: ['sudoku-best-time', 'sudoku-puzzles-solved'] },
     { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility', trackedStats: [] }
 ];
+window.GAMES = GAMES;
 
 const DEFAULT_GAME_POSTER = 'icon-512.png';
+const TELEMETRY_KEYWORDS = [
+    'score', 'best', 'level', 'stats', 'rank', 'xp', 'streak', 'win', 'lose', 
+    'food', 'points', 'plays', 'time', 'likes', 'views', 'eng', 'rep', 
+    'consecutive', 'hi-score', 'high-score', 'money', 'coins',
+    'gems', 'kills', 'deaths', 'waves', 'stage', 'round'
+];
 const STATIC_HUB_IDS = {
     snake: 'hub-snake',
     basketball: 'hub-basketball',
@@ -913,19 +920,38 @@ function encodeTextAsDataUrl(text, mimeType = 'text/plain;charset=utf-8') {
 }
 
 function collectTrackedStatsFromFiles(processedFiles) {
-    const allCode = processedFiles.map(f => `${f.content || ''}`).join(' ');
-    const trackedStats = [];
-    const statRegex = /localStorage\.(?:get|set)Item\(['"]([^'"]+)['"]\)/g;
+    const allCode = processedFiles.map(f => decodeWorkshopFileContent(f)).join('\n');
+    const trackedStats = new Set();
+    
+    // 1. Regex for standard localStorage.getItem/setItem('key')
+    const methodRegex = /(?:localStorage|sessionStorage)\.(?:get|set|remove)Item\(['"]([^'"]+)['"]\)/g;
+    
+    // 2. Regex for bracket notation localStorage['key']
+    const bracketRegex = /(?:localStorage|sessionStorage)\[['"]([^'"]+)['"]\]/g;
+    
+    // 3. Regex for property notation localStorage.key (if not a standard method)
+    const propertyRegex = /(?:localStorage|sessionStorage)\.([A-Za-z_$][\w$]*)/g;
+
+    const isMeaningfulKey = (key) => {
+        if (!key) return false;
+        const lower = key.toLowerCase();
+        // Ignore standard storage methods
+        if (['getitem', 'setitem', 'removeitem', 'clear', 'length', 'key'].includes(lower)) return false;
+        return TELEMETRY_KEYWORDS.some(k => lower.includes(k));
+    };
+
     let match;
-    while ((match = statRegex.exec(allCode)) !== null) {
-        const key = match[1];
-        const lowerKey = key.toLowerCase();
-        const keywords = ['score', 'best', 'level', 'stats', 'rank', 'xp', 'streak', 'win', 'lose', 'food', 'points', 'plays', 'time', 'likes', 'views', 'eng', 'rep', 'consecutive'];
-        if (keywords.some(k => lowerKey.includes(k)) && !trackedStats.includes(key)) {
-            trackedStats.push(key);
-        }
+    while ((match = methodRegex.exec(allCode)) !== null) {
+        if (isMeaningfulKey(match[1])) trackedStats.add(match[1]);
     }
-    return trackedStats;
+    while ((match = bracketRegex.exec(allCode)) !== null) {
+        if (isMeaningfulKey(match[1])) trackedStats.add(match[1]);
+    }
+    while ((match = propertyRegex.exec(allCode)) !== null) {
+        if (isMeaningfulKey(match[1])) trackedStats.add(match[1]);
+    }
+
+    return Array.from(trackedStats);
 }
 
 function normalizeWorkshopAssetReference(value = '') {
@@ -2582,10 +2608,81 @@ function launchCustomGame(gameId) {
                 }
             });
 
+            // Inject Automatic Telemetry Bridge
+            const telemetryShim = `
+<script>
+(function() {
+    const gameId = "${gameId}";
+    const keywords = ${JSON.stringify(TELEMETRY_KEYWORDS)};
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+        originalSetItem.apply(this, arguments);
+        try {
+            const lowerKey = String(key).toLowerCase();
+            if (keywords.some(k => lowerKey.includes(k))) {
+                const score = parseInt(value);
+                if (!isNaN(score)) {
+                    window.parent.postMessage({
+                        type: 'GAME_SCORE',
+                        gameId: gameId,
+                        score: score,
+                        metadata: { key: key, autoTracked: true, timestamp: new Date().toISOString() }
+                    }, '*');
+                }
+            }
+        } catch (e) {
+            console.warn('[Arcade Telemetry] Failed to auto-track score:', e);
+        }
+    };
+    console.log('[Arcade Telemetry] Bridge active for ' + gameId);
+})();
+</script>
+            `.trim();
+
+            if (content.includes('<head>')) {
+                content = content.replace('<head>', '<head>' + telemetryShim);
+            } else if (content.includes('<body>')) {
+                content = content.replace('<body>', '<body>' + telemetryShim);
+            } else {
+                content = telemetryShim + content;
+            }
+
             openApp(content, game.title, game.poster, gameId);
         } else {
             const js = entry.content.split('base64,')[1] ? atob(entry.content.split('base64,')[1]) : entry.content;
-            const htmlWrapper = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + game.title + '</title></head><body><scr' + 'ipt>' + js + '</scr' + 'ipt></body></html>';
+            
+            // Inject Automatic Telemetry Bridge
+            const telemetryShim = `
+<script>
+(function() {
+    const gameId = "${gameId}";
+    const keywords = ${JSON.stringify(TELEMETRY_KEYWORDS)};
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+        originalSetItem.apply(this, arguments);
+        try {
+            const lowerKey = String(key).toLowerCase();
+            if (keywords.some(k => lowerKey.includes(k))) {
+                const score = parseInt(value);
+                if (!isNaN(score)) {
+                    window.parent.postMessage({
+                        type: 'GAME_SCORE',
+                        gameId: gameId,
+                        score: score,
+                        metadata: { key: key, autoTracked: true, timestamp: new Date().toISOString() }
+                    }, '*');
+                }
+            }
+        } catch (e) {
+            console.warn('[Arcade Telemetry] Failed to auto-track score:', e);
+        }
+    };
+    console.log('[Arcade Telemetry] Bridge active for ' + gameId);
+})();
+</script>
+            `.trim();
+
+            const htmlWrapper = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + game.title + '</title>' + telemetryShim + '</head><body><scr' + 'ipt>' + js + '</scr' + 'ipt></body></html>';
             openApp(htmlWrapper, game.title, game.poster, gameId);
         }
     }
@@ -2917,17 +3014,30 @@ function discoverStats(game) {
         }
     }
 
-    // 3. LOW PRIORITY: Contextual Global Metrics (Only if they aren't explicitly prefixed for another game)
-    if (stats.length < 3 && engine) {
+    // 3. Contextual Heuristic Discovery (Only if they aren't explicitly prefixed for another game)
+    if (stats.length < 3) {
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
+            if (!key) continue;
             
             // SECURITY: If the key clearly belongs to another game (contains their ID), skip it
-            const isOtherGameKey = GAMES.some(g => g.id !== id && key.toLowerCase().includes(g.id.toLowerCase()));
+            const isOtherGameKey = GAMES.some(g => {
+                if (g.id === id) return false;
+                const lowerKey = key.toLowerCase();
+                const lowerId = g.id.toLowerCase();
+                // Check if the key contains the other game's ID
+                if (lowerKey.includes(lowerId)) return true;
+                // Check if the other game has this key explicitly tracked
+                if (Array.isArray(g.trackedStats) && g.trackedStats.includes(key)) return true;
+                return false;
+            });
             if (isOtherGameKey) continue;
 
-            // Check if this global key matches a dictionary entry and is "meaningful"
-            if (engine.getMetric(key)) {
+            // Check if this key matches meaningful patterns
+            const lowerKey = key.toLowerCase();
+            const meaningful = TELEMETRY_KEYWORDS.some(k => lowerKey.includes(k));
+            
+            if (meaningful || (engine && engine.getMetric(key))) {
                 tryAddStat(key);
             }
             if (stats.length >= 3) break;

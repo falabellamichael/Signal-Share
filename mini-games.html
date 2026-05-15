@@ -697,12 +697,12 @@
 
         .workshop-edit-upload-item strong {
             font-weight: 700;
-            color: rgba(255,255,255,0.9);
+            color: rgba(255, 255, 255, 0.9);
             word-break: break-all;
         }
 
         .workshop-edit-upload-meta {
-            color: rgba(255,255,255,0.5);
+            color: rgba(255, 255, 255, 0.5);
             font-size: 0.68rem;
         }
 
@@ -1897,8 +1897,6 @@
             </div>
             <iframe id="app-frame" class="runner-frame" src=""></iframe>
         </div>
-
-
     </div>
 
     <script src="config.js?v=1.5"></script>
@@ -1939,7 +1937,12 @@
         // Global exposing for use in other functions
         window.renderGlobalLeaderboards = async () => {
             console.log('[Arcade Launcher] Rendering global leaderboards...');
-            const games = ['pinball', 'basketball', 'snake', 'sudoku'];
+            
+            // Dynamically discover all games that could have stats
+            const games = (window.GAMES || [])
+                .filter(g => g.type === 'game')
+                .map(g => g.id);
+                
             const container = document.getElementById('global-leaderboard-grid');
             if (!container) return;
             
