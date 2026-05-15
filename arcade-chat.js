@@ -539,17 +539,11 @@ function isComposeDraftIntent(message = "") {
 
 
 function getActiveWorkshopEditorContext(workshopContext = null) {
-    const providedEditor = workshopContext?.workshopEditor || null;
-    if (providedEditor) return providedEditor;
-    if (typeof window.getWorkshopEditorState === 'function') {
-        return window.getWorkshopEditorState();
-    }
-    return null;
+    return window.ArcadeWorkshopManager.getActiveWorkshopEditorContext(workshopContext);
 }
 
 function hasActiveWorkshopEditor(workshopContext = null) {
-    const editor = getActiveWorkshopEditorContext(workshopContext);
-    return !!(`${editor?.activeGameId || ''}`.trim() && `${editor?.activeFileName || ''}`.trim());
+    return window.ArcadeWorkshopManager.hasActiveWorkshopEditor(workshopContext);
 }
 
 
@@ -2214,6 +2208,8 @@ function removeTypingIndicator(id) {
 }
 
 let isSendingChatMessage = false;
+window.activeArcadeCommandMode = null;
+window.activeArcadeCommandModes = [];
 const SEND_BUTTON_SEND_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>';
 const SEND_BUTTON_STOP_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>';
 

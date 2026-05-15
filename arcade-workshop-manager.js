@@ -15,6 +15,20 @@ window.ArcadeWorkshopManager = {
         return 'text/plain';
     },
 
+    getActiveWorkshopEditorContext: function(workshopContext = null) {
+        const providedEditor = workshopContext?.workshopEditor || null;
+        if (providedEditor) return providedEditor;
+        if (typeof window.getWorkshopEditorState === 'function') {
+            return window.getWorkshopEditorState();
+        }
+        return null;
+    },
+
+    hasActiveWorkshopEditor: function(workshopContext = null) {
+        const editor = this.getActiveWorkshopEditorContext(workshopContext);
+        return !!(`${editor?.activeGameId || ''}`.trim() && `${editor?.activeFileName || ''}`.trim());
+    },
+
     /**
      * Checks if a string looks like executable browser code.
      */
@@ -532,7 +546,7 @@ window.ArcadeWorkshopManager = {
         const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
         if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
 
-        const editorIsActive = typeof window.hasActiveWorkshopEditor === 'function' ? window.hasActiveWorkshopEditor(workshopContext) : false;
+        const editorIsActive = this.hasActiveWorkshopEditor(workshopContext);
         
         // 1. COMMAND PRIORITY
         if (modes.has('/rewrite')) {
