@@ -9,6 +9,7 @@ const GAMES = [
     { id: 'basketball', title: 'Neon Hoops', category: 'ARCADE', poster: 'basketball_game_poster.png', tag: 'ARCADE • 3D', type: 'game', trackedStats: ['hoops-bests', 'hoops-total-points', 'hoops-sessions'] },
     { id: 'pinball', title: 'Neon Pinball', category: 'ARCADE', poster: 'neon_pinball_v2_poster.png', tag: 'ARCADE • NEW', type: 'game', trackedStats: ['pinball-pro-best', 'pinball-total-score', 'pinball-avg-score', 'pinball-sessions'] },
     { id: 'sudoku', title: 'Neon Sudoku', category: 'ARCADE', poster: 'neon_sudoku_poster.png', tag: 'ARCADE • PUZZLE', type: 'game', trackedStats: ['sudoku-best-time', 'sudoku-puzzles-solved'] },
+    { id: 'astro-sync', title: 'Astro Sync', category: 'ARCADE', poster: 'astro_sync_poster_1778868531974.png', tag: 'ARCADE • NEW', type: 'game', trackedStats: ['astro-sync-best', 'astro-sync-sessions'] },
     { id: 'calc', title: 'Scientific Calc', category: 'UTILITY', poster: 'calculator_tool_poster_1778466276736.png', tag: 'UTILITY', type: 'utility', trackedStats: [] }
 ];
 window.GAMES = GAMES;
@@ -25,7 +26,8 @@ const STATIC_HUB_IDS = {
     basketball: 'hub-basketball',
     pinball: 'hub-pinball',
     calc: 'hub-calc',
-    sudoku: 'hub-sudoku'
+    sudoku: 'hub-sudoku',
+    'astro-sync': 'hub-astro-sync'
 };
 
 function escapeHtml(value) {
@@ -3514,6 +3516,11 @@ function launchSudoku() {
 function launchCalc() {
     recordLaunch('calc');
     openApp('./Calculator.html', 'Scientific Calc', 'calculator_tool_poster_1778466276736.png', 'calc');
+}
+
+function launchAstroSync() {
+    recordLaunch('astro-sync');
+    openApp('./astro-sync-game.html', 'Astro Sync', 'astro_sync_poster_1778868531974.png', 'astro-sync');
 }
 
 function openApp(url, title, icon, appId, skipPush = false) {

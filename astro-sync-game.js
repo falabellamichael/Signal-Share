@@ -51,8 +51,8 @@ const updateUI = () => {
         elements.targetColorBox.style.backgroundColor = GAME_STATE.targetColor;
         elements.targetColorBox.textContent = ''; // Clear text when color is active
     } else if (!GAME_STATE.isRunning && !GAME_STATE.targetColor) {
-         elements.targetColorBox.style.backgroundColor = '#333';
-         elements.targetColorBox.textContent = 'Waiting...';
+        elements.targetColorBox.style.backgroundColor = '#333';
+        elements.targetColorBox.textContent = 'Waiting...';
     }
 };
 
@@ -100,7 +100,7 @@ const startNewRound = () => {
 
     // 2. Update the visual target box
     elements.targetColorBox.style.backgroundColor = newColor;
-    
+
     // 3. Enable sync button and update UI
     updateUI();
 };
