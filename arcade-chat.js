@@ -2279,6 +2279,8 @@ window.sendChatMessage = async function (promptOverride = '') {
         return;
     }
 
+    let typingId = null;
+
     try {
         const isCommand = text.startsWith('/')
             || text.startsWith('[')
@@ -2384,7 +2386,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             await pollDesktopBridge();
         }
 
-        const typingId = addTypingIndicator();
+        typingId = addTypingIndicator();
         let activeAiAbortController = new AbortController();
         const { signal } = activeAiAbortController;
         setChatSendButtonMode('stop');
@@ -2393,7 +2395,10 @@ window.sendChatMessage = async function (promptOverride = '') {
             if (activeAiAbortController) {
                 activeAiAbortController.abort();
                 activeAiAbortController = null;
-                removeTypingIndicator(typingId);
+                if (typingId) {
+                    removeTypingIndicator(typingId);
+                    typingId = null;
+                }
                 addChatMessage('ai', '🕹️ [Arcade Protocol]: Intelligence process terminated by user.');
                 updateChatStatus('idle');
                 setChatSendButtonMode('send');
@@ -2439,7 +2444,6 @@ window.sendChatMessage = async function (promptOverride = '') {
         if (editRequestActive && hasActiveWorkshopEditor(richContext) && !activeEditorHasSource) {
             const editorName = `${activeEditorForRequest?.activeFileName || 'selected file'}`.trim();
             const replyText = `[Workshop Edit]: I can see ${editorName} selected in the editor, but its source content is not readable yet. Re-select the file in Workshop Edit Mode, then send the edit request again.`;
-            removeTypingIndicator(typingId);
             addChatMessage('ai', replyText);
             arcadeChatHistory.push({ role: 'assistant', content: replyText });
             saveCurrentChat();
@@ -2448,7 +2452,6 @@ window.sendChatMessage = async function (promptOverride = '') {
         }
         if (editorReferenceActive && !hasActiveWorkshopEditor(richContext)) {
             const replyText = '[Workshop Edit]: I cannot read an active Workshop editor file yet. Open Workshop Edit Mode, select the game and file, then send the edit request again.';
-            removeTypingIndicator(typingId);
             addChatMessage('ai', replyText);
             arcadeChatHistory.push({ role: 'assistant', content: replyText });
             saveCurrentChat();
@@ -2777,7 +2780,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             console.error("[Arcade Chat] Failed to show error in UI:", uiErr);
         }
     } finally {
-        if (typeof typingId !== 'undefined') {
+        if (typingId) {
             removeTypingIndicator(typingId);
         }
         isSendingChatMessage = false;
