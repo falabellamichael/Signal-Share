@@ -106,7 +106,8 @@
                     title: jsonToParse.match(/"title"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
                     category: jsonToParse.match(/"category"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || 'GAME',
                     description: jsonToParse.match(/"description"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
-                    mode: jsonToParse.match(/"mode"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || ''
+                    mode: jsonToParse.match(/"mode"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
+                    files: window.ArcadeWorkshopManager.extractFilesGreedily(jsonToParse)
                 };
             }
 

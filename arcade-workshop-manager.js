@@ -29,12 +29,9 @@ window.ArcadeWorkshopManager = {
         return !!(`${editor?.activeGameId || ''}`.trim() && `${editor?.activeFileName || ''}`.trim());
     },
 
-    /**
-     * Checks if a string looks like executable browser code.
-     */
     looksLikeExecutableCode: function(value) {
         const text = `${value || ''}`.trim();
-        if (text.length < 80) return false;
+        if (text.length < 40) return false;
         
         const markers = [
             'function ', 'const ', 'let ', 'var ', '=>',
@@ -60,53 +57,31 @@ window.ArcadeWorkshopManager = {
         return hitCount >= 2 && structureHits >= 4;
     },
 
-    /**
-     * Infers the language (html, css, js, txt) based on code markers.
-     */
-    inferCodeKind: function(lang = '', code = '') {
-        const language = `${lang || ''}`.trim().toLowerCase();
+    inferCodeKind: function(langHint = "", code = "") {
+        const hint = `${langHint || ''}`.toLowerCase().trim();
+        if (hint === 'html' || hint === 'htm') return 'html';
+        if (hint === 'css') return 'css';
+        if (hint === 'javascript' || hint === 'js') return 'js';
+        
         const source = `${code || ''}`.trim();
-        const lower = source.toLowerCase();
-        if (language.includes('html')) return 'html';
-        if (language.includes('css')) return 'css';
-        if (language.includes('js') || language.includes('javascript') || language.includes('ts')) return 'js';
-        if (lower.includes('<!doctype html') || lower.includes('<html')) return 'html';
-        if (/^<style[\s>]/i.test(source) || /^[.#:a-z0-9_*@[\]-][^{\n]*\{[\s\S]*\}/i.test(source)) return 'css';
+        if (source.startsWith('<!doctype html') || source.startsWith('<html') || source.includes('<body') || source.includes('<script')) return 'html';
+        if (source.includes('{') && source.includes(':') && (source.includes('background-') || source.includes('margin:'))) return 'css';
         if (this.looksLikeExecutableCode(source)) return 'js';
+        
         return 'txt';
     },
 
     /**
-     * Determines if a publish request should be routed to the workshop vs a standard post.
+     * Working code principles for AI guidance.
      */
-    shouldRouteToWorkshop: function(data, rawReplyText, userPrompt) {
-        const prompt = `${userPrompt || ''}`.toLowerCase();
-        const reply = `${rawReplyText || ''}`.toLowerCase();
-        
-        // Explicit command check
-        const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
-        if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
-        if (modes.has('/publish') || modes.has('/workshop') || modes.has('/arcade')) return true;
-
-        // Explicit workshop keywords
-        const workshopKeywords = ['workshop', 'arcade library', 'game library', 'mini-game', 'playable', 'publish game', 'upload game', 'arcade workshop'];
-        const hasKeyword = workshopKeywords.some(k => prompt.includes(k) || reply.includes(k));
-        
-        // Structural clues in payload
-        const hasWorkshopTarget = data?.target === 'workshop' || data?.destination === 'workshop' || data?.mode === 'workshop';
-        const hasMultipleFiles = Array.isArray(data?.files) && data.files.length > 0;
-        const hasEntrypoint = Array.isArray(data?.files) && data.files.some(f => f.name === 'index.html');
-        
-        // If the AI response contains multiple code blocks, it's almost certainly a workshop project
-        const codeBlocks = (rawReplyText || '').match(/```[\s\S]*?```/g) || [];
-        const hasCodeBlocks = codeBlocks.length >= 1;
-
-        return hasKeyword || hasWorkshopTarget || hasMultipleFiles || hasEntrypoint || hasCodeBlocks;
+    workingCodePrinciples: {
+        architecture: "Single-file component style, separation of concerns via modules if needed.",
+        media: "Use standard HTML5 audio/video. No external assets unless data-URLs.",
+        state: "Predictable state management, no global leaks.",
+        styling: "Neon-themed, premium CSS, glassmorphism, responsive.",
+        events: "Passive listeners where possible, clean cleanup."
     },
 
-    /**
-     * Extracts files from a block of text using greedy regex and protocol fallbacks.
-     */
     buildFilesFromText: function(rawText) {
         const files = [];
         const counters = { html: 0, css: 0, js: 0, txt: 0 };
@@ -157,18 +132,65 @@ window.ArcadeWorkshopManager = {
 
         if (files.length > 0) return files;
 
-        // 3. Last Resort Fallback
-        let fallback = sourceText.split(/\[PUBLISH:\s*/i)[0] || '';
-        const codeStart = fallback.search(/<!doctype html|<html|(?:^|\n)\s*(?:function|const|let|var|class)\s+/i);
-        if (codeStart >= 0) {
-            fallback = fallback.slice(codeStart).trim();
-            if (this.looksLikeExecutableCode(fallback)) {
-                const isHtml = /<!doctype html|<html/i.test(fallback);
+        // 3. Last Resort Fallback: use extractFilesGreedily
+        return this.extractFilesGreedily(rawText);
+    },
+
+    /**
+     * Deep regex-based search for {"name": "...", "content": "..."} patterns
+     * within a potentially malformed or truncated string.
+     */
+    extractFilesGreedily: function(text = "") {
+        const source = `${text || ""}`;
+        const files = [];
+        const usedNames = new Set();
+        
+        // Match patterns like "name": "index.html", "content": "..."
+        // Handles optional spaces, different quotes, and escaped quotes
+        const filePattern = /"name"\s*:\s*"([^"]+)"\s*,\s*"(?:content|code)"\s*:\s*"([\s\S]*?)(?<!\\)"/gi;
+        let match;
+        while ((match = filePattern.exec(source)) !== null) {
+            const name = match[1].trim();
+            const content = this.decodeEscapedCodeText(match[2]);
+            if (name && content && !usedNames.has(name.toLowerCase())) {
                 files.push({
-                    name: isHtml ? 'index.html' : 'game.js',
-                    type: isHtml ? 'text/html' : 'text/javascript',
-                    content: fallback
+                    name: name,
+                    type: this.inferFileType(name),
+                    content: content
                 });
+                usedNames.add(name.toLowerCase());
+            }
+        }
+
+        // If still nothing, try looking for just content strings that look like code
+        if (files.length === 0) {
+            const contentMatches = source.matchAll(/"(?:content|code|body|html)"\s*:\s*"([\s\S]*?)(?<!\\)"/gi);
+            for (const cMatch of contentMatches) {
+                const code = this.decodeEscapedCodeText(cMatch[1]);
+                if (this.looksLikeExecutableCode(code)) {
+                    const kind = this.inferCodeKind('', code);
+                    const name = kind === 'html' ? 'index.html' : kind === 'css' ? 'styles.css' : 'game.js';
+                    if (!usedNames.has(name)) {
+                        files.push({ name, type: this.inferFileType(name), content: code });
+                        usedNames.add(name);
+                    }
+                }
+            }
+        }
+
+        if (files.length === 0) {
+            let fallback = source.split(/\[PUBLISH:\s*/i)[0] || '';
+            const codeStart = fallback.search(/<!doctype html|<html|(?:^|\n)\s*(?:function|const|let|var|class)\s+/i);
+            if (codeStart >= 0) {
+                fallback = fallback.slice(codeStart).trim();
+                if (this.looksLikeExecutableCode(fallback)) {
+                    const isHtml = /<!doctype html|<html/i.test(fallback);
+                    files.push({
+                        name: isHtml ? 'index.html' : 'game.js',
+                        type: isHtml ? 'text/html' : 'text/javascript',
+                        content: fallback
+                    });
+                }
             }
         }
 
@@ -253,87 +275,9 @@ window.ArcadeWorkshopManager = {
     },
 
     /**
-     * Principles for ensuring AI-generated code is 'real' and functional.
-     */
-    workingCodePrinciples: [
-        "SELF-CONTAINED: All logic (JS), styles (CSS), and markup (HTML) must reside within the provided files.",
-        "VANILLA: No external dependencies (jQuery, React, etc.) unless explicitly requested.",
-        "CANVAS-FIRST: For arcade games, prefer <canvas> for performance and flexibility.",
-        "RESPONSIVE: Use 'dvh' or 'vh' for height and percentage-based widths to fit any screen.",
-        "STATE-DRIVEN: Use a central 'gameState' object to make debugging and saving easy.",
-        "BATTLE-TESTED: Avoid 'theoretical' APIs; stick to well-supported browser features."
-    ],
-
-    /**
-     * Checks if the user prompt mentions the workshop editor.
-     */
-    /**
-     * Checks if a prompt indicates an intent to edit multiple files.
-     */
-    isWorkshopMultiFileEditPrompt: function(message = "", workshopContext = null) {
-        const text = `${message || ''}`.trim().toLowerCase();
-        const modes = window.activeArcadeCommandModes || [];
-        if (modes.includes('/multi')) return true;
-        return /\b(multi-file|multiple files|across files|all files)\b/.test(text);
-    },
-
-    isWorkshopEditorReferencePrompt: function(message = "") {
-        const text = `${message || ''}`.trim().toLowerCase();
-        return /\b(?:file|code|game|it|that|this)\b.{0,80}\b(?:open|opened|loaded|selected|showing|visible)\b.{0,80}\b(?:editor|workshop editor)\b/.test(text)
-            || /\b(?:editor|workshop editor)\b.{0,80}\b(?:open|opened|loaded|selected|showing|visible)\b/.test(text)
-            || /\b(?:the\s+)?(?:file|code|game)\s+is\s+(?:already\s+)?(?:in|inside|on)\s+the\s+(?:workshop\s+)?editor\b/.test(text)
-            || /\bi\s+(?:have|got)\s+(?:it|the\s+(?:file|code|game))\s+(?:open|opened|loaded|selected)\s+in\s+the\s+(?:workshop\s+)?editor\b/.test(text);
-    },
-
-    isStyleEditPrompt: function(prompt = '') {
-        return /\b(style|styles|css|design|visual|theme|color|colour|pretty|background|polish|make it look)\b/i.test(`${prompt || ''}`);
-    },
-
-    allowsLocalStyleFallback: function(prompt = '') {
-        return /\b(local fallback|quick style fallback|apply local style|fallback style)\b/i.test(`${prompt || ''}`);
-    },
-
-    /**
-     * Checks if a prompt indicates an intent to publish to the workshop.
+     * Determines if a prompt indicates an intent to publish a game to the workshop.
      */
     isWorkshopPublishIntentPrompt: function(message = "") {
-        const text = `${message || ''}`.trim().toLowerCase();
-        if (!text) return false;
-        const publishVerb = /\b(publish|upload|save|add|ship|submit|post|share)\b/.test(text);
-        const buildVerb = /\b(write|create|build|make|generate|code|new)\b/.test(text);
-        const target = /\b(library|workshop|arcade|store)\b/.test(text);
-        const gameMention = /\b(game|app|mini-game|project|site)\b/.test(text);
-        return (target && publishVerb) || (buildVerb && gameMention) || (publishVerb && gameMention);
-    },
-
-    /**
-     * Determines if a prompt indicates an intent to edit a workshop file.
-     */
-    isWorkshopEditIntentPrompt: function(message = "", workshopContext = null) {
-        const text = `${message || ''}`.trim().toLowerCase();
-        const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
-        if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
-
-        const hasExplicitMode = modes.has('/edit') || modes.has('/fix') || modes.has('/rewrite');
-        if (hasExplicitMode) return true;
-
-        if (!text) return false;
-        if (/^\/(?:edit|fix|rewrite)\b/.test(text) || /^\[(?:edit|fix|rewrite)\]/.test(text)) return true;
-        if (this.isWorkshopEditorReferencePrompt(text) && this.hasActiveWorkshopEditor(workshopContext)) return true;
-
-        const editVerb = /\b(edit|fix|repair|change|update|modify|replace|remove|delete|add|insert|improve|tweak|adjust|refactor|rename|debug|rewrite)\b/.test(text);
-        const activeEditor = this.hasActiveWorkshopEditor(workshopContext);
-        const editorCodeGenVerb = /\b(write|create|generate|code|build|make|implement|integrate)\b/.test(text);
-        if (!editVerb && !(activeEditor && editorCodeGenVerb)) return false;
-
-        const fileTarget = /\b(editor|website|workshop|file|code|html|css|javascript|js|game|page|button|screen|layout|style)\b/.test(text);
-        return activeEditor || fileTarget;
-    },
-
-    /**
-     * Checks if a prompt is explicitly asking to publish to the workshop.
-     */
-    isExplicitWorkshopPublishIntentPrompt: function(message = "") {
         const text = `${message || ''}`.trim().toLowerCase();
         const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
         if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
@@ -342,9 +286,28 @@ window.ArcadeWorkshopManager = {
 
         if (!text) return false;
         if (/^\/publish\b/.test(text) || /^\[publish\]/.test(text)) return true;
+
+        return /\b(?:publish|upload|share|save|release|submit|deploy)\b/i.test(text) 
+            && /\b(?:game|project|workshop|arcade|app|logic|code|files)\b/i.test(text);
+    },
+
+    /**
+     * Determines if a prompt indicates an intent to edit a game's code.
+     */
+    isWorkshopEditIntentPrompt: function(message = "", workshopContext = null) {
+        const text = `${message || ''}`.trim().toLowerCase();
+        const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
+        if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
+
+        if (modes.has('/edit') || modes.has('/fix')) return true;
+
+        if (!text) return false;
+        if (/^\/(?:edit|fix)\b/.test(text) || /^\[(?:edit|fix)\]/.test(text)) return true;
+
+        const keywords = /\b(?:edit|fix|change|update|modify|tweak|repair|debug|add|insert|remove|replace)\b/i;
+        const codeContext = /\b(?:code|file|script|index|logic|game|project|workshop|html|css|javascript|js)\b/i;
         
-        return /\b(?:publish|upload|share|save|update|sync)\b.{0,30}\b(?:workshop|library|game|project|arcade)\b/.test(text)
-            || /\b(?:send|put|move)\s+(?:this|the|it|code)\s+(?:to|into)\s+(?:the\s+)?(?:workshop|library|arcade)\b/.test(text);
+        return keywords.test(text) && codeContext.test(text) && this.hasActiveWorkshopEditor(workshopContext);
     },
 
     /**
@@ -449,7 +412,7 @@ window.ArcadeWorkshopManager = {
                 return {
                     jsonText: source.slice(cursor, i + 1),
                     start: markerIndex,
-                    end: hasClosingBracket ? endCursor + 1 : i + 1
+                    end: endCursor + (hasClosingBracket ? 1 : 0)
                 };
             }
             searchFrom = markerIndex + markerLength;
@@ -457,9 +420,6 @@ window.ArcadeWorkshopManager = {
         return null;
     },
 
-    /**
-     * Safely parses JSON that might contain LLM artifacts like unescaped newlines.
-     */
     robustParseJson: function(jsonStr) {
         if (!jsonStr || typeof jsonStr !== 'string') return null;
         let clean = jsonStr.trim();
@@ -488,15 +448,23 @@ window.ArcadeWorkshopManager = {
         let sanitized = "", inString = false, escaped = false;
         for (let i = 0; i < standardized.length; i++) {
             const char = standardized[i];
-            if (char === '"' && !escaped) { inString = !inString; sanitized += char; }
-            else if (inString && !escaped) {
+            if (char === '"' && !escaped) { 
+                inString = !inString; 
+                sanitized += char; 
+            } else if (inString && !escaped) {
                 if (char === '\n') sanitized += "\\n";
                 else if (char === '\r') sanitized += "\\r";
                 else if (char === '\t') sanitized += "\\t";
                 else if (char === '\\') { escaped = true; sanitized += char; }
                 else sanitized += char;
-            } else { sanitized += char; escaped = false; }
+            } else { 
+                sanitized += char; 
+                escaped = false; 
+            }
         }
+        // If we are still in a string at the end of the content, close it
+        if (inString) sanitized += '"';
+
         result = attemptParse(sanitized);
         if (result) return result;
 
@@ -578,29 +546,8 @@ window.ArcadeWorkshopManager = {
     stripArcadeProtocolTags: function(content = "") {
         let text = `${content || ""}`;
         let hadTags = false;
-        let pub;
-        let safety = 0;
-        while ((pub = this.extractBalancedJsonTagPayload(text, 'PUBLISH')) !== null && safety < 10) {
-            hadTags = true;
-            text = text.substring(0, pub.start) + text.substring(pub.end);
-            safety++;
-        }
-        const blockTypes = ['PLANNING', 'IMPLEMENTATION_PLAN', 'TEST_PLAN', 'EDIT', 'FILE_EDIT', 'Workshop/Edit'];
-        for (const type of blockTypes) {
-            const startTag = `[${type}`, endTag = `[/${type}]`, upper = text.toUpperCase();
-            let sIdx = upper.indexOf(startTag);
-            while (sIdx !== -1) {
-                const eTagIdx = upper.indexOf(endTag, sIdx);
-                if (eTagIdx !== -1) {
-                    text = text.substring(0, sIdx) + text.substring(eTagIdx + endTag.length);
-                    hadTags = true;
-                    sIdx = text.toUpperCase().indexOf(startTag);
-                } else {
-                    text = text.substring(0, sIdx) + text.substring(sIdx + startTag.length);
-                    break;
-                }
-            }
-        }
+        
+        // Strip balanced JSON tags first
         const jsonTags = ['PUBLISH', 'ARCADE', 'COMPOSE', 'SEARCH', 'FETCH', 'LAUNCH', 'SHELL', 'FIND', 'REASONING_ORCHESTRATOR_V2', 'PLANNING', 'IMPLEMENTATION_PLAN', 'TEST_PLAN'];
         for (const tag of jsonTags) {
             let pubInner, safetyInner = 0;
@@ -638,163 +585,40 @@ window.ArcadeWorkshopManager = {
             const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
             if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
 
-            const editorIsActive = this.hasActiveWorkshopEditor(workshopContext);
-            const editor = this.getActiveWorkshopEditorContext(workshopContext);
-
-            // 1. COMMAND PRIORITY
-            if (modes.has('/rewrite')) {
-                directives.push(this.buildWorkshopRewriteDirective(workshopContext, userPrompt));
-            }
-            if (modes.has('/idea')) {
-                directives.push(this.getIdeaDirective(userPrompt));
-            }
-            
-            if (modes.has('/edit') || modes.has('/fix')) {
-                const isFixMode = modes.has('/fix');
-                directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
-                    ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
-                    : this.buildWorkshopEditDirective(workshopContext, isFixMode, userPrompt));
-            }
-
-            if (modes.has('/publish') || (text.includes('publish') && text.includes('workshop')) || text.includes('upload to workshop')) {
+            if (this.isWorkshopPublishIntentPrompt(text)) {
                 directives.push(this.getPublishDirective());
             }
 
-            if (modes.has('/deep')) {
-                directives.push('[DEEP_REASONING_MODE]');
-                directives.push('The user has requested a DEEP reasoning session.');
-                directives.push('You MUST provide an exhaustive [PLANNING] block before any implementation.');
-                directives.push('Focus on edge cases, performance bottlenecks, and architectural integrity.');
-            }
-
-            // 2. AUTO-DETECTION
-            if (directives.length === 0) {
-                if (editorIsActive && !this.isExplicitWorkshopPublishIntentPrompt(text)) {
-                    directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
-                        ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
-                        : this.buildWorkshopEditDirective(workshopContext, false, userPrompt));
-                } else if (this.isWorkshopPublishIntentPrompt(text)) {
-                    directives.push(this.getPublishDirective());
-                } else if (editorIsActive && this.isWorkshopEditIntentPrompt(text, workshopContext)) {
-                    directives.push(this.isWorkshopMultiFileEditPrompt(text, workshopContext)
-                        ? this.buildWorkshopRewriteDirective(workshopContext, userPrompt)
-                        : this.buildWorkshopEditDirective(workshopContext, false, userPrompt));
-                }
-            }
-            
-            // 3. VISION ENHANCEMENT
-            if (typeof window.SignalShareWorkshopVision !== 'undefined' 
-                && window.SignalShareWorkshopVision.shouldApplyVisionDirective(text, attachment, workshopContext)) {
-                directives.push(window.SignalShareWorkshopVision.buildWorkshopVisionDirective(workshopContext));
+            if (this.isWorkshopRewriteIntentPrompt(text, workshopContext)) {
+                const editor = this.getActiveWorkshopEditorContext(workshopContext);
+                directives.push([
+                    '[WORKSHOP_REWRITE]',
+                    `You are rewriting the ENTIRE content of "${editor.activeFileName}" for the game "${editor.activeGameId}".`,
+                    'Your response MUST contain the full, improved code for this file.',
+                    'IMPORTANT: Wrap your code in standard markdown code blocks.',
+                    '[/WORKSHOP_REWRITE]'
+                ].join('\n'));
+            } else if (this.isWorkshopEditIntentPrompt(text, workshopContext)) {
+                const editor = this.getActiveWorkshopEditorContext(workshopContext);
+                directives.push([
+                    '[SURGICAL_EDIT]',
+                    `You are editing "${editor.activeFileName}" in the game "${editor.activeGameId}".`,
+                    'Provide surgical edits using [EDIT]SEARCH:...REPLACE:...[/EDIT] blocks.',
+                    'Include as much context as needed in the SEARCH block to ensure a unique match.',
+                    '[/SURGICAL_EDIT]'
+                ].join('\n'));
             }
 
             return directives.join('\n\n');
         } catch (err) {
-            console.error("[Arcade Manager] Error generating protocol directives:", err);
+            console.error("[Arcade Workshop Manager] Failed to get directives:", err);
             return "";
         }
     },
 
-    buildWorkshopEditDirective: function(workshopContext = null, isFixMode = false, userPrompt = '') {
-        const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
-        const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
-        const isStyleMode = this.isStyleEditPrompt(userPrompt);
-
-        const lines = [
-            '[SURGICAL_EDIT_PROTOCOL]',
-            isFixMode ? 'FOCUS: Bug Fix / Error Resolution.' : 'FOCUS: Feature Update / Refactoring.',
-            'WORKSHOP FILES ARE VIRTUAL APP RECORDS, NOT DESKTOP FILE PATHS.',
-            'Do NOT use [READ_FILE], [LIST_FILES], [WRITE_FILE], or custom_.../filename paths for this request.',
-            'The file content below is already the current source of truth.',
-            'Format:',
-            '[EDIT]',
-            'SEARCH: 2-5 lines of exact existing code',
-            'REPLACE: updated snippet',
-            '[/EDIT]',
-            'RULES:',
-            '- Use [REASONING_ORCHESTRATOR_V2] for every edit: always output a [PLANNING] block before your [EDIT] tag.',
-            '- You MUST include the [EDIT] tag in the same response as the plan.',
-            '- Keep the plan concise to save tokens.',
-            '- Break changes into multiple [EDIT] blocks for safety.',
-            '- NEVER rewrite the entire file.',
-            '- NEVER use [PUBLISH] for edits to the active editor file.',
-            '- Do not return full-file code fences unless the user explicitly asks for a full file.',
-            '- Your actionable output should be the [EDIT] block, not a rewritten file.',
-            '- For style-only edits, if SEARCH/REPLACE is difficult, return one fenced css block with only CSS to insert.',
-            '- If you cannot find a safe SEARCH block in the provided content, ask the user to select the relevant file/section.',
-            '- Be precise with whitespace/indentation in SEARCH.',
-            '[/SURGICAL_EDIT_PROTOCOL]'
-        ];
-
-        if (isStyleMode) {
-            lines.splice(5, 0,
-                'STYLE_EDIT_MODE:',
-                '- Return exactly one fenced css code block when the request is only about style/design/CSS.',
-                '- Do not return a full HTML file for style-only edits.',
-                '- Do not invent external frameworks or classes; write real CSS selectors for the existing markup.',
-                '- The editor will insert the css block into the active HTML/CSS file as a targeted patch.'
-            );
-        }
-
-        if (activeGameId && activeFileName) {
-            const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
-            let contentToProvide = "";
-            let isSkeleton = false;
-            
-            // Threshold for VRAM optimization: 4000 characters
-            if (rawContent.length > 4000) {
-                isSkeleton = true;
-                contentToProvide = this.generateCodeSkeleton(rawContent, activeFileName);
-            } else {
-                contentToProvide = rawContent;
-            }
-
-            if (isSkeleton) {
-                lines.push(
-                    'VRAM_OPTIMIZATION_ACTIVE: The file is large. I am providing a SKELETON (index) of the code.',
-                    'If you need to see the implementation of a specific function or block, output [FIND: exact unique string] in your response.',
-                    'The system will automatically find that block and provide it to you in the next turn.',
-                    'Use [FIND] to "heavy lift" the context without bloating VRAM.'
-                );
-            }
-
-            lines.push(`Target: ${activeFileName} (${activeGameId})\nContent:\n\`\`\`\n${contentToProvide}\n\`\`\``);
-        }
-
-        return lines.join('\n');
-    },
-
-    buildWorkshopRewriteDirective: function(workshopContext = null, userPrompt = '') {
-        const activeGameId = `${workshopContext?.workshopEditor?.activeGameId || ''}`.trim();
-        const activeFileName = `${workshopContext?.workshopEditor?.activeFileName || ''}`.trim();
-        const fileKind = this.getWorkshopFileKindFromName(activeFileName);
-        const fenceLang = fileKind === 'js' ? 'javascript' : fileKind === 'css' ? 'css' : fileKind === 'html' ? 'html' : '';
-
-        const lines = [
-            '[FULL_FILE_REWRITE_PROTOCOL]',
-            'FOCUS: Complete replacement of the active Workshop editor file.',
-            'WORKSHOP FILES ARE VIRTUAL APP RECORDS, NOT DESKTOP FILE PATHS.',
-            'Do NOT use [READ_FILE], [LIST_FILES], [WRITE_FILE], [PUBLISH], or custom_.../filename paths for this request.',
-            'The file content below is already the current source of truth.',
-            'Format:',
-            `Return one fenced ${fenceLang || 'text'} code block containing the complete replacement content for the active file.`,
-            'If extra files are useful, add separate fenced code blocks for them and include a filename in the fence info, such as ```css filename=styles.css or ```javascript filename=game.js.',
-            'The editor will add or replace those extra files in the same Workshop game.',
-            'For HTML feature additions that use JavaScript or CSS files, return BOTH the complete updated active HTML file and every named extra file it references.',
-            'The updated HTML must include any required DOM controls/displays and exact <script src="..."></script> or <link href="..."> references for the extra files.',
-            'Do not return a standalone JavaScript/CSS snippet when the active file is HTML.',
-            'Do not wrap the answer in [EDIT] tags.',
-            'Do not ask the user to provide the source file.',
-            '[/FULL_FILE_REWRITE_PROTOCOL]'
-        ];
-
-        if (activeGameId && activeFileName) {
-            const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
-            const content = rawContent.length > 22000 ? rawContent.substring(0, 22000) + '\n\n[TRUNCATED]' : rawContent;
-            lines.push(`Target: ${activeFileName} (${activeGameId})\nUser request: ${userPrompt}\nCurrent content:\n\`\`\`${fenceLang}\n${content}\n\`\`\``);
-        }
-
-        return lines.join('\n');
+    shouldRouteToWorkshop: function(data, text, userPrompt) {
+        if (data?.target === 'workshop') return true;
+        return this.isWorkshopPublishIntentPrompt(userPrompt) || text.includes('[PUBLISH]');
     },
 
     generateCodeSkeleton: function(content, fileName = '') {
@@ -834,4 +658,3 @@ window.ArcadeWorkshopManager = {
         return skeleton.join('\n');
     }
 };
-
