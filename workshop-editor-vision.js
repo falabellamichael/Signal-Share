@@ -13,21 +13,12 @@
         const fileName = `${editorContext?.activeFileName || "index.html"}`.trim();
         
         return [
-            "[VISION_DRIVEN_EDIT_PROTOCOL]",
-            "An image has been attached to this request. You MUST use it as a visual reference for your code edits.",
-            `TARGET FILE: ${fileName}`,
-            "",
-            "MAPPING INSTRUCTIONS:",
-            "1. Analyze the attached image for layout, colors, spacing, or UI bugs.",
-            "2. Correlate visual elements in the image with the provided code in the Workshop Editor.",
-            "3. If the image shows a design you need to implement, translate visual styles into CSS/HTML properties.",
-            "4. If the image highlights a bug, identify the corresponding code block that causes it.",
-            "5. Use [EDIT] tags to apply surgical changes based on your visual analysis.",
-            "",
-            "COORDINATE MAPPING (VRAM OPTIMIZED):",
-            "- Use your vision capabilities to pinpoint exactly where in the UI the changes are needed.",
-            "- Translate 'the top right button' or 'the red text' into specific class names or IDs found in the code.",
-            "- If the image contains text, search for that exact text in the code to find your bearings.",
+            "DOUBLE_PRECISION_MAPPING (VISUAL ANCHORING):",
+            "1. STEP 1 (The Chatbot Helper): Analyze the image for any unique words, labels, text content, or specific headers. These are your 'Visual Anchors'.",
+            "2. STEP 2 (The AI Precision): Search the provided code for these exact Visual Anchors. If 'Add Score' is seen in the image, find the string 'Add Score' in the code.",
+            "3. COLLABORATION: Use the anchors to align the visual layout with the code structure. If a button is visually 'below' a specific text anchor, identify the corresponding DOM element in the code that follows that text.",
+            "4. REFINEMENT: Before proposing the [EDIT], briefly list the text identifiers you found in the image that helped you locate the code section.",
+            "5. ERROR PREVENTION: If the image contains text that is NOT in the provided code, use [FIND: 'unique word'] to ask the system to locate it in other parts of the project.",
             "[/VISION_DRIVEN_EDIT_PROTOCOL]"
         ].join("\n");
     }

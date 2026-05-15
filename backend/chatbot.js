@@ -74,7 +74,7 @@ SYSTEM TOOLS:
      REPLACE: updated snippet
      [/EDIT]
    - NEVER rewrite the whole file. Break changes into multiple [EDIT] blocks.
-9. [SYS_INFO] | 10. [PROCESS: list|kill] | 11. [SHELL: {cmd, shell}]
+9. [SYS_INFO] | 10. [PROCESS: list|kill] | 11. [SHELL: {cmd, shell}] | 12. [FIND: query]
 
 PROTOCOLS:
 - Use [SEARCH] for all factual/live info.

@@ -3741,7 +3741,9 @@ async function executeArcadeChatActions(text, options = {}) {
         workshopPublishAttempted: false,
         workshopPublishSucceeded: false,
         workshopFileRewriteAttempted: false,
-        workshopFileRewriteSucceeded: false
+        workshopFileRewriteSucceeded: false,
+        findTagDetected: false,
+        feedback: ''
     };
     if (!text) return actionResult;
 
@@ -3913,6 +3915,21 @@ async function executeArcadeChatActions(text, options = {}) {
         actionResult.handled = true;
         const url = openMatch[1].trim();
         window.open(url, '_blank');
+    }
+
+    // 5.5 [FIND: query] - Surgical search and return
+    const findMatch = text.match(/\[FIND:\s*([^\]]+)\]/i);
+    if (findMatch && typeof window.handleAiSearchCommand === 'function') {
+        actionResult.handled = true;
+        actionResult.findTagDetected = true;
+        const query = findMatch[1].trim();
+        const searchResult = window.handleAiSearchCommand(query);
+        
+        if (searchResult && searchResult.ok) {
+            actionResult.feedback = `[SYSTEM RETRIEVAL]: Found "${searchResult.match}" on line ${searchResult.line}. Context: \`${searchResult.match}\`. You may now apply an [EDIT] using this anchor.`;
+        } else {
+            actionResult.feedback = `[SYSTEM RETRIEVAL]: No matches found for "${query}" in the active editor. Check spelling or try a different keyword from the image.`;
+        }
     }
 
     // 6. WORKSHOP ACTIONS (Re-enabled for Commands)
