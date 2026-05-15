@@ -64,7 +64,10 @@ window.ArcadeWorkshopManager = {
         if (hint === 'javascript' || hint === 'js') return 'js';
         
         const source = `${code || ''}`.trim();
-        if (source.startsWith('<!doctype html') || source.startsWith('<html') || source.includes('<body') || source.includes('<script')) return 'html';
+        // More robust HTML detection: check for common tags or any tag-like structure
+        if (source.startsWith('<!doctype html') || source.startsWith('<html') || source.includes('<body') || source.includes('<script') || /<[a-z1-6]+(?:\s+[^>]*?)?>/i.test(source)) {
+            return 'html';
+        }
         if (source.includes('{') && source.includes(':') && (source.includes('background-') || source.includes('margin:'))) return 'css';
         if (this.looksLikeExecutableCode(source)) return 'js';
         
@@ -153,12 +156,22 @@ window.ArcadeWorkshopManager = {
             const name = match[1].trim();
             const content = this.decodeEscapedCodeText(match[2]);
             if (name && content && !usedNames.has(name.toLowerCase())) {
+                const inferredKind = this.inferCodeKind(this.getWorkshopFileKindFromName(name), content);
+                let finalName = name;
+                
+                // If the AI gave us a JS name but the content is clearly HTML, fix it.
+                if (inferredKind === 'html' && (name.toLowerCase().endsWith('.js') || name.toLowerCase().endsWith('.css'))) {
+                    finalName = 'index.html';
+                } else if (inferredKind === 'js' && (name.toLowerCase().endsWith('.html') || name.toLowerCase().endsWith('.css'))) {
+                    finalName = 'game.js';
+                }
+
                 files.push({
-                    name: name,
-                    type: this.inferFileType(name),
+                    name: finalName,
+                    type: this.inferFileType(finalName),
                     content: content
                 });
-                usedNames.add(name.toLowerCase());
+                usedNames.add(finalName.toLowerCase());
             }
         }
 
@@ -169,10 +182,12 @@ window.ArcadeWorkshopManager = {
                 const code = this.decodeEscapedCodeText(cMatch[1]);
                 if (this.looksLikeExecutableCode(code)) {
                     const kind = this.inferCodeKind('', code);
-                    const name = kind === 'html' ? 'index.html' : kind === 'css' ? 'styles.css' : 'game.js';
-                    if (!usedNames.has(name)) {
+                    let name = kind === 'html' ? 'index.html' : kind === 'css' ? 'styles.css' : 'game.js';
+                    if (kind === 'txt') name = 'snippet.txt';
+                    
+                    if (!usedNames.has(name.toLowerCase())) {
                         files.push({ name, type: this.inferFileType(name), content: code });
-                        usedNames.add(name);
+                        usedNames.add(name.toLowerCase());
                     }
                 }
             }
