@@ -463,24 +463,57 @@ window.ArcadeWorkshopManager = {
     robustParseJson: function(jsonStr) {
         if (!jsonStr || typeof jsonStr !== 'string') return null;
         let clean = jsonStr.trim();
-        try { return JSON.parse(clean); } catch (e) {
-            let sanitized = "", inString = false, escaped = false;
-            for (let i = 0; i < clean.length; i++) {
-                const char = clean[i];
-                if (char === '"' && !escaped) { inString = !inString; sanitized += char; }
-                else if (inString && !escaped) {
-                    if (char === '\n') sanitized += "\\n";
-                    else if (char === '\r') sanitized += "\\r";
-                    else if (char === '\t') sanitized += "\\t";
-                    else if (char === '\\') { escaped = true; sanitized += char; }
-                    else sanitized += char;
-                } else { sanitized += char; escaped = false; }
-            }
-            try { return JSON.parse(sanitized); } catch (e2) {
-                try { if (clean.startsWith('{') && !clean.endsWith('}')) return JSON.parse(clean + '}'); } catch (e3) {}
-                return null;
-            }
+        
+        // Remove markdown code fences if wrapped
+        clean = clean.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/i, '').trim();
+
+        const attemptParse = (str) => {
+            try { return JSON.parse(str); } catch (e) { return null; }
+        };
+
+        // 1. Direct attempt
+        let result = attemptParse(clean);
+        if (result) return result;
+
+        // 2. Sanitize unescaped characters in strings
+        let sanitized = "", inString = false, escaped = false;
+        for (let i = 0; i < clean.length; i++) {
+            const char = clean[i];
+            if (char === '"' && !escaped) { inString = !inString; sanitized += char; }
+            else if (inString && !escaped) {
+                if (char === '\n') sanitized += "\\n";
+                else if (char === '\r') sanitized += "\\r";
+                else if (char === '\t') sanitized += "\\t";
+                else if (char === '\\') { escaped = true; sanitized += char; }
+                else sanitized += char;
+            } else { sanitized += char; escaped = false; }
         }
+        result = attemptParse(sanitized);
+        if (result) return result;
+
+        // 3. Fix common malformations (single quotes, trailing commas, missing quotes on keys)
+        let fixed = sanitized
+            .replace(/'/g, '"') // Single to double quotes (risky but often needed)
+            .replace(/,\s*([}\]])/g, '$1') // Trailing commas
+            .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3'); // Unquoted keys
+
+        result = attemptParse(fixed);
+        if (result) return result;
+
+        // 4. Handle truncation (add missing closing braces/brackets)
+        let openBraces = (fixed.match(/{/g) || []).length - (fixed.match(/}/g) || []).length;
+        let openBrackets = (fixed.match(/\[/g) || []).length - (fixed.match(/]/g) || []).length;
+        
+        let closing = "";
+        while (openBraces > 0) { closing += "}"; openBraces--; }
+        while (openBrackets > 0) { closing += "]"; openBrackets--; }
+        
+        if (closing) {
+            result = attemptParse(fixed + closing);
+            if (result) return result;
+        }
+
+        return null;
     },
 
     /**
