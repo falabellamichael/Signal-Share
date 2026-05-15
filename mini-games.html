@@ -1898,7 +1898,8 @@
                 <!-- History items injected here -->
             </div>
 
-            <div class="chat-input-area">
+            <div class="chat-input-area" style="position: relative;">
+                <div id="chat-command-suggestions" class="command-suggestions-panel" hidden></div>
                 <div id="chat-attachment-preview" class="chat-attachment-preview" hidden>
                     <div class="preview-content">
                         <img id="chat-preview-img" src="" alt="Preview" style="display:none">
@@ -2062,7 +2063,7 @@
     </script>
     <script src="companion-ai-core.js?v=1.5"></script>
     <script src="mini-games.js?v=3.3"></script>
-    <script src="workshop-editor-ai-fix.js?v=1.0"></script>
+    <script src="workshop-editor-ai-fix.js?v=1.1"></script>
     <script src="workshop-editor-search.js?v=1.0"></script>
     <script src="workshop-editor-vision.js?v=1.0"></script>
     <script src="workshop-editor-color.js?v=1.0"></script>
@@ -2074,7 +2075,8 @@
     <script src="arcade-commands/clear.js?v=1.1"></script>
     <script src="arcade-commands/help.js?v=1.1"></script>
     <script src="arcade-commands/find.js?v=1.0"></script>
-    <script src="arcade-chat.js?v=1.50" defer></script>
+    <script src="arcade-commands/plan.js?v=1.0"></script>
+    <script src="arcade-chat.js?v=1.51" defer></script>
     <script>
         window.resetArcadeChat = window.startNewChat;
     </script>

@@ -2544,7 +2544,7 @@ function setChatSendButtonMode(mode = 'send') {
     button.title = 'Send message';
 }
 
-window.sendChatMessage = async function () {
+window.sendChatMessage = async function (promptOverride = '') {
     if (isSendingChatMessage) {
         if (typeof window.stopArcadeAi === 'function') window.stopArcadeAi();
         return;
@@ -2555,6 +2555,10 @@ window.sendChatMessage = async function () {
     if (!input) {
         isSendingChatMessage = false;
         return;
+    }
+    const overrideText = typeof promptOverride === 'string' ? promptOverride.trim() : '';
+    if (overrideText) {
+        input.value = overrideText;
     }
     const text = input.value.trim();
     if (!text) {
@@ -4835,12 +4839,98 @@ function setupCloseParityHandlers() {
 
     setChatSendButtonMode('send');
 
+    let selectedSuggestionIndex = -1;
+    let filteredCommands = [];
+
+    function updateCommandSuggestions() {
+        const input = document.getElementById('arc-chat-input');
+        const panel = document.getElementById('chat-command-suggestions');
+        if (!input || !panel) return;
+
+        const val = input.value;
+        if (val.startsWith('/') && !val.includes(' ')) {
+            const query = val.substring(1).toLowerCase();
+            const allCmds = window.ArcadeCommandManager ? window.ArcadeCommandManager.getAllCommands() : [];
+            filteredCommands = allCmds.filter(c => c.id.toLowerCase().startsWith(query));
+
+            if (filteredCommands.length > 0) {
+                if (selectedSuggestionIndex >= filteredCommands.length) selectedSuggestionIndex = filteredCommands.length - 1;
+                renderSuggestions(filteredCommands);
+                panel.hidden = false;
+            } else {
+                panel.hidden = true;
+                selectedSuggestionIndex = -1;
+            }
+        } else {
+            panel.hidden = true;
+            selectedSuggestionIndex = -1;
+        }
+    }
+
+    function renderSuggestions(cmds) {
+        const panel = document.getElementById('chat-command-suggestions');
+        if (!panel) return;
+
+        panel.innerHTML = cmds.map((c, i) => `
+            <div class="command-suggestion-item ${i === selectedSuggestionIndex ? 'selected' : ''}" onclick="applyCommandSuggestion('${c.id}')">
+                <div class="command-suggestion-name">/${c.id}</div>
+                <div class="command-suggestion-desc">${c.description}</div>
+            </div>
+        `).join('');
+
+        const selected = panel.querySelector('.selected');
+        if (selected) {
+            selected.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    window.applyCommandSuggestion = function(id) {
+        const input = document.getElementById('arc-chat-input');
+        const panel = document.getElementById('chat-command-suggestions');
+        if (!input) return;
+
+        input.value = `/${id} `;
+        input.focus();
+        panel.hidden = true;
+        selectedSuggestionIndex = -1;
+    };
+
     if (arcInput) {
+        arcInput.addEventListener('input', updateCommandSuggestions);
+
         arcInput.addEventListener('keydown', (event) => {
+            const panel = document.getElementById('chat-command-suggestions');
+            const isPanelOpen = panel && !panel.hidden;
+
             if (event.key === 'Enter') {
+                if (isPanelOpen && selectedSuggestionIndex >= 0) {
+                    event.preventDefault();
+                    applyCommandSuggestion(filteredCommands[selectedSuggestionIndex].id);
+                } else {
+                    event.preventDefault();
+                    isVoiceSessionActive = false;
+                    sendChatMessage();
+                    if (panel) panel.hidden = true;
+                }
+            } else if (event.key === 'ArrowDown' && isPanelOpen) {
                 event.preventDefault();
-                isVoiceSessionActive = false; // Regular typing reset
-                sendChatMessage();
+                selectedSuggestionIndex = (selectedSuggestionIndex + 1) % filteredCommands.length;
+                renderSuggestions(filteredCommands);
+            } else if (event.key === 'ArrowUp' && isPanelOpen) {
+                event.preventDefault();
+                selectedSuggestionIndex = (selectedSuggestionIndex - 1 + filteredCommands.length) % filteredCommands.length;
+                renderSuggestions(filteredCommands);
+            } else if (event.key === 'Escape' && isPanelOpen) {
+                panel.hidden = true;
+                selectedSuggestionIndex = -1;
+            }
+        });
+
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', (e) => {
+            const panel = document.getElementById('chat-command-suggestions');
+            if (panel && !panel.contains(e.target) && e.target !== arcInput) {
+                panel.hidden = true;
             }
         });
     }
