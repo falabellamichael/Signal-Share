@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arcade & AI Guide | Signal Share</title>
+    <link rel="stylesheet" href="./questions-guide.css?v=1.6">
+    <link rel="stylesheet" href="./android-optimizations.css?v=1.7">
+    <style>
+      .command-list {
+          background: rgba(0,0,0,0.2);
+          border-radius: 8px;
+          padding: 15px;
+          margin: 15px 0;
+          font-family: monospace;
+      }
+      .command-item {
+          margin-bottom: 10px;
+          display: flex;
+          gap: 15px;
+      }
+      .command-name {
+          color: #8be9fd;
+          font-weight: bold;
+          min-width: 80px;
+      }
+      .command-desc {
+          opacity: 0.8;
+      }
+      .feature-tag {
+          background: rgba(164, 208, 7, 0.2);
+          color: #a4d007;
+          padding: 2px 8px;
+          border-radius: 4px;
+          font-size: 0.7rem;
+          font-weight: 800;
+          margin-left: 10px;
+      }
+    </style>
+    <script>
+        (function() {
+            const isNative = !!window.Capacitor
+                && typeof window.Capacitor.getPlatform === 'function'
+                && window.Capacitor.getPlatform() !== 'web';
+            if (isNative || /Android/i.test(navigator.userAgent)) {
+                document.documentElement.classList.add('platform-android');
+            }
+        })();
+    </script>
+</head>
+<body class="questions-page">
+  <main class="questions-page-shell">
+    <a class="questions-back-link" href="./mini-games.html">← Back to Arcade</a>
+
+    <p class="questions-page-topline">Official Documentation</p>
+    <h1>Arcade Workshop & AI Guide</h1>
+    <p class="questions-page-lede">
+      The Arcade Workshop is a powerful environment for creating, editing, and publishing mini-games. 
+      Integrated with a local AI Companion, you can build entire experiences using natural language.
+    </p>
+
+    <section class="questions-page-card">
+      <h2>The AI Companion</h2>
+      <p>
+        The AI Chatbot in the Arcade isn't just for conversation—it's a system-aware assistant. 
+        It can see your active workshop project, analyze your code, and perform file operations on your behalf.
+      </p>
+      <ul>
+        <li><strong>Context Awareness</strong>: The AI knows which game you are editing and can read all its files.</li>
+        <li><strong>Surgical Edits</strong>: It can perform line-by-line patching to fix bugs or add features.</li>
+        <li><strong>Full Rewrites</strong>: For major changes, it can replace entire files with optimized versions.</li>
+      </ul>
+    </section>
+
+    <section class="questions-page-card">
+      <h2>Workshop Slash Commands</h2>
+      <p>Use these commands in the Arcade Chat to trigger specific automation workflows:</p>
+      <div class="command-list">
+        <div class="command-item">
+            <span class="command-name">/edit</span>
+            <span class="command-desc">Request specific code changes to your active workshop file.</span>
+        </div>
+        <div class="command-item">
+            <span class="command-name">/fix</span>
+            <span class="command-desc">Automatically analyze the active file for bugs and apply surgical patches.</span>
+        </div>
+        <div class="command-item">
+            <span class="command-name">/publish</span>
+            <span class="command-desc">Prepare and publish your current workshop project to the global library.</span>
+        </div>
+        <div class="command-item">
+            <span class="command-name">/clear</span>
+            <span class="command-desc">Reset the chat context and clear the conversation history.</span>
+        </div>
+        <div class="command-item">
+            <span class="command-name">/help</span>
+            <span class="command-desc">Display a list of all available commands and their usage.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="questions-page-card">
+      <h2>System & Media Control</h2>
+      <p>
+        The AI Companion can also bridge with your Windows PC to control media playback. 
+        Try asking the AI to perform these actions:
+      </p>
+      <ul>
+        <li><strong>Spotify Control</strong>: "Play some music on Spotify", "Next track", or "Pause Spotify".</li>
+        <li><strong>YouTube Control</strong>: "Play the YouTube video", "Previous video", or "Set volume to 50%".</li>
+        <li><strong>Status Query</strong>: "What is playing right now?" or "Is the desktop bridge active?"</li>
+      </ul>
+      <p style="font-size: 0.85rem; opacity: 0.6; margin-top: 15px;">
+        *Note: These commands require the <strong>Signal Share Desktop Bridge</strong> to be running on your host machine.
+      </p>
+    </section>
+
+    <section class="questions-page-card">
+      <h2>Publishing to the Library</h2>
+      <p>When you are happy with your game, you can share it with the community:</p>
+      <ol>
+        <li>Ensure your game has an <strong>index.html</strong> entry point.</li>
+        <li>Add a description and tags in the Workshop Edit panel.</li>
+        <li>Use the <strong>Publish</strong> button or the <code>/publish</code> command.</li>
+        <li>Once published, your game will appear in the <strong>Workshop</strong> tab for others to play.</li>
+        <li><strong>Leaderboards</strong>: The system automatically detects score-related code and creates global rankings for your game.</li>
+      </ol>
+    </section>
+
+    <div class="questions-guide-footer">
+      <div class="footer-links">
+          <a href="./index.html">Main Site</a>
+          <a href="./mini-games.html">Arcade Home</a>
+          <a href="./how-to-guide.html">General Guide</a>
+      </div>
+      <span>Signal Share Arcade Documentation</span><br>
+      <span>&copy; 2026 AI Workshop Series</span>
+    </div>
+  </main>
+</body>
+</html>
