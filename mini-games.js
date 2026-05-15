@@ -2625,6 +2625,11 @@ function syncWorkshopEditOverlay() {
     }
     updateWorkshopEditorLineNumbers();
     queueWorkshopEditorAutosize();
+    
+    // Notify secondary systems (like Color Assistant) that content has changed
+    window.dispatchEvent(new CustomEvent('workshop-editor-content-update', {
+        detail: { gameId: activeGame.id, fileName: activeFile.name }
+    }));
 }
 
 function handleWorkshopEditGameChange() {

@@ -411,20 +411,31 @@ function stripArcadeProtocolTags(content = "") {
     while ((pub = extractBalancedJsonTagPayload(text, 'PUBLISH')) !== null) {
         hadTags = true;
         try {
-            if (!publishData) publishData = JSON.parse(pub.jsonText);
+            if (!publishData) {
+                try {
+                    publishData = JSON.parse(pub.jsonText);
+                } catch (e) {
+                    // Fallback for AI-escaped JSON (common in smaller models)
+                    try {
+                        publishData = JSON.parse(decodeEscapedCodeText(pub.jsonText));
+                    } catch (e2) {
+                        console.warn('[Arcade Chat] Failed to parse [PUBLISH] even with escape fallback:', e2);
+                    }
+                }
+            }
         } catch (e) { }
         text = text.substring(0, pub.start) + text.substring(pub.end);
     }
 
-    // 2. [EDIT]...[/EDIT] blocks
-    const editRegex = /\[(IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit)\][\s\S]*?\[\/\1\]/gi;
+    // 2. [PLANNING] and [EDIT] blocks with optional labels
+    const editRegex = /\[(PLANNING|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit)(?::\s*[^\]]+)?\][\s\S]*?\[\/\1\]/gi;
     if (editRegex.test(text)) {
         hadTags = true;
         text = text.replace(editRegex, "");
     }
 
-    // 3. Simple tags [OPEN: url], [COMPOSE: text] etc.
-    const simpleRegex = /\[(ARCADE|DUCKDUCKGO|OPEN|COMPOSE|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit):\s*([^\]]+)\]/gi;
+    // 3. Simple tags [OPEN: url], [COMPOSE: text], [PLANNING: task] etc.
+    const simpleRegex = /\[(ARCADE|DUCKDUCKGO|OPEN|COMPOSE|PLANNING|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit):\s*([^\]]+)\]/gi;
     if (simpleRegex.test(text)) {
         hadTags = true;
         text = text.replace(simpleRegex, (match, tag, val) => {
@@ -434,7 +445,7 @@ function stripArcadeProtocolTags(content = "") {
     }
 
     // 4. Any remaining stray tags
-    const strayRegex = /\[(?:\/)?(ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit)\]/gi;
+    const strayRegex = /\[(?:\/)?(ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|PLANNING|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit)\]/gi;
     if (strayRegex.test(text)) {
         hadTags = true;
         text = text.replace(strayRegex, "");
@@ -638,6 +649,9 @@ function isWorkshopPublishIntentPrompt(message = "") {
 
 function isExplicitWorkshopPublishIntentPrompt(message = "") {
     const text = `${message || ''}`.trim().toLowerCase();
+    const modes = window.activeArcadeCommandModes || [];
+    if (modes.includes('/publish')) return true;
+
     if (!text) return false;
     if (/^\/publish\b/.test(text) || /^\[publish\]/.test(text)) return true;
     const publishVerb = /\b(publish|upload|submit|ship|post|share)\b/.test(text);
@@ -670,6 +684,10 @@ function isWorkshopEditorReferencePrompt(message = "") {
 
 function isWorkshopEditIntentPrompt(message = "", workshopContext = null) {
     const text = `${message || ''}`.trim().toLowerCase();
+    const modes = window.activeArcadeCommandModes || [];
+    const hasExplicitMode = modes.includes('/edit') || modes.includes('/fix') || modes.includes('/rewrite');
+    if (hasExplicitMode) return true;
+
     if (!text) return false;
     if (/^\/(?:edit|fix|rewrite)\b/.test(text) || /^\[(?:edit|fix|rewrite)\]/.test(text)) return true;
     if (isWorkshopEditorReferencePrompt(text) && hasActiveWorkshopEditor(workshopContext)) return true;
@@ -696,6 +714,9 @@ function isWorkshopMultiFileEditPrompt(message = "", workshopContext = null) {
 
 function isWorkshopRewriteIntentPrompt(message = "", workshopContext = null) {
     const text = `${message || ''}`.trim().toLowerCase();
+    const modes = window.activeArcadeCommandModes || [];
+    if (modes.includes('/rewrite')) return true;
+
     if (!text) return false;
     if (/^\/rewrite\b/.test(text) || /^\[rewrite\]/.test(text)) return true;
     return /\brewrite\b/.test(text)
@@ -728,23 +749,35 @@ function buildProtocolAwareUserMessage(userPrompt = "") {
 function getProtocolDirectives(userPrompt = "", workshopContext = null, attachment = null) {
     const text = `${userPrompt || ''}`.trim().toLowerCase();
     const directives = [];
-    const commandMode = window.activeArcadeCommandMode;
+    
+    // Collect all active command modes (stacked)
+    const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
+    if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
+
     const editorIsActive = hasActiveWorkshopEditor(workshopContext);
 
-    // Clear flag so it doesn't persist to next message
+    // Clear flags so they don't persist to next message
     window.activeArcadeCommandMode = null;
+    window.activeArcadeCommandModes = [];
 
-    // 1. COMMAND PRIORITY
-    if (commandMode === '/rewrite') {
+    // 1. COMMAND PRIORITY (Handles stacked commands like /edit /fix)
+    if (modes.has('/rewrite')) {
         directives.push(buildWorkshopRewriteDirective(workshopContext, userPrompt));
-    } else if (commandMode === '/edit' || commandMode === '/fix') {
+    }
+    
+    if (modes.has('/edit') || modes.has('/fix')) {
+        const isFixMode = modes.has('/fix');
         directives.push(isWorkshopMultiFileEditPrompt(text, workshopContext)
             ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
-            : buildWorkshopEditDirective(workshopContext, commandMode === '/fix', userPrompt));
-    } else if (commandMode === '/publish') {
+            : buildWorkshopEditDirective(workshopContext, isFixMode, userPrompt));
+    }
+
+    if (modes.has('/publish')) {
         directives.push(buildWorkshopPublishDirective());
-    } else {
-        // 2. AUTO-DETECTION (Fallback)
+    }
+
+    // 2. AUTO-DETECTION (Only if no explicit command modes were set)
+    if (directives.length === 0) {
         if (editorIsActive && !isExplicitWorkshopPublishIntentPrompt(text)) {
             directives.push(isWorkshopMultiFileEditPrompt(text, workshopContext)
                 ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
@@ -2570,21 +2603,24 @@ window.sendChatMessage = async function (promptOverride = '') {
         const isCommand = text.startsWith('/')
             || text.startsWith('[')
             || /^(?:edit|fix|rewrite|publish|clear|help)\s*\//i.test(text);
+        const originalText = text;
         if (isCommand) {
             const cmdHandled = await handleArcadeSlashCommand(text, input);
             if (cmdHandled) {
                 isSendingChatMessage = false;
                 return;
             }
+            // Update internal text to stripped version for intent detection
+            text = input.value.trim();
         }
 
         if (isWorkshopStyleRevertPrompt(text)) {
-            addChatMessage('user', text);
+            addChatMessage('user', originalText);
             input.value = '';
             const revertResult = await tryRevertLocalWorkshopStyleEnhancement();
             const revertReply = revertResult.message || 'No AI style enhancement block was found to revert.';
             addChatMessage('ai', `[Workshop Edit]: ${revertReply}`);
-            arcadeChatHistory.push({ role: 'user', content: text, attachment: null });
+            arcadeChatHistory.push({ role: 'user', content: originalText, attachment: null });
             arcadeChatHistory.push({ role: 'assistant', content: `[Workshop Edit]: ${revertReply}` });
             saveCurrentChat();
             updateChatStatus(revertResult.ok ? 'active' : 'idle');
@@ -2592,7 +2628,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             return;
         }
 
-        addChatMessage('user', text);
+        addChatMessage('user', originalText);
 
         const directSteamTarget = parseDirectSteamCommand(text);
         if (directSteamTarget) {
@@ -2628,7 +2664,7 @@ window.sendChatMessage = async function (promptOverride = '') {
         // Add to history with attachment if present
         arcadeChatHistory.push({
             role: 'user',
-            content: text,
+            content: originalText,
             attachment: currentChatAttachment ? {
                 data: currentChatAttachment,
                 type: currentChatAttachmentType,
@@ -3763,7 +3799,13 @@ async function executeArcadeChatActions(text, options = {}) {
     } else if (publishPayload?.jsonText) {
         actionResult.publishTagDetected = true;
         try {
-            const data = JSON.parse(publishPayload.jsonText);
+            let data;
+            try {
+                data = JSON.parse(publishPayload.jsonText);
+            } catch (jsonErr) {
+                // Fallback for AI-escaped JSON
+                data = JSON.parse(decodeEscapedCodeText(publishPayload.jsonText));
+            }
             const { title, caption, tags } = data;
 
             const routeToWorkshop = shouldRoutePublishToWorkshop(data, text, options.userPrompt || '');
@@ -4848,19 +4890,20 @@ function setupCloseParityHandlers() {
         if (!input || !panel) return;
 
         const val = input.value;
-        if (val.startsWith('/') && !val.includes(' ')) {
-            const query = val.substring(1).toLowerCase();
-            const allCmds = window.ArcadeCommandManager ? window.ArcadeCommandManager.getAllCommands() : [];
-            filteredCommands = allCmds.filter(c => c.id.toLowerCase().startsWith(query));
+        if (!val.startsWith('/')) {
+            panel.hidden = true;
+            selectedSuggestionIndex = -1;
+            return;
+        }
 
-            if (filteredCommands.length > 0) {
-                if (selectedSuggestionIndex >= filteredCommands.length) selectedSuggestionIndex = filteredCommands.length - 1;
-                renderSuggestions(filteredCommands);
-                panel.hidden = false;
-            } else {
-                panel.hidden = true;
-                selectedSuggestionIndex = -1;
+        filteredCommands = window.ArcadeCommandManager ? window.ArcadeCommandManager.getSuggestions(val) : [];
+
+        if (filteredCommands.length > 0) {
+            if (selectedSuggestionIndex >= filteredCommands.length) {
+                selectedSuggestionIndex = filteredCommands.length - 1;
             }
+            renderSuggestions(filteredCommands);
+            panel.hidden = false;
         } else {
             panel.hidden = true;
             selectedSuggestionIndex = -1;
@@ -4872,8 +4915,9 @@ function setupCloseParityHandlers() {
         if (!panel) return;
 
         panel.innerHTML = cmds.map((c, i) => `
-            <div class="command-suggestion-item ${i === selectedSuggestionIndex ? 'selected' : ''}" onclick="applyCommandSuggestion('${c.id}')">
-                <div class="command-suggestion-name">/${c.id}</div>
+            <div class="command-suggestion-item ${i === selectedSuggestionIndex ? 'selected' : ''}" 
+                 onclick="applyCommandSuggestion('${c.id}', ${c.isTopLevel || false}, '${c.commandId || ''}')">
+                <div class="command-suggestion-name">${c.name || `/${c.id}`}</div>
                 <div class="command-suggestion-desc">${c.description}</div>
             </div>
         `).join('');
@@ -4884,15 +4928,19 @@ function setupCloseParityHandlers() {
         }
     }
 
-    window.applyCommandSuggestion = function(id) {
+    window.applyCommandSuggestion = function(id, isTopLevel, commandId) {
         const input = document.getElementById('arc-chat-input');
         const panel = document.getElementById('chat-command-suggestions');
         if (!input) return;
 
-        input.value = `/${id} `;
+        if (isTopLevel) {
+            input.value = `/${id} `;
+        } else {
+            input.value = `/${commandId} ${id} `;
+        }
+        
         input.focus();
-        panel.hidden = true;
-        selectedSuggestionIndex = -1;
+        updateCommandSuggestions();
     };
 
     if (arcInput) {
@@ -4905,7 +4953,8 @@ function setupCloseParityHandlers() {
             if (event.key === 'Enter') {
                 if (isPanelOpen && selectedSuggestionIndex >= 0) {
                     event.preventDefault();
-                    applyCommandSuggestion(filteredCommands[selectedSuggestionIndex].id);
+                    const sug = filteredCommands[selectedSuggestionIndex];
+                    applyCommandSuggestion(sug.id, sug.isTopLevel, sug.commandId);
                 } else {
                     event.preventDefault();
                     isVoiceSessionActive = false;

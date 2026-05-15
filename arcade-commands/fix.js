@@ -7,23 +7,23 @@
         id: 'fix',
         description: 'Rapid bug fixing protocol.',
         execute: async (args, inputElement) => {
-            if (typeof window.resolveWorkshopEditGameFromPrompt === 'function'
-                && typeof window.setWorkshopEditActiveGame === 'function') {
-                let targetGame = window.resolveWorkshopEditGameFromPrompt(args);
-                if (!targetGame && typeof window.getWorkshopManageableGames === 'function') {
-                    const games = window.getWorkshopManageableGames();
-                    if (Array.isArray(games) && games.length === 1) targetGame = games[0];
-                }
-                if (targetGame) {
-                    const selected = window.setWorkshopEditActiveGame(targetGame.id, { prompt: args });
-                    if (selected?.ok) {
-                        console.log(`[Command: Fix] Auto-switching context to: ${selected.title} / ${selected.fileName}`);
-                    }
-                }
+            // Re-use logic from edit for target resolution
+            const editCmd = window.ArcadeCommandManager.getCommand('edit');
+            if (editCmd) {
+                await editCmd.execute(args, inputElement);
             }
-
             window.activeArcadeCommandMode = '/fix';
-            return false; // Let normal flow continue to AI
+            return false;
+        },
+        getSuggestions: (args = '') => {
+            const editCmd = window.ArcadeCommandManager.getCommand('edit');
+            if (editCmd && typeof editCmd.getSuggestions === 'function') {
+                return editCmd.getSuggestions(args).map(s => ({
+                    ...s,
+                    description: s.description.replace('Edit', 'Fix')
+                }));
+            }
+            return [];
         }
     });
 })();

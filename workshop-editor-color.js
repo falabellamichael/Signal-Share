@@ -141,9 +141,11 @@
         }
     });
 
-    // Hook into global events if they exist
-    window.addEventListener('workshop-editor-status-change', (e) => {
-        // Optional: scan on success saves?
+    // Hook into global events for content updates
+    window.addEventListener('workshop-editor-content-update', () => {
+        if (colorPanelVisible) {
+            window.scanForWorkshopColors();
+        }
     });
 
     console.log('[Color Assistant] System ready.');
