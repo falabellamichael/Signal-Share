@@ -276,10 +276,10 @@ window.ArcadeWorkshopManager = {
         return [
             '[WORKSHOP_PROTOCOL]',
             'CRITICAL: Do NOT ask for permission or wait for approval. IMPLEMENT NOW.',
-            'IMPORTANT: You can EITHER output the [PUBLISH] tag containing the JSON payload with: { "target": "workshop", "title": "...", "files": [{ "name": "...", "content": "..." }] }, OR simply output standard markdown code blocks with the file name specified in the block info (e.g. ```javascript filename=game.js).',
+            'IMPORTANT: Do NOT use the [PUBLISH] tag with a JSON payload for the file content, as it is too long and causes the response to truncate. Instead, you MUST output standard markdown code blocks with the file name specified in the block info (e.g. ```html filename=index.html or ```javascript filename=game.js).',
             'Generate a functional, playable, self-contained browser game. It could be just a single HTML file or a multi-file package. At least 1 file must be generated (images are always optional).',
             'Use plain browser APIs only; no external libraries, CDNs, or module syntax.',
-            'You can include a brief explanation or introductory text if needed, but make sure to output the code blocks clearly. If using code blocks, make sure to include the file name in the info string so the system can extract it.',
+            'You can include a brief explanation or introductory text if needed, but make sure to output the code blocks clearly. You MUST include the file name in the info string so the system can extract it.',
             '[/WORKSHOP_PROTOCOL]'
         ].join('\n');
     },
