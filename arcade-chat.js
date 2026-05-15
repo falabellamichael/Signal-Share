@@ -2347,7 +2347,7 @@ window.sendChatMessage = async function (promptOverride = '') {
 
         const workshopPublishIntent = window.ArcadeWorkshopManager.isWorkshopPublishIntentPrompt(text);
 
-        if (allowsLocalStyleFallback(text)) {
+        if (window.ArcadeWorkshopManager.allowsLocalStyleFallback(text)) {
             window.activeArcadeCommandMode = null;
             const localStyleFallback = await tryLocalWorkshopStyleFallback(text);
             const fallbackReply = `[Workshop Edit]: ${localStyleFallback.ok
@@ -2648,7 +2648,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                 }
             }
 
-            if (editRequestActive && isUnhelpfulWorkshopEditReply(reply) && allowsLocalStyleFallback(text)) {
+            if (editRequestActive && isUnhelpfulWorkshopEditReply(reply) && window.ArcadeWorkshopManager.allowsLocalStyleFallback(text)) {
                 const localStyleFallback = await tryLocalWorkshopStyleFallback(text, richContext);
                 if (localStyleFallback?.ok) {
                     const fallbackReply = `[Workshop Edit]: ${localStyleFallback.message}`;
@@ -3250,7 +3250,7 @@ async function tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt = '
         }
     }
 
-    if (isStyleEditPrompt(userPrompt) && (activeKind === 'html' || activeKind === 'css')) {
+    if (window.ArcadeWorkshopManager.isStyleEditPrompt(userPrompt) && (activeKind === 'html' || activeKind === 'css')) {
         const cssFile = generatedFiles.find((file) => {
             const kind = getWorkshopFileKindFromName(file.name) || window.ArcadeWorkshopManager.inferCodeKind('', file.content);
             return kind === 'css' || looksLikeCssPatchContent(file.content);
@@ -3663,7 +3663,7 @@ function removeLocalStyleEnhancement(content = '') {
 
 async function tryLocalWorkshopStyleFallback(userPrompt = '', richContext = null) {
     const result = { attempted: false, ok: false, message: '' };
-    if (!isStyleEditPrompt(userPrompt)) return result;
+    if (!window.ArcadeWorkshopManager.isStyleEditPrompt(userPrompt)) return result;
     if (typeof window.internalApplyWorkshopFileEdit !== 'function') {
         result.message = 'Workshop edit function is unavailable.';
         return result;
