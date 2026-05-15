@@ -3463,16 +3463,6 @@ async function executeArcadeChatActions(text, options = {}) {
         }
     }
 
-    // 6. WORKSHOP ACTIONS (Re-enabled for Commands)
-    const editCmd = window.ArcadeCommandManager.getCommand('edit');
-    if (editCmd && typeof editCmd.handleResponse === 'function') {
-        const editResult = await editCmd.handleResponse(text, options);
-        if (editResult.handled) {
-            Object.assign(actionResult, editResult);
-            return actionResult;
-        }
-    }
-
     return actionResult;
 }
 
