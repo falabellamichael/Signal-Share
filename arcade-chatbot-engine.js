@@ -51,6 +51,27 @@ window.ArcadeChatbotEngine = (function() {
             }
         },
         {
+            keywords: ['find', 'search', 'where is', 'look for'],
+            action: (text) => {
+                const query = text.toLowerCase()
+                    .replace(/find|search|where is|look for/g, '')
+                    .replace(/\bin\b|\bthe\b|\beditor\b|\bcode\b/g, '')
+                    .replace(/[?.!]/g, '')
+                    .trim();
+                    
+                if (!query) return "🔍 [Search Protocol]: What would you like me to find in the editor?";
+                
+                if (typeof window.handleAiSearchCommand === 'function') {
+                    const result = window.handleAiSearchCommand(query);
+                    if (result && result.ok) {
+                        return `🔍 [Search Protocol]: Found "${result.match}" on line ${result.line}. I've centered the editor for you.`;
+                    }
+                    return `🔍 [Search Protocol]: I couldn't find "${query}" in the active file. Try a different keyword?`;
+                }
+                return "🔍 [Search Protocol]: The editor search engine is not available. Please enter Workshop > Edit mode first.";
+            }
+        },
+        {
             keywords: ['library', 'games'],
             action: () => {
                 if (typeof window.setCategory === 'function') window.setCategory('all');

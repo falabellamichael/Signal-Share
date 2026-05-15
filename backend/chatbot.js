@@ -113,6 +113,10 @@ const CHAT_COMPLETION_TIMEOUT_MS = Math.max(15000, Number(process.env.SIGNAL_SHA
 const WEB_SEARCH_TIMEOUT_MS = Math.max(2000, Number(process.env.SIGNAL_SHARE_WEB_SEARCH_TIMEOUT_MS || 10000));
 const WEB_FETCH_TIMEOUT_MS = Math.max(3000, Number(process.env.SIGNAL_SHARE_WEB_FETCH_TIMEOUT_MS || 12000));
 const DEFAULT_WEB_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+const IDLE_UNLOAD_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_CONTEXT_TOKENS = 4096; // Hard cap for VRAM safety
+let lastActivityAt = Date.now();
+let idleUnloadTimer = null;
 let modelCatalogCache = { at: 0, data: null };
 let lastSuccessfulModelByProvider = { lmstudio: "", ollama: "" };
 
@@ -438,6 +442,10 @@ async function ensureLmStudioExclusiveModel(targetModel) {
     const requestedTarget = `${targetModel || ""}`.trim();
     if (!requestedTarget) return;
 
+    // Refresh activity for idle timer
+    lastActivityAt = Date.now();
+    resetIdleUnloadTimer();
+
     try {
         const initialPayload = await fetchLmStudioJson("/models", { timeoutMs: 3000 });
         const initialRows = parseLmStudioModelRows(initialPayload);
@@ -452,10 +460,17 @@ async function ensureLmStudioExclusiveModel(targetModel) {
         if (!targetLoaded) {
             await fetchLmStudioJson("/models/load", {
                 method: "POST",
-                body: { model: resolvedTarget },
+                body: { 
+                    model: resolvedTarget,
+                    // VRAM LIFTING: Force aggressive context limits on load
+                    config: {
+                        n_ctx: MAX_CONTEXT_TOKENS,
+                        flash_attn: true
+                    }
+                },
                 timeoutMs: 120000
             });
-            console.log(`[Chatbot] LM Studio loaded model: ${resolvedTarget}`);
+            console.log(`[Chatbot] LM Studio loaded model (VRAM Optimized): ${resolvedTarget}`);
         }
 
         const refreshedPayload = targetLoaded
@@ -482,6 +497,31 @@ async function ensureLmStudioExclusiveModel(targetModel) {
     } catch (error) {
         console.warn(`[Chatbot] LM Studio model switch skipped: ${error.message}`);
     }
+}
+
+function resetIdleUnloadTimer() {
+    if (idleUnloadTimer) clearTimeout(idleUnloadTimer);
+    idleUnloadTimer = setTimeout(async () => {
+        const now = Date.now();
+        if (now - lastActivityAt >= IDLE_UNLOAD_TIMEOUT_MS) {
+            console.log("[Chatbot] Idle timeout reached. Flushing VRAM...");
+            try {
+                const payload = await fetchLmStudioJson("/models", { timeoutMs: 3000 });
+                const rows = parseLmStudioModelRows(payload);
+                const loaded = getLoadedLmStudioInstances(rows);
+                for (const instance of loaded) {
+                    await fetchLmStudioJson("/models/unload", {
+                        method: "POST",
+                        body: { instance_id: instance.id },
+                        timeoutMs: 10000
+                    });
+                    console.log(`[Chatbot] Idle Unload: ${instance.id}`);
+                }
+            } catch (err) {
+                console.warn("[Chatbot] Failed to perform idle VRAM flush:", err.message);
+            }
+        }
+    }, IDLE_UNLOAD_TIMEOUT_MS);
 }
 
 async function getAutoSelectedLmStudioModel({ fallbackModels = [] } = {}) {
@@ -760,18 +800,31 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                     body = {
                         model: model,
                         messages: openAiMessages,
-                        temperature: workshopEditActive ? 0.2 : 0.7
+                        temperature: workshopEditActive ? 0.2 : 0.7,
+                        // VRAM LIFTING: Cap context and enable performance flags
+                        max_tokens: 2048,
+                        stream: false
                     };
                 } else {
                     body = {
                         model: model,
                         messages: messages,
-                        stream: false
+                        stream: false,
+                        // VRAM LIFTING: Ollama specific context capping
+                        options: {
+                            num_ctx: MAX_CONTEXT_TOKENS,
+                            num_gpu: 99, // Maximize GPU offload
+                            low_vram: false // We want performance if we are loading it
+                        }
                     };
                     if (imageBase64 && iteration === 0) {
                         body.images = [imageBase64];
                     }
                 }
+
+                // Update activity
+                lastActivityAt = Date.now();
+                resetIdleUnloadTimer();
 
                 const response = await fetchWithTimeout(endpoint.chatUrl, {
                     method: 'POST',

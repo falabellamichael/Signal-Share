@@ -801,8 +801,28 @@ function buildWorkshopEditDirective(workshopContext = null, isFixMode = false, u
 
     if (activeGameId && activeFileName) {
         const rawContent = `${workshopContext?.workshopEditor?.activeFileContent || ''}`.trim();
-        const content = rawContent.length > 20000 ? rawContent.substring(0, 20000) + '\n\n[TRUNCATED]' : rawContent;
-        lines.push(`Target: ${activeFileName} (${activeGameId})\nContent:\n\`\`\`\n${content}\n\`\`\``);
+        
+        let contentToProvide = "";
+        let isSkeleton = false;
+        
+        // Threshold for VRAM optimization: 4000 characters
+        if (rawContent.length > 4000) {
+            isSkeleton = true;
+            contentToProvide = generateCodeSkeleton(rawContent, activeFileName);
+        } else {
+            contentToProvide = rawContent;
+        }
+
+        if (isSkeleton) {
+            lines.push(
+                'VRAM_OPTIMIZATION_ACTIVE: The file is large. I am providing a SKELETON (index) of the code.',
+                'If you need to see the implementation of a specific function or block, output [FIND: exact unique string] in your response.',
+                'The system will automatically find that block and provide it to you in the next turn.',
+                'Use [FIND] to "heavy lift" the context without bloating VRAM.'
+            );
+        }
+
+        lines.push(`Target: ${activeFileName} (${activeGameId})\nContent:\n\`\`\`\n${contentToProvide}\n\`\`\``);
     }
 
     return lines.join('\n');
@@ -1687,6 +1707,33 @@ function readArcadeChats() {
 }
 
 /**
+ * Compress and downscale images to save VRAM on the bridge.
+ */
+function compressChatImage(dataUrl, maxWidth = 512, quality = 0.7) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(dataUrl); // Fallback
+        img.src = dataUrl;
+    });
+}
+
+/**
  * Handles image, video, or file selection for the chat.
  */
 window.handleChatFileSelect = function (event) {
@@ -1695,8 +1742,9 @@ window.handleChatFileSelect = function (event) {
 
     currentChatAttachmentName = file.name;
     const reader = new FileReader();
-    reader.onload = function (e) {
-        currentChatAttachment = e.target.result;
+    reader.onload = async function (e) {
+        let fileData = e.target.result;
+        
         const preview = document.getElementById('chat-attachment-preview');
         const img = document.getElementById('chat-preview-img');
         const video = document.getElementById('chat-preview-video');
@@ -1713,18 +1761,23 @@ window.handleChatFileSelect = function (event) {
 
         if (file.type.startsWith('image/')) {
             currentChatAttachmentType = 'image';
+            // VRAM LIFTING: Compress image before storing
+            fileData = await compressChatImage(fileData);
+            currentChatAttachment = fileData;
             if (img) {
                 img.src = currentChatAttachment;
                 img.style.display = 'block';
             }
         } else if (file.type.startsWith('video/')) {
             currentChatAttachmentType = 'video';
+            currentChatAttachment = fileData;
             if (video) {
                 video.src = currentChatAttachment;
                 video.style.display = 'block';
             }
         } else {
             currentChatAttachmentType = 'file';
+            currentChatAttachment = fileData;
             if (fileDiv && fileName) {
                 fileName.textContent = file.name;
                 fileDiv.style.display = 'flex';
@@ -2896,6 +2949,21 @@ window.sendChatMessage = async function () {
             // Execute any tags in the reply
             const actionResult = await executeArcadeChatActions(reply, { userPrompt: text });
 
+            // AUTO-REFINE: If AI requested a search, automatically fetch it and trigger a follow-up
+            if (actionResult.findTagDetected && actionResult.feedback) {
+                const autoFollowUp = actionResult.feedback;
+                console.log('[Arcade Chat] Auto-refining search result for AI...');
+                
+                // Add the retrieval to history so the AI sees it in context
+                arcadeChatHistory.push({ role: 'user', content: autoFollowUp });
+                
+                // Trigger a recursive call to sendChatMessage with the new context
+                setTimeout(() => {
+                    sendChatMessage(autoFollowUp);
+                }, 500);
+                return;
+            }
+
             // MUTUAL EXCLUSION: If an edit was attempted/performed, do not also try to publish a new game.
             // This prevents "Double Actioning" when the prompt is ambiguous.
             if (actionResult?.workshopFileRewriteAttempted) {
@@ -3770,7 +3838,6 @@ async function executeArcadeChatActions(text, options = {}) {
                     return actionResult;
                 }
 
-                // Prepare the post object
                 const basePost = {
                     id: `ai-${crypto.randomUUID()}`,
                     creator: window.getDefaultProfileName ? window.getDefaultProfileName() : "AI Assistant",

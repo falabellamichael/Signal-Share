@@ -4,11 +4,11 @@
  */
 (function initSignalShareAiCore(global) {
     const CORE_VERSION = "1.2";
-    const DEFAULT_MAX_HISTORY_MESSAGES = 18;
-    const DEFAULT_MAX_MESSAGE_CHARS = 900;
-    const DEFAULT_MAX_PAGE_TEXT_CHARS = 600;
-    const DEFAULT_MAX_STEAM_HINTS = 20;
-    const DEFAULT_MAX_VISIBLE_TEXT_SAMPLE = 1200;
+    const DEFAULT_MAX_HISTORY_MESSAGES = 12; // Reduced from 18
+    const DEFAULT_MAX_MESSAGE_CHARS = 800;  // Reduced from 900
+    const DEFAULT_MAX_PAGE_TEXT_CHARS = 500; // Reduced from 600
+    const DEFAULT_MAX_STEAM_HINTS = 15;
+    const DEFAULT_MAX_VISIBLE_TEXT_SAMPLE = 800; // Reduced from 1200
     const CUSTOM_INSTRUCTIONS_STORAGE_KEY = "ss_ai_custom_instructions";
     const DEFAULT_MAX_CUSTOM_INSTRUCTIONS_CHARS = 2000;
     const STEAM_GAME_APP_IDS = Object.freeze({
