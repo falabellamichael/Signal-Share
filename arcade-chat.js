@@ -794,6 +794,9 @@ function getProtocolDirectives(userPrompt = "", workshopContext = null, attachme
     if (modes.has('/rewrite')) {
         directives.push(buildWorkshopRewriteDirective(workshopContext, userPrompt));
     }
+    if (modes.has('/idea')) {
+        directives.push(window.ArcadeWorkshopManager.getIdeaDirective(userPrompt));
+    }
     
     if (modes.has('/edit') || modes.has('/fix')) {
         const isFixMode = modes.has('/fix');

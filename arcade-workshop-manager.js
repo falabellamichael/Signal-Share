@@ -209,5 +209,52 @@ window.ArcadeWorkshopManager = {
             'VISUALIZATION: In addition to the [PUBLISH] tag, also provide markdown code blocks (```html, ```javascript) for the primary files so the user can see your work.',
             '[/WORKSHOP_PROTOCOL]'
         ].join('\n');
+    },
+
+    /**
+     * Principles for ensuring AI-generated code is 'real' and functional.
+     */
+    workingCodePrinciples: [
+        "SELF-CONTAINED: All logic (JS), styles (CSS), and markup (HTML) must reside within the provided files.",
+        "VANILLA: No external dependencies (jQuery, React, etc.) unless explicitly requested.",
+        "CANVAS-FIRST: For arcade games, prefer <canvas> for performance and flexibility.",
+        "RESPONSIVE: Use 'dvh' or 'vh' for height and percentage-based widths to fit any screen.",
+        "STATE-DRIVEN: Use a central 'gameState' object to make debugging and saving easy.",
+        "BATTLE-TESTED: Avoid 'theoretical' APIs; stick to well-supported browser features."
+    ],
+
+    /**
+     * Curated list of neon-themed game concepts for AI inspiration.
+     */
+    seedIdeas: [
+        { title: "Neon Drift", genre: "Racing", concept: "Top-down 2D drifter. Use HSL colors for tire smoke. Glowing gates give speed boosts." },
+        { title: "Cyber Shield", genre: "Action/Rhythm", concept: "Defend a central core from incoming pulses. Time your blocks to the beat for combo multipliers." },
+        { title: "Grid Runner", genre: "Endless Runner", concept: "Isometric grid-based dodging. Jump over 'data corruption' walls and collect 'bit' power-ups." },
+        { title: "Pulse Strike", genre: "Sports/Arcade", concept: "Physics-based Pong variant with 'gravity wells' that bend the ball's trajectory." },
+        { title: "Signal Breach", genre: "Puzzle", concept: "Connect glowing nodes using limited 'bandwidth' lines. Avoid 'firewall' nodes." },
+        { title: "Static Void", genre: "Survival/Horror", concept: "Navigate a maze using only sound pulses (visualized as expanding rings). Avoid the shadow glitches." },
+        { title: "Bit-Shift", genre: "Platformer", concept: "Switch between 0 (low gravity) and 1 (high speed) to navigate binary-themed levels." },
+        { title: "Glow Worm", genre: "Snake Variant", concept: "Snake grows by eating light. Body segments leave temporary trails that hurt enemies but fade over time." },
+        { title: "Pixel Rain", genre: "Catch/Arcade", concept: "Catch falling pixels to rebuild a portrait. Don't let the 'corrupted' red blocks hit your catcher." },
+        { title: "Neon Nexus", genre: "Strategy/Tower Defense", concept: "Place prism towers that split light beams into different colors to destroy matching enemy waves." }
+    ],
+
+    /**
+     * Generates a directive for the AI to brainstorm new game ideas.
+     */
+    getIdeaDirective: function(genreHint = "") {
+        const hintText = genreHint ? ` focusing on the "${genreHint}" genre` : "";
+        return [
+            '[IDEA_PROTOCOL]',
+            `AUTONOMOUS DESIGNER MODE: Suggest 3 unique, high-concept mini-game ideas${hintText}.`,
+            'IMPORTANT: These must be REAL, implementable concepts, not "placeholder" ideas.',
+            'Each idea MUST have: A catchy Title, Genre, and a 2-sentence Concept.',
+            'Themes: Neon, Cyberpunk, Retrowave, Minimalist, Fluid Animations.',
+            'Constraint: Must follow these WORKING CODE PRINCIPLES:',
+            JSON.stringify(this.workingCodePrinciples),
+            'Reference these existing seeds for inspiration:',
+            JSON.stringify(this.seedIdeas.slice(0, 5)),
+            '[/IDEA_PROTOCOL]'
+        ].join('\n');
     }
 };
