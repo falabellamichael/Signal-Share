@@ -318,6 +318,8 @@ let workshopEditorManualHeight = Number(localStorage.getItem('ss-workshop-editor
 let workshopEditorResizeSession = null;
 let workshopEditorAutosizeRaf = 0;
 let workshopEditorHighlightedLine = 0;
+let workshopEditorForceMinOnOpen = false;
+let lastWorkshopEditOverlayVisibility = false;
 const workshopEditDraftCache = new Map();
 const workshopEditPendingFilesByGame = new Map();
 const workshopEditCoverDraftByGame = new Map();
@@ -1735,6 +1737,12 @@ async function publishProcessedGameFiles(options = {}) {
 
             if (error) {
                 console.error('[Mini-Games] Supabase workshop publish failed:', error);
+                console.error('[Mini-Games] Failed Row Payload:', { 
+                    id: row.id, 
+                    title: row.title, 
+                    author_id: row.author_id, 
+                    fileCount: row.files?.length 
+                });
                 return { ok: false, error: 'supabase-save-failed', message: error.message || 'Supabase rejected the workshop publish.' };
             }
 
@@ -2278,9 +2286,13 @@ function autoSizeWorkshopEditor() {
     const minHeight = getWorkshopEditorMinHeight();
     let appliedHeight = minHeight;
 
-    if (workshopEditorManualHeight > 0) {
+    // Use manual height ONLY if we haven't just opened the editor OR if we have no force-min flag
+    if (!workshopEditorForceMinOnOpen && workshopEditorManualHeight > 0) {
         appliedHeight = clampWorkshopEditorHeight(workshopEditorManualHeight);
     }
+    
+    // Clear the flag after the first auto-size call following an open event
+    workshopEditorForceMinOnOpen = false;
 
     editor.style.height = `${appliedHeight}px`;
     if (shell) shell.style.height = `${appliedHeight}px`;
@@ -2471,6 +2483,13 @@ function syncWorkshopEditOverlay() {
     if (!overlay) return;
 
     const shouldShow = workshopTileMode === 'edit' && currentCategory === 'edit';
+    
+    // If transitioning from hidden to visible, flag that we should force the minimum height
+    if (shouldShow && !lastWorkshopEditOverlayVisibility) {
+        workshopEditorForceMinOnOpen = true;
+    }
+    lastWorkshopEditOverlayVisibility = shouldShow;
+
     overlay.hidden = !shouldShow;
     overlay.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
     if (!shouldShow) return;
