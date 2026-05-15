@@ -445,8 +445,8 @@ function stripArcadeProtocolTags(content = "") {
     }
 
     // 4. Greedy Cleanup Fallback (for truncated/malformed tags)
-    // If [PUBLISH: or [EDIT: or [PLANNING: is left over, it's likely a truncated tag that failed balanced parsing.
-    const greedyRegex = /\[(PUBLISH|EDIT|FILE_EDIT|Workshop\/Edit|PLANNING|IMPLEMENTATION_PLAN|TEST_PLAN):[\s\S]*$/gi;
+    // If [PUBLISH: or [EDIT: or [PLANNING is left over, it's likely a truncated tag that failed balanced parsing.
+    const greedyRegex = /\[(PUBLISH|EDIT|FILE_EDIT|Workshop\/Edit|PLANNING|IMPLEMENTATION_PLAN|TEST_PLAN)(?::|\])[\s\S]*$/gi;
     if (greedyRegex.test(text)) {
         hadTags = true;
         text = text.replace(greedyRegex, "").trim();
@@ -737,13 +737,14 @@ function isWorkshopRewriteIntentPrompt(message = "", workshopContext = null) {
 function buildWorkshopPublishDirective() {
     return [
         '[WORKSHOP_PROTOCOL]',
-        'If the user asks to create/build/write a game and publish/add it to the Arcade Library/Workshop, you MUST include exactly one [PUBLISH:{...}] tag.',
+        'REASONING PROTOCOL: [REASONING_ORCHESTRATOR_V2]',
+        'Before building a game, you MUST output a concise [PLANNING] block.',
+        'IMPORTANT: You MUST include the [PUBLISH] tag in the same response as the plan.',
         'The tag MUST contain a valid JSON object with: { "target": "workshop", "title": "...", "files": [{ "name": "...", "content": "..." }] }.',
         'Generate a complete, playable, self-contained browser game.',
         'index.html MUST be the entry point and reference any other files (style.css, game.js) by their exact name.',
         'Use plain browser APIs only; no external libraries, CDNs, or module syntax.',
-        'VISUALIZATION: In addition to the [PUBLISH] tag, you SHOULD also provide a markdown code block (```html or ```javascript) containing the primary game code so the user can see what you built.',
-        'The [PUBLISH] tag itself will be hidden from the user, while the code blocks will be shown.',
+        'VISUALIZATION: In addition to the [PUBLISH] tag, also provide markdown code blocks (```html, ```javascript) for the primary files so the user can see your work.',
         '[/WORKSHOP_PROTOCOL]'
     ].join('\n');
 }
@@ -833,7 +834,10 @@ function buildWorkshopEditDirective(workshopContext = null, isFixMode = false, u
         'REPLACE: updated snippet',
         '[/EDIT]',
         'RULES:',
-        '- Break changes into small, surgical [EDIT] blocks.',
+        '- Use [REASONING_ORCHESTRATOR_V2] for every edit: always output a [PLANNING] block before your [EDIT] tag.',
+        '- You MUST include the [EDIT] tag in the same response as the plan.',
+        '- Keep the plan concise to save tokens.',
+        '- Break changes into multiple [EDIT] blocks for safety.',
         '- NEVER rewrite the entire file.',
         '- NEVER use [PUBLISH] for edits to the active editor file.',
         '- Do not return full-file code fences unless the user explicitly asks for a full file.',
