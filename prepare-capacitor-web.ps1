@@ -74,6 +74,7 @@ $criticalDistFiles = @(
   "arcade-commands/edit.js",
   "arcade-commands/rewrite.js",
   "arcade-commands/fix.js",
+  "arcade-commands/deep.js",
   "arcade-commands/publish.js",
   "arcade-commands/clear.js",
   "arcade-commands/help.js"
