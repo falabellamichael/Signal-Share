@@ -477,12 +477,7 @@ async function ensureLmStudioExclusiveModel(targetModel) {
             await fetchLmStudioJson("/models/load", {
                 method: "POST",
                 body: { 
-                    model: resolvedTarget,
-                    // VRAM LIFTING: Force aggressive context limits on load
-                    config: {
-                        n_ctx: MAX_CONTEXT_TOKENS,
-                        flash_attn: true
-                    }
+                    model: resolvedTarget
                 },
                 timeoutMs: 120000
             });
@@ -636,7 +631,7 @@ export async function getLocalModelCatalog({ force = false } = {}) {
 export async function getChatResponse(message, history = [], pageContext = 'Signal Share', iteration = 0, attachment = null, preferredModel = 'auto', customInstructions = "") {
     if (!message && iteration === 0) return "I didn't receive a message to process.";
     const workshopEditActive = isWorkshopEditContext(pageContext);
-    const publishIntentActive = /\b(publish|upload|create\s+game|new\s+game|build\s+game)\b/i.test(message || "");
+    const publishIntentActive = /\b(publish|upload|create\s+game|new\s+game|build\s+game|package|workshop)\b/i.test(message || "");
     
     // Safety check for infinite recursion - reduced for memory pressure
     const MAX_ITERATIONS = 2;
@@ -830,6 +825,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                         // VRAM LIFTING: Ollama specific context capping
                         options: {
                             num_ctx: MAX_CONTEXT_TOKENS,
+                            num_predict: (workshopEditActive || publishIntentActive) ? 4096 : 2048,
                             num_gpu: 99, // Maximize GPU offload
                             low_vram: false // We want performance if we are loading it
                         }
