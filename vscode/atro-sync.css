@@ -1,0 +1,118 @@
+:root {
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --primary-color: #8a2be2; /* BlueViolet */
+    --secondary-color: #f4e6ff;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0f0c3d 0%, #2a0b48 100%);
+    color: var(--secondary-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.game-container {
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    border: 1px solid var(--glass-border);
+    text-align: center;
+    width: 90%;
+    max-width: 600px;
+}
+
+h1 {
+    font-size: 2.5em;
+    margin-bottom: 5px;
+    color: #ffffff;
+}
+
+.subtitle {
+    opacity: 0.8;
+    margin-bottom: 30px;
+}
+
+.stats-bar {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 25px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+.stat-box {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.game-area {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.color-display {
+    width: 150px;
+    height: 150px;
+    border-radius: 15px;
+    transition: background-color 0.2s ease, transform 0.1s;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.target-box {
+    border: 4px solid var(--primary-color);
+}
+
+.action-button {
+    padding: 15px 30px;
+    font-size: 1.2em;
+    cursor: pointer;
+    border: none;
+    border-radius: 10px;
+    background-color: var(--primary-color);
+    color: white;
+    transition: background-color 0.3s, transform 0.1s;
+}
+
+.action-button:hover:not(.disabled) {
+    background-color: #7b24c8;
+    transform: translateY(-2px);
+}
+
+.action-button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.start-button, .message-area {
+    margin-top: 20px;
+}
+
+.start-button {
+    padding: 12px 40px;
+    font-size: 1.3em;
+    background-color: #4CAF50; /* Green for start */
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.start-button:hover {
+    background-color: #45a049;
+}
+
+.message-area {
+    min-height: 30px;
+    font-style: italic;
+    opacity: 0.9;
+}

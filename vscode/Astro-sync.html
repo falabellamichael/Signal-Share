@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astro Sync</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="game-container">
+        <h1>Astro Sync</h1>
+        <p class="subtitle">Match the target color to win!</p>
+
+        <div class="stats-bar">
+            <div id="scoreDisplay" class="stat-box">Score: 0</div>
+            <div id="timerDisplay" class="stat-box">Time Left: 30s</div>
+        </div>
+
+        <div class="game-area">
+            <div id="targetColorBox" class="color-display target-box">Waiting...</div>
+            <button id="syncButton" class="action-button disabled" disabled>Sync</button>
+        </div>
+
+        <div id="messageArea" class="message-area">Click 'Start Game' to begin.</div>
+        <button id="startButton" class="start-button">Start Game</button>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
