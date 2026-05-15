@@ -725,7 +725,7 @@ function buildProtocolAwareUserMessage(userPrompt = "") {
     return `${userPrompt || ''}`.trim();
 }
 
-function getProtocolDirectives(userPrompt = "", workshopContext = null) {
+function getProtocolDirectives(userPrompt = "", workshopContext = null, attachment = null) {
     const text = `${userPrompt || ''}`.trim().toLowerCase();
     const directives = [];
     const commandMode = window.activeArcadeCommandMode;
@@ -756,6 +756,13 @@ function getProtocolDirectives(userPrompt = "", workshopContext = null) {
                 ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
                 : buildWorkshopEditDirective(workshopContext, false, userPrompt));
         }
+    }
+    
+    // 3. VISION ENHANCEMENT (Multimodal Analysis)
+    if (typeof SignalShareWorkshopVision !== 'undefined' 
+        && SignalShareWorkshopVision.shouldApplyVisionDirective(text, attachment, workshopContext)) {
+        console.log('[Arcade Chat] Vision Attachment Detected: Injecting Multimodal Edit Protocol.');
+        directives.push(SignalShareWorkshopVision.buildWorkshopVisionDirective(workshopContext));
     }
 
     return directives.join('\n\n');
@@ -2747,7 +2754,8 @@ window.sendChatMessage = async function () {
                 attachment: arcadeChatHistory[arcadeChatHistory.length - 1]?.attachment || null
             })
             : '';
-        const protocolDirectives = getProtocolDirectives(text, richContext);
+        const attachment = arcadeChatHistory[arcadeChatHistory.length - 1]?.attachment || null;
+        const protocolDirectives = getProtocolDirectives(text, richContext, attachment);
         const workshopEditContext = editRequestActive
             ? `[ACTIVE_WORKSHOP_EDITOR]\n${JSON.stringify(contextForModel.workshopEditor || null)}`
             : '';
