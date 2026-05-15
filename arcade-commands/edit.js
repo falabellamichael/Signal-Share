@@ -154,17 +154,24 @@
             if (editBlocks.length === 0) {
                 // FALLBACK: If no tags were found, try the automatic rewrite/patch logic
                 if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
+                    if (window.showFeedback) window.showFeedback('No explicit [EDIT] tags found. Attempting automatic patch...', false);
                     const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(text, options.userPrompt || '');
                     if (fallbackResult.attempted) {
                         actionResult.handled = true;
                         actionResult.workshopFileRewriteAttempted = true;
                         actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
+                        
+                        if (!fallbackResult.ok) {
+                            actionResult.errorReason = fallbackResult.reason || 'Auto-patch failed';
+                            if (window.showFeedback) window.showFeedback(`Auto-Patch Failed: ${actionResult.errorReason}`, true);
+                        }
                         return actionResult;
                     }
                 }
                 return actionResult;
             }
 
+            if (window.showFeedback) window.showFeedback('Applying surgical edits...', false);
             actionResult.handled = true;
             const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
             const gameId = editorState?.activeGameId || window.lastPlayedGameId || "";

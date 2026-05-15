@@ -38,6 +38,7 @@
         COMPOSE: "[COMPOSE:<text>]",
         PUBLISH: "[PUBLISH:{json}]",
         EDIT: "[EDIT]...[/EDIT]",
+        REWRITE: "[REWRITE]...[/REWRITE]",
         SCREENSHOT: "[SCREENSHOT]",
         LIST_TABS: "[LIST_TABS]",
         LIST_APPS: "[LIST_APPS]",
@@ -443,7 +444,10 @@
             "SNIPPET RULES:",
             "1. Break large changes into multiple small [EDIT] snippets.",
             "2. Small snippets are faster and more reliable. Never output the whole file.",
-            "3. Precision is key. SEARCH must be an exact copy-paste."
+            "3. Precision is key. SEARCH must be an exact copy-paste.",
+            "REWRITE RULES:",
+            "1. Use [REWRITE]...[/REWRITE] for full file replacements when snippets are too complex.",
+            "2. Provide the complete, functional file content inside the tag."
         ].join("\n");
     }
 

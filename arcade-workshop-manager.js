@@ -311,8 +311,10 @@ window.ArcadeWorkshopManager = {
      */
     isWorkshopEditIntentPrompt: function(message = "", workshopContext = null) {
         const text = `${message || ''}`.trim().toLowerCase();
-        const modes = window.activeArcadeCommandModes || [];
-        const hasExplicitMode = modes.includes('/edit') || modes.includes('/fix') || modes.includes('/rewrite');
+        const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
+        if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
+
+        const hasExplicitMode = modes.has('/edit') || modes.has('/fix') || modes.has('/rewrite');
         if (hasExplicitMode) return true;
 
         if (!text) return false;
@@ -350,13 +352,16 @@ window.ArcadeWorkshopManager = {
      */
     isWorkshopRewriteIntentPrompt: function(message = "", workshopContext = null) {
         const text = `${message || ''}`.trim().toLowerCase();
-        const modes = window.activeArcadeCommandModes || [];
-        if (modes.includes('/rewrite')) return true;
+        const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
+        if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
+
+        if (modes.has('/rewrite')) return true;
 
         if (!text) return false;
         if (/^\/rewrite\b/.test(text) || /^\[rewrite\]/.test(text)) return true;
-        return /\brewrite\b/.test(text)
-            && /\b(editor|website|workshop|file|code|html|css|javascript|js|game|page)\b/.test(text)
+        
+        return /\b(?:rewrite|rebuild|recreate|overhaul|start over|clean slate|full replacement)\b/i.test(text)
+            && /\b(?:code|file|script|index|logic|game|project|workshop|html|css|javascript|js)\b/i.test(text)
             && this.hasActiveWorkshopEditor(workshopContext);
     },
 

@@ -3403,6 +3403,16 @@ async function executeArcadeChatActions(text, options = {}) {
             if (publishResult.handled) return actionResult;
         }
     }
+    
+    // 1.5 [REWRITE] or full-file replacements
+    const rewriteCmd = window.ArcadeCommandManager.getCommand('rewrite');
+    if (rewriteCmd && typeof rewriteCmd.handleResponse === 'function') {
+        const rewriteResult = await rewriteCmd.handleResponse(text, options);
+        if (rewriteResult.handled) {
+            Object.assign(actionResult, rewriteResult);
+            return actionResult;
+        }
+    }
 
     // 2. [EDIT] or surgical patches
     const editCmd = window.ArcadeCommandManager.getCommand('edit');

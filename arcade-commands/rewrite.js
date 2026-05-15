@@ -81,7 +81,8 @@
             }
 
             if (selected?.ok && isTargetOnlyRewriteRequest(args, selected)) {
-                window.activeArcadeCommandMode = null;
+                // Clear modes if we are just replying with info
+                window.activeArcadeCommandModes = [];
                 return replyLocally(
                     inputElement,
                     `[Workshop Edit]: Opened "${selected.title}" in Rewrite Mode (${selected.fileName}). Tell me what the full rewrite should do, for example: /rewrite ${selected.title} add a stopwatch and split CSS/JS into separate files.`
@@ -89,15 +90,56 @@
             }
 
             if (!selected?.ok && isTargetOnlyRewriteRequest(args, selected)) {
-                window.activeArcadeCommandMode = null;
+                window.activeArcadeCommandModes = [];
                 return replyLocally(
                     inputElement,
                     '[Workshop Edit]: I need a matching Workshop game and rewrite instructions. Try: /rewrite Random Number Guessing Game add a stopwatch and split CSS/JS into separate files.'
                 );
             }
 
-            window.activeArcadeCommandMode = '/rewrite';
+            // Command mode is already added by the manager, but we can ensure it's here
+            if (window.activeArcadeCommandModes && !window.activeArcadeCommandModes.includes('/rewrite')) {
+                window.activeArcadeCommandModes.push('/rewrite');
+            }
+
             return false;
+        },
+        /**
+         * The response handler handles full-file rewrites from the AI reply.
+         */
+        handleResponse: async (text, options = {}) => {
+            const actionResult = {
+                handled: false,
+                workshopFileRewriteAttempted: false,
+                workshopFileRewriteSucceeded: false,
+                errorReason: null
+            };
+
+            // 1. Explicit check for rewrite intent
+            const isExplicitRewrite = window.ArcadeWorkshopManager.isWorkshopRewriteIntentPrompt(options.userPrompt || '');
+            if (!isExplicitRewrite && !text.includes('[REWRITE]')) {
+                return actionResult;
+            }
+
+            if (window.showFeedback) window.showFeedback('Processing Workshop rewrite...', false);
+
+            // 2. Try the automatic rewrite logic
+            if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
+                const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(text, options.userPrompt || '');
+                if (fallbackResult.attempted) {
+                    actionResult.handled = true;
+                    actionResult.workshopFileRewriteAttempted = true;
+                    actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
+                    
+                    if (!fallbackResult.ok) {
+                        actionResult.errorReason = fallbackResult.reason || 'Rewrite failed';
+                        if (window.showFeedback) window.showFeedback(`Rewrite Failed: ${actionResult.errorReason}`, true);
+                    }
+                    return actionResult;
+                }
+            }
+
+            return actionResult;
         }
     });
 })();

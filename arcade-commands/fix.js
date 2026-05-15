@@ -12,8 +12,20 @@
             if (editCmd) {
                 await editCmd.execute(args, inputElement);
             }
-            window.activeArcadeCommandMode = '/fix';
+            if (window.activeArcadeCommandModes && !window.activeArcadeCommandModes.includes('/fix')) {
+                window.activeArcadeCommandModes.push('/fix');
+            }
             return false;
+        },
+        /**
+         * The response handler aliases to the edit handler.
+         */
+        handleResponse: async (text, options = {}) => {
+            const editCmd = window.ArcadeCommandManager.getCommand('edit');
+            if (editCmd && typeof editCmd.handleResponse === 'function') {
+                return await editCmd.handleResponse(text, options);
+            }
+            return { handled: false };
         },
         getSuggestions: (args = '') => {
             const editCmd = window.ArcadeCommandManager.getCommand('edit');

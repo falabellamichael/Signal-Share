@@ -1763,11 +1763,13 @@ async function publishProcessedGameFiles(options = {}) {
 
 async function publishCustomGameFromAi(payload = {}) {
     if (!currentUser) {
+        console.warn('[Mini-Games] AI Publish rejected: No current user session.');
         return { ok: false, error: 'auth-required', message: 'Sign in to publish games to the workshop.' };
     }
 
     const payloadMode = `${payload.mode || payload.action || payload.operation || ''}`.trim().toLowerCase();
     const wantsUpdate = payloadMode === 'update' || payloadMode === 'edit' || payloadMode === 'improve';
+    console.debug('[Mini-Games] AI Publish Request:', { payloadMode, wantsUpdate, currentUser: currentUser?.id, payload });
 
     const explicitIdCandidates = [
         payload.gameId,
