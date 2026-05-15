@@ -464,7 +464,8 @@ window.ArcadeWorkshopManager = {
         if (!jsonStr || typeof jsonStr !== 'string') return null;
         let clean = jsonStr.trim();
         
-        // Remove markdown code fences if wrapped
+        // Remove common LLM prefixes like "JSON:" or "```json"
+        clean = clean.replace(/^(?:JSON|Output):\s*/i, '').trim();
         clean = clean.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/i, '').trim();
 
         const attemptParse = (str) => {
@@ -475,10 +476,18 @@ window.ArcadeWorkshopManager = {
         let result = attemptParse(clean);
         if (result) return result;
 
-        // 2. Sanitize unescaped characters in strings
+        // 2. Fix "Smart Quotes" and other non-standard chars
+        let standardized = clean
+            .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"') // Smart double quotes
+            .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'"); // Smart single quotes
+            
+        result = attemptParse(standardized);
+        if (result) return result;
+
+        // 3. Sanitize unescaped characters in strings
         let sanitized = "", inString = false, escaped = false;
-        for (let i = 0; i < clean.length; i++) {
-            const char = clean[i];
+        for (let i = 0; i < standardized.length; i++) {
+            const char = standardized[i];
             if (char === '"' && !escaped) { inString = !inString; sanitized += char; }
             else if (inString && !escaped) {
                 if (char === '\n') sanitized += "\\n";
@@ -491,16 +500,16 @@ window.ArcadeWorkshopManager = {
         result = attemptParse(sanitized);
         if (result) return result;
 
-        // 3. Fix common malformations (single quotes, trailing commas, missing quotes on keys)
+        // 4. Fix common malformations (single quotes, trailing commas, missing quotes on keys)
         let fixed = sanitized
-            .replace(/'/g, '"') // Single to double quotes (risky but often needed)
+            .replace(/'/g, '"') // Single to double quotes
             .replace(/,\s*([}\]])/g, '$1') // Trailing commas
             .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3'); // Unquoted keys
 
         result = attemptParse(fixed);
         if (result) return result;
 
-        // 4. Handle truncation (add missing closing braces/brackets)
+        // 5. Handle truncation (add missing closing braces/brackets)
         let openBraces = (fixed.match(/{/g) || []).length - (fixed.match(/}/g) || []).length;
         let openBrackets = (fixed.match(/\[/g) || []).length - (fixed.match(/]/g) || []).length;
         
@@ -513,6 +522,16 @@ window.ArcadeWorkshopManager = {
             if (result) return result;
         }
 
+        // 6. Last resort: if it's still failing, it might be double-encoded or have a leading/trailing trash
+        const firstBrace = fixed.indexOf('{');
+        const lastBrace = fixed.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            result = attemptParse(fixed.substring(firstBrace, lastBrace + 1));
+            if (result) return result;
+        }
+
+        // Final log for debugging (won't be visible to user unless they open console)
+        console.debug('[Arcade: RobustParse] All parsing attempts failed for string:', jsonStr);
         return null;
     },
 
