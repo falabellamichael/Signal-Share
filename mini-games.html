@@ -722,21 +722,68 @@
             padding: 0;
         }
 
+        .workshop-code-editor {
+            width: 100%;
+            min-height: 260px;
+            height: auto;
+            display: grid;
+            grid-template-columns: minmax(46px, auto) minmax(0, 1fr);
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            overflow: hidden;
+            flex: 0 0 auto;
+        }
+
+        .workshop-code-editor:focus-within {
+            border-color: rgba(102, 192, 244, 0.55);
+            box-shadow: 0 0 0 2px rgba(102, 192, 244, 0.15);
+        }
+
+        .workshop-edit-line-numbers {
+            min-height: 260px;
+            height: 100%;
+            overflow: hidden;
+            background: rgba(2, 8, 16, 0.62);
+            border-right: 1px solid rgba(102, 192, 244, 0.16);
+            color: rgba(145, 180, 205, 0.64);
+            padding: 12px 10px 12px 8px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            text-align: right;
+            user-select: none;
+            white-space: pre;
+        }
+
+        .workshop-edit-line-number {
+            min-width: 2ch;
+            height: 1.45em;
+            line-height: 1.45;
+            border-radius: 4px;
+            padding: 0 2px;
+        }
+
+        .workshop-edit-line-number.is-error-line {
+            background: rgba(255, 120, 120, 0.22);
+            color: #ffb7b7;
+            font-weight: 800;
+        }
+
         .workshop-edit-content {
             width: 100%;
             min-height: 260px;
             height: auto;
             resize: none;
-            background: rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
             color: #d6e0ea;
             padding: 12px;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             font-size: 0.8rem;
             line-height: 1.45;
             outline: none;
-            flex: 0 0 auto;
             max-height: none;
             overflow-y: hidden;
         }
@@ -768,13 +815,12 @@
             user-select: none;
         }
 
-        body.workshop-editor-resizing .workshop-edit-content {
+        body.workshop-editor-resizing .workshop-code-editor {
             pointer-events: none;
         }
 
         .workshop-edit-content:focus {
-            border-color: rgba(102, 192, 244, 0.55);
-            box-shadow: 0 0 0 2px rgba(102, 192, 244, 0.15);
+            outline: none;
         }
 
         .workshop-edit-actions {
@@ -818,7 +864,9 @@
                 grid-template-columns: 1fr;
             }
 
-            .workshop-edit-content {
+            .workshop-code-editor,
+            .workshop-edit-content,
+            .workshop-edit-line-numbers {
                 min-height: 220px;
                 height: auto;
             }
@@ -1708,7 +1756,10 @@
                         </div>
                     </div>
 
-                    <textarea id="workshop-edit-file-content" class="workshop-edit-content" spellcheck="false" oninput="handleWorkshopEditContentInput()"></textarea>
+                    <div id="workshop-code-editor" class="workshop-code-editor">
+                        <div id="workshop-edit-line-numbers" class="workshop-edit-line-numbers" aria-hidden="true"></div>
+                        <textarea id="workshop-edit-file-content" class="workshop-edit-content" spellcheck="false" oninput="handleWorkshopEditContentInput()" onscroll="syncWorkshopEditorLineNumbers()"></textarea>
+                    </div>
                     <div id="workshop-edit-resize-handle" class="workshop-edit-resize-handle" onmousedown="startWorkshopEditorResize(event)" role="separator" aria-label="Drag to resize code editor" aria-orientation="horizontal"></div>
 
                     <div class="workshop-edit-actions">
@@ -1948,7 +1999,7 @@
         });
     </script>
     <script src="companion-ai-core.js?v=1.5"></script>
-    <script src="mini-games.js?v=3.1"></script>
+    <script src="mini-games.js?v=3.2"></script>
     <script src="arcade-commands/manager.js?v=1.2"></script>
     <script src="arcade-commands/edit.js?v=1.3"></script>
     <script src="arcade-commands/rewrite.js?v=1.2"></script>

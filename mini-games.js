@@ -308,6 +308,7 @@ let workshopEditToolsExpanded = false;
 let workshopEditorManualHeight = 0;
 let workshopEditorResizeSession = null;
 let workshopEditorAutosizeRaf = 0;
+let workshopEditorHighlightedLine = 0;
 const workshopEditDraftCache = new Map();
 const workshopEditPendingFilesByGame = new Map();
 const workshopEditCoverDraftByGame = new Map();
@@ -979,30 +980,266 @@ function extractInlineScriptsFromHtml(html = '') {
     return scripts;
 }
 
+function maskJavaScriptCommentsAndStrings(code = '') {
+    const source = `${code || ''}`;
+    let masked = '';
+    let state = 'code';
+    let escaped = false;
+    for (let i = 0; i < source.length; i += 1) {
+        const char = source[i];
+        const next = source[i + 1] || '';
+
+        if (state === 'line-comment') {
+            if (char === '\n') {
+                state = 'code';
+                masked += '\n';
+            } else {
+                masked += ' ';
+            }
+            continue;
+        }
+
+        if (state === 'block-comment') {
+            if (char === '*' && next === '/') {
+                masked += '  ';
+                i += 1;
+                state = 'code';
+            } else {
+                masked += char === '\n' ? '\n' : ' ';
+            }
+            continue;
+        }
+
+        if (state === 'single-string' || state === 'double-string' || state === 'template-string') {
+            const endChar = state === 'single-string' ? "'" : state === 'double-string' ? '"' : '`';
+            masked += char === '\n' ? '\n' : ' ';
+            if (escaped) {
+                escaped = false;
+            } else if (char === '\\') {
+                escaped = true;
+            } else if (char === endChar) {
+                state = 'code';
+            }
+            continue;
+        }
+
+        if (char === '/' && next === '/') {
+            masked += '  ';
+            i += 1;
+            state = 'line-comment';
+            continue;
+        }
+        if (char === '/' && next === '*') {
+            masked += '  ';
+            i += 1;
+            state = 'block-comment';
+            continue;
+        }
+        if (char === "'") {
+            masked += ' ';
+            state = 'single-string';
+            escaped = false;
+            continue;
+        }
+        if (char === '"') {
+            masked += ' ';
+            state = 'double-string';
+            escaped = false;
+            continue;
+        }
+        if (char === '`') {
+            masked += ' ';
+            state = 'template-string';
+            escaped = false;
+            continue;
+        }
+
+        masked += char;
+    }
+    return masked;
+}
+
+function collectJavaScriptDeclarationNames(line = '') {
+    const names = [];
+    let match;
+    const lexicalRegex = /\b(?:let|const)\s+([^;]+)/g;
+    while ((match = lexicalRegex.exec(line)) !== null) {
+        const declarationText = `${match[1] || ''}`;
+        declarationText.split(',').forEach((part) => {
+            const name = part.trim().match(/^([A-Za-z_$][\w$]*)/)?.[1];
+            if (name) names.push(name);
+        });
+    }
+
+    const namedRegex = /\b(?:class|function)\s+([A-Za-z_$][\w$]*)/g;
+    while ((match = namedRegex.exec(line)) !== null) {
+        if (match[1]) names.push(match[1]);
+    }
+    return names;
+}
+
+function findDuplicateJavaScriptDeclaration(code = '', targetName = '') {
+    const maskedLines = maskJavaScriptCommentsAndStrings(code).split('\n');
+    const originalLines = `${code || ''}`.split('\n');
+    const seen = new Map();
+    const target = `${targetName || ''}`.trim();
+
+    for (let index = 0; index < maskedLines.length; index += 1) {
+        const names = collectJavaScriptDeclarationNames(maskedLines[index]);
+        for (const name of names) {
+            const first = seen.get(name);
+            const line = index + 1;
+            const column = Math.max(1, (originalLines[index] || '').indexOf(name) + 1);
+            if (first && (!target || target === name)) {
+                return {
+                    name,
+                    line,
+                    column,
+                    previousLine: first.line,
+                    previousColumn: first.column
+                };
+            }
+            if (!first) {
+                seen.set(name, { line, column });
+            }
+        }
+    }
+
+    return null;
+}
+
+function extractJavaScriptSyntaxLocation(error = null) {
+    const stack = `${error?.stack || ''}`;
+    const match = stack.match(/<anonymous>:(\d+):(\d+)/);
+    if (!match) return null;
+    const rawLine = Number.parseInt(match[1], 10) || 0;
+    return {
+        line: Math.max(1, rawLine - 2),
+        column: Number.parseInt(match[2], 10) || 0
+    };
+}
+
 function validateJavaScriptSyntax(code = '', label = 'script') {
-    const source = `${code || ''}`.trim();
-    if (!source) return { ok: true };
+    const source = `${code || ''}`;
+    if (!source.trim()) return { ok: true };
     try {
         // Generated Workshop games are executed as classic scripts by the runner.
         // This catches syntax/runtime-loader issues before saving bad games.
         new Function(source);
         return { ok: true };
     } catch (error) {
+        const errorMessage = `${error?.message || 'invalid JavaScript'}`;
+        const duplicateName = errorMessage.match(/Identifier ['"]([^'"]+)['"] has already been declared/i)?.[1] || '';
+        const duplicate = duplicateName ? findDuplicateJavaScriptDeclaration(source, duplicateName) : null;
+        if (duplicate) {
+            return {
+                ok: false,
+                line: duplicate.line,
+                column: duplicate.column,
+                message: `${label} has JavaScript syntax error at line ${duplicate.line}, column ${duplicate.column}: Identifier '${duplicate.name}' has already been declared (previous declaration at line ${duplicate.previousLine}).`
+            };
+        }
+
+        const location = extractJavaScriptSyntaxLocation(error);
+        if (location?.line) {
+            return {
+                ok: false,
+                line: location.line,
+                column: location.column,
+                message: `${label} has JavaScript syntax error at line ${location.line}${location.column ? `, column ${location.column}` : ''}: ${errorMessage}`
+            };
+        }
+
         return {
             ok: false,
-            message: `${label} has JavaScript syntax error: ${error?.message || 'invalid JavaScript'}`
+            message: `${label} has JavaScript syntax error: ${errorMessage}`
         };
     }
 }
 
-function hasBalancedCssBraces(css = '') {
+function findCssBraceIssue(css = '') {
+    const source = `${css || ''}`;
     let depth = 0;
-    for (const char of `${css || ''}`) {
-        if (char === '{') depth += 1;
-        if (char === '}') depth -= 1;
-        if (depth < 0) return false;
+    let lastOpen = null;
+    let line = 1;
+    let column = 0;
+    let state = 'code';
+    let quote = '';
+    let escaped = false;
+
+    for (let index = 0; index < source.length; index += 1) {
+        const char = source[index];
+        const next = source[index + 1] || '';
+
+        if (char === '\n') {
+            line += 1;
+            column = 0;
+            continue;
+        }
+
+        column += 1;
+
+        if (state === 'comment') {
+            if (char === '*' && next === '/') {
+                index += 1;
+                column += 1;
+                state = 'code';
+            }
+            continue;
+        }
+
+        if (state === 'string') {
+            if (escaped) {
+                escaped = false;
+            } else if (char === '\\') {
+                escaped = true;
+            } else if (char === quote) {
+                state = 'code';
+            }
+            continue;
+        }
+
+        if (char === '/' && next === '*') {
+            index += 1;
+            column += 1;
+            state = 'comment';
+            continue;
+        }
+
+        if (char === '"' || char === "'") {
+            state = 'string';
+            quote = char;
+            escaped = false;
+            continue;
+        }
+
+        if (char === '{') {
+            depth += 1;
+            lastOpen = { line, column };
+            continue;
+        }
+
+        if (char === '}') {
+            depth -= 1;
+            if (depth < 0) {
+                return { line, column, message: 'unexpected closing brace' };
+            }
+        }
     }
-    return depth === 0;
+
+    if (depth !== 0) {
+        return {
+            line: lastOpen?.line || line,
+            column: lastOpen?.column || Math.max(1, column),
+            message: 'unclosed opening brace'
+        };
+    }
+
+    return null;
+}
+
+function hasBalancedCssBraces(css = '') {
+    return !findCssBraceIssue(css);
 }
 
 function hasWorkshopPlaceholderCode(content = '') {
@@ -1094,8 +1331,13 @@ function validateWorkshopGameFiles(files = [], options = {}) {
             if (!syntax.ok) return { ok: false, message: syntax.message, warnings: [] };
         }
         if (/\.css$/i.test(decoded.name) || /text\/css/i.test(decoded.type)) {
-            if (!hasBalancedCssBraces(decoded.content)) {
-                return { ok: false, message: `${decoded.name} has unbalanced CSS braces.`, warnings: [] };
+            const cssIssue = findCssBraceIssue(decoded.content);
+            if (cssIssue) {
+                return {
+                    ok: false,
+                    message: `${decoded.name} has CSS syntax error at line ${cssIssue.line}, column ${cssIssue.column}: ${cssIssue.message}.`,
+                    warnings: []
+                };
             }
         }
     }
@@ -1488,6 +1730,30 @@ function getWorkshopPendingFiles(gameId) {
     return Array.isArray(files) ? files : [];
 }
 
+function getWorkshopEditableFiles(game) {
+    if (!game || !game.id) return [];
+    const byName = new Map();
+    const addEditableFile = (file, isPending = false) => {
+        if (!isWorkshopFileEditable(file)) return;
+        const name = normalizeWorkshopFileName(file.name, 'file.txt');
+        byName.set(name, {
+            ...file,
+            name,
+            isPendingWorkshopEdit: isPending
+        });
+    };
+
+    (Array.isArray(game.files) ? game.files : []).forEach((file) => addEditableFile(file, false));
+    getWorkshopPendingFiles(game.id).forEach((file) => addEditableFile(file, true));
+    return Array.from(byName.values());
+}
+
+function findWorkshopEditableFile(game, fileName) {
+    const targetName = normalizeWorkshopFileName(fileName, '');
+    if (!targetName) return null;
+    return getWorkshopEditableFiles(game).find((file) => `${file.name || ''}` === targetName) || null;
+}
+
 function setWorkshopPendingFiles(gameId, files) {
     if (!gameId) return;
     const normalized = (Array.isArray(files) ? files : []).filter((file) => file && typeof file === 'object');
@@ -1588,6 +1854,100 @@ function clampWorkshopEditorHeight(height) {
     return Math.min(maxHeight, Math.max(minHeight, Math.floor(Number(height) || minHeight)));
 }
 
+function getWorkshopCodeEditorShell() {
+    return document.getElementById('workshop-code-editor');
+}
+
+function syncWorkshopEditorLineNumbers() {
+    const editor = document.getElementById('workshop-edit-file-content');
+    const lineNumbers = document.getElementById('workshop-edit-line-numbers');
+    if (!editor || !lineNumbers) return;
+    lineNumbers.scrollTop = editor.scrollTop;
+}
+
+function updateWorkshopEditorLineNumbers(highlightLine = workshopEditorHighlightedLine) {
+    const editor = document.getElementById('workshop-edit-file-content');
+    const lineNumbers = document.getElementById('workshop-edit-line-numbers');
+    if (!editor || !lineNumbers) return;
+
+    const lineCount = Math.max(1, `${editor.value || ''}`.split('\n').length);
+    const nextHighlight = Math.max(0, Number.parseInt(highlightLine, 10) || 0);
+    if (lineNumbers.dataset.lineCount === `${lineCount}` && lineNumbers.dataset.highlightLine === `${nextHighlight}`) {
+        syncWorkshopEditorLineNumbers();
+        return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    for (let line = 1; line <= lineCount; line += 1) {
+        const row = document.createElement('div');
+        row.className = `workshop-edit-line-number${line === nextHighlight ? ' is-error-line' : ''}`;
+        row.textContent = `${line}`;
+        row.dataset.line = `${line}`;
+        fragment.appendChild(row);
+    }
+
+    lineNumbers.replaceChildren(fragment);
+    lineNumbers.dataset.lineCount = `${lineCount}`;
+    lineNumbers.dataset.highlightLine = `${nextHighlight}`;
+    syncWorkshopEditorLineNumbers();
+}
+
+function setWorkshopEditorHighlightedLine(lineNumber = 0) {
+    workshopEditorHighlightedLine = Math.max(0, Number.parseInt(lineNumber, 10) || 0);
+    updateWorkshopEditorLineNumbers(workshopEditorHighlightedLine);
+}
+
+function parseWorkshopValidationLine(message = '') {
+    const text = `${message || ''}`;
+    const match = text.match(/\bline\s+(\d+)(?:\s*,?\s*column\s+(\d+))?/i);
+    if (!match) return null;
+    return {
+        line: Number.parseInt(match[1], 10) || 0,
+        column: Number.parseInt(match[2] || '0', 10) || 0
+    };
+}
+
+function parseWorkshopValidationFileName(message = '') {
+    const text = `${message || ''}`;
+    return text.match(/\b([A-Za-z0-9_.-]+\.(?:html?|css|js|mjs|cjs|json|txt))\b/)?.[1] || '';
+}
+
+function focusWorkshopValidationTarget(message = '') {
+    const fileName = parseWorkshopValidationFileName(message);
+    const lineInfo = parseWorkshopValidationLine(message);
+    if (!fileName || !workshopEditActiveGameId) return;
+
+    const games = getWorkshopManageableGames();
+    const activeGame = games.find((game) => game.id === workshopEditActiveGameId) || null;
+    if (!findWorkshopEditableFile(activeGame, fileName)) return;
+
+    if (workshopEditActiveFileName !== fileName) {
+        workshopEditActiveFileName = fileName;
+        syncWorkshopEditOverlay();
+    }
+    if (lineInfo?.line) {
+        setWorkshopEditorHighlightedLine(lineInfo.line);
+        window.requestAnimationFrame(() => revealWorkshopEditorLine(lineInfo.line));
+    }
+}
+
+function revealWorkshopEditorLine(lineNumber = 0) {
+    const editor = document.getElementById('workshop-edit-file-content');
+    if (!editor || !lineNumber) return;
+    const lines = `${editor.value || ''}`.split('\n');
+    const targetIndex = Math.max(0, Math.min(lines.length - 1, lineNumber - 1));
+    const before = lines.slice(0, targetIndex).join('\n');
+    const selectionStart = before.length + (targetIndex > 0 ? 1 : 0);
+    const selectionEnd = selectionStart + (lines[targetIndex] || '').length;
+    editor.focus();
+    editor.setSelectionRange(selectionStart, selectionEnd);
+
+    const computed = window.getComputedStyle(editor);
+    const lineHeight = Number.parseFloat(computed.lineHeight) || Number.parseFloat(computed.fontSize) * 1.45 || 18;
+    editor.scrollTop = Math.max(0, (targetIndex * lineHeight) - (editor.clientHeight * 0.45));
+    syncWorkshopEditorLineNumbers();
+}
+
 function startWorkshopEditorResize(event) {
     if (!event || (typeof event.button === 'number' && event.button !== 0)) return;
     const editor = document.getElementById('workshop-edit-file-content');
@@ -1605,7 +1965,12 @@ function startWorkshopEditorResize(event) {
         const nextHeight = clampWorkshopEditorHeight(workshopEditorResizeSession.startHeight + deltaY);
         workshopEditorManualHeight = nextHeight;
         editor.style.height = `${nextHeight}px`;
+        const shell = getWorkshopCodeEditorShell();
+        const lineNumbers = document.getElementById('workshop-edit-line-numbers');
+        if (shell) shell.style.height = `${nextHeight}px`;
+        if (lineNumbers) lineNumbers.style.height = `${nextHeight}px`;
         editor.style.overflowY = editor.scrollHeight > nextHeight ? 'auto' : 'hidden';
+        syncWorkshopEditorLineNumbers();
     };
 
     const onMouseUp = () => {
@@ -1631,13 +1996,15 @@ function queueWorkshopEditorAutosize() {
 function autoSizeWorkshopEditor() {
     const overlay = document.getElementById('workshop-edit-overlay');
     const editor = document.getElementById('workshop-edit-file-content');
+    const shell = getWorkshopCodeEditorShell();
+    const lineNumbers = document.getElementById('workshop-edit-line-numbers');
     if (!overlay || !editor) return;
     if (overlay.hidden || editor.disabled) return;
 
     const minHeight = getWorkshopEditorMinHeight();
     const reservedBottomSpace = 130;
     const overlayRect = overlay.getBoundingClientRect();
-    const editorRect = editor.getBoundingClientRect();
+    const editorRect = (shell || editor).getBoundingClientRect();
     const availableHeight = Math.max(minHeight, Math.floor(overlayRect.bottom - editorRect.top - reservedBottomSpace));
 
     editor.style.height = 'auto';
@@ -1651,7 +2018,10 @@ function autoSizeWorkshopEditor() {
     }
 
     editor.style.height = `${appliedHeight}px`;
+    if (shell) shell.style.height = `${appliedHeight}px`;
+    if (lineNumbers) lineNumbers.style.height = `${appliedHeight}px`;
     editor.style.overflowY = desiredHeight > appliedHeight ? 'auto' : 'hidden';
+    updateWorkshopEditorLineNumbers();
 }
 
 function refreshWorkshopEditMeta() {
@@ -1664,7 +2034,7 @@ function refreshWorkshopEditMeta() {
         return;
     }
 
-    const activeFile = (Array.isArray(activeGame.files) ? activeGame.files : []).find((file) => `${file?.name || ''}` === workshopEditActiveFileName) || null;
+    const activeFile = findWorkshopEditableFile(activeGame, workshopEditActiveFileName);
     const fileName = activeFile?.name || workshopEditActiveFileName || 'No file selected';
     const fileTypeLabel = activeFile ? (activeFile.type || inferFileTypeFromName(activeFile.name)) : 'n/a';
     const pendingCount = getWorkshopPendingFiles(activeGame.id).length;
@@ -1772,8 +2142,19 @@ function removeWorkshopEditPendingFile(encodedName) {
 function setWorkshopEditStatus(message = '', isError = false) {
     const statusEl = document.getElementById('workshop-edit-status');
     if (!statusEl) return;
-    statusEl.textContent = message;
+    const lineInfo = isError ? parseWorkshopValidationLine(message) : null;
+    statusEl.textContent = lineInfo?.line
+        ? `${message} Click to jump to line ${lineInfo.line}.`
+        : message;
     statusEl.style.color = isError ? 'rgba(255, 120, 120, 0.92)' : 'rgba(102, 192, 244, 0.92)';
+    statusEl.style.cursor = lineInfo?.line ? 'pointer' : '';
+    statusEl.onclick = lineInfo?.line
+        ? () => {
+            setWorkshopEditorHighlightedLine(lineInfo.line);
+            revealWorkshopEditorLine(lineInfo.line);
+        }
+        : null;
+    setWorkshopEditorHighlightedLine(lineInfo?.line || 0);
 }
 
 function syncWorkshopModeToggleButtons() {
@@ -1830,12 +2211,22 @@ function syncWorkshopEditOverlay() {
     if (!gameSelect || !fileSelect || !editor || !saveButton || !metaEl || !coverInput || !coverFileInput || !addFilesInput) return;
 
     const disableEditorUi = (message = '') => {
+        const shell = getWorkshopCodeEditorShell();
+        const lineNumbers = document.getElementById('workshop-edit-line-numbers');
         gameSelect.disabled = true;
         fileSelect.disabled = true;
         editor.value = '';
         editor.disabled = true;
         editor.style.height = '';
         editor.style.overflowY = 'hidden';
+        if (shell) shell.style.height = '';
+        if (lineNumbers) {
+            lineNumbers.style.height = '';
+            lineNumbers.replaceChildren();
+            lineNumbers.dataset.lineCount = '0';
+            lineNumbers.dataset.highlightLine = '0';
+        }
+        workshopEditorHighlightedLine = 0;
         saveButton.disabled = true;
         coverInput.value = '';
         coverInput.disabled = true;
@@ -1885,7 +2276,7 @@ function syncWorkshopEditOverlay() {
         return;
     }
 
-    const editableFiles = (Array.isArray(activeGame.files) ? activeGame.files : []).filter(isWorkshopFileEditable);
+    const editableFiles = getWorkshopEditableFiles(activeGame);
     const activeCover = getWorkshopCoverDraftValue(activeGame);
     coverInput.value = activeCover;
     coverInput.disabled = false;
@@ -1895,11 +2286,23 @@ function syncWorkshopEditOverlay() {
     renderWorkshopEditPendingFiles(activeGame.id);
 
     if (editableFiles.length === 0) {
+        const shell = getWorkshopCodeEditorShell();
+        const lineNumbers = document.getElementById('workshop-edit-line-numbers');
         workshopEditActiveFileName = '';
         fileSelect.innerHTML = '<option value="">No editable files</option>';
         fileSelect.disabled = true;
         editor.value = '';
         editor.disabled = true;
+        editor.style.height = '';
+        editor.style.overflowY = 'hidden';
+        if (shell) shell.style.height = '';
+        if (lineNumbers) {
+            lineNumbers.style.height = '';
+            lineNumbers.replaceChildren();
+            lineNumbers.dataset.lineCount = '0';
+            lineNumbers.dataset.highlightLine = '0';
+        }
+        workshopEditorHighlightedLine = 0;
         saveButton.disabled = true;
         metaEl.textContent = `${activeGame.title} has no text-based files available for inline editing.`;
         setWorkshopEditStatus('Add .html/.css/.js/.json/.txt files to edit in this panel.', true);
@@ -1930,6 +2333,7 @@ function syncWorkshopEditOverlay() {
     const cachedDraft = workshopEditDraftCache.get(draftKey);
     editor.value = typeof cachedDraft === 'string' ? cachedDraft : decodeWorkshopFileContent(activeFile);
     editor.disabled = false;
+    setWorkshopEditorHighlightedLine(0);
     saveButton.disabled = false;
     const fileTypeLabel = activeFile.type || inferFileTypeFromName(activeFile.name);
     const pendingCount = getWorkshopPendingFiles(activeGame.id).length;
@@ -1939,6 +2343,7 @@ function syncWorkshopEditOverlay() {
     if (!cachedDraft) {
         setWorkshopEditStatus('Edit the file and click Save Changes.');
     }
+    updateWorkshopEditorLineNumbers();
     queueWorkshopEditorAutosize();
 }
 
@@ -1970,7 +2375,7 @@ function setWorkshopEditActiveGame(gameId, preferredFileName = '') {
         return { ok: false, message: 'Workshop game not found or not editable.' };
     }
 
-    const editableFiles = (Array.isArray(game.files) ? game.files : []).filter(isWorkshopFileEditable);
+    const editableFiles = getWorkshopEditableFiles(game);
     if (editableFiles.length === 0) {
         return { ok: false, message: `${game.title || game.id} has no editable text files.` };
     }
@@ -2004,7 +2409,9 @@ function handleWorkshopEditContentInput() {
     if (!editor || !workshopEditActiveGameId || !workshopEditActiveFileName) return;
     const draftKey = `${workshopEditActiveGameId}::${workshopEditActiveFileName}`;
     workshopEditDraftCache.set(draftKey, editor.value);
+    setWorkshopEditorHighlightedLine(0);
     setWorkshopEditStatus('Unsaved changes.');
+    updateWorkshopEditorLineNumbers();
     queueWorkshopEditorAutosize();
 }
 
@@ -2057,7 +2464,7 @@ async function saveWorkshopEditPanel() {
         if (!file || typeof file !== 'object') return;
         const name = normalizeWorkshopFileName(file.name, 'file.txt');
         const type = file.type || inferFileTypeFromName(name);
-        let content = typeof file.content === 'string' ? file.content : '';
+        let content = name === fileName ? encodeTextAsDataUrl(editor.value, type) : (typeof file.content === 'string' ? file.content : '');
         if (content && !content.startsWith('data:')) {
             content = encodeTextAsDataUrl(content, type);
         }
@@ -2108,7 +2515,9 @@ async function saveWorkshopEditPanel() {
         setWorkshopEditStatus(`Saved workshop changes at ${savedTime}.`);
     } catch (error) {
         console.error('[Mini-Games] Workshop edit save failed:', error);
-        setWorkshopEditStatus(error?.message || 'Failed to save workshop changes.', true);
+        const errorMessage = error?.message || 'Failed to save workshop changes.';
+        focusWorkshopValidationTarget(errorMessage);
+        setWorkshopEditStatus(errorMessage, true);
     } finally {
         saveButton.disabled = false;
     }
@@ -2880,6 +3289,8 @@ window.handleWorkshopEditAddFiles = handleWorkshopEditAddFiles;
 window.removeWorkshopEditPendingFile = removeWorkshopEditPendingFile;
 window.toggleWorkshopEditToolsPanel = toggleWorkshopEditToolsPanel;
 window.startWorkshopEditorResize = startWorkshopEditorResize;
+window.syncWorkshopEditorLineNumbers = syncWorkshopEditorLineNumbers;
+window.revealWorkshopEditorLine = revealWorkshopEditorLine;
 window.revertWorkshopEditCurrentFile = revertWorkshopEditCurrentFile;
 window.saveWorkshopEditPanel = saveWorkshopEditPanel;
 window.getWorkshopGamesForAi = function() {
@@ -2888,8 +3299,7 @@ window.getWorkshopGamesForAi = function() {
         .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0))
         .slice(0, 5) // Drastically reduce memory pressure by only showing top 5 recent games
         .map((game) => {
-            const editableFiles = (Array.isArray(game.files) ? game.files : [])
-                .filter(isWorkshopFileEditable)
+            const editableFiles = getWorkshopEditableFiles(game)
                 .map(f => ({ name: f.name, type: f.type || inferFileTypeFromName(f.name) }));
             
             return {
@@ -2969,6 +3379,7 @@ window.internalApplyWorkshopFileEdit = async function(gameId, fileName, content,
         if (editor) {
             editor.value = content;
             setWorkshopEditStatus('A.I. updated file.');
+            updateWorkshopEditorLineNumbers();
             queueWorkshopEditorAutosize();
         }
         syncWorkshopEditOverlay();
@@ -3076,7 +3487,7 @@ window.getWorkshopFileContent = function(gameId, fileName) {
     const game = customGames.find(g => g.id === gameId);
     if (!game || !canCurrentSessionEditWorkshopGame(game)) return null;
 
-    const file = (Array.isArray(game.files) ? game.files : []).find(f => f.name === fileName);
+    const file = findWorkshopEditableFile(game, fileName);
     if (!file) return null;
 
     // Check draft cache first
@@ -3103,11 +3514,14 @@ window.getWorkshopEditorState = function() {
     const storedContent = activeGameId && activeFileName
         ? window.getWorkshopFileContent(activeGameId, activeFileName)
         : null;
+    const activeFileContent = typeof editorContent === 'string' ? editorContent : storedContent;
 
     return {
         activeGameId,
         activeFileName,
-        activeFileContent: typeof editorContent === 'string' ? editorContent : storedContent,
+        activeFileContent,
+        activeFileLineCount: typeof activeFileContent === 'string' ? Math.max(1, activeFileContent.split('\n').length) : 0,
+        highlightedLine: workshopEditorHighlightedLine || 0,
         activeFileContentSource: typeof editorContent === 'string' ? 'editor' : 'stored',
         isToolsExpanded: !!(typeof workshopEditToolsExpanded !== 'undefined' && workshopEditToolsExpanded)
     };
