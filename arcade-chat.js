@@ -2483,7 +2483,7 @@ window.sendChatMessage = async function (promptOverride = '') {
         const rewriteRequestActive = multiFileEditActive || isWorkshopRewriteIntentPrompt(text, richContext);
         const editRequestActive = rewriteRequestActive || isWorkshopEditIntentPrompt(text, richContext);
         const activeEditorForRequest = getActiveWorkshopEditorContext(richContext);
-        const activeEditorHasSource = !!`${activeEditorForRequest?.activeFileContent || ''}`.trim();
+        const activeEditorHasSource = activeEditorForRequest?.activeFileContent !== null && activeEditorForRequest?.activeFileContent !== undefined;
         if (editRequestActive && hasActiveWorkshopEditor(richContext) && !activeEditorHasSource) {
             const editorName = `${activeEditorForRequest?.activeFileName || 'selected file'}`.trim();
             const replyText = `[Workshop Edit]: I can see ${editorName} selected in the editor, but its source content is not readable yet. Re-select the file in Workshop Edit Mode, then send the edit request again.`;

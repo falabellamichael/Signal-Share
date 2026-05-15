@@ -104,6 +104,41 @@
 
             return false;
         },
+        getSuggestions: (args = '') => {
+            if (typeof window.getWorkshopManageableGames !== 'function') return [];
+            const games = window.getWorkshopManageableGames();
+            if (!Array.isArray(games) || games.length === 0) return [];
+
+            const prompt = `${args || ''}`.trim().toLowerCase();
+            
+            if (!prompt) {
+                return games.map(g => ({
+                    id: g.title,
+                    name: g.title,
+                    description: `Rewrite files in "${g.title}"`
+                }));
+            }
+
+            const matchingGame = games.find(g => prompt.startsWith(g.title.toLowerCase()));
+            if (matchingGame) {
+                const files = Array.isArray(matchingGame.files) ? matchingGame.files : [];
+                const remaining = prompt.substring(matchingGame.title.length).trim();
+                
+                return files.map(f => ({
+                    id: `${matchingGame.title} ${f.name}`,
+                    name: f.name,
+                    description: `Rewrite ${f.name} in "${matchingGame.title}"`
+                })).filter(s => !remaining || s.name.toLowerCase().includes(remaining));
+            }
+
+            return games
+                .filter(g => g.title.toLowerCase().includes(prompt))
+                .map(g => ({
+                    id: g.title,
+                    name: g.title,
+                    description: `Rewrite files in "${g.title}"`
+                }));
+        },
         /**
          * The response handler handles full-file rewrites from the AI reply.
          */
