@@ -3793,7 +3793,6 @@ async function handleArcadeSlashCommand(text, inputElement) {
     }
     return false;
 }
-}
 
 window.startNewChat = startNewChat;
 
