@@ -21,12 +21,28 @@ window.ArcadeWorkshopManager = {
     looksLikeExecutableCode: function(value) {
         const text = `${value || ''}`.trim();
         if (text.length < 80) return false;
+        
         const markers = [
             'function ', 'const ', 'let ', 'var ', '=>',
             'document.', 'addEventListener', '<html', '<!doctype', 'return '
         ];
-        const hitCount = markers.reduce((count, marker) => count + (text.toLowerCase().includes(marker) ? 1 : 0), 0);
-        const structureHits = (text.match(/[{};]/g) || []).length;
+        
+        let hitCount = 0;
+        const lowerText = text.toLowerCase();
+        for (const marker of markers) {
+            if (lowerText.includes(marker)) hitCount++;
+        }
+        
+        // Use a simple loop for structure hits instead of .match() to avoid large array overhead
+        let structureHits = 0;
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (ch === '{' || ch === '}' || ch === ';') {
+                structureHits++;
+                if (structureHits >= 20) break; // We have enough proof
+            }
+        }
+        
         return hitCount >= 2 && structureHits >= 4;
     },
 

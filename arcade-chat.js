@@ -331,16 +331,20 @@ function isLoopbackSiteOrigin() {
  */
 function extractBalancedJsonTagPayload(text, tagName) {
     const source = `${text || ''}`;
-    const upperSource = source.toUpperCase();
-    const marker = `[${`${tagName || ''}`.trim().toUpperCase()}:`;
-    if (!marker || marker === '[:') return null;
+    if (!tagName) return null;
+    
+    const markerPattern = '\\[' + tagName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':';
+    const markerRegex = new RegExp(markerPattern, 'gi');
 
     let searchFrom = 0;
     while (searchFrom < source.length) {
-        const markerIndex = upperSource.indexOf(marker, searchFrom);
-        if (markerIndex < 0) return null;
+        markerRegex.lastIndex = searchFrom;
+        const match = markerRegex.exec(source);
+        if (!match) return null;
 
-        let cursor = markerIndex + marker.length;
+        const markerIndex = match.index;
+        const markerLength = match[0].length;
+        let cursor = markerIndex + markerLength;
         while (cursor < source.length && /\s/.test(source[cursor])) cursor += 1;
         if (source[cursor] !== '{') {
             searchFrom = markerIndex + marker.length;
@@ -3209,7 +3213,7 @@ function buildAiWorkshopFilesFromText(rawText) {
     const codeBlocks = extractAiCodeBlocks(sourceText);
     for (const block of codeBlocks) {
         const code = block.code;
-        const kind = inferAiCodeKind(block.lang, code);
+        const kind = window.ArcadeWorkshopManager.inferCodeKind(block.lang, code);
         files.push({
             name: fileNameFromInfo(block.lang) || nextName(kind),
             type: kind === 'html' ? 'text/html' : kind === 'css' ? 'text/css' : kind === 'js' ? 'text/javascript' : 'text/plain',
@@ -3230,7 +3234,7 @@ function buildAiWorkshopFilesFromText(rawText) {
             if (rawFiles && rawFiles.length > 0 && (rawFiles[0].content || rawFiles[0].code)) {
                 return rawFiles.map(f => ({
                     name: f.name || f.filename || `file-${Math.random().toString(36).slice(2, 5)}.txt`,
-                    type: f.type || inferAiWorkshopFileType(f.name || f.filename),
+                    type: f.type || window.ArcadeWorkshopManager.inferFileType(f.name || f.filename),
                     content: f.content || f.code || ""
                 })).filter(f => f.content);
             }
@@ -3242,8 +3246,8 @@ function buildAiWorkshopFilesFromText(rawText) {
         const contentMatches = sourceText.matchAll(/"(?:content|code)"\s*:\s*"([\s\S]*?)(?<!\\)"/g);
         for (const match of contentMatches) {
             const code = decodeEscapedCodeText(match[1]);
-            if (looksLikeExecutableCode(code)) {
-                const kind = inferAiCodeKind('', code);
+            if (window.ArcadeWorkshopManager.looksLikeExecutableCode(code)) {
+                const kind = window.ArcadeWorkshopManager.inferCodeKind('', code);
                 files.push({
                     name: nextName(kind),
                     type: kind === 'html' ? 'text/html' : kind === 'css' ? 'text/css' : kind === 'js' ? 'text/javascript' : 'text/plain',
@@ -3264,7 +3268,7 @@ function buildAiWorkshopFilesFromText(rawText) {
         fallback = fallback.slice(codeStart).trim();
     }
 
-    if (!looksLikeExecutableCode(fallback)) {
+    if (!window.ArcadeWorkshopManager.looksLikeExecutableCode(fallback)) {
         return [];
     }
 
@@ -3358,7 +3362,7 @@ function looksLikeFullActiveFileContent(fileName = '', generatedContent = '', ol
     const minReasonableLength = Math.max(80, Math.floor(current.length * 0.45));
     if (generated.length < minReasonableLength || generated.length > current.length * 2.5) return false;
     if (kind === 'css') return looksLikeCssPatchContent(generated);
-    if (kind === 'js') return looksLikeExecutableCode(generated);
+    if (kind === 'js') return window.ArcadeWorkshopManager.looksLikeExecutableCode(generated);
     return false;
 }
 
@@ -3468,7 +3472,7 @@ function ensureHtmlReferencesWorkshopFiles(html = '', generatedFiles = [], activ
     for (const file of generatedFiles) {
         const fileName = `${file?.name || ''}`.trim();
         if (!fileName || fileName.toLowerCase() === activeLower) continue;
-        const kind = getWorkshopFileKindFromName(file.name) || inferAiCodeKind('', file.content);
+        const kind = getWorkshopFileKindFromName(file.name) || window.ArcadeWorkshopManager.inferCodeKind('', file.content);
         if (kind === 'css' && file.content?.trim()) cssFiles.push(fileName);
         if (kind === 'js' && file.content?.trim()) jsFiles.push(fileName);
     }
@@ -3576,12 +3580,12 @@ async function tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt = '
         const assetFiles = generatedFiles.filter((file) => {
             const name = `${file?.name || ''}`.trim();
             if (!name || name.toLowerCase() === fileName.toLowerCase()) return false;
-            const kind = getWorkshopFileKindFromName(name) || inferAiCodeKind('', file.content);
+            const kind = getWorkshopFileKindFromName(name) || window.ArcadeWorkshopManager.inferCodeKind('', file.content);
             return (kind === 'js' || kind === 'css') && `${file.content || ''}`.trim();
         });
 
         const hasGeneratedHtmlFile = generatedFiles.some((file) => {
-            const kind = getWorkshopFileKindFromName(file.name) || inferAiCodeKind('', file.content);
+            const kind = getWorkshopFileKindFromName(file.name) || window.ArcadeWorkshopManager.inferCodeKind('', file.content);
             return kind === 'html' && looksLikeFullActiveFileContent(fileName, file.content, oldContent);
         });
 
@@ -3596,7 +3600,7 @@ async function tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt = '
 
             const applyResult = await window.addAiWorkshopFilesToGame(gameId, assetFiles, {
                 activeFileName: fileName,
-                activeFileType: inferAiWorkshopFileType(fileName),
+                activeFileType: window.ArcadeWorkshopManager.inferFileType(fileName),
                 activeFileContent: nextContent
             });
             result.ok = !!applyResult?.ok;
@@ -3611,7 +3615,7 @@ async function tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt = '
 
     if (activeKind === 'html' && !isWorkshopRewriteIntentPrompt(userPrompt, richContext)) {
         const htmlFragment = generatedFiles.find((file) => {
-            const kind = getWorkshopFileKindFromName(file.name) || inferAiCodeKind('', file.content);
+            const kind = getWorkshopFileKindFromName(file.name) || window.ArcadeWorkshopManager.inferCodeKind('', file.content);
             return kind === 'html' && looksLikeHtmlFragment(file.content);
         });
 
@@ -3627,7 +3631,7 @@ async function tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt = '
                 const applyResult = extraFiles.length > 0 && typeof window.addAiWorkshopFilesToGame === 'function'
                     ? await window.addAiWorkshopFilesToGame(gameId, extraFiles, {
                         activeFileName: fileName,
-                        activeFileType: inferAiWorkshopFileType(fileName),
+                        activeFileType: window.ArcadeWorkshopManager.inferFileType(fileName),
                         activeFileContent: nextContent
                     })
                     : await window.internalApplyWorkshopFileEdit(gameId, fileName, nextContent, { save: true });
@@ -3646,7 +3650,7 @@ async function tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt = '
 
     if (isStyleEditPrompt(userPrompt) && (activeKind === 'html' || activeKind === 'css')) {
         const cssFile = generatedFiles.find((file) => {
-            const kind = getWorkshopFileKindFromName(file.name) || inferAiCodeKind('', file.content);
+            const kind = getWorkshopFileKindFromName(file.name) || window.ArcadeWorkshopManager.inferCodeKind('', file.content);
             return kind === 'css' || looksLikeCssPatchContent(file.content);
         });
 
@@ -4007,7 +4011,7 @@ async function tryApplyWorkshopRewriteFromReply(replyText, userPrompt = '', rich
     const activeLower = fileName.toLowerCase();
     let generatedActiveFile = generatedFiles.find((file) => `${file.name || ''}`.toLowerCase() === activeLower)
         || generatedFiles.find((file) => getWorkshopFileKindFromName(file.name) === activeKind)
-        || generatedFiles.find((file) => inferAiCodeKind('', file.content) === activeKind);
+        || generatedFiles.find((file) => window.ArcadeWorkshopManager.inferCodeKind('', file.content) === activeKind);
 
     if (!generatedActiveFile?.content?.trim()) {
         result.reason = 'no-generated-active-file';
@@ -4032,7 +4036,7 @@ async function tryApplyWorkshopRewriteFromReply(replyText, userPrompt = '', rich
     const applyResult = extraFiles.length > 0 && typeof window.addAiWorkshopFilesToGame === 'function'
         ? await window.addAiWorkshopFilesToGame(gameId, extraFiles, {
             activeFileName: fileName,
-            activeFileType: inferAiWorkshopFileType(fileName),
+            activeFileType: window.ArcadeWorkshopManager.inferFileType(fileName),
             activeFileContent: nextContent
         })
         : await window.internalApplyWorkshopFileEdit(gameId, fileName, nextContent, { save: true });
@@ -4089,7 +4093,7 @@ async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '', r
         }
 
         result.reason = generatedPatchResult.reason || 'no-edit-blocks';
-        if (window.showFeedback && looksLikeExecutableCode(replyText)) {
+        if (window.showFeedback && window.ArcadeWorkshopManager.looksLikeExecutableCode(replyText)) {
             window.showFeedback('AI returned code, but it was not safe to apply as a targeted Workshop edit.', true);
         }
         return result;
