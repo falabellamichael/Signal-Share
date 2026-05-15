@@ -1,54 +1,289 @@
+/**
+ * /publish Command
+ * Handles Workshop Arcade publish/update actions from the Arcade chat.
+ */
 (function() {
+    function getWorkshopManager() {
+        return window.ArcadeWorkshopManager || null;
+    }
+
+    function ensureLiveWorkshopPublishedPromptApi() {
+        const manager = getWorkshopManager();
+        if (!manager || typeof manager !== "object") return;
+
+        if (typeof manager.setLiveWorkshopPublishedPrompt !== "function") {
+            manager.setLiveWorkshopPublishedPrompt = function(prompt = "") {
+                const normalizedPrompt = `${prompt || ""}`.trim();
+                manager.liveWorkshopPublishedPrompt = normalizedPrompt;
+                window.__arcadeLiveWorkshopPublishedPrompt = normalizedPrompt;
+                return normalizedPrompt;
+            };
+        }
+
+        if (typeof manager.getLiveWorkshopPublishedPrompt !== "function") {
+            manager.getLiveWorkshopPublishedPrompt = function() {
+                return `${manager.liveWorkshopPublishedPrompt || window.__arcadeLiveWorkshopPublishedPrompt || ""}`.trim();
+            };
+        }
+
+        if (typeof manager.clearLiveWorkshopPublishedPrompt !== "function") {
+            manager.clearLiveWorkshopPublishedPrompt = function() {
+                manager.liveWorkshopPublishedPrompt = "";
+                window.__arcadeLiveWorkshopPublishedPrompt = "";
+            };
+        }
+    }
+
+    function normalizeArgs(args, inputElement) {
+        if (Array.isArray(args)) return args.join(" ").trim();
+        const directArgs = `${args || ""}`.trim();
+        if (directArgs) return directArgs;
+        return `${inputElement?.value || ""}`.trim();
+    }
+
+    function pushCommandMode(mode) {
+        window.activeArcadeCommandMode = mode;
+        if (!Array.isArray(window.activeArcadeCommandModes)) {
+            window.activeArcadeCommandModes = [];
+        }
+        if (!window.activeArcadeCommandModes.includes(mode)) {
+            window.activeArcadeCommandModes.push(mode);
+        }
+    }
+
+    function showPublishFeedback(message, isError = false) {
+        if (!message) return;
+        if (typeof window.showFeedback === "function") {
+            window.showFeedback(message, isError);
+            return;
+        }
+        if (typeof window.addChatMessage === "function") {
+            window.addChatMessage("ai", isError ? `⚠️ ${message}` : message);
+        }
+    }
+
+    function resolveFallbackPublishTarget(args = "") {
+        if (typeof window.getWorkshopManageableGames !== "function") return null;
+        const games = window.getWorkshopManageableGames();
+        if (!Array.isArray(games) || games.length === 0) return null;
+
+        const editorState = typeof window.getWorkshopEditorState === "function"
+            ? window.getWorkshopEditorState()
+            : null;
+        const activeGameId = `${editorState?.activeGameId || ""}`.trim();
+        const activeGame = activeGameId ? games.find((game) => game.id === activeGameId) : null;
+        if (activeGame) return activeGame;
+
+        const prompt = `${args || ""}`.toLowerCase();
+        if (games.length === 1 || /\b(any|whatever|something|one of my|a game|my game)\b/.test(prompt)) {
+            return games[0];
+        }
+
+        return null;
+    }
+
+    function resolvePublishTarget(args = "") {
+        let targetGame = null;
+        if (typeof window.resolveWorkshopEditGameFromPrompt === "function") {
+            targetGame = window.resolveWorkshopEditGameFromPrompt(args);
+        }
+        if (!targetGame) targetGame = resolveFallbackPublishTarget(args);
+        return targetGame;
+    }
+
+    function getStringFieldFromJsonText(jsonText = "", key = "", fallback = "") {
+        if (!jsonText || !key) return fallback;
+        const safeKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const pattern = new RegExp(`"${safeKey}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "i");
+        const match = jsonText.match(pattern);
+        if (!match) return fallback;
+        try {
+            return JSON.parse(`"${match[1]}"`);
+        } catch (_error) {
+            return match[1];
+        }
+    }
+
+    function recoverPublishData(jsonText = "") {
+        const manager = getWorkshopManager();
+        return {
+            title: getStringFieldFromJsonText(jsonText, "title", ""),
+            gameTitle: getStringFieldFromJsonText(jsonText, "gameTitle", ""),
+            category: getStringFieldFromJsonText(jsonText, "category", "GAME"),
+            description: getStringFieldFromJsonText(jsonText, "description", ""),
+            caption: getStringFieldFromJsonText(jsonText, "caption", ""),
+            mode: getStringFieldFromJsonText(jsonText, "mode", ""),
+            action: getStringFieldFromJsonText(jsonText, "action", ""),
+            gameId: getStringFieldFromJsonText(jsonText, "gameId", ""),
+            id: getStringFieldFromJsonText(jsonText, "id", ""),
+            updateId: getStringFieldFromJsonText(jsonText, "updateId", ""),
+            targetTitle: getStringFieldFromJsonText(jsonText, "targetTitle", ""),
+            updateTitle: getStringFieldFromJsonText(jsonText, "updateTitle", ""),
+            files: typeof manager?.extractFilesGreedily === "function"
+                ? manager.extractFilesGreedily(jsonText)
+                : []
+        };
+    }
+
+    function isExplicitPublishPrompt(prompt = "") {
+        const manager = getWorkshopManager();
+        if (typeof manager?.isExplicitWorkshopPublishIntentPrompt === "function") {
+            return manager.isExplicitWorkshopPublishIntentPrompt(prompt);
+        }
+        const text = `${prompt || ""}`.trim();
+        if (!text) return false;
+        return /^\/publish\b/i.test(text) || /^\[publish\]/i.test(text)
+            || (/\b(?:publish|upload|share|save|release|submit|deploy)\b/i.test(text)
+                && /\b(?:game|project|workshop|arcade|app|logic|code|files)\b/i.test(text));
+    }
+
+    function getEditorFilesFallback(editorState) {
+        if (!editorState?.activeGameId) return [];
+        if (typeof window.getWorkshopManageableGames !== "function") return [];
+        if (typeof window.getWorkshopEditableFiles !== "function") return [];
+
+        const games = window.getWorkshopManageableGames();
+        const activeGame = Array.isArray(games)
+            ? games.find((game) => game.id === editorState.activeGameId)
+            : null;
+        if (!activeGame) return [];
+
+        return window.getWorkshopEditableFiles(activeGame).map((file) => ({
+            name: file.name,
+            type: file.type,
+            content: typeof window.decodeWorkshopFileContent === "function"
+                ? window.decodeWorkshopFileContent(file)
+                : `${file.content || ""}`
+        }));
+    }
+
+    async function publishToWorkshop({ data, text, userPrompt, editorState, actionResult }) {
+        const manager = getWorkshopManager();
+        actionResult.handled = true;
+        actionResult.workshopPublishAttempted = true;
+
+        if (typeof window.publishCustomGameFromAi !== "function") {
+            const feedbackMsg = "Workshop publishing is unavailable in this environment.";
+            console.warn(`[Arcade: Publish] API function missing: ${feedbackMsg}`);
+            showPublishFeedback(feedbackMsg, true);
+            actionResult.errorReason = feedbackMsg;
+            return actionResult;
+        }
+
+        let workshopFiles = typeof manager?.buildPublishFiles === "function"
+            ? manager.buildPublishFiles(data, text)
+            : [];
+
+        if (workshopFiles.length === 0 && typeof window.buildAiWorkshopFilesFromText === "function") {
+            workshopFiles = window.buildAiWorkshopFilesFromText(text);
+        }
+
+        if (workshopFiles.length === 0 && editorState?.activeGameId) {
+            console.log("[Arcade: Publish] No files in AI response, falling back to editor state.");
+            workshopFiles = getEditorFilesFallback(editorState);
+        }
+
+        if (workshopFiles.length === 0) {
+            const feedbackMsg = "Couldn't find game code to publish. Try telling me to 'write the full code and publish'.";
+            console.warn(`[Arcade: Publish] No files found: ${feedbackMsg}`);
+            showPublishFeedback(feedbackMsg, true);
+            actionResult.errorReason = feedbackMsg;
+            return actionResult;
+        }
+
+        const targetGameId = data.gameId
+            || data.id
+            || data.updateId
+            || data.existingGameId
+            || window.activeArcadePublishTarget?.id
+            || "";
+        const publishMode = data.mode || data.action || data.operation || (targetGameId ? "update" : "");
+
+        try {
+            const workshopResult = await window.publishCustomGameFromAi({
+                title: data.title || data.gameTitle || window.activeArcadePublishTarget?.title || "AI Workshop Game",
+                category: data.category || "GAME",
+                description: data.description || data.caption || "",
+                thumbnail: data.thumbnail || data.poster || "",
+                tags: Array.isArray(data.tags) ? data.tags.join(", ") : (typeof data.tags === "string" ? data.tags : ""),
+                files: workshopFiles,
+                mode: publishMode,
+                gameId: targetGameId,
+                updateTitle: data.updateTitle || data.targetTitle || ""
+            });
+
+            if (workshopResult?.ok) {
+                actionResult.workshopPublishSucceeded = true;
+                const actionLabel = workshopResult.updated ? "Updated" : "Published";
+                showPublishFeedback(`${actionLabel} "${workshopResult.title}" in Workshop (${workshopResult.assetCount} assets).`);
+            } else {
+                const apiError = workshopResult?.message || "Failed to publish game to Workshop due to a server issue.";
+                console.error("[Arcade: Publish] Publishing API call failed:", workshopResult);
+                actionResult.errorReason = apiError;
+                showPublishFeedback(apiError, true);
+            }
+        } catch (error) {
+            console.error("[Arcade: Publish] Critical system failure during publish attempt:", error);
+            actionResult.errorReason = `Critical upload error: ${error?.message || "Check console for details."}`;
+            showPublishFeedback(actionResult.errorReason, true);
+        }
+
+        return actionResult;
+    }
+
+    ensureLiveWorkshopPublishedPromptApi();
+
     window.ArcadeCommandManager.register({
-        id: 'publish',
-        description: 'Full project upload/publish to Workshop Arcade.',
+        id: "publish",
+        description: "Full project upload/publish to Workshop Arcade.",
         execute: async (args, inputElement) => {
-            // Smart context: try to resolve a target game from the args
-            let targetGame = null;
-            if (typeof window.resolveWorkshopEditGameFromPrompt === 'function') {
-                targetGame = window.resolveWorkshopEditGameFromPrompt(args);
-            }
+            ensureLiveWorkshopPublishedPromptApi();
 
-            // Store the resolved target globally so handleResponse can use it as a fallback
+            const prompt = normalizeArgs(args, inputElement);
+            const targetGame = resolvePublishTarget(prompt);
+
             window.activeArcadePublishTarget = targetGame;
-            
-            // Set the command mode so subsequent AI responses know this is a publish intent
-            window.activeArcadeCommandMode = '/publish'; 
-            
-            if (targetGame && typeof window.showFeedback === 'function') {
-                window.showFeedback(`Preparing update for "${targetGame.title}"...`);
+
+            const manager = getWorkshopManager();
+            if (typeof manager?.setLiveWorkshopPublishedPrompt === "function") {
+                manager.setLiveWorkshopPublishedPrompt(prompt);
             }
 
-            return false; // Let normal flow continue to AI for response generation
+            pushCommandMode("/publish");
+
+            if (targetGame) {
+                showPublishFeedback(`Preparing update for "${targetGame.title}"...`);
+            }
+
+            return false;
         },
-        getSuggestions: (args = '') => {
-            if (typeof window.getWorkshopManageableGames !== 'function') return [];
+
+        getSuggestions: (args = "") => {
+            if (typeof window.getWorkshopManageableGames !== "function") return [];
             const games = window.getWorkshopManageableGames();
             if (!Array.isArray(games) || games.length === 0) return [];
 
-            const prompt = `${args || ''}`.trim().toLowerCase();
-            
-            // If no args, suggest all games
+            const prompt = `${args || ""}`.trim().toLowerCase();
+
             if (!prompt) {
-                return games.map(g => ({
-                    id: g.title,
-                    name: g.title,
-                    description: `Update or publish "${g.title}"`
+                return games.map((game) => ({
+                    id: game.title,
+                    name: game.title,
+                    description: `Update or publish "${game.title}"`
                 }));
             }
 
-            // Search games
             return games
-                .filter(g => g.title.toLowerCase().includes(prompt))
-                .map(g => ({
-                    id: g.title,
-                    name: g.title,
-                    description: `Update or publish "${g.title}"`
+                .filter((game) => `${game.title || ""}`.toLowerCase().includes(prompt))
+                .map((game) => ({
+                    id: game.title,
+                    name: game.title,
+                    description: `Update or publish "${game.title}"`
                 }));
         },
+
         /**
-         * The response handler handles the [PUBLISH] tag in the AI reply.
-         * This moves the pipeline logic out of the main chat loop, ensuring clean separation and robust error handling.
+         * Handles [PUBLISH: {...}] tags in AI replies and explicit /publish requests.
          */
         handleResponse: async (text, options = {}) => {
             const actionResult = {
@@ -59,152 +294,80 @@
                 errorReason: null
             };
 
-            // 1. Extract the structured payload from the AI's response text
-            const publishPayload = window.ArcadeWorkshopManager.extractBalancedJsonTagPayload(text, 'PUBLISH');
-            
-            // AUTO-EXTRACTION HARDLINING:
-            // If no [PUBLISH] tag is found, but the user's prompt was a publish command,
-            // we should still try to extract files from the response text and proceed.
-            const isExplicitPublish = window.ArcadeWorkshopManager.isExplicitWorkshopPublishIntentPrompt(options.userPrompt || '');
-            
-            if (publishPayload?.jsonText) {
-                actionResult.publishTagDetected = true;
-            } else if (!isExplicitPublish) {
-                return actionResult; // No tag and no explicit publish intent, nothing to do.
-            }
+            ensureLiveWorkshopPublishedPromptApi();
+            const manager = getWorkshopManager();
+            const userPrompt = `${options.userPrompt || manager?.getLiveWorkshopPublishedPrompt?.() || ""}`.trim();
 
-            // 2. Check for conflicts (e.g., publishing while actively editing)
-            const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
-            const isEditingActive = window.ArcadeWorkshopManager.isWorkshopEditIntentPrompt(options.userPrompt || '', { workshopEditor: editorState });
-            const isExplicitPublishIntent = window.ArcadeWorkshopManager.isExplicitWorkshopPublishIntentPrompt(options.userPrompt || '');
-
-            // Skip publishing if we are in an active edit mode AND the user didn't explicitly command a publish action.
-            if (isEditingActive && !isExplicitPublishIntent) {
-                console.warn('[Arcade: Publish] Ignoring [PUBLISH] during active editor edit request.');
-                actionResult.errorReason = 'Cannot publish while actively editing a file.';
-                return actionResult;
-            }
-
-            let data = null;
-            const jsonToParse = publishPayload?.jsonText || '';
-            
             try {
-                // Attempt to parse the JSON payload first using robust parser
-                if (jsonToParse) {
-                    data = window.ArcadeWorkshopManager.robustParseJson(jsonToParse);
-                }
-            } catch (e) {
-                console.error('[Arcade: Publish] Critical error during JSON parsing:', e);
-                actionResult.errorReason = 'Failed to process AI response due to malformed data.';
-                return actionResult;
-            }
-
-            // 3. Fallback/Validation Check if robust parse failed
-            if (!data) {
-                console.warn('[Arcade: Publish] Robust parse failed, attempting greedy field recovery.');
-                data = {
-                    title: jsonToParse.match(/"title"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
-                    category: jsonToParse.match(/"category"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || 'GAME',
-                    description: jsonToParse.match(/"description"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
-                    mode: jsonToParse.match(/"mode"\s*:\s*"([\s\S]*?)(?<!\\)"/i)?.[1] || '',
-                    files: window.ArcadeWorkshopManager.extractFilesGreedily(jsonToParse)
-                };
-            }
-
-            const routeToWorkshop = window.ArcadeWorkshopManager.shouldRouteToWorkshop(data, text, options.userPrompt || '');
-            if (routeToWorkshop) {
-                actionResult.handled = true;
-                actionResult.workshopPublishAttempted = true;
-
-                // Check if the necessary API function exists before proceeding
-                if (typeof window.publishCustomGameFromAi !== 'function') {
-                    const feedbackMsg = "Workshop publishing is unavailable in this environment.";
-                    console.warn(`[Arcade: Publish] API function missing: ${feedbackMsg}`);
-                    if (window.showFeedback) window.showFeedback(feedbackMsg, true);
-                    actionResult.errorReason = feedbackMsg;
-                    actionResult.handled = true; // Still mark as handled to prevent further fallbacks
+                if (!manager) {
+                    actionResult.errorReason = "Workshop manager is unavailable.";
                     return actionResult;
                 }
 
-                // File Extraction Fallback Logic
-                let workshopFiles = window.ArcadeWorkshopManager.buildPublishFiles(data, text);
-                
-                // EXTRA: Try buildAiWorkshopFilesFromText if buildPublishFiles was too strict
-                if (workshopFiles.length === 0 && typeof window.buildAiWorkshopFilesFromText === 'function') {
-                    workshopFiles = window.buildAiWorkshopFilesFromText(text);
+                const publishPayload = typeof manager.extractBalancedJsonTagPayload === "function"
+                    ? manager.extractBalancedJsonTagPayload(text, "PUBLISH")
+                    : null;
+                const explicitPublish = isExplicitPublishPrompt(userPrompt);
+
+                if (publishPayload?.jsonText) {
+                    actionResult.publishTagDetected = true;
+                } else if (!explicitPublish) {
+                    return actionResult;
                 }
-                
-                // If no files were found in the AI response but an editor is active, 
-                // and the AI was prompted to publish/save, use the editor's current content as the source.
-                if (workshopFiles.length === 0 && editorState?.activeGameId) {
-                    console.log('[Arcade: Publish] No files in AI response, falling back to editor state.');
-                    if (typeof window.getWorkshopManageableGames === 'function' && typeof window.getWorkshopEditableFiles === 'function') {
-                        const games = window.getWorkshopManageableGames();
-                        const activeGame = games.find(g => g.id === editorState.activeGameId);
-                        if (activeGame) {
-                            workshopFiles = window.getWorkshopEditableFiles(activeGame).map(f => ({
-                                name: f.name,
-                                type: f.type,
-                                content: (typeof window.decodeWorkshopFileContent === 'function') ? window.decodeWorkshopFileContent(f) : (f.content || '')
-                            }));
-                        }
+
+                const editorState = typeof window.getWorkshopEditorState === "function"
+                    ? window.getWorkshopEditorState()
+                    : null;
+                const isEditingActive = typeof manager.isWorkshopEditIntentPrompt === "function"
+                    ? manager.isWorkshopEditIntentPrompt(userPrompt, { workshopEditor: editorState })
+                    : false;
+
+                if (isEditingActive && !explicitPublish) {
+                    console.warn("[Arcade: Publish] Ignoring [PUBLISH] during active editor edit request.");
+                    actionResult.errorReason = "Cannot publish while actively editing a file.";
+                    return actionResult;
+                }
+
+                const jsonToParse = publishPayload?.jsonText || "";
+                let data = null;
+
+                if (jsonToParse && typeof manager.robustParseJson === "function") {
+                    try {
+                        data = manager.robustParseJson(jsonToParse);
+                    } catch (error) {
+                        console.error("[Arcade: Publish] Critical error during JSON parsing:", error);
                     }
                 }
 
-                if (workshopFiles.length === 0) {
-                    const feedbackMsg = "Couldn't find game code to publish. Try telling me to 'write the full code and publish'.";
-                    console.warn(`[Arcade: Publish] No files found: ${feedbackMsg}`);
-                    if (window.showFeedback) window.showFeedback(feedbackMsg, true);
-                    actionResult.errorReason = feedbackMsg;
-                    actionResult.handled = true; // Mark as handled because we attempted but failed
-                    return actionResult;
+                if (!data && jsonToParse) {
+                    console.warn("[Arcade: Publish] Robust parse failed, attempting field recovery.");
+                    data = recoverPublishData(jsonToParse);
                 }
 
-                // 4. Resolve Target Game ID (Update vs New)
-                const targetGameId = data.gameId || data.id || data.updateId || (window.activeArcadePublishTarget?.id) || '';
-                const publishMode = (data.mode || data.action || (targetGameId ? 'update' : '')) || '';
+                if (!data || typeof data !== "object") {
+                    data = {};
+                }
 
-                // 5. Execute API Call
-                try {
-                    const workshopResult = await window.publishCustomGameFromAi({
-                        title: data.title || data.gameTitle || (window.activeArcadePublishTarget?.title) || 'AI Workshop Game',
-                        category: data.category || 'GAME',
-                        description: data.description || data.caption || '',
-                        thumbnail: data.thumbnail || data.poster || '',
-                        tags: Array.isArray(data.tags) ? data.tags.join(', ') : (typeof data.tags === 'string' ? data.tags : ''),
-                        files: workshopFiles,
-                        mode: publishMode,
-                        gameId: targetGameId,
-                        updateTitle: data.updateTitle || data.targetTitle || ''
+                const routeToWorkshop = explicitPublish
+                    || (typeof manager.shouldRouteToWorkshop === "function" && manager.shouldRouteToWorkshop(data, text, userPrompt));
+
+                if (routeToWorkshop) {
+                    return await publishToWorkshop({
+                        data,
+                        text,
+                        userPrompt,
+                        editorState,
+                        actionResult
                     });
-
-                    if (workshopResult?.ok) {
-                        actionResult.workshopPublishSucceeded = true;
-                        const actionLabel = workshopResult.updated ? 'Updated' : 'Published';
-                        if (window.showFeedback) {
-                            window.showFeedback(`${actionLabel} "${workshopResult.title}" in Workshop (${workshopResult.assetCount} assets).`);
-                        }
-                    } else {
-                        const apiError = workshopResult?.message || 'Failed to publish game to Workshop due to a server issue.';
-                        console.error('[Arcade: Publish] Publishing API call failed:', workshopResult);
-                        actionResult.errorReason = apiError;
-                        if (window.showFeedback) window.showFeedback(apiError, true);
-                    }
-                } catch (e) {
-                    console.error('[Arcade: Publish] Critical system failure during publish attempt:', e);
-                    actionResult.errorReason = `Critical upload error: ${e.message || 'Check console for details.'}`;
-                    if (window.showFeedback) window.showFeedback(actionResult.errorReason, true);
                 }
 
-            } else if (!isExplicitPublish && typeof window.publishPostToSupabase === 'function') {
-                // Route to Standard Social Post (Supabase)
-                // ONLY if this wasn't an explicit workshop command
-                actionResult.handled = true;
+                if (!explicitPublish && typeof window.publishPostToSupabase === "function") {
+                    actionResult.handled = true;
                     try {
                         const postPayload = {
-                            title: data.title || 'Shared Game',
-                            content: data.description || text.substring(0, 500),
-                            type: 'game_link',
+                            title: data.title || "Shared Game",
+                            content: data.description || `${text || ""}`.slice(0, 500),
+                            type: "game_link",
                             metadata: {
                                 aiGenerated: true,
                                 ...data
@@ -212,22 +375,26 @@
                         };
                         const postResult = await window.publishPostToSupabase(postPayload);
                         if (postResult?.ok) {
-                            if (window.showFeedback) window.showFeedback("Posted to Signal Share!");
+                            showPublishFeedback("Posted to Signal Share.");
                         }
-                    } catch (err) {
-                        console.error('[Arcade: Publish] Social post failed:', err);
+                    } catch (error) {
+                        console.error("[Arcade: Publish] Social post failed:", error);
+                        actionResult.errorReason = error?.message || "Social post failed.";
                     }
-                } else {
-                     const feedbackMsg = "Standard posting functionality is unavailable.";
-                     console.warn(`[Arcade: Publish] API function missing: ${feedbackMsg}`);
-                     if (window.showFeedback) window.showFeedback(feedbackMsg, true);
-                     actionResult.errorReason = feedbackMsg;
-            }
+                }
 
-            // Cleanup
-            window.activeArcadePublishTarget = null;
-            return actionResult;
+                return actionResult;
+            } catch (error) {
+                console.error("[Arcade: Publish] Unexpected publish handler error:", error);
+                actionResult.errorReason = error?.message || "Unexpected publish handler error.";
+                showPublishFeedback(actionResult.errorReason, true);
+                return actionResult;
+            } finally {
+                window.activeArcadePublishTarget = null;
+                if (typeof manager?.clearLiveWorkshopPublishedPrompt === "function") {
+                    manager.clearLiveWorkshopPublishedPrompt();
+                }
+            }
         }
     });
 })();
-
