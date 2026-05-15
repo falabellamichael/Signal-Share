@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Deep-Dive | Signal Share Arcade</title>
+    <link rel="stylesheet" href="./questions-guide.css?v=1.6">
+    <link rel="stylesheet" href="./android-optimizations.css?v=1.7">
+    <style>
+        :root {
+            --accent-primary: #8be9fd;
+            --accent-secondary: #ff79c6;
+            --accent-tertiary: #50fa7b;
+            --accent-purple: #bd93f9;
+            --surface-glass: rgba(255, 255, 255, 0.03);
+            --border-glass: rgba(255, 255, 255, 0.12);
+        }
+
+        .deepdive-index {
+            position: sticky;
+            top: calc(10px + var(--status-bar-safe-space, 0px));
+            z-index: 100;
+            margin: 24px auto;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border-glass);
+            background: rgba(15, 15, 20, 0.6);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+            width: fit-content;
+            max-width: 100%;
+            overflow-x: auto;
+            scrollbar-width: none;
+            margin-bottom: 30px;
+        }
+        .deepdive-index::-webkit-scrollbar { display: none; }
+        .deepdive-index ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.82rem;
+            white-space: nowrap;
+        }
+        .deepdive-index a {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 999px;
+            transition: all 200ms ease;
+            font-weight: 500;
+        }
+        .deepdive-index a:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff !important;
+        }
+
+        .questions-page-card {
+            position: relative;
+            overflow: hidden;
+            transition: transform 300ms ease, border-color 300ms ease;
+        }
+        .questions-page-card:hover {
+            border-color: rgba(255,255,255,0.25);
+            transform: translateY(-2px);
+        }
+        .questions-page-card h2 {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.5rem;
+            color: #fff;
+        }
+        .questions-page-card h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 24px;
+            background: var(--accent-primary);
+            border-radius: 2px;
+        }
+
+        .feature-box {
+            background: var(--surface-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            padding: 25px;
+            margin: 20px 0;
+            position: relative;
+        }
+        .feature-box h3 {
+            color: var(--accent-primary);
+            margin-top: 0;
+            font-size: 1.2rem;
+        }
+        .feature-box p {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            opacity: 0.8;
+        }
+
+        .code-snippet {
+            background: #1e1e2e;
+            padding: 20px;
+            border-radius: 14px;
+            margin: 15px 0;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.85rem;
+            color: #cdd6f4;
+            border: 1px solid rgba(255,255,255,0.05);
+            line-height: 1.5;
+        }
+        .code-snippet strong { color: var(--accent-secondary); }
+
+        .flow-diagram {
+            background: rgba(0,0,0,0.2);
+            padding: 20px;
+            border-radius: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin: 20px 0;
+            border: 1px dashed var(--border-glass);
+            flex-wrap: wrap;
+        }
+        .flow-step {
+            background: var(--accent-primary);
+            color: #000;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-weight: 800;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        .flow-arrow { color: rgba(255,255,255,0.2); font-weight: bold; }
+
+        .performance-stat {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--accent-tertiary);
+        }
+        .stat-label {
+            font-size: 0.8rem;
+            opacity: 0.6;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        @media (max-width: 760px) {
+            .deepdive-index {
+                width: calc(100% + 32px);
+                border-radius: 0;
+                margin: 18px -16px;
+                padding: 12px 16px;
+                background: rgba(10, 10, 15, 0.9);
+                top: 0;
+            }
+        }
+    </style>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ theme: 'dark' });
+    </script>
+</head>
+<body class="questions-page">
+  <main class="questions-page-shell">
+    <a class="questions-back-link" href="./arcade-guide.html">← Back to Main Guide</a>
+
+    <p class="questions-page-topline">Advanced Intelligence Protocol</p>
+    <h1 id="ai-deep-dive">Arcade AI Deep-Dive: Optimization Architecture</h1>
+    <p class="questions-page-lede">
+      An technical examination of how the Signal Share AI Companion achieves near-instant response times and minimal hardware footprint through local "Surgical Retrieval" and multimodal compression.
+    </p>
+
+    <!-- Navigation Index -->
+    <nav class="deepdive-index">
+        <ul>
+            <li><a href="#section-vram">VRAM Lifting</a></li>
+            <li><a href="#section-surgical">Surgical Retrieval</a></li>
+            <li><a href="#section-search">Search Engine</a></li>
+            <li><a href="#section-multimodal">Vision Opts</a></li>
+        </ul>
+    </nav>
+
+    <!-- VRAM Section -->
+    <section class="questions-page-card" id="section-vram">
+      <h2>1. Pillar: VRAM Lifting</h2>
+      <p>Local AI models are greedy consumers of GPU memory. To ensure your game's frame rate never drops, the companion uses an autonomous memory manager.</p>
+      
+      <div class="feature-box" style="border-left: 4px solid var(--accent-secondary);">
+          <h3>Idle-Unload Protocol</h3>
+          <p>The companion monitors the "Last Interaction" timestamp. If no activity is detected for 15 minutes, a silent trigger is sent to the local LLM bridge to flush the model from memory.</p>
+          
+          <div class="performance-stat">
+              <span class="stat-value">0 MB</span>
+              <span class="stat-label">Idle VRAM Usage</span>
+          </div>
+          
+          <p>When you send a new message, the model is re-cached in the background. This ensures that a 12GB GPU feels like a 24GB GPU by rotating models in and out based on demand.</p>
+      </div>
+    </section>
+
+    <!-- Surgical Retrieval Section -->
+    <section class="questions-page-card" id="section-surgical">
+      <h2>2. Pillar: Surgical Retrieval</h2>
+      <p>Context window bloat is the #1 cause of AI latency. Our "Skeleton Indexing" engine keeps the LLM lean.</p>
+      
+      <div class="feature-box" style="border-left: 4px solid var(--accent-primary);">
+          <h3>Skeleton Indexing</h3>
+          <p>Instead of reading your entire 10,000-line HTML file, the system extracts a structural map. The AI sees function names and IDs, but not the heavy implementation logic, until it specifically asks for it.</p>
+          
+          <div class="flow-diagram">
+            <span class="flow-step">Index Map</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">LLM Analysis</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">[FIND] Request</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">Surgical Snippet</span>
+          </div>
+
+          <div class="code-snippet">
+            <strong>[AI REQUEST]:</strong> [FIND: updatePlayerScore]<br>
+            <strong>[SYSTEM RESPONSE]:</strong> // Lines 452-490 provided...
+          </div>
+      </div>
+    </section>
+
+    <!-- Search Engine Section -->
+    <section class="questions-page-card" id="section-search">
+      <h2>3. Pillar: AI-Powered Search Engine</h2>
+      <p>The AI is integrated directly into the editor's scroll and highlight engine.</p>
+      
+      <div class="feature-box" style="border-left: 4px solid var(--accent-tertiary);">
+          <h3>Natural Language Navigation</h3>
+          <p>When you ask "Where is the boss battle logic?", the AI triggers a fuzzy-search pass. It calculates the line number and sends a sync command to the editor.</p>
+          
+          <div class="code-snippet">
+            // Internal Logic:<br>
+            window.findInWorkshopEditor(query) -> textarea.scrollTop = line * lineHeight;
+          </div>
+          
+          <p>This "Heavy Lifting" allows you to navigate massive files without manually scrolling, making the chatbot your literal eyes in the codebase.</p>
+      </div>
+    </section>
+
+    <!-- Vision Section -->
+    <section class="questions-page-card" id="section-multimodal">
+      <h2>4. Multimodal Optimization</h2>
+      <p>Vision tasks are the most resource-intensive. We use a "Vision Safe" pipeline for all attachments.</p>
+      
+      <div class="feature-box" style="border-left: 4px solid var(--accent-purple);">
+          <h3>Automated Compression</h3>
+          <p>Every image you paste into the chat is intercepted and optimized before being sent to the LLM's vision encoder.</p>
+          
+          <div class="performance-stat">
+              <span class="stat-value">85%</span>
+              <span class="stat-label">VRAM Reduction</span>
+          </div>
+
+          <ul>
+              <li><strong>Downsampling:</strong> 4K images are reduced to 512px.</li>
+              <li><strong>Greyscale Filtering:</strong> Optional mode for logic-only analysis.</li>
+              <li><strong>Bridge Batching:</strong> Images are sent as base64-compressed strings to avoid file-system latency.</li>
+          </ul>
+      </div>
+    </section>
+
+    <div class="questions-guide-footer">
+      <div class="footer-links">
+          <a href="./mini-games.html">Arcade Home</a>
+          <a href="./arcade-guide.html">Main Guide</a>
+      </div>
+      <span>Signal Share AI Research Laboratory</span><br>
+      <span>&copy; 2026 Advanced Agentic Series</span>
+    </div>
+  </main>
+</body>
+</html>

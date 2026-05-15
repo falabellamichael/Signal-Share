@@ -336,6 +336,40 @@
       </div>
     </section>
 
+    <!-- AI Optimization & Performance -->
+    <section class="questions-page-card">
+      <h2>AI Optimization & Performance</h2>
+      <p>The Arcade Companion is designed to run efficiently even on consumer-grade hardware by using advanced "VRAM Lifting" and "Surgical Retrieval" techniques.</p>
+      
+      <div class="architecture-grid">
+        <div class="arch-card">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+            VRAM Lifting
+          </h3>
+          <p>To preserve your GPU memory, the system uses an aggressive idle-unload protocol. If you haven't chatted for 15 minutes, the LLM is automatically flushed from VRAM. Additionally, vision-based attachments are compressed to 512px on the fly.</p>
+        </div>
+        <div class="arch-card">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            Surgical Retrieval
+          </h3>
+          <p>For large files, the system sends a lightweight "Skeleton Index" instead of the full code. The AI then uses the <strong>[FIND]</strong> protocol to retrieve only the specific blocks it needs, keeping the context window clean and fast.</p>
+        </div>
+      </div>
+
+      <div class="code-block" style="border-left: 3px solid var(--accent-green);">
+        <strong style="color: var(--accent-green);">Smart Editor Search</strong><br>
+        The AI is now a literal search engine for your code. You can use <code>/find &lt;text&gt;</code> or simply ask: "Where is the movement logic?" to have the companion automatically locate and highlight code in the editor.
+      </div>
+
+      <p style="text-align: center; margin-top: 20px;">
+        <a href="./arcade-ai-deepdive.html" style="color: var(--accent-blue); font-weight: 800; text-decoration: none; border: 1px solid var(--accent-blue); padding: 10px 20px; border-radius: 8px; display: inline-block;">
+          🚀 View the AI Performance Deep-Dive →
+        </a>
+      </p>
+    </section>
+
     <!-- Troubleshooting -->
     <section class="questions-page-card">
       <h2>Troubleshooting & FAQ</h2>
