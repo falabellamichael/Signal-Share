@@ -634,10 +634,23 @@ function isWorkshopEditIntentPrompt(message = "", workshopContext = null) {
     if (isWorkshopEditorReferencePrompt(text) && hasActiveWorkshopEditor(workshopContext)) return true;
 
     const editVerb = /\b(edit|fix|repair|change|update|modify|replace|remove|delete|add|insert|improve|tweak|adjust|refactor|rename|debug|rewrite)\b/.test(text);
-    if (!editVerb) return false;
+    const activeEditor = hasActiveWorkshopEditor(workshopContext);
+    const editorCodeGenVerb = /\b(write|create|generate|code|build|make|implement|integrate)\b/.test(text);
+    if (!editVerb && !(activeEditor && editorCodeGenVerb)) return false;
 
     const fileTarget = /\b(editor|website|workshop|file|code|html|css|javascript|js|game|page|button|screen|layout|style)\b/.test(text);
-    return hasActiveWorkshopEditor(workshopContext) || fileTarget;
+    return activeEditor || fileTarget;
+}
+
+function isWorkshopMultiFileEditPrompt(message = "", workshopContext = null) {
+    const text = `${message || ''}`.trim().toLowerCase();
+    if (!text || !hasActiveWorkshopEditor(workshopContext)) return false;
+    const editor = getActiveWorkshopEditorContext(workshopContext);
+    if (getWorkshopFileKindFromName(editor?.activeFileName || '') !== 'html') return false;
+
+    const wantsAssetFile = /\b(?:javascript|java\s*script|js|script|module|css|stylesheet|style\s*sheet|separate\s+file|new\s+file|add\s+(?:a\s+)?file|external\s+(?:file|script|stylesheet))\b/.test(text);
+    const wantsImplementation = /\b(?:add|write|create|generate|code|build|make|handle|implement|integrate|wire|connect|need|want|same|also)\b/.test(text);
+    return wantsAssetFile && wantsImplementation;
 }
 
 function isWorkshopRewriteIntentPrompt(message = "", workshopContext = null) {
@@ -684,17 +697,23 @@ function getProtocolDirectives(userPrompt = "", workshopContext = null) {
     if (commandMode === '/rewrite') {
         directives.push(buildWorkshopRewriteDirective(workshopContext, userPrompt));
     } else if (commandMode === '/edit' || commandMode === '/fix') {
-        directives.push(buildWorkshopEditDirective(workshopContext, commandMode === '/fix', userPrompt));
+        directives.push(isWorkshopMultiFileEditPrompt(text, workshopContext)
+            ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
+            : buildWorkshopEditDirective(workshopContext, commandMode === '/fix', userPrompt));
     } else if (commandMode === '/publish') {
         directives.push(buildWorkshopPublishDirective());
     } else {
         // 2. AUTO-DETECTION (Fallback)
         if (editorIsActive && !isExplicitWorkshopPublishIntentPrompt(text)) {
-            directives.push(buildWorkshopEditDirective(workshopContext, false, userPrompt));
+            directives.push(isWorkshopMultiFileEditPrompt(text, workshopContext)
+                ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
+                : buildWorkshopEditDirective(workshopContext, false, userPrompt));
         } else if (isWorkshopPublishIntentPrompt(text)) {
             directives.push(buildWorkshopPublishDirective());
         } else if (editorIsActive && isWorkshopEditIntentPrompt(text, workshopContext)) {
-            directives.push(buildWorkshopEditDirective(workshopContext, false, userPrompt));
+            directives.push(isWorkshopMultiFileEditPrompt(text, workshopContext)
+                ? buildWorkshopRewriteDirective(workshopContext, userPrompt)
+                : buildWorkshopEditDirective(workshopContext, false, userPrompt));
         }
     }
 
@@ -764,6 +783,9 @@ function buildWorkshopRewriteDirective(workshopContext = null, userPrompt = '') 
         `Return one fenced ${fenceLang || 'text'} code block containing the complete replacement content for the active file.`,
         'If extra files are useful, add separate fenced code blocks for them and include a filename in the fence info, such as ```css filename=styles.css or ```javascript filename=game.js.',
         'The editor will add or replace those extra files in the same Workshop game.',
+        'For HTML feature additions that use JavaScript or CSS files, return BOTH the complete updated active HTML file and every named extra file it references.',
+        'The updated HTML must include any required DOM controls/displays and exact <script src="..."></script> or <link href="..."> references for the extra files.',
+        'Do not return a standalone JavaScript/CSS snippet when the active file is HTML.',
         'Do not wrap the answer in [EDIT] tags.',
         'Do not ask the user to provide the source file.',
         'Do not return explanations before or after the code blocks.',
@@ -2576,7 +2598,8 @@ window.sendChatMessage = async function () {
         };
 
         const editorReferenceActive = isWorkshopEditorReferencePrompt(text);
-        const rewriteRequestActive = isWorkshopRewriteIntentPrompt(text, richContext);
+        const multiFileEditActive = isWorkshopMultiFileEditPrompt(text, richContext);
+        const rewriteRequestActive = multiFileEditActive || isWorkshopRewriteIntentPrompt(text, richContext);
         const editRequestActive = rewriteRequestActive || isWorkshopEditIntentPrompt(text, richContext);
         const activeEditorForRequest = getActiveWorkshopEditorContext(richContext);
         const activeEditorHasSource = !!`${activeEditorForRequest?.activeFileContent || ''}`.trim();
@@ -3432,6 +3455,43 @@ async function tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt = '
     }
 
     const activeKind = getWorkshopFileKindFromName(fileName);
+    if (activeKind === 'html') {
+        const assetFiles = generatedFiles.filter((file) => {
+            const name = `${file?.name || ''}`.trim();
+            if (!name || name.toLowerCase() === fileName.toLowerCase()) return false;
+            const kind = getWorkshopFileKindFromName(name) || inferAiCodeKind('', file.content);
+            return (kind === 'js' || kind === 'css') && `${file.content || ''}`.trim();
+        });
+
+        const hasGeneratedHtmlFile = generatedFiles.some((file) => {
+            const kind = getWorkshopFileKindFromName(file.name) || inferAiCodeKind('', file.content);
+            return kind === 'html' && looksLikeFullActiveFileContent(fileName, file.content, oldContent);
+        });
+
+        if (assetFiles.length > 0 && !hasGeneratedHtmlFile) {
+            const nextContent = ensureHtmlReferencesWorkshopFiles(oldContent, assetFiles, fileName);
+            result.attempted = true;
+            if (typeof window.addAiWorkshopFilesToGame !== 'function') {
+                result.reason = 'add-files-function-unavailable';
+                result.message = 'Workshop file add function is unavailable.';
+                return result;
+            }
+
+            const applyResult = await window.addAiWorkshopFilesToGame(gameId, assetFiles, {
+                activeFileName: fileName,
+                activeFileType: inferAiWorkshopFileType(fileName),
+                activeFileContent: nextContent
+            });
+            result.ok = !!applyResult?.ok;
+            result.reason = result.ok ? '' : (applyResult?.message || 'asset-file-apply-failed');
+            result.message = result.ok
+                ? `Added ${assetFiles.length} generated asset file${assetFiles.length === 1 ? '' : 's'} and linked ${fileName}.`
+                : result.reason;
+            if (window.showFeedback) window.showFeedback(result.message, !result.ok);
+            return result;
+        }
+    }
+
     if (activeKind === 'html' && !isWorkshopRewriteIntentPrompt(userPrompt, richContext)) {
         const htmlFragment = generatedFiles.find((file) => {
             const kind = getWorkshopFileKindFromName(file.name) || inferAiCodeKind('', file.content);
@@ -3771,7 +3831,8 @@ async function executeArcadeChatActions(text, options = {}) {
 
 async function tryApplyWorkshopRewriteFromReply(replyText, userPrompt = '', richContext = null, target = {}) {
     const result = { attempted: false, ok: false, reason: '', message: '' };
-    if (!isWorkshopRewriteIntentPrompt(userPrompt, richContext)) return result;
+    if (!isWorkshopRewriteIntentPrompt(userPrompt, richContext)
+        && !isWorkshopMultiFileEditPrompt(userPrompt, richContext)) return result;
     if (typeof window.getWorkshopFileContent !== 'function'
         || typeof window.internalApplyWorkshopFileEdit !== 'function') {
         result.reason = 'workshop-edit-functions-unavailable';
@@ -3858,7 +3919,8 @@ async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '', r
         return result;
     }
 
-    if (isWorkshopRewriteIntentPrompt(userPrompt, richContext)) {
+    if (isWorkshopRewriteIntentPrompt(userPrompt, richContext)
+        || isWorkshopMultiFileEditPrompt(userPrompt, richContext)) {
         const rewriteResult = await tryApplyWorkshopRewriteFromReply(replyText, userPrompt, richContext, { gameId, fileName });
         if (rewriteResult.attempted) {
             return {
