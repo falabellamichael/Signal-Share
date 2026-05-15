@@ -809,6 +809,49 @@
             border-radius: 3px;
             background: rgba(255, 255, 255, 0.56);
             transform: translate(-50%, -50%);
+            transition: all 0.2s;
+        }
+
+        /* Color Assistant */
+        .workshop-color-panel {
+            background: rgba(13, 20, 30, 0.98);
+            border: 1px solid rgba(102, 192, 244, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown {
+            from { transform: translateY(-10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .workshop-color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+            gap: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+        .workshop-color-swatch {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 2px solid rgba(255,255,255,0.15);
+            cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .workshop-color-swatch:hover {
+            transform: scale(1.15);
+            border-color: #fff;
+            box-shadow: 0 0 15px rgba(255,255,255,0.3);
+        }
+        #workshop-color-assistant-btn.active {
+            background: var(--steam-light) !important;
+            color: #000 !important;
+            border-color: var(--steam-light) !important;
         }
 
         body.workshop-editor-resizing {
@@ -1760,6 +1803,15 @@
                         </div>
                     </div>
 
+                    <div id="workshop-color-panel" class="workshop-color-panel" hidden>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <div style="font-size: 0.65rem; font-weight: 900; letter-spacing: 1px; color: var(--steam-light); text-transform: uppercase;">Color Discovery <span id="workshop-color-count" style="opacity: 0.5; margin-left: 5px;"></span></div>
+                            <button type="button" class="workshop-edit-secondary-btn" onclick="triggerWorkshopNativeColorPicker()" style="font-size: 0.65rem; padding: 4px 10px;">+ New Color</button>
+                            <input type="color" id="workshop-native-color-picker" style="display: none;" onchange="insertNewWorkshopColor(event)">
+                        </div>
+                        <div id="workshop-color-grid" class="workshop-color-grid"></div>
+                    </div>
+
                     <div id="workshop-code-editor" class="workshop-code-editor">
                         <div id="workshop-edit-line-numbers" class="workshop-edit-line-numbers" aria-hidden="true"></div>
                         <textarea id="workshop-edit-file-content" class="workshop-edit-content" spellcheck="false" oninput="handleWorkshopEditContentInput()" onscroll="syncWorkshopEditorLineNumbers()"></textarea>
@@ -1769,6 +1821,9 @@
                     <div class="workshop-edit-actions">
                         <button type="button" class="play-btn" id="workshop-edit-save-btn" onclick="saveWorkshopEditPanel()" style="font-size: 0.85rem; padding: 12px 22px; margin: 0; letter-spacing: 1px;">Save Changes</button>
                         <button type="button" class="workshop-edit-secondary-btn" onclick="revertWorkshopEditCurrentFile()">Revert File</button>
+                        <button type="button" class="workshop-edit-secondary-btn" id="workshop-color-assistant-btn" onclick="toggleWorkshopColorAssistant()" title="Color Wheel Assistant" style="padding: 10px; display: flex; align-items: center; justify-content: center; width: 42px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.92 0 1.5-.58 1.5-1.5 0-.43-.17-.81-.44-1.1-.27-.29-.44-.7-.44-1.15 0-.92.78-1.75 1.7-1.75h2.2c3.25 0 5.98-2.73 5.98-5.98 0-4.71-4.75-8.52-10.5-8.52z"/></svg>
+                        </button>
                     </div>
                     <div id="workshop-edit-status" class="workshop-edit-status"></div>
                 </section>
@@ -2010,6 +2065,7 @@
     <script src="workshop-editor-ai-fix.js?v=1.0"></script>
     <script src="workshop-editor-search.js?v=1.0"></script>
     <script src="workshop-editor-vision.js?v=1.0"></script>
+    <script src="workshop-editor-color.js?v=1.0"></script>
     <script src="arcade-commands/manager.js?v=1.2"></script>
     <script src="arcade-commands/edit.js?v=1.3"></script>
     <script src="arcade-commands/rewrite.js?v=1.2"></script>
