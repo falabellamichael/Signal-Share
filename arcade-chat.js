@@ -3036,6 +3036,9 @@ window.sendChatMessage = async function (promptOverride = '') {
             updateChatStatus('active');
 
             // Execute any tags in the reply
+            if (window.showFeedback && (reply.includes('[PUBLISH]') || isWorkshopPublishIntentPrompt(text))) {
+                window.showFeedback("🕹️ Processing Workshop Assets...", false, 4000);
+            }
             const actionResult = await executeArcadeChatActions(reply, { userPrompt: text });
 
             // AUTO-REFINE: If AI requested a search, automatically fetch it and trigger a follow-up
@@ -3280,7 +3283,7 @@ function buildAiWorkshopFilesFromHistory() {
         const entry = arcadeChatHistory[i];
         if (!entry || entry.role !== 'assistant' || typeof entry.content !== 'string') continue;
         assistantMessagesChecked += 1;
-        const files = buildAiWorkshopFilesFromText(entry.content);
+        const files = window.ArcadeWorkshopManager.buildFilesFromText(entry.content);
         if (files.length > 0) return files;
         if (assistantMessagesChecked >= 8) break;
     }
@@ -3562,7 +3565,7 @@ async function tryApplyGeneratedWorkshopPatchFromReply(replyText, userPrompt = '
         return result;
     }
 
-    const generatedFiles = buildAiWorkshopFilesFromText(replyText);
+    const generatedFiles = window.ArcadeWorkshopManager.buildFilesFromText(replyText);
     if (generatedFiles.length === 0) {
         result.reason = 'no-generated-code-blocks';
         return result;
@@ -3994,7 +3997,7 @@ async function tryApplyWorkshopRewriteFromReply(replyText, userPrompt = '', rich
         return result;
     }
 
-    const generatedFiles = buildAiWorkshopFilesFromText(replyText);
+    const generatedFiles = window.ArcadeWorkshopManager.buildFilesFromText(replyText);
     if (generatedFiles.length === 0) {
         result.reason = 'no-generated-code-blocks';
         return result;
@@ -4318,7 +4321,7 @@ async function tryAutoPublishWorkshopFromReply(replyText, userPrompt = '') {
         return result;
     }
 
-    const files = buildAiWorkshopPublishFiles({}, replyText);
+    const files = window.ArcadeWorkshopManager.buildPublishFiles({}, replyText);
     if (files.length === 0) {
         result.reason = 'no-files';
         return result;
