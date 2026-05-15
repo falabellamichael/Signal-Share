@@ -61,11 +61,17 @@
 
             // 1. Extract the structured payload from the AI's response text
             const publishPayload = window.ArcadeWorkshopManager.extractBalancedJsonTagPayload(text, 'PUBLISH');
-            if (!publishPayload?.jsonText) {
-                return actionResult; // No [PUBLISH] tag found
+            
+            // AUTO-EXTRACTION HARDLINING:
+            // If no [PUBLISH] tag is found, but the user's prompt was a publish command,
+            // we should still try to extract files from the response text and proceed.
+            const isExplicitPublish = window.ArcadeWorkshopManager.isExplicitWorkshopPublishIntentPrompt(options.userPrompt || '');
+            
+            if (publishPayload?.jsonText) {
+                actionResult.publishTagDetected = true;
+            } else if (!isExplicitPublish) {
+                return actionResult; // No tag and no explicit publish intent, nothing to do.
             }
-
-            actionResult.publishTagDetected = true;
 
             // 2. Check for conflicts (e.g., publishing while actively editing)
             const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
