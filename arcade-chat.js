@@ -261,7 +261,11 @@ function speakArcadeText(text) {
     utterance.pitch = 1.0;
 
     // ERROR HANDLING: If it fails, log it for debugging
-    utterance.onerror = (e) => console.error('[Voice] TTS Error:', e);
+    utterance.onerror = (e) => {
+        // 'interrupted' is normal when we call .cancel() to start a new message
+        if (e.error === 'interrupted') return;
+        console.error('[Voice] TTS Error:', e);
+    };
 
     arcadeSpeechSynth.speak(utterance);
 }
