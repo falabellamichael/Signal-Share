@@ -4046,19 +4046,9 @@ function setupCloseParityHandlers() {
     // Restore collapsed state
     const isSteamShell = document.querySelector('.steam-shell') || document.documentElement.classList.contains('is-steam-shell');
     const isAndroidPlatform = document.documentElement.classList.contains('platform-android');
-    let wasCollapsed = localStorage.getItem('arcade-chat-collapsed');
-
-    // Default to collapsed (tab mode) on steam-shell pages if no preference exists
-    if (wasCollapsed === null && isSteamShell) {
-        wasCollapsed = 'true';
-    } else {
-        wasCollapsed = wasCollapsed === 'true';
-    }
-
-    // Keep Android steam-shell pages in tab-open mode by default so content always fits.
-    if (isSteamShell && isAndroidPlatform) {
-        wasCollapsed = true;
-    }
+    // Force to collapsed (tab mode) on every new load/open to start at "smallest"
+    // but we still preserve the 'arcade-chat-sidebar-width' for when it's expanded.
+    const wasCollapsed = true;
 
     if (wasCollapsed) {
         const sidebar = document.querySelector('.steam-chat-sidebar');

@@ -314,7 +314,7 @@ let workshopLastLibraryCategory = 'all';
 let workshopEditActiveGameId = '';
 let workshopEditActiveFileName = '';
 let workshopEditToolsExpanded = false;
-let workshopEditorManualHeight = 0;
+let workshopEditorManualHeight = Number(localStorage.getItem('ss-workshop-editor-height')) || 0;
 let workshopEditorResizeSession = null;
 let workshopEditorAutosizeRaf = 0;
 let workshopEditorHighlightedLine = 0;
@@ -2237,6 +2237,7 @@ function startWorkshopEditorResize(event) {
         const deltaY = moveEvent.clientY - workshopEditorResizeSession.startY;
         const nextHeight = clampWorkshopEditorHeight(workshopEditorResizeSession.startHeight + deltaY);
         workshopEditorManualHeight = nextHeight;
+        localStorage.setItem('ss-workshop-editor-height', nextHeight);
         editor.style.height = `${nextHeight}px`;
         const shell = getWorkshopCodeEditorShell();
         const lineNumbers = document.getElementById('workshop-edit-line-numbers');
@@ -2275,25 +2276,16 @@ function autoSizeWorkshopEditor() {
     if (overlay.hidden || editor.disabled) return;
 
     const minHeight = getWorkshopEditorMinHeight();
-    const reservedBottomSpace = 130;
-    const overlayRect = overlay.getBoundingClientRect();
-    const editorRect = (shell || editor).getBoundingClientRect();
-    const availableHeight = Math.max(minHeight, Math.floor(overlayRect.bottom - editorRect.top - reservedBottomSpace));
-
-    editor.style.height = 'auto';
-    const desiredHeight = Math.max(minHeight, editor.scrollHeight + 2);
-    const nextHeight = Math.min(desiredHeight, availableHeight);
-    let appliedHeight = Math.max(minHeight, nextHeight);
+    let appliedHeight = minHeight;
 
     if (workshopEditorManualHeight > 0) {
-        workshopEditorManualHeight = clampWorkshopEditorHeight(workshopEditorManualHeight);
-        appliedHeight = Math.max(appliedHeight, workshopEditorManualHeight);
+        appliedHeight = clampWorkshopEditorHeight(workshopEditorManualHeight);
     }
 
     editor.style.height = `${appliedHeight}px`;
     if (shell) shell.style.height = `${appliedHeight}px`;
     if (lineNumbers) lineNumbers.style.height = `${appliedHeight}px`;
-    editor.style.overflowY = desiredHeight > appliedHeight ? 'auto' : 'hidden';
+    editor.style.overflowY = editor.scrollHeight > (appliedHeight + 5) ? 'auto' : 'hidden';
     updateWorkshopEditorLineNumbers();
 }
 

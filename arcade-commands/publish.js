@@ -217,7 +217,6 @@
                      console.warn(`[Arcade: Publish] API function missing: ${feedbackMsg}`);
                      if (window.showFeedback) window.showFeedback(feedbackMsg, true);
                      actionResult.errorReason = feedbackMsg;
-                }
             }
 
             // Cleanup
