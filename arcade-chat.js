@@ -444,7 +444,15 @@ function stripArcadeProtocolTags(content = "") {
         });
     }
 
-    // 4. Any remaining stray tags
+    // 4. Greedy Cleanup Fallback (for truncated/malformed tags)
+    // If [PUBLISH: or [EDIT: or [PLANNING: is left over, it's likely a truncated tag that failed balanced parsing.
+    const greedyRegex = /\[(PUBLISH|EDIT|FILE_EDIT|Workshop\/Edit|PLANNING|IMPLEMENTATION_PLAN|TEST_PLAN):[\s\S]*$/gi;
+    if (greedyRegex.test(text)) {
+        hadTags = true;
+        text = text.replace(greedyRegex, "").trim();
+    }
+
+    // 5. Any remaining stray tags
     const strayRegex = /\[(?:\/)?(ARCADE|DUCKDUCKGO|OPEN|PUBLISH|COMPOSE|PLANNING|IMPLEMENTATION_PLAN|TEST_PLAN|EDIT|FILE_EDIT|Workshop\/Edit)\]/gi;
     if (strayRegex.test(text)) {
         hadTags = true;
@@ -774,6 +782,13 @@ function getProtocolDirectives(userPrompt = "", workshopContext = null, attachme
 
     if (modes.has('/publish')) {
         directives.push(buildWorkshopPublishDirective());
+    }
+
+    if (modes.has('/deep')) {
+        directives.push('[DEEP_REASONING_MODE]');
+        directives.push('The user has requested a DEEP reasoning session.');
+        directives.push('You MUST provide an exhaustive [PLANNING] block before any implementation.');
+        directives.push('Focus on edge cases, performance bottlenecks, and architectural integrity.');
     }
 
     // 2. AUTO-DETECTION (Only if no explicit command modes were set)
@@ -2605,30 +2620,58 @@ window.sendChatMessage = async function (promptOverride = '') {
             || /^(?:edit|fix|rewrite|publish|clear|help)\s*\//i.test(text);
         const originalText = text;
         if (isCommand) {
-            const cmdHandled = await handleArcadeSlashCommand(text, input);
-            if (cmdHandled) {
-                isSendingChatMessage = false;
-                return;
+            try {
+                const cmdHandled = await handleArcadeSlashCommand(text, input);
+                if (cmdHandled) {
+                    // Ensure the user sees their command even if it was handled locally (except /clear which is silent)
+                    if (!text.toLowerCase().startsWith('/clear')) {
+                        addChatMessage('user', originalText);
+                        arcadeChatHistory.push({ role: 'user', content: originalText, attachment: null });
+                        saveCurrentChat();
+                    }
+                    isSendingChatMessage = false;
+                    return;
+                }
+                // Update internal text to stripped version for intent detection
+                text = input.value.trim();
+            } catch (cmdErr) {
+                console.error("[Arcade Chat] Slash command failed:", cmdErr);
+                // Fall back to treating it as a normal message if the command failed
             }
-            // Update internal text to stripped version for intent detection
-            text = input.value.trim();
         }
 
+        // --- ALWAYS add the user message to UI and history now (if not handled by /clear) ---
+        addChatMessage('user', originalText);
+        arcadeChatHistory.push({
+            role: 'user',
+            content: originalText,
+            attachment: currentChatAttachment ? {
+                data: currentChatAttachment,
+                type: currentChatAttachmentType,
+                name: currentChatAttachmentName
+            } : null
+        });
+        saveCurrentChat();
+
+        // Clear input early to feel responsive
+        input.value = '';
+        const attachmentSnapshot = currentChatAttachment ? {
+            data: currentChatAttachment,
+            type: currentChatAttachmentType,
+            name: currentChatAttachmentName
+        } : null;
+        clearChatAttachment();
+
         if (isWorkshopStyleRevertPrompt(text)) {
-            addChatMessage('user', originalText);
-            input.value = '';
             const revertResult = await tryRevertLocalWorkshopStyleEnhancement();
             const revertReply = revertResult.message || 'No AI style enhancement block was found to revert.';
             addChatMessage('ai', `[Workshop Edit]: ${revertReply}`);
-            arcadeChatHistory.push({ role: 'user', content: originalText, attachment: null });
             arcadeChatHistory.push({ role: 'assistant', content: `[Workshop Edit]: ${revertReply}` });
             saveCurrentChat();
             updateChatStatus(revertResult.ok ? 'active' : 'idle');
             isSendingChatMessage = false;
             return;
         }
-
-        addChatMessage('user', originalText);
 
         const directSteamTarget = parseDirectSteamCommand(text);
         if (directSteamTarget) {
@@ -2637,8 +2680,6 @@ window.sendChatMessage = async function (promptOverride = '') {
             arcadeChatHistory.push({ role: 'assistant', content: response });
             saveCurrentChat();
             updateChatStatus('active');
-            input.value = '';
-            clearChatAttachment();
             isSendingChatMessage = false;
             return;
         }
@@ -2653,27 +2694,11 @@ window.sendChatMessage = async function (promptOverride = '') {
             arcadeChatHistory.push({ role: 'assistant', content: response });
             saveCurrentChat();
             updateChatStatus('active');
-            input.value = '';
-            clearChatAttachment();
             isSendingChatMessage = false;
             return;
         }
 
         const workshopPublishIntent = isWorkshopPublishIntentPrompt(text);
-
-        // Add to history with attachment if present
-        arcadeChatHistory.push({
-            role: 'user',
-            content: originalText,
-            attachment: currentChatAttachment ? {
-                data: currentChatAttachment,
-                type: currentChatAttachmentType,
-                name: currentChatAttachmentName
-            } : null
-        });
-
-        input.value = '';
-        clearChatAttachment();
 
         if (allowsLocalStyleFallback(text)) {
             window.activeArcadeCommandMode = null;
@@ -2794,7 +2819,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                 attachment: arcadeChatHistory[arcadeChatHistory.length - 1]?.attachment || null
             })
             : '';
-        const attachment = arcadeChatHistory[arcadeChatHistory.length - 1]?.attachment || null;
+        const attachment = attachmentSnapshot;
         const protocolDirectives = getProtocolDirectives(text, richContext, attachment);
         const workshopEditContext = editRequestActive
             ? `[ACTIVE_WORKSHOP_EDITOR]\n${JSON.stringify(contextForModel.workshopEditor || null)}`
@@ -2831,7 +2856,6 @@ window.sendChatMessage = async function (promptOverride = '') {
             }
 
             const protocolAwareMessage = buildProtocolAwareUserMessage(text);
-            const attachment = arcadeChatHistory[arcadeChatHistory.length - 1].attachment;
             const compactHistory = Array.isArray(normalizedHistory) ? normalizedHistory.slice(editRequestActive ? -4 : -10) : [];
             const maxContextChars = editRequestActive ? 9000 : 12000;
             const compactPageContext = `${fullPageContext || ''}`.slice(0, maxContextChars); // Keep small local models responsive
@@ -3230,6 +3254,26 @@ function buildAiWorkshopFilesFromText(rawText) {
                 })).filter(f => f.content);
             }
         } catch (e) { }
+    }
+
+    // NEW: Greedy Extraction for truncated JSON content (Handles cases where JSON is malformed/truncated but code is present)
+    if (files.length === 0) {
+        const contentMatches = sourceText.matchAll(/"(?:content|code)"\s*:\s*"([\s\S]*?)(?<!\\)"/g);
+        for (const match of contentMatches) {
+            const code = decodeEscapedCodeText(match[1]);
+            if (looksLikeExecutableCode(code)) {
+                const kind = inferAiCodeKind('', code);
+                files.push({
+                    name: nextName(kind),
+                    type: kind === 'html' ? 'text/html' : kind === 'css' ? 'text/css' : kind === 'js' ? 'text/javascript' : 'text/plain',
+                    content: code
+                });
+            }
+        }
+    }
+
+    if (files.length > 0) {
+        return files;
     }
 
     let fallback = sourceText.split(/\[PUBLISH:\s*/i)[0] || '';
