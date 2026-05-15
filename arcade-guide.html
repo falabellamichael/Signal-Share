@@ -7,34 +7,134 @@
     <link rel="stylesheet" href="./questions-guide.css?v=1.6">
     <link rel="stylesheet" href="./android-optimizations.css?v=1.7">
     <style>
+      :root {
+          --accent-blue: #67c1f5;
+          --accent-green: #a4d007;
+          --accent-purple: #bd93f9;
+          --bg-card: rgba(255, 255, 255, 0.03);
+          --border-subtle: rgba(255, 255, 255, 0.08);
+      }
       .command-list {
-          background: rgba(0,0,0,0.2);
-          border-radius: 8px;
-          padding: 15px;
-          margin: 15px 0;
-          font-family: monospace;
+          background: rgba(0,0,0,0.3);
+          border-radius: 12px;
+          padding: 20px;
+          margin: 20px 0;
+          font-family: 'Space Grotesk', monospace;
+          border: 1px solid var(--border-subtle);
       }
       .command-item {
-          margin-bottom: 10px;
+          margin-bottom: 20px;
+          padding-bottom: 15px;
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+      }
+      .command-item:last-child {
+          border-bottom: none;
+          margin-bottom: 0;
+          padding-bottom: 0;
+      }
+      .command-header {
           display: flex;
-          gap: 15px;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 8px;
       }
       .command-name {
-          color: #8be9fd;
-          font-weight: bold;
-          min-width: 80px;
+          color: var(--accent-blue);
+          font-weight: 800;
+          font-size: 1.1rem;
+          text-transform: uppercase;
+          letter-spacing: 1px;
       }
       .command-desc {
-          opacity: 0.8;
+          opacity: 0.9;
+          line-height: 1.6;
+          font-size: 0.9rem;
+      }
+      .command-example {
+          margin-top: 10px;
+          padding: 10px;
+          background: rgba(0,0,0,0.4);
+          border-radius: 6px;
+          font-size: 0.85rem;
+          color: #ccc;
+          border-left: 3px solid var(--accent-blue);
       }
       .feature-tag {
-          background: rgba(164, 208, 7, 0.2);
-          color: #a4d007;
+          background: rgba(164, 208, 7, 0.15);
+          color: var(--accent-green);
+          padding: 3px 10px;
+          border-radius: 20px;
+          font-size: 0.65rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+      }
+      .architecture-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 20px;
+          margin: 25px 0;
+      }
+      .arch-card {
+          background: var(--bg-card);
+          padding: 20px;
+          border-radius: 16px;
+          border: 1px solid var(--border-subtle);
+          transition: transform 0.3s ease;
+      }
+      .arch-card:hover {
+          transform: translateY(-5px);
+          background: rgba(255, 255, 255, 0.05);
+      }
+      .arch-card h3 {
+          margin-top: 0;
+          color: var(--accent-blue);
+          font-size: 1rem;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+      }
+      .troubleshooting-item {
+          margin-bottom: 25px;
+      }
+      .troubleshooting-item strong {
+          display: block;
+          color: #ff5555;
+          margin-bottom: 5px;
+          font-size: 1rem;
+      }
+      .status-pill {
+          display: inline-block;
           padding: 2px 8px;
           border-radius: 4px;
           font-size: 0.7rem;
-          font-weight: 800;
-          margin-left: 10px;
+          font-weight: bold;
+          margin-right: 5px;
+      }
+      .status-online { background: rgba(103, 193, 245, 0.2); color: #67c1f5; }
+      .status-busy { background: rgba(255, 184, 108, 0.2); color: #ffb86c; }
+      .code-block {
+          background: #1a1b26;
+          padding: 15px;
+          border-radius: 8px;
+          font-family: 'Space Grotesk', monospace;
+          font-size: 0.85rem;
+          overflow-x: auto;
+          border: 1px solid #333;
+          margin: 15px 0;
+      }
+      .step-number {
+          background: var(--accent-blue);
+          color: #000;
+          width: 24px;
+          height: 24px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          font-weight: 900;
+          font-size: 0.8rem;
+          margin-right: 10px;
       }
     </style>
     <script>
@@ -52,79 +152,213 @@
   <main class="questions-page-shell">
     <a class="questions-back-link" href="./mini-games.html">← Back to Arcade</a>
 
-    <p class="questions-page-topline">Official Documentation</p>
-    <h1>Arcade Workshop & AI Guide</h1>
+    <p class="questions-page-topline">The Technical Manual</p>
+    <h1>Arcade Workshop & AI Companion</h1>
     <p class="questions-page-lede">
-      The Arcade Workshop is a powerful environment for creating, editing, and publishing mini-games. 
-      Integrated with a local AI Companion, you can build entire experiences using natural language.
+      Master the art of rapid prototyping. The Arcade Workshop is a professional-grade sandbox where natural language meets real-time execution. Use the local AI Companion to build, debug, and publish applications instantly.
     </p>
 
+    <!-- Architecture Section -->
     <section class="questions-page-card">
-      <h2>The AI Companion</h2>
-      <p>
-        The AI Chatbot in the Arcade isn't just for conversation—it's a system-aware assistant. 
-        It can see your active workshop project, analyze your code, and perform file operations on your behalf.
-      </p>
-      <ul>
-        <li><strong>Context Awareness</strong>: The AI knows which game you are editing and can read all its files.</li>
-        <li><strong>Surgical Edits</strong>: It can perform line-by-line patching to fix bugs or add features.</li>
-        <li><strong>Full Rewrites</strong>: For major changes, it can replace entire files with optimized versions.</li>
-      </ul>
-    </section>
-
-    <section class="questions-page-card">
-      <h2>Workshop Slash Commands</h2>
-      <p>Use these commands in the Arcade Chat to trigger specific automation workflows:</p>
-      <div class="command-list">
-        <div class="command-item">
-            <span class="command-name">/edit</span>
-            <span class="command-desc">Request specific code changes to your active workshop file.</span>
+      <h2>System Architecture</h2>
+      <p>Understanding how the AI interacts with your system is key to mastering the workflow.</p>
+      <div class="architecture-grid">
+        <div class="arch-card">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+            Local LLM Bridge
+          </h3>
+          <p>The companion connects to a local AI server (running Llama 3 or Qwen) on your PC. This ensures your code and data remain private and secure while providing low-latency intelligence.</p>
         </div>
-        <div class="command-item">
-            <span class="command-name">/fix</span>
-            <span class="command-desc">Automatically analyze the active file for bugs and apply surgical patches.</span>
+        <div class="arch-card">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            Desktop Controller
+          </h3>
+          <p>The "Desktop Bridge" (Node.js) allows the AI to execute PowerShell commands, control Spotify/YouTube, and perform file-system operations safely within the workshop sandbox.</p>
         </div>
-        <div class="command-item">
-            <span class="command-name">/publish</span>
-            <span class="command-desc">Prepare and publish your current workshop project to the global library.</span>
-        </div>
-        <div class="command-item">
-            <span class="command-name">/clear</span>
-            <span class="command-desc">Reset the chat context and clear the conversation history.</span>
-        </div>
-        <div class="command-item">
-            <span class="command-name">/help</span>
-            <span class="command-desc">Display a list of all available commands and their usage.</span>
+        <div class="arch-card">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            Secure Sandbox
+          </h3>
+          <p>Workshop games run in isolated environments. The AI uses a <code>[FILE_EDIT]</code> protocol to patch your code without the risk of breaking unrelated files or system configurations.</p>
         </div>
       </div>
     </section>
 
+    <!-- Slash Commands Deep Dive -->
     <section class="questions-page-card">
-      <h2>System & Media Control</h2>
-      <p>
-        The AI Companion can also bridge with your Windows PC to control media playback. 
-        Try asking the AI to perform these actions:
-      </p>
-      <ul>
-        <li><strong>Spotify Control</strong>: "Play some music on Spotify", "Next track", or "Pause Spotify".</li>
-        <li><strong>YouTube Control</strong>: "Play the YouTube video", "Previous video", or "Set volume to 50%".</li>
-        <li><strong>Status Query</strong>: "What is playing right now?" or "Is the desktop bridge active?"</li>
-      </ul>
-      <p style="font-size: 0.85rem; opacity: 0.6; margin-top: 15px;">
-        *Note: These commands require the <strong>Signal Share Desktop Bridge</strong> to be running on your host machine.
+      <h2>Advanced Slash Commands</h2>
+      <p>Commands are the fastest way to communicate intent. Each command triggers a specialized AI agent optimized for that specific task.</p>
+      
+      <div class="command-list">
+        <!-- /EDIT -->
+        <div class="command-item">
+          <div class="command-header">
+            <span class="command-name">/edit</span>
+            <span class="feature-tag">Surgical</span>
+          </div>
+          <p class="command-desc">The primary tool for incremental development. Use this to describe a feature or change you want in the currently open file. The AI will look for the most relevant lines and replace them with updated code.</p>
+          <div class="command-example">
+            <strong>Example:</strong> "/edit add a scoring system that gives 10 points for every blue circle collected"
+          </div>
+        </div>
+
+        <!-- /FIX -->
+        <div class="command-item">
+          <div class="command-header">
+            <span class="command-name">/fix</span>
+            <span class="feature-tag">Autonomous</span>
+          </div>
+          <p class="command-desc">Triggers an "Audit & Repair" cycle. The AI analyzes your entire file for syntax errors, logical bugs, or performance bottlenecks and attempts to apply a patch automatically.</p>
+          <div class="command-example">
+            <strong>Example:</strong> "/fix my character is getting stuck in the walls on the left side"
+          </div>
+        </div>
+
+        <!-- /PUBLISH -->
+        <div class="command-item">
+          <div class="command-header">
+            <span class="command-name">/publish</span>
+            <span class="feature-tag">Sync</span>
+          </div>
+          <p class="command-desc">Deploys your project to the Signal Share Cloud. It automatically bundles your HTML, CSS, and JS files, assigns a unique ID, and makes your game playable in the global Library.</p>
+          <div class="command-example">
+            <strong>Example:</strong> "/publish I'm done with the Space Shooter v1.0"
+          </div>
+        </div>
+
+        <!-- /CLEAR -->
+        <div class="command-item">
+          <div class="command-header">
+            <span class="command-name">/clear</span>
+          </div>
+          <p class="command-desc">Wipes the AI's "short-term memory" for the current session. Use this if the AI becomes confused or if you want to switch to a completely different task without previous context interference.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Prototyping Masterclass -->
+    <section class="questions-page-card">
+      <h2>Prototyping Masterclass</h2>
+      <p>How to go from an idea to a playable game in under 5 minutes:</p>
+      
+      <div style="margin-top: 20px;">
+        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+          <span class="step-number">1</span>
+          <div>
+            <strong>Define the Boilerplate</strong>
+            <p style="margin: 5px 0 0; font-size: 0.9rem; opacity: 0.8;">Ask the AI for a basic template: "Create a simple HTML5 canvas game with a player that moves with WASD keys."</p>
+          </div>
+        </div>
+        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+          <span class="step-number">2</span>
+          <div>
+            <strong>Iterative Styling</strong>
+            <p style="margin: 5px 0 0; font-size: 0.9rem; opacity: 0.8;">Apply the Signal Share aesthetic: "Use /edit to make the background a dark midnight gradient with a subtle starfield effect using particles."</p>
+          </div>
+        </div>
+        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+          <span class="step-number">3</span>
+          <div>
+            <strong>Passive Telemetry</strong>
+            <p style="margin: 5px 0 0; font-size: 0.9rem; opacity: 0.8;">The system is smart. If you use a variable named <code>score</code> or <code>kills</code>, the global leaderboard system will automatically detect it. You don't need to write any backend code.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Game Logic Recipes -->
+    <section class="questions-page-card">
+      <h2>Game Logic Recipes</h2>
+      <p>Quick formulas to prompt the AI for complex game mechanics:</p>
+      
+      <div class="code-block" style="border-left: 3px solid var(--accent-purple);">
+        <strong style="color: var(--accent-purple);">Recipe: Screen Shake</strong><br>
+        "Add a function to shake the screen for 200ms whenever the player takes damage."
+      </div>
+
+      <div class="code-block" style="border-left: 3px solid var(--accent-purple);">
+        <strong style="color: var(--accent-purple);">Recipe: Parallax Background</strong><br>
+        "Create 3 layers of stars that move at different speeds to create a 3D depth effect."
+      </div>
+
+      <div class="code-block" style="border-left: 3px solid var(--accent-purple);">
+        <strong style="color: var(--accent-purple);">Recipe: State Management</strong><br>
+        "Implement a simple state machine with 'START', 'PLAYING', and 'GAMEOVER' states."
+      </div>
+
+      <div class="code-block" style="border-left: 3px solid var(--accent-purple);">
+        <strong style="color: var(--accent-purple);">Recipe: Procedural Generation</strong><br>
+        "Write a function to generate random platforms that never overlap and are always reachable by the player jump height."
+      </div>
+    </section>
+
+    <!-- Media & System Commands -->
+    <section class="questions-page-card">
+      <h2>Media & System Control</h2>
+      <p>The companion isn't just for coding—it's your PC's command center.</p>
+      <div class="code-block">
+        &gt; "Pause Spotify and skip to the next track"<br>
+        &gt; "Check if the YouTube media bridge is connected"<br>
+        &gt; "What song is currently playing on my PC?"<br>
+        &gt; "Set system volume to 20%"
+      </div>
+      <p style="font-size: 0.85rem; background: rgba(103, 193, 245, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(103, 193, 245, 0.2);">
+        <strong style="color: var(--accent-blue);">Pro Tip:</strong> You can use these commands while your game is running to change the vibe of your development session without leaving the Arcade.
       </p>
     </section>
 
+    <!-- Prompt Engineering Section -->
     <section class="questions-page-card">
-      <h2>Publishing to the Library</h2>
-      <p>When you are happy with your game, you can share it with the community:</p>
-      <ol>
-        <li>Ensure your game has an <strong>index.html</strong> entry point.</li>
-        <li>Add a description and tags in the Workshop Edit panel.</li>
-        <li>Use the <strong>Publish</strong> button or the <code>/publish</code> command.</li>
-        <li>Once published, your game will appear in the <strong>Workshop</strong> tab for others to play.</li>
-        <li><strong>Leaderboards</strong>: The system automatically detects score-related code and creates global rankings for your game.</li>
-      </ol>
+      <h2>Advanced Prompt Engineering</h2>
+      <p>The quality of the AI's code depends on the precision of your request. Follow these rules for the best results:</p>
+      
+      <div class="troubleshooting-item" style="margin-top: 15px;">
+        <strong style="color: var(--accent-purple);">1. Be Surgical</strong>
+        <p>Instead of "Fix the movement", say "/edit increase the player movement speed by 50% and add a small bounce effect when hitting walls."</p>
+      </div>
+
+      <div class="troubleshooting-item">
+        <strong style="color: var(--accent-purple);">2. Define the Stack</strong>
+        <p>If you want a specific style, tell the AI: "Use CSS variables for colors and ensure all animations use <code>requestAnimationFrame</code> for smoothness."</p>
+      </div>
+
+      <div class="troubleshooting-item">
+        <strong style="color: var(--accent-purple);">3. The "Chain of Thought" Trick</strong>
+        <p>Ask the AI to think before coding: "First, explain how you will implement the inventory system, then use /edit to add the code."</p>
+      </div>
+
+      <div class="troubleshooting-item">
+        <strong style="color: var(--accent-purple);">4. Multi-File Workflow</strong>
+        <p>The AI can see all files in your workshop. You can say: "Look at the styles in <code>theme.css</code> and update <code>index.html</code> to match that color scheme."</p>
+      </div>
+    </section>
+
+    <!-- Troubleshooting -->
+    <section class="questions-page-card">
+      <h2>Troubleshooting & FAQ</h2>
+      
+      <div class="troubleshooting-item">
+        <strong>"Bridge Unreachable"</strong>
+        <p>This means the web app cannot see the Node.js server on your PC. Ensure <code>setup-companion.bat</code> is running and your firewall allows connections on port 3000.</p>
+      </div>
+
+      <div class="troubleshooting-item">
+        <strong>"LLM Connection Timeout"</strong>
+        <p>If the AI takes more than 30 seconds to respond, it may be struggling with a very large file. Try breaking your code into smaller modules or use <code>/clear</code> to reset the context window.</p>
+      </div>
+
+      <div class="troubleshooting-item">
+        <strong>"Surgical Edit Failed"</strong>
+        <p>The AI tries to match your code exactly. If your file has non-standard indentation or hidden characters, the match might fail. Try using <code>/fix</code> to let the AI normalize the file first.</p>
+      </div>
+
+      <div class="troubleshooting-item">
+        <strong>"Leaderboard Not Updating"</strong>
+        <p>Ensure your score variable is global or stored in <code>localStorage</code>. The Signal Share Telemetry Bridge monitors <code>localStorage</code> changes for keys like 'score', 'points', or 'highScore'.</p>
+      </div>
     </section>
 
     <div class="questions-guide-footer">

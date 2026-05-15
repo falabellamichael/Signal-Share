@@ -1006,6 +1006,85 @@ function extractInlineScriptsFromHtml(html = '') {
     return scripts;
 }
 
+function getWorkshopTextPositionAtIndex(text = '', index = 0) {
+    const source = `${text || ''}`;
+    const safeIndex = Math.max(0, Math.min(source.length, Number(index) || 0));
+    const before = source.slice(0, safeIndex);
+    const lines = before.split('\n');
+    return {
+        line: lines.length,
+        column: (lines[lines.length - 1] || '').length + 1
+    };
+}
+
+function getWorkshopScriptType(attributes = '') {
+    return `${attributes || ''}`.match(/\btype\s*=\s*["']([^"']+)["']/i)?.[1]?.trim().toLowerCase() || '';
+}
+
+function isWorkshopJavaScriptScript(attributes = '') {
+    const scriptType = getWorkshopScriptType(attributes);
+    return !scriptType || /\b(?:module|javascript|ecmascript)\b/i.test(scriptType);
+}
+
+function extractWorkshopHtmlScripts(html = '', htmlFileName = 'index.html') {
+    const scripts = [];
+    const scriptRegex = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+    let match;
+    while ((match = scriptRegex.exec(html)) !== null) {
+        const fullMatch = `${match[0] || ''}`;
+        const attributes = `${match[1] || ''}`;
+        if (!isWorkshopJavaScriptScript(attributes)) continue;
+
+        const srcName = normalizeWorkshopAssetReference(attributes.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1] || '');
+        const openTagEnd = fullMatch.indexOf('>') + 1;
+        const contentStart = match.index + Math.max(0, openTagEnd);
+        const contentPosition = getWorkshopTextPositionAtIndex(html, contentStart);
+        const isModule = getWorkshopScriptType(attributes) === 'module';
+
+        if (srcName) {
+            scripts.push({
+                kind: 'external',
+                fileName: srcName,
+                referenceName: srcName,
+                label: srcName,
+                code: '',
+                lineOffset: 0,
+                isModule
+            });
+            continue;
+        }
+
+        const code = `${match[2] || ''}`;
+        if (!code.trim()) continue;
+        scripts.push({
+            kind: 'inline',
+            fileName: htmlFileName,
+            referenceName: htmlFileName,
+            label: `${htmlFileName} inline script`,
+            code,
+            lineOffset: contentPosition.line - 1,
+            isModule
+        });
+    }
+    return scripts;
+}
+
+function buildWorkshopScriptValidationUnits(htmlFile, decodedFileByName) {
+    if (!htmlFile) return [];
+    return extractWorkshopHtmlScripts(htmlFile.content, htmlFile.name).map((script) => {
+        if (script.kind !== 'external') return script;
+        const decoded = decodedFileByName.get(`${script.referenceName || ''}`.toLowerCase());
+        if (!decoded) return null;
+        return {
+            ...script,
+            fileName: decoded.name,
+            label: decoded.name,
+            code: decoded.content,
+            lineOffset: 0
+        };
+    }).filter((script) => script && `${script.code || ''}`.trim());
+}
+
 function maskJavaScriptCommentsAndStrings(code = '') {
     const source = `${code || ''}`;
     let masked = '';
@@ -1085,37 +1164,83 @@ function maskJavaScriptCommentsAndStrings(code = '') {
     return masked;
 }
 
-function collectJavaScriptDeclarationNames(line = '') {
-    const names = [];
+function splitJavaScriptDeclarationParts(declarationText = '') {
+    const parts = [];
+    const source = `${declarationText || ''}`;
+    let depth = 0;
+    let start = 0;
+    for (let index = 0; index < source.length; index += 1) {
+        const char = source[index];
+        if (char === '(' || char === '[' || char === '{') depth += 1;
+        if (char === ')' || char === ']' || char === '}') depth = Math.max(0, depth - 1);
+        if (char === ',' && depth === 0) {
+            parts.push({
+                text: source.slice(start, index),
+                start
+            });
+            start = index + 1;
+        }
+    }
+    parts.push({
+        text: source.slice(start),
+        start
+    });
+    return parts;
+}
+
+function collectJavaScriptDeclarationEntries(line = '', options = {}) {
+    const entries = [];
     let match;
-    const lexicalRegex = /\b(?:let|const)\s+([^;]+)/g;
+    const includeFunctions = options.includeFunctions !== false;
+    const lexicalRegex = /\b(let|const)\s+([^;]+)/g;
     while ((match = lexicalRegex.exec(line)) !== null) {
-        const declarationText = `${match[1] || ''}`;
-        declarationText.split(',').forEach((part) => {
-            const name = part.trim().match(/^([A-Za-z_$][\w$]*)/)?.[1];
-            if (name) names.push(name);
+        const declarationText = `${match[2] || ''}`;
+        const declarationStart = match.index + match[0].indexOf(declarationText);
+        const isForHeader = /\bfor\s*\([^)]*$/i.test(line.slice(0, match.index));
+        splitJavaScriptDeclarationParts(declarationText).forEach((partInfo) => {
+            const name = partInfo.text.trim().match(/^([A-Za-z_$][\w$]*)/)?.[1];
+            if (!name) return;
+            const localNameIndex = partInfo.text.indexOf(name);
+            entries.push({
+                name,
+                column: declarationStart + partInfo.start + localNameIndex + 1,
+                kind: match[1],
+                isForHeader
+            });
         });
     }
 
-    const namedRegex = /\b(?:class|function)\s+([A-Za-z_$][\w$]*)/g;
+    const namedRegex = /\b(class|function)\s+([A-Za-z_$][\w$]*)/g;
     while ((match = namedRegex.exec(line)) !== null) {
-        if (match[1]) names.push(match[1]);
+        if (!includeFunctions && match[1] === 'function') continue;
+        if (match[2]) {
+            entries.push({
+                name: match[2],
+                column: match.index + match[0].lastIndexOf(match[2]) + 1,
+                kind: match[1],
+                isForHeader: false
+            });
+        }
     }
-    return names;
+    return entries;
+}
+
+function collectJavaScriptDeclarationNames(line = '') {
+    return collectJavaScriptDeclarationEntries(line).map((entry) => entry.name);
 }
 
 function findDuplicateJavaScriptDeclaration(code = '', targetName = '') {
     const maskedLines = maskJavaScriptCommentsAndStrings(code).split('\n');
-    const originalLines = `${code || ''}`.split('\n');
     const seen = new Map();
     const target = `${targetName || ''}`.trim();
 
     for (let index = 0; index < maskedLines.length; index += 1) {
-        const names = collectJavaScriptDeclarationNames(maskedLines[index]);
-        for (const name of names) {
+        const entries = collectJavaScriptDeclarationEntries(maskedLines[index]);
+        for (const entry of entries) {
+            const name = entry.name;
             const first = seen.get(name);
             const line = index + 1;
-            const column = Math.max(1, (originalLines[index] || '').indexOf(name) + 1);
+            const column = entry.column;
             if (first && (!target || target === name)) {
                 return {
                     name,
@@ -1134,15 +1259,88 @@ function findDuplicateJavaScriptDeclaration(code = '', targetName = '') {
     return null;
 }
 
-function extractJavaScriptSyntaxLocation(error = null) {
+function getJavaScriptBraceDepthBeforeColumn(maskedLine = '', startDepth = 0, column = 1) {
+    let depth = Math.max(0, Number(startDepth) || 0);
+    const stopIndex = Math.max(0, Number(column) - 1);
+    for (let index = 0; index < stopIndex && index < maskedLine.length; index += 1) {
+        const char = maskedLine[index];
+        if (char === '{') depth += 1;
+        if (char === '}') depth = Math.max(0, depth - 1);
+    }
+    return depth;
+}
+
+function getJavaScriptBraceDepthAfterLine(maskedLine = '', startDepth = 0) {
+    let depth = Math.max(0, Number(startDepth) || 0);
+    for (const char of `${maskedLine || ''}`) {
+        if (char === '{') depth += 1;
+        if (char === '}') depth = Math.max(0, depth - 1);
+    }
+    return depth;
+}
+
+function collectTopLevelJavaScriptDeclarations(scriptUnit) {
+    if (!scriptUnit || scriptUnit.isModule) return [];
+    const maskedLines = maskJavaScriptCommentsAndStrings(scriptUnit.code).split('\n');
+    const declarations = [];
+    let depth = 0;
+
+    maskedLines.forEach((line, index) => {
+        const entries = collectJavaScriptDeclarationEntries(line);
+        entries.forEach((entry) => {
+            if (entry.isForHeader) return;
+            if (getJavaScriptBraceDepthBeforeColumn(line, depth, entry.column) !== 0) return;
+            declarations.push({
+                name: entry.name,
+                kind: entry.kind,
+                fileName: scriptUnit.fileName,
+                label: scriptUnit.label,
+                line: (scriptUnit.lineOffset || 0) + index + 1,
+                column: entry.column
+            });
+        });
+        depth = getJavaScriptBraceDepthAfterLine(line, depth);
+    });
+
+    return declarations;
+}
+
+function findDuplicateJavaScriptDeclarationAcrossScripts(scriptUnits = []) {
+    const seen = new Map();
+    for (const scriptUnit of Array.isArray(scriptUnits) ? scriptUnits : []) {
+        const declarations = collectTopLevelJavaScriptDeclarations(scriptUnit);
+        for (const declaration of declarations) {
+            const first = seen.get(declaration.name);
+            if (first) {
+                if (first.kind === 'function' && declaration.kind === 'function') continue;
+                return {
+                    ...declaration,
+                    previousFileName: first.fileName,
+                    previousLine: first.line,
+                    previousColumn: first.column
+                };
+            }
+            seen.set(declaration.name, declaration);
+        }
+    }
+    return null;
+}
+
+function extractJavaScriptSyntaxLocation(error = null, source = '') {
     const stack = `${error?.stack || ''}`;
-    const match = stack.match(/<anonymous>:(\d+):(\d+)/);
-    if (!match) return null;
-    const rawLine = Number.parseInt(match[1], 10) || 0;
-    return {
-        line: Math.max(1, rawLine - 2),
-        column: Number.parseInt(match[2], 10) || 0
-    };
+    const sourceLineCount = Math.max(1, `${source || ''}`.split('\n').length);
+    const matches = [...stack.matchAll(/<anonymous>:(\d+):(\d+)/g)];
+    for (const match of matches) {
+        const rawLine = Number.parseInt(match[1], 10) || 0;
+        const line = Math.max(1, rawLine - 2);
+        if (line <= sourceLineCount) {
+            return {
+                line,
+                column: Number.parseInt(match[2], 10) || 0
+            };
+        }
+    }
+    return null;
 }
 
 function validateJavaScriptSyntax(code = '', label = 'script') {
@@ -1158,29 +1356,57 @@ function validateJavaScriptSyntax(code = '', label = 'script') {
         const duplicateName = errorMessage.match(/Identifier ['"]([^'"]+)['"] has already been declared/i)?.[1] || '';
         const duplicate = duplicateName ? findDuplicateJavaScriptDeclaration(source, duplicateName) : null;
         if (duplicate) {
+            const reason = `Identifier '${duplicate.name}' has already been declared`;
             return {
                 ok: false,
                 line: duplicate.line,
                 column: duplicate.column,
-                message: `${label} has JavaScript syntax error at line ${duplicate.line}, column ${duplicate.column}: Identifier '${duplicate.name}' has already been declared (previous declaration at line ${duplicate.previousLine}).`
+                previousLine: duplicate.previousLine,
+                reason,
+                message: `${label} has JavaScript syntax error at line ${duplicate.line}, column ${duplicate.column}: ${reason} (previous declaration at line ${duplicate.previousLine}).`
             };
         }
 
-        const location = extractJavaScriptSyntaxLocation(error);
+        const location = extractJavaScriptSyntaxLocation(error, source);
         if (location?.line) {
             return {
                 ok: false,
                 line: location.line,
                 column: location.column,
+                reason: errorMessage,
                 message: `${label} has JavaScript syntax error at line ${location.line}${location.column ? `, column ${location.column}` : ''}: ${errorMessage}`
             };
         }
 
         return {
             ok: false,
+            reason: errorMessage,
             message: `${label} has JavaScript syntax error: ${errorMessage}`
         };
     }
+}
+
+function ensureTrailingPeriod(text = '') {
+    const clean = `${text || ''}`.trim();
+    if (!clean) return '';
+    return /[.!?]$/.test(clean) ? clean : `${clean}.`;
+}
+
+function formatWorkshopJavaScriptSyntaxMessage(syntax, scriptUnit) {
+    if (!syntax?.line || !scriptUnit?.fileName) return syntax?.message || 'JavaScript syntax error.';
+    const line = (scriptUnit.lineOffset || 0) + syntax.line;
+    const column = syntax.column || 1;
+    let reason = `${syntax.reason || 'invalid JavaScript'}`.trim();
+    if (syntax.previousLine) {
+        const previousLine = (scriptUnit.lineOffset || 0) + syntax.previousLine;
+        reason = `${reason} (previous declaration at line ${previousLine})`;
+    }
+    return `${scriptUnit.fileName} has JavaScript syntax error at line ${line}, column ${column}: ${ensureTrailingPeriod(reason)}`;
+}
+
+function formatWorkshopCrossFileDuplicateMessage(duplicate) {
+    if (!duplicate) return '';
+    return `${duplicate.fileName} has JavaScript syntax error at line ${duplicate.line}, column ${duplicate.column}: Identifier '${duplicate.name}' has already been declared in ${duplicate.previousFileName} at line ${duplicate.previousLine}.`;
 }
 
 function findCssBraceIssue(css = '') {
@@ -1313,6 +1539,7 @@ function validateWorkshopGameFiles(files = [], options = {}) {
         type: file.type || inferFileTypeFromName(file.name),
         content: decodeWorkshopFileContent(file)
     }));
+    const decodedFileByName = new Map(decodedFiles.map((decoded) => [decoded.lowerName, decoded]));
 
     const placeholderFile = decodedFiles.find(({ content }) => {
         return hasWorkshopPlaceholderCode(content);
@@ -1343,9 +1570,25 @@ function validateWorkshopGameFiles(files = [], options = {}) {
             };
         }
 
-        for (const inlineScript of extractInlineScriptsFromHtml(html)) {
-            const syntax = validateJavaScriptSyntax(inlineScript, `${htmlFile.name} inline script`);
-            if (!syntax.ok) return { ok: false, message: syntax.message, warnings: [] };
+        const scriptUnits = buildWorkshopScriptValidationUnits(htmlFile, decodedFileByName);
+        for (const scriptUnit of scriptUnits) {
+            const syntax = validateJavaScriptSyntax(scriptUnit.code, scriptUnit.label);
+            if (!syntax.ok) {
+                return {
+                    ok: false,
+                    message: formatWorkshopJavaScriptSyntaxMessage(syntax, scriptUnit),
+                    warnings: []
+                };
+            }
+        }
+
+        const duplicateAcrossScripts = findDuplicateJavaScriptDeclarationAcrossScripts(scriptUnits);
+        if (duplicateAcrossScripts) {
+            return {
+                ok: false,
+                message: formatWorkshopCrossFileDuplicateMessage(duplicateAcrossScripts),
+                warnings: []
+            };
         }
     } else if (!/\.js$/i.test(`${entryFile.name || ''}`)) {
         return { ok: false, message: 'Generated games need an index.html or JavaScript entry file.', warnings: [] };
@@ -2169,6 +2412,7 @@ function setWorkshopEditStatus(message = '', isError = false) {
     const statusEl = document.getElementById('workshop-edit-status');
     if (!statusEl) return;
     const lineInfo = isError ? parseWorkshopValidationLine(message) : null;
+    const fileName = isError ? parseWorkshopValidationFileName(message) : '';
     statusEl.textContent = lineInfo?.line
         ? `${message} Click to jump to line ${lineInfo.line}.`
         : message;
@@ -2181,6 +2425,16 @@ function setWorkshopEditStatus(message = '', isError = false) {
         }
         : null;
     setWorkshopEditorHighlightedLine(lineInfo?.line || 0);
+
+    const detail = {
+        message,
+        isError: !!isError,
+        fileName,
+        line: lineInfo?.line || 0,
+        column: lineInfo?.column || 0
+    };
+    window.workshopEditorLastError = isError ? detail : null;
+    window.dispatchEvent(new CustomEvent('workshop-editor-status-change', { detail }));
 }
 
 function syncWorkshopModeToggleButtons() {

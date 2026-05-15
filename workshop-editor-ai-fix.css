@@ -1,0 +1,38 @@
+.workshop-edit-error-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    min-height: 0;
+}
+
+.workshop-ai-fix-btn {
+    border: 1px solid rgba(102, 192, 244, 0.35);
+    background: rgba(102, 192, 244, 0.1);
+    color: rgba(214, 232, 244, 0.95);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+}
+
+.workshop-ai-fix-btn:hover,
+.workshop-ai-fix-btn:focus-visible {
+    background: rgba(102, 192, 244, 0.18);
+    border-color: rgba(102, 192, 244, 0.58);
+    outline: none;
+}
+
+.workshop-ai-fix-note {
+    color: rgba(214, 224, 234, 0.58);
+    font-size: 0.7rem;
+}
+
+@media (max-width: 620px) {
+    .workshop-edit-error-actions {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
