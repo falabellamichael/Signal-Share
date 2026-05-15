@@ -2284,7 +2284,7 @@ window.sendChatMessage = async function (promptOverride = '') {
     try {
         const isCommand = text.startsWith('/')
             || text.startsWith('[')
-            || /^(?:edit|fix|rewrite|publish|clear|help)\s*\//i.test(text);
+            || /^(?:edit|fix|rewrite|publish|clear|help)\b\s*\//i.test(text);
         const originalText = text;
         if (isCommand) {
             try {
@@ -2301,6 +2301,13 @@ window.sendChatMessage = async function (promptOverride = '') {
                 }
                 // Update internal text to stripped version for intent detection
                 text = input.value.trim();
+                
+                // CRITICAL FIX: If the command manager cleared the input (e.g. /edit with no args),
+                // but returned false (continue to AI), we must abort if no text remains.
+                if (!text) {
+                    isSendingChatMessage = false;
+                    return;
+                }
             } catch (cmdErr) {
                 console.error("[Arcade Chat] Slash command failed:", cmdErr);
                 // Fall back to treating it as a normal message if the command failed
