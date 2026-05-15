@@ -83,16 +83,25 @@ window.ArcadeWorkshopManager = {
         const prompt = `${userPrompt || ''}`.toLowerCase();
         const reply = `${rawReplyText || ''}`.toLowerCase();
         
+        // Explicit command check
+        const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
+        if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
+        if (modes.has('/publish') || modes.has('/workshop') || modes.has('/arcade')) return true;
+
         // Explicit workshop keywords
-        const workshopKeywords = ['workshop', 'arcade library', 'game library', 'mini-game', 'playable', 'publish game', 'upload game'];
+        const workshopKeywords = ['workshop', 'arcade library', 'game library', 'mini-game', 'playable', 'publish game', 'upload game', 'arcade workshop'];
         const hasKeyword = workshopKeywords.some(k => prompt.includes(k) || reply.includes(k));
         
         // Structural clues in payload
-        const hasWorkshopTarget = data?.target === 'workshop' || data?.destination === 'workshop';
+        const hasWorkshopTarget = data?.target === 'workshop' || data?.destination === 'workshop' || data?.mode === 'workshop';
         const hasMultipleFiles = Array.isArray(data?.files) && data.files.length > 0;
         const hasEntrypoint = Array.isArray(data?.files) && data.files.some(f => f.name === 'index.html');
         
-        return hasKeyword || hasWorkshopTarget || hasMultipleFiles || hasEntrypoint;
+        // If the AI response contains multiple code blocks, it's almost certainly a workshop project
+        const codeBlocks = (rawReplyText || '').match(/```[\s\S]*?```/g) || [];
+        const hasCodeBlocks = codeBlocks.length >= 1;
+
+        return hasKeyword || hasWorkshopTarget || hasMultipleFiles || hasEntrypoint || hasCodeBlocks;
     },
 
     /**
@@ -324,14 +333,16 @@ window.ArcadeWorkshopManager = {
      */
     isExplicitWorkshopPublishIntentPrompt: function(message = "") {
         const text = `${message || ''}`.trim().toLowerCase();
-        const modes = window.activeArcadeCommandModes || [];
-        if (modes.includes('/publish')) return true;
+        const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
+        if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
+
+        if (modes.has('/publish')) return true;
 
         if (!text) return false;
         if (/^\/publish\b/.test(text) || /^\[publish\]/.test(text)) return true;
         
-        return /\b(?:publish|upload|share|save|update|sync)\b.{0,30}\b(?:workshop|library|game|project)\b/.test(text)
-            || /\b(?:send|put|move)\s+(?:this|the|it|code)\s+(?:to|into)\s+(?:the\s+)?(?:workshop|library)\b/.test(text);
+        return /\b(?:publish|upload|share|save|update|sync)\b.{0,30}\b(?:workshop|library|game|project|arcade)\b/.test(text)
+            || /\b(?:send|put|move)\s+(?:this|the|it|code)\s+(?:to|into)\s+(?:the\s+)?(?:workshop|library|arcade)\b/.test(text);
     },
 
     /**

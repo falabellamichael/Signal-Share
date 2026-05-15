@@ -3473,7 +3473,7 @@ async function executeArcadeChatActions(text, options = {}) {
     return actionResult;
 }
 
-async function tryApplyWorkshopRewriteFromReply(replyText, userPrompt = '', richContext = null, target = {}) {
+window.tryApplyWorkshopRewriteFromReply = async function(replyText, userPrompt = '', richContext = null, target = {}) {
     const result = { attempted: false, ok: false, reason: '', message: '' };
     if (!getWorkshop().isWorkshopRewriteIntentPrompt(userPrompt, richContext)
         && !getWorkshop().isWorkshopMultiFileEditPrompt(userPrompt, richContext)) return result;
@@ -3547,7 +3547,7 @@ async function tryApplyWorkshopRewriteFromReply(replyText, userPrompt = '', rich
     return result;
 }
 
-async function tryAutoWorkshopFileRewriteFromReply(replyText, userPrompt = '', richContext = null) {
+window.tryAutoWorkshopFileRewriteFromReply = async function(replyText, userPrompt = '', richContext = null) {
     const result = { attempted: false, ok: false, reason: '' };
     if (!getWorkshop().isWorkshopEditIntentPrompt(userPrompt, richContext)) return result;
     if (typeof window.applyAiFilePatch !== 'function') {

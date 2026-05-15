@@ -150,7 +150,20 @@
             };
 
             const editBlocks = typeof window.extractWorkshopEditBlocks === 'function' ? window.extractWorkshopEditBlocks(text) : [];
-            if (editBlocks.length === 0) return actionResult;
+            
+            if (editBlocks.length === 0) {
+                // FALLBACK: If no tags were found, try the automatic rewrite/patch logic
+                if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
+                    const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(text, options.userPrompt || '');
+                    if (fallbackResult.attempted) {
+                        actionResult.handled = true;
+                        actionResult.workshopFileRewriteAttempted = true;
+                        actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
+                        return actionResult;
+                    }
+                }
+                return actionResult;
+            }
 
             actionResult.handled = true;
             const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;

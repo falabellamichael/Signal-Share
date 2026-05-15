@@ -117,11 +117,17 @@
                     console.warn(`[Arcade: Publish] API function missing: ${feedbackMsg}`);
                     if (window.showFeedback) window.showFeedback(feedbackMsg, true);
                     actionResult.errorReason = feedbackMsg;
+                    actionResult.handled = true; // Still mark as handled to prevent further fallbacks
                     return actionResult;
                 }
 
                 // File Extraction Fallback Logic
                 let workshopFiles = window.ArcadeWorkshopManager.buildPublishFiles(data, text);
+                
+                // EXTRA: Try buildAiWorkshopFilesFromText if buildPublishFiles was too strict
+                if (workshopFiles.length === 0 && typeof window.buildAiWorkshopFilesFromText === 'function') {
+                    workshopFiles = window.buildAiWorkshopFilesFromText(text);
+                }
                 
                 // If no files were found in the AI response but an editor is active, 
                 // and the AI was prompted to publish/save, use the editor's current content as the source.
@@ -145,6 +151,7 @@
                     console.warn(`[Arcade: Publish] No files found: ${feedbackMsg}`);
                     if (window.showFeedback) window.showFeedback(feedbackMsg, true);
                     actionResult.errorReason = feedbackMsg;
+                    actionResult.handled = true; // Mark as handled because we attempted but failed
                     return actionResult;
                 }
 
@@ -184,10 +191,10 @@
                     if (window.showFeedback) window.showFeedback(actionResult.errorReason, true);
                 }
 
-            } else {
+            } else if (!isExplicitPublish && typeof window.publishPostToSupabase === 'function') {
                 // Route to Standard Social Post (Supabase)
-                if (typeof window.publishPostToSupabase === 'function') {
-                    actionResult.handled = true;
+                // ONLY if this wasn't an explicit workshop command
+                actionResult.handled = true;
                     try {
                         const postPayload = {
                             title: data.title || 'Shared Game',
