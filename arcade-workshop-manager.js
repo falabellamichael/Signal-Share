@@ -194,7 +194,7 @@ window.ArcadeWorkshopManager = {
         }
 
         if (files.length === 0) {
-            let fallback = source.split(/\[PUBLISH:\s*/i)[0] || '';
+            let fallback = source.split(/\[PUBLISH:?\s*/i)[0] || '';
             const codeStart = fallback.search(/<!doctype html|<html|(?:^|\n)\s*(?:function|const|let|var|class)\s+/i);
             if (codeStart >= 0) {
                 fallback = fallback.slice(codeStart).trim();
@@ -433,7 +433,7 @@ window.ArcadeWorkshopManager = {
     extractBalancedJsonTagPayload: function(text, tagName) {
         const source = `${text || ''}`;
         if (!tagName) return null;
-        const markerPattern = '\\[' + tagName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':';
+        const markerPattern = '\\[' + tagName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':?';
         const markerRegex = new RegExp(markerPattern, 'gi');
 
         let searchFrom = 0;

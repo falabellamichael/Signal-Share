@@ -560,6 +560,32 @@ function parseDuckDuckGoCommand(text = "") {
     return getAiCore()?.parseDuckDuckGoCommand?.(text) || "";
 }
 
+/**
+ * Checks if the user is asking for performance or VRAM optimization advice.
+ */
+function isVramOptimizationIntentPrompt(message = "") {
+    const text = `${message || ""}`.trim().toLowerCase();
+    if (!text) return false;
+    const keywords = /\b(?:vram|memory|performance|optimize|speed up|reduce footprint|low memory|efficient)\b/i;
+    return keywords.test(text);
+}
+
+/**
+ * Formats a request for the AI to act as an optimization expert, providing code context.
+ */
+function requestVramOptimization(code = "", context = "") {
+    const prompt = `You are an expert WebGL and browser performance engineer. Your task is to analyze the provided game code and suggest specific, actionable changes to drastically reduce VRAM usage and improve runtime memory efficiency. 
+    
+    CONTEXT: ${context}
+    CODE TO ANALYZE:\n\`\`\`javascript\n${code}\n\`\`\`
+    
+    Provide your analysis in two parts:
+    1. A brief summary of the biggest VRAM bottlenecks found.
+    2. Specific, refactored code snippets or architectural suggestions to fix those issues (e.g., texture pooling, dynamic LODs, reducing draw calls).`;
+    return prompt;
+}
+
+
 function isComposeDraftIntent(message = "") {
     const text = `${message || ""}`.trim().toLowerCase();
     if (!text) return false;
