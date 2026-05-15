@@ -63,9 +63,9 @@ IMPORTANT: You MUST include the actual implementation ([PUBLISH] tag or [EDIT] s
 
 Format:
 [PLANNING: Task Name]
-1. ARCHITECTURAL AUDIT: (Keep this concise - max 100 words). Map systems and state.
-2. PSEUDOCODE ALGORITHM: Define clear logic.
-3. PERFORMANCE & VISUALS: (GPU, Glassmorphism, animations).
+1. AUDIT: (Ultra-concise, max 50 words). Map systems/state.
+2. LOGIC: Define clear pseudocode.
+3. VIBE: Glassmorphism/Animations.
 [/PLANNING]
 
 CORE DIRECTIVES:

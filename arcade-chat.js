@@ -2633,7 +2633,7 @@ window.sendChatMessage = async function (promptOverride = '') {
     if (overrideText) {
         input.value = overrideText;
     }
-    const text = input.value.trim();
+    let text = input.value.trim();
     if (!text) {
         isSendingChatMessage = false;
         return;
