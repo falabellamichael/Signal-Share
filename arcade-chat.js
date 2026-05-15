@@ -377,8 +377,8 @@ function getProtocolDirectives(userPrompt = "", workshopContext = null, attachme
         if (directives && typeof directives === 'string' && directives.trim() !== "") {
             console.log("[Arcade Chat] Successfully generated protocol directives:", directives);
         } else {
-            // This is the critical warning: if it returns empty, the AI failed to recognize intent.
-            console.warn("[Arcade Chat] Protocol directive generation returned empty or invalid output.");
+            // Log this for debugging, but don't warn as simple messages like greetings won't produce directives.
+            console.log("[Arcade Chat] Protocol directive generation returned empty or invalid output.");
         }
         return directives;
     } catch (err) {

@@ -186,11 +186,13 @@
                 try {
                     if (editBlock?.search && typeof window.applyAiFilePatch === 'function') {
                         actionResult.workshopFileRewriteAttempted = true;
-                        const patchResult = await window.applyAiFilePatch(gameId, fileName, editBlock.search, editBlock.replace, { save: true });
+                        const targetFileName = editBlock.fileName || fileName;
+                        console.log(`[Arcade: Edit] Applying patch to ${targetFileName}`);
+                        const patchResult = await window.applyAiFilePatch(gameId, targetFileName, editBlock.search, editBlock.replace, { save: true });
                         if (patchResult?.ok) {
                             actionResult.workshopFileRewriteSucceeded = true;
                         } else if (window.showFeedback) {
-                            window.showFeedback(patchResult?.message || "Edit failed.", true);
+                            window.showFeedback(patchResult?.message || `Edit failed for ${targetFileName}`, true);
                         }
                     }
                 } catch (e) {

@@ -34,6 +34,30 @@
             }
             
             return true; // Command was handled locally
+        },
+        getSuggestions: (args = "") => {
+            const prompt = `${args || ""}`.trim().toLowerCase();
+            if (!prompt) return [];
+
+            const editorState = typeof window.getWorkshopEditorState === "function"
+                ? window.getWorkshopEditorState()
+                : null;
+
+            const content = editorState?.activeFileContent || "";
+            if (!content) return [];
+
+            // Extract unique words longer than 3 chars
+            const words = content.match(/\b[a-zA-Z_]\w{3,}\b/g) || [];
+            const uniqueWords = [...new Set(words)];
+
+            return uniqueWords
+                .filter(word => word.toLowerCase().includes(prompt))
+                .slice(0, 5)
+                .map(word => ({
+                    id: word,
+                    name: word,
+                    description: `Search for "${word}"`
+                }));
         }
     });
 })();

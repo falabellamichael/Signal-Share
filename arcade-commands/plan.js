@@ -23,6 +23,32 @@
                 return true;
             }
             return false;
+        },
+        getSuggestions: (args = "") => {
+            const prompt = `${args || ""}`.trim().toLowerCase();
+            const topics = [
+                'a GPU-optimized scroll system',
+                'a state management system',
+                'a media player controller',
+                'a responsive UI layout',
+                'a secure file upload flow'
+            ];
+
+            if (!prompt) {
+                return topics.map(topic => ({
+                    id: topic,
+                    name: topic,
+                    description: `Plan ${topic}`
+                }));
+            }
+
+            return topics
+                .filter(topic => topic.toLowerCase().includes(prompt))
+                .map(topic => ({
+                    id: topic,
+                    name: topic,
+                    description: `Plan ${topic}`
+                }));
         }
     });
 })();

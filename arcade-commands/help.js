@@ -18,6 +18,26 @@
                 return true; // Locally handled
             }
             return false;
+        },
+        getSuggestions: (args = "") => {
+            const prompt = `${args || ""}`.trim().toLowerCase();
+            const commands = window.ArcadeCommandManager.getAllCommands();
+
+            if (!prompt) {
+                return commands.map(c => ({
+                    id: c.id,
+                    name: c.id,
+                    description: c.description
+                }));
+            }
+
+            return commands
+                .filter(c => c.id.toLowerCase().includes(prompt))
+                .map(c => ({
+                    id: c.id,
+                    name: c.id,
+                    description: c.description
+                }));
         }
     });
 })();

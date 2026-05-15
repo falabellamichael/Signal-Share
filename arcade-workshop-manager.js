@@ -569,11 +569,14 @@ window.ArcadeWorkshopManager = {
     extractWorkshopEditBlocks: function(text = "") {
         const source = `${text || ''}`;
         const blocks = [];
-        const workshopActionRegex = /\[(EDIT|EDIT_FILE|FILE_EDIT|Workshop\/Edit)(?::\s*([\s\S]*?))?\]([\s\S]*?)(?:\[\/\1\]|$)/gi;
+        const workshopActionRegex = /\[(EDIT|EDIT_FILE|FILE_EDIT|Workshop\/Edit)(?::\s*([^\]]*?))?\]([\s\S]*?)(?:\[\/\1\]|$)/gi;
         let match;
         while ((match = workshopActionRegex.exec(source)) !== null) {
             const parsed = this.parseWorkshopSearchReplaceBlock(match[3]);
-            if (parsed) blocks.push(parsed);
+            if (parsed) {
+                if (match[2]) parsed.fileName = match[2].trim();
+                blocks.push(parsed);
+            }
         }
         if (blocks.length === 0 && /SEARCH:\s*[\s\S]+?REPLACE:/i.test(source)) {
             const parsed = this.parseWorkshopSearchReplaceBlock(source);
