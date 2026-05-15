@@ -43,9 +43,11 @@
 
     function pushCommandMode(mode) {
         window.activeArcadeCommandMode = mode;
+
         if (!Array.isArray(window.activeArcadeCommandModes)) {
             window.activeArcadeCommandModes = [];
         }
+
         if (!window.activeArcadeCommandModes.includes(mode)) {
             window.activeArcadeCommandModes.push(mode);
         }
@@ -53,10 +55,12 @@
 
     function showPublishFeedback(message, isError = false) {
         if (!message) return;
+
         if (typeof window.showFeedback === "function") {
             window.showFeedback(message, isError);
             return;
         }
+
         if (typeof window.addChatMessage === "function") {
             window.addChatMessage("ai", isError ? `⚠️ ${message}` : message);
         }
@@ -64,17 +68,23 @@
 
     function resolveFallbackPublishTarget(args = "") {
         if (typeof window.getWorkshopManageableGames !== "function") return null;
+
         const games = window.getWorkshopManageableGames();
         if (!Array.isArray(games) || games.length === 0) return null;
 
         const editorState = typeof window.getWorkshopEditorState === "function"
             ? window.getWorkshopEditorState()
             : null;
+
         const activeGameId = `${editorState?.activeGameId || ""}`.trim();
-        const activeGame = activeGameId ? games.find((game) => game.id === activeGameId) : null;
+        const activeGame = activeGameId
+            ? games.find((game) => game.id === activeGameId)
+            : null;
+
         if (activeGame) return activeGame;
 
         const prompt = `${args || ""}`.toLowerCase();
+
         if (games.length === 1 || /\b(any|whatever|something|one of my|a game|my game)\b/.test(prompt)) {
             return games[0];
         }
@@ -84,19 +94,27 @@
 
     function resolvePublishTarget(args = "") {
         let targetGame = null;
+
         if (typeof window.resolveWorkshopEditGameFromPrompt === "function") {
             targetGame = window.resolveWorkshopEditGameFromPrompt(args);
         }
-        if (!targetGame) targetGame = resolveFallbackPublishTarget(args);
+
+        if (!targetGame) {
+            targetGame = resolveFallbackPublishTarget(args);
+        }
+
         return targetGame;
     }
 
     function getStringFieldFromJsonText(jsonText = "", key = "", fallback = "") {
         if (!jsonText || !key) return fallback;
+
         const safeKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const pattern = new RegExp(`"${safeKey}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "i");
         const match = jsonText.match(pattern);
+
         if (!match) return fallback;
+
         try {
             return JSON.parse(`"${match[1]}"`);
         } catch (_error) {
@@ -106,6 +124,7 @@
 
     function recoverPublishData(jsonText = "") {
         const manager = getWorkshopManager();
+
         return {
             title: getStringFieldFromJsonText(jsonText, "title", ""),
             gameTitle: getStringFieldFromJsonText(jsonText, "gameTitle", ""),
@@ -117,6 +136,7 @@
             gameId: getStringFieldFromJsonText(jsonText, "gameId", ""),
             id: getStringFieldFromJsonText(jsonText, "id", ""),
             updateId: getStringFieldFromJsonText(jsonText, "updateId", ""),
+            existingGameId: getStringFieldFromJsonText(jsonText, "existingGameId", ""),
             targetTitle: getStringFieldFromJsonText(jsonText, "targetTitle", ""),
             updateTitle: getStringFieldFromJsonText(jsonText, "updateTitle", ""),
             files: typeof manager?.extractFilesGreedily === "function"
@@ -127,14 +147,20 @@
 
     function isExplicitPublishPrompt(prompt = "") {
         const manager = getWorkshopManager();
+
         if (typeof manager?.isExplicitWorkshopPublishIntentPrompt === "function") {
             return manager.isExplicitWorkshopPublishIntentPrompt(prompt);
         }
+
         const text = `${prompt || ""}`.trim();
         if (!text) return false;
-        return /^\/publish\b/i.test(text) || /^\[publish\]/i.test(text)
-            || (/\b(?:publish|upload|share|save|release|submit|deploy)\b/i.test(text)
-                && /\b(?:game|project|workshop|arcade|app|logic|code|files)\b/i.test(text));
+
+        return /^\/publish\b/i.test(text)
+            || /^\[publish\]/i.test(text)
+            || (
+                /\b(?:publish|upload|share|save|release|submit|deploy)\b/i.test(text)
+                && /\b(?:game|project|workshop|arcade|app|logic|code|files)\b/i.test(text)
+            );
     }
 
     function getEditorFilesFallback(editorState) {
@@ -146,9 +172,13 @@
         const activeGame = Array.isArray(games)
             ? games.find((game) => game.id === editorState.activeGameId)
             : null;
+
         if (!activeGame) return [];
 
-        return window.getWorkshopEditableFiles(activeGame).map((file) => ({
+        const editableFiles = window.getWorkshopEditableFiles(activeGame);
+        if (!Array.isArray(editableFiles)) return [];
+
+        return editableFiles.map((file) => ({
             name: file.name,
             type: file.type,
             content: typeof window.decodeWorkshopFileContent === "function"
@@ -157,8 +187,128 @@
         }));
     }
 
+    function normalizeWorkshopFileName(name = "") {
+        return `${name || ""}`.trim().replace(/^\.?\//, "");
+    }
+
+    function getWorkshopFileBaseName(name = "") {
+        return normalizeWorkshopFileName(name).split("/").pop() || "";
+    }
+
+    function getReferencedAssetNamesFromHtml(html = "") {
+        const refs = new Set();
+        const source = `${html || ""}`;
+
+        const patterns = [
+            /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi,
+            /<link\b[^>]*\bhref=["']([^"']+)["'][^>]*>/gi
+        ];
+
+        for (const pattern of patterns) {
+            let match;
+
+            while ((match = pattern.exec(source))) {
+                const raw = `${match[1] || ""}`.trim();
+                if (!raw) continue;
+
+                if (/^(https?:)?\/\//i.test(raw)) continue;
+                if (/^(data:|blob:|mailto:|tel:)/i.test(raw)) continue;
+
+                refs.add(normalizeWorkshopFileName(raw.split("?")[0].split("#")[0]));
+            }
+        }
+
+        return Array.from(refs).filter(Boolean);
+    }
+
+    function inferWorkshopFileTypeFromName(name = "") {
+        const lower = `${name || ""}`.toLowerCase();
+
+        if (lower.endsWith(".html") || lower.endsWith(".htm")) return "html";
+        if (lower.endsWith(".css")) return "css";
+        if (lower.endsWith(".js") || lower.endsWith(".mjs")) return "js";
+        if (lower.endsWith(".json")) return "json";
+
+        return "asset";
+    }
+
+    function mergeMissingReferencedFilesFromEditor(workshopFiles = [], editorState = null) {
+        const files = Array.isArray(workshopFiles) ? [...workshopFiles] : [];
+
+        const existingNames = new Set(
+            files.map((file) => normalizeWorkshopFileName(file.name).toLowerCase())
+        );
+
+        const existingBaseNames = new Set(
+            files.map((file) => getWorkshopFileBaseName(file.name).toLowerCase())
+        );
+
+        const htmlFiles = files.filter((file) => {
+            return normalizeWorkshopFileName(file.name).toLowerCase().endsWith(".html");
+        });
+
+        const referencedNames = htmlFiles.flatMap((file) => {
+            return getReferencedAssetNamesFromHtml(file.content || "");
+        });
+
+        if (referencedNames.length === 0) return files;
+        if (!editorState?.activeGameId) return files;
+        if (typeof window.getWorkshopManageableGames !== "function") return files;
+        if (typeof window.getWorkshopEditableFiles !== "function") return files;
+
+        const games = window.getWorkshopManageableGames();
+        const activeGame = Array.isArray(games)
+            ? games.find((game) => game.id === editorState.activeGameId)
+            : null;
+
+        if (!activeGame) return files;
+
+        const editableFiles = window.getWorkshopEditableFiles(activeGame);
+        if (!Array.isArray(editableFiles)) return files;
+
+        for (const refName of referencedNames) {
+            const normalizedRef = normalizeWorkshopFileName(refName);
+            const refKey = normalizedRef.toLowerCase();
+            const refBaseKey = getWorkshopFileBaseName(normalizedRef).toLowerCase();
+
+            if (existingNames.has(refKey) || existingBaseNames.has(refBaseKey)) {
+                continue;
+            }
+
+            const sourceFile = editableFiles.find((file) => {
+                const sourceName = normalizeWorkshopFileName(file.name).toLowerCase();
+                const sourceBaseName = getWorkshopFileBaseName(file.name).toLowerCase();
+
+                return sourceName === refKey || sourceBaseName === refBaseKey;
+            });
+
+            if (!sourceFile) {
+                console.warn(`[Arcade: Publish] Missing referenced file could not be found in editor: ${normalizedRef}`);
+                continue;
+            }
+
+            const content = typeof window.decodeWorkshopFileContent === "function"
+                ? window.decodeWorkshopFileContent(sourceFile)
+                : `${sourceFile.content || ""}`;
+
+            files.push({
+                name: sourceFile.name || normalizedRef,
+                type: sourceFile.type || inferWorkshopFileTypeFromName(sourceFile.name || normalizedRef),
+                content
+            });
+
+            existingNames.add(refKey);
+            existingBaseNames.add(refBaseKey);
+
+            console.log(`[Arcade: Publish] Added missing referenced file from editor: ${normalizedRef}`);
+        }
+
+        return files;
+    }
+
     async function publishToWorkshop({ data, text, userPrompt, editorState, actionResult }) {
         const manager = getWorkshopManager();
+
         actionResult.handled = true;
         actionResult.workshopPublishAttempted = true;
 
@@ -183,8 +333,10 @@
             workshopFiles = getEditorFilesFallback(editorState);
         }
 
+        workshopFiles = mergeMissingReferencedFilesFromEditor(workshopFiles, editorState);
+
         if (workshopFiles.length === 0) {
-            const feedbackMsg = "Couldn't find game code to publish. Try telling me to 'write the full code and publish'.";
+            const feedbackMsg = "Couldn't find game code to publish. Try telling me to write the full code and publish.";
             console.warn(`[Arcade: Publish] No files found: ${feedbackMsg}`);
             showPublishFeedback(feedbackMsg, true);
             actionResult.errorReason = feedbackMsg;
@@ -197,33 +349,58 @@
             || data.existingGameId
             || window.activeArcadePublishTarget?.id
             || "";
-        const publishMode = data.mode || data.action || data.operation || (targetGameId ? "update" : "");
+
+        const publishMode = data.mode
+            || data.action
+            || data.operation
+            || (targetGameId ? "update" : "");
+
+        const publishPayload = {
+            title: data.title || data.gameTitle || window.activeArcadePublishTarget?.title || "AI Workshop Game",
+            category: data.category || "GAME",
+            description: data.description || data.caption || "",
+            thumbnail: data.thumbnail || data.poster || "",
+            tags: Array.isArray(data.tags)
+                ? data.tags.join(", ")
+                : (typeof data.tags === "string" ? data.tags : "arcade, ai"),
+            files: workshopFiles,
+            mode: publishMode,
+            gameId: targetGameId,
+            updateTitle: data.updateTitle || data.targetTitle || window.activeArcadePublishTarget?.title || ""
+        };
+
+        console.log("[Arcade: Publish] Sending to publishCustomGameFromAi:", {
+            title: publishPayload.title,
+            mode: publishPayload.mode,
+            gameId: publishPayload.gameId,
+            updateTitle: publishPayload.updateTitle,
+            fileCount: workshopFiles.length,
+            files: workshopFiles.map((file) => ({
+                name: file.name,
+                type: file.type,
+                contentLength: `${file.content || ""}`.length
+            }))
+        });
 
         try {
-            const workshopResult = await window.publishCustomGameFromAi({
-                title: data.title || data.gameTitle || window.activeArcadePublishTarget?.title || "AI Workshop Game",
-                category: data.category || "GAME",
-                description: data.description || data.caption || "",
-                thumbnail: data.thumbnail || data.poster || "",
-                tags: Array.isArray(data.tags) ? data.tags.join(", ") : (typeof data.tags === "string" ? data.tags : ""),
-                files: workshopFiles,
-                mode: publishMode,
-                gameId: targetGameId,
-                updateTitle: data.updateTitle || data.targetTitle || ""
-            });
+            const workshopResult = await window.publishCustomGameFromAi(publishPayload);
 
             if (workshopResult?.ok) {
                 actionResult.workshopPublishSucceeded = true;
+
                 const actionLabel = workshopResult.updated ? "Updated" : "Published";
                 showPublishFeedback(`${actionLabel} "${workshopResult.title}" in Workshop (${workshopResult.assetCount} assets).`);
             } else {
                 const apiError = workshopResult?.message || "Failed to publish game to Workshop due to a server issue.";
+
                 console.error("[Arcade: Publish] Publishing API call failed:", workshopResult);
+
                 actionResult.errorReason = apiError;
                 showPublishFeedback(apiError, true);
             }
         } catch (error) {
             console.error("[Arcade: Publish] Critical system failure during publish attempt:", error);
+
             actionResult.errorReason = `Critical upload error: ${error?.message || "Check console for details."}`;
             showPublishFeedback(actionResult.errorReason, true);
         }
@@ -236,6 +413,7 @@
     window.ArcadeCommandManager.register({
         id: "publish",
         description: "Full project upload/publish to Workshop Arcade.",
+
         execute: async (args, inputElement) => {
             ensureLiveWorkshopPublishedPromptApi();
 
@@ -245,6 +423,7 @@
             window.activeArcadePublishTarget = targetGame;
 
             const manager = getWorkshopManager();
+
             if (typeof manager?.setLiveWorkshopPublishedPrompt === "function") {
                 manager.setLiveWorkshopPublishedPrompt(prompt);
             }
@@ -260,6 +439,7 @@
 
         getSuggestions: (args = "") => {
             if (typeof window.getWorkshopManageableGames !== "function") return [];
+
             const games = window.getWorkshopManageableGames();
             if (!Array.isArray(games) || games.length === 0) return [];
 
@@ -295,6 +475,7 @@
             };
 
             ensureLiveWorkshopPublishedPromptApi();
+
             const manager = getWorkshopManager();
             const userPrompt = `${options.userPrompt || manager?.getLiveWorkshopPublishedPrompt?.() || ""}`.trim();
 
@@ -307,6 +488,7 @@
                 const publishPayload = typeof manager.extractBalancedJsonTagPayload === "function"
                     ? manager.extractBalancedJsonTagPayload(text, "PUBLISH")
                     : null;
+
                 const explicitPublish = isExplicitPublishPrompt(userPrompt);
 
                 if (publishPayload?.jsonText) {
@@ -318,6 +500,7 @@
                 const editorState = typeof window.getWorkshopEditorState === "function"
                     ? window.getWorkshopEditorState()
                     : null;
+
                 const isEditingActive = typeof manager.isWorkshopEditIntentPrompt === "function"
                     ? manager.isWorkshopEditIntentPrompt(userPrompt, { workshopEditor: editorState })
                     : false;
@@ -349,48 +532,32 @@
                 }
 
                 const routeToWorkshop = explicitPublish
-                    || (typeof manager.shouldRouteToWorkshop === "function" && manager.shouldRouteToWorkshop(data, text, userPrompt));
+                    || (
+                        typeof manager.shouldRouteToWorkshop === "function"
+                        && manager.shouldRouteToWorkshop(data, text, userPrompt)
+                    );
 
-                if (routeToWorkshop) {
-                    return await publishToWorkshop({
-                        data,
-                        text,
-                        userPrompt,
-                        editorState,
-                        actionResult
-                    });
+                if (!routeToWorkshop) {
+                    return actionResult;
                 }
 
-                if (!explicitPublish && typeof window.publishPostToSupabase === "function") {
-                    actionResult.handled = true;
-                    try {
-                        const postPayload = {
-                            title: data.title || "Shared Game",
-                            content: data.description || `${text || ""}`.slice(0, 500),
-                            type: "game_link",
-                            metadata: {
-                                aiGenerated: true,
-                                ...data
-                            }
-                        };
-                        const postResult = await window.publishPostToSupabase(postPayload);
-                        if (postResult?.ok) {
-                            showPublishFeedback("Posted to Signal Share.");
-                        }
-                    } catch (error) {
-                        console.error("[Arcade: Publish] Social post failed:", error);
-                        actionResult.errorReason = error?.message || "Social post failed.";
-                    }
-                }
-
-                return actionResult;
+                return await publishToWorkshop({
+                    data,
+                    text,
+                    userPrompt,
+                    editorState,
+                    actionResult
+                });
             } catch (error) {
                 console.error("[Arcade: Publish] Unexpected publish handler error:", error);
+
                 actionResult.errorReason = error?.message || "Unexpected publish handler error.";
                 showPublishFeedback(actionResult.errorReason, true);
+
                 return actionResult;
             } finally {
                 window.activeArcadePublishTarget = null;
+
                 if (typeof manager?.clearLiveWorkshopPublishedPrompt === "function") {
                     manager.clearLiveWorkshopPublishedPrompt();
                 }
