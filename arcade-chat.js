@@ -756,18 +756,7 @@ function isWorkshopRewriteIntentPrompt(message = "", workshopContext = null) {
 
 
 function buildWorkshopPublishDirective() {
-    return [
-        '[WORKSHOP_PROTOCOL]',
-        'REASONING PROTOCOL: [REASONING_ORCHESTRATOR_V2]',
-        'Before building a game, you MUST output a concise [PLANNING] block.',
-        'IMPORTANT: You MUST include the [PUBLISH] tag in the same response as the plan.',
-        'The tag MUST contain a valid JSON object with: { "target": "workshop", "title": "...", "files": [{ "name": "...", "content": "..." }] }.',
-        'Generate a complete, playable, self-contained browser game.',
-        'index.html MUST be the entry point and reference any other files (style.css, game.js) by their exact name.',
-        'Use plain browser APIs only; no external libraries, CDNs, or module syntax.',
-        'VISUALIZATION: In addition to the [PUBLISH] tag, also provide markdown code blocks (```html, ```javascript) for the primary files so the user can see your work.',
-        '[/WORKSHOP_PROTOCOL]'
-    ].join('\n');
+    return window.ArcadeWorkshopManager.getPublishDirective();
 }
 
 
@@ -805,7 +794,7 @@ function getProtocolDirectives(userPrompt = "", workshopContext = null, attachme
             : buildWorkshopEditDirective(workshopContext, isFixMode, userPrompt));
     }
 
-    if (modes.has('/publish')) {
+    if (modes.has('/publish') || (text.includes('publish') && text.includes('workshop')) || text.includes('upload to workshop')) {
         directives.push(buildWorkshopPublishDirective());
     }
 

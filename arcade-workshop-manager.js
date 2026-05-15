@@ -201,6 +201,7 @@ window.ArcadeWorkshopManager = {
             '[WORKSHOP_PROTOCOL]',
             'REASONING PROTOCOL: [REASONING_ORCHESTRATOR_V2]',
             'Before building a game, you MUST output a concise [PLANNING] block.',
+            'CRITICAL: Do NOT ask for permission or wait for approval. IMPLEMENT NOW.',
             'IMPORTANT: You MUST include the [PUBLISH] tag in the same response as the plan.',
             'The tag MUST contain a valid JSON object with: { "target": "workshop", "title": "...", "files": [{ "name": "...", "content": "..." }] }.',
             'Generate a complete, playable, self-contained browser game.',
