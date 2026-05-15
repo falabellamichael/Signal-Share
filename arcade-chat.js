@@ -371,10 +371,18 @@ function stripArcadeProtocolTags(content = "") {
 }
 
 function getProtocolDirectives(userPrompt = "", workshopContext = null, attachment = null) {
+    console.log(`[Arcade Chat] Attempting to generate directives for prompt: "${userPrompt}"`);
     try {
-        return getWorkshop().getProtocolDirectives(userPrompt, workshopContext, attachment);
+        const directives = getWorkshop().getProtocolDirectives(userPrompt, workshopContext, attachment);
+        if (directives && typeof directives === 'string' && directives.trim() !== "") {
+            console.log("[Arcade Chat] Successfully generated protocol directives:", directives);
+        } else {
+            // This is the critical warning: if it returns empty, the AI failed to recognize intent.
+            console.warn("[Arcade Chat] Protocol directive generation returned empty or invalid output.");
+        }
+        return directives;
     } catch (err) {
-        console.error("[Arcade Chat] Failed to get protocol directives:", err);
+        console.error("[Arcade Chat] CRITICAL: Failed to get protocol directives due to internal error:", err);
         return "";
     }
 }
