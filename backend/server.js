@@ -6,6 +6,7 @@ import { SMTCMonitor, PlaybackStatus } from "@coooookies/windows-smtc-monitor";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 const SYSTEM_PROMPT = `You are a helpful assistant for the Signal Share Arcade.
+
 When the user asks to publish a game, output the code inside markdown code blocks with filename annotations.
 Example:
 \`\`\`html filename=index.html
@@ -14,7 +15,17 @@ Example:
 ...
 </html>
 \`\`\`
-Do not output planning or audits. Just output the code directly.`;
+
+When editing a game, use the surgical edit format:
+[EDIT: filename]
+SEARCH:
+Exact code to replace
+REPLACE:
+New code to insert
+[/EDIT]
+
+The SEARCH block must match the existing file content exactly (including whitespace).
+Do not output planning or audits. Just output the code blocks or edit blocks directly.`;
 
 async function getChatResponse(message, history = []) {
     if (!message && history.length === 0) return "No message provided.";
