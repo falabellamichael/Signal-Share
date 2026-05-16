@@ -7,8 +7,8 @@
 
 // Configuration - Customize these values based on your AI backend
 const CONFIG = {
-  // Your AI endpoint URL (e.g., Supabase REST API, Flask API, Node.js API)
-  aiEndpoint: 'http://localhost:5000/api/chat', 
+  // Your AI endpoint URL (using relative path to hit your running backend)
+  aiEndpoint: '/api/llm/chat', 
   
   // Optional: Custom prompt template for the AI
   customPromptTemplate: null, 
@@ -17,12 +17,10 @@ const CONFIG = {
   customResponseFormat: null,
 };
 
-// Mock data to simulate AI responses based on user input length
-const MOCK_RESPONSES = {
-  short: "Here's a helpful answer to your question:",
-  medium: `Here's a helpful answer to your question: ${text.substring(0, 50)}...`,
-  long: `Here's a comprehensive answer to your question about ${text}: \n\n${text.replace(/\s+/g, ' ')}. This is a detailed response that covers the topic thoroughly. The AI assistant can provide more information based on this context.\n\nHope this helps!`,
-};
+// State to maintain chat history for context
+let chatHistory = [];
+let currentAiResponse = null;
+let isTyping = false;
 
 /**
  * Send message to AI backend and display response
@@ -34,41 +32,51 @@ async function sendMessage(message) {
 
   // Add user message to UI
   addMessage('user', text);
-  hideLoading();
-
-  // Simulate network delay (mock)
-  await new Promise(resolve => setTimeout(resolve, 1000));
-
-  // Get mock response based on input length
-  const responseText = MOCK_RESPONSES[Object.keys(MOCK_RESPONSES).length](text);
-
-  // Add AI message to UI
-  addMessage('ai', responseText);
   
-  // Store the current response for typing indicator
-  currentAiResponse = responseText;
+  // Show typing indicator
+  showTyping();
+
+  try {
+    const response = await fetch(CONFIG.aiEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: text,
+        history: chatHistory,
+        pageContext: "", // Can add page context if needed
+        model: "auto"
+      })
+    });
+
+    const data = await response.json();
+    hideTyping();
+
+    if (data && data.ok) {
+      const reply = data.reply || "No response from AI.";
+      addMessage('ai', reply);
+    } else {
+      addMessage('ai', `Error: ${data.error || 'Failed to get response.'}`);
+    }
+  } catch (error) {
+    hideTyping();
+    console.error("[AI Chatbot] Error:", error);
+    addMessage('ai', `Error: ${error.message || 'Network error.'}`);
+  }
 }
 
 /**
- * Start a simulated "typing" effect
+ * Start a simulated "typing" effect (kept for backward compatibility or mock use)
  */
 function startTyping() {
-  isTyping = true;
-  typingIndicator.classList.add('active');
-  hideLoading();
+  showTyping();
 
-  // Simulate AI response delay (mock)
+  // If we have a stored response, show it after a delay
   setTimeout(() => {
-    isTyping = false;
-    typingIndicator.classList.remove('active');
+    hideTyping();
     
     if (currentAiResponse) {
       addMessage('ai', currentAiResponse);
       currentAiResponse = null;
-    } else {
-      // Fallback to mock response
-      const text = message.trim();
-      addMessage('ai', MOCK_RESPONSES[Object.keys(MOCK_RESPONSES).length](text));
     }
   }, 1500);
 }
@@ -119,6 +127,9 @@ function addMessage(role, text) {
 
   // Scroll to bottom
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+  // Save to history for context (AMD optimizations guard will trim this before sending)
+  chatHistory.push({ role, content: text });
 }
 
 /**
