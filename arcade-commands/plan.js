@@ -1,54 +1,62 @@
 /**
  * /plan Command
- * Requests a detailed pseudocode planning block from the AI before any implementation.
+ * Converts the current chat turn into a planning request.
  */
 (function() {
+    const TOPICS = [
+        'a GPU-optimized scroll system',
+        'a state management system',
+        'a media player controller',
+        'a responsive UI layout',
+        'a secure file upload flow',
+        'a Workshop edit flow',
+        'an arcade command workflow',
+        'a local bridge recovery flow'
+    ];
+
+    function normalize(value = '') {
+        return `${value || ''}`.trim();
+    }
+
     window.ArcadeCommandManager.register({
         id: 'plan',
-        description: 'Generate a [REASONING_ORCHESTRATOR_V1] plan for a feature.',
+        description: 'Ask the AI for a structured implementation plan.',
+
         execute: async (args, inputElement) => {
-            if (!args) {
+            const topic = normalize(args);
+            if (!topic) {
                 if (typeof window.addChatMessage === 'function') {
-                    window.addChatMessage('ai', '⚠️ Please provide a topic for the plan. Example: `/plan a GPU-optimized scroll system`.');
+                    window.addChatMessage('ai', '⚠️ Please provide a topic. Example: /plan a Workshop edit flow');
                 }
+                if (inputElement) inputElement.value = '';
                 return true;
             }
-            
-            // Re-route as a regular message but prefixed with a planning instruction
-            const planningPrompt = `[PLAN_REQUEST] Using the REASONING_ORCHESTRATOR_V1 protocol, please provide a detailed [PLANNING] block for the following: ${args}`;
-            
-            if (typeof window.sendChatMessage === 'function') {
-                inputElement.value = planningPrompt;
-                window.sendChatMessage();
-                return true;
-            }
+
+            const planningPrompt = [
+                '[PLAN_REQUEST]',
+                'Create a concise implementation plan before writing code.',
+                'Include: goal, files likely affected, exact steps, risks, and test checklist.',
+                `Topic: ${topic}`
+            ].join('\n');
+
+            // Do not call sendChatMessage() from inside sendChatMessage().
+            // Replace the active input and let the existing send pipeline continue.
+            if (inputElement) inputElement.value = planningPrompt;
+            window.activeArcadeCommandMode = '/plan';
+            window.activeArcadeCommandModes = ['/plan'];
             return false;
         },
-        getSuggestions: (args = "") => {
-            const prompt = `${args || ""}`.trim().toLowerCase();
-            const topics = [
-                'a GPU-optimized scroll system',
-                'a state management system',
-                'a media player controller',
-                'a responsive UI layout',
-                'a secure file upload flow'
-            ];
 
-            if (!prompt) {
-                return topics.map(topic => ({
-                    id: topic,
-                    name: topic,
-                    description: `Plan ${topic}`
-                }));
-            }
-
-            return topics
-                .filter(topic => topic.toLowerCase().includes(prompt))
+        getSuggestions: (args = '') => {
+            const prompt = normalize(args).toLowerCase();
+            return TOPICS
+                .filter(topic => !prompt || topic.toLowerCase().includes(prompt))
                 .map(topic => ({
                     id: topic,
                     name: topic,
                     description: `Plan ${topic}`
-                }));
+                }))
+                .slice(0, 10);
         }
     });
 })();
