@@ -326,3 +326,126 @@ window.ArcadeCommandManager = (function() {
         window.setTimeout(() => window.clearInterval(timer), 10000);
     }
 })();
+
+/**
+ * Suppress expected bridge-failure noise for editor commands.
+ * /edit can select/open a target locally, but actual AI edits require the bridge.
+ * When the bridge is down, do not render red bridge cards or generic offline
+ * arcade fallback replies into the chat transcript.
+ */
+(function suppressEditorBridgeFailureNoise() {
+    if (window.__arcadeEditorBridgeNoiseSuppressionInstalled) return;
+    window.__arcadeEditorBridgeNoiseSuppressionInstalled = true;
+
+    let lastEditorCommandAt = 0;
+    let suppressedBridgeErrorAt = 0;
+
+    function isEditorCommand(value = '') {
+        return /^\s*\/(?:edit|fix|rewrite)\b/i.test(`${value || ''}`);
+    }
+
+    function isBridgeErrorText(value = '') {
+        const text = `${value || ''}`.toLowerCase();
+        return text.includes('a.i. bridge error')
+            || text.includes('bridge is unreachable')
+            || text.includes('bridge request failed')
+            || text.includes('failed to fetch bridge')
+            || text.includes('local llm bridge');
+    }
+
+    function isOfflineArcadeFallback(value = '') {
+        const text = `${value || ''}`.toLowerCase();
+        return text.includes('[arcade protocol]')
+            && (
+                text.includes('main intelligence core is unstable')
+                || text.includes('advanced logic core is currently out of range')
+                || text.includes('communication with the main intelligence core')
+                || text.includes('sync failed')
+                || text.includes('bridge unreachable')
+            );
+    }
+
+    function isFreshEditorBridgeFailureWindow() {
+        const now = Date.now();
+        return now - lastEditorCommandAt < 15000 || now - suppressedBridgeErrorAt < 5000;
+    }
+
+    function removeBridgeNoiseNode(node) {
+        if (!(node instanceof HTMLElement)) return;
+        const text = `${node.textContent || ''}`;
+        if (isBridgeErrorText(text) && isFreshEditorBridgeFailureWindow()) {
+            suppressedBridgeErrorAt = Date.now();
+            node.remove();
+            return;
+        }
+        if (isOfflineArcadeFallback(text) && isFreshEditorBridgeFailureWindow()) {
+            node.remove();
+        }
+    }
+
+    function patchSendChatMessage() {
+        if (typeof window.sendChatMessage !== 'function') {
+            window.setTimeout(patchSendChatMessage, 50);
+            return;
+        }
+        if (window.sendChatMessage.__arcadeEditorBridgeNoiseTracker) return;
+
+        const originalSendChatMessage = window.sendChatMessage;
+        window.sendChatMessage = function patchedEditorBridgeNoiseSend(message, ...rest) {
+            const input = document.getElementById('arc-chat-input');
+            const outgoing = typeof message === 'string' && message.trim()
+                ? message
+                : `${input?.value || ''}`;
+            if (isEditorCommand(outgoing)) lastEditorCommandAt = Date.now();
+            return originalSendChatMessage.apply(this, arguments);
+        };
+        window.sendChatMessage.__arcadeEditorBridgeNoiseTracker = true;
+    }
+
+    function patchAddChatMessage() {
+        if (typeof window.addChatMessage !== 'function') {
+            window.setTimeout(patchAddChatMessage, 50);
+            return;
+        }
+        if (window.addChatMessage.__arcadeEditorBridgeNoiseSuppression) return;
+
+        const originalAddChatMessage = window.addChatMessage;
+        window.addChatMessage = function patchedEditorBridgeNoiseAdd(sender, content, ...rest) {
+            const role = `${sender || ''}`.toLowerCase();
+            const text = `${content || ''}`;
+
+            if (role !== 'ai' && role !== 'assistant' && role !== 'system' && role !== 'bot') {
+                if (isEditorCommand(text)) lastEditorCommandAt = Date.now();
+                return originalAddChatMessage.apply(this, arguments);
+            }
+
+            if (isFreshEditorBridgeFailureWindow() && (isBridgeErrorText(text) || isOfflineArcadeFallback(text))) {
+                suppressedBridgeErrorAt = Date.now();
+                return null;
+            }
+
+            return originalAddChatMessage.apply(this, arguments);
+        };
+        window.addChatMessage.__arcadeEditorBridgeNoiseSuppression = true;
+    }
+
+    function installDomObserver() {
+        const container = document.getElementById('chat-messages');
+        if (!container) {
+            window.setTimeout(installDomObserver, 100);
+            return;
+        }
+
+        Array.from(container.children).forEach(removeBridgeNoiseNode);
+        const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                mutation.addedNodes.forEach(removeBridgeNoiseNode);
+            }
+        });
+        observer.observe(container, { childList: true, subtree: false });
+    }
+
+    patchSendChatMessage();
+    patchAddChatMessage();
+    installDomObserver();
+})();
