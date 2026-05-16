@@ -167,23 +167,11 @@ window.ArcadeCommandManager = (function() {
     function normalizeSuggestion(raw, cmdId = '') {
         if (!raw) return null;
         if (typeof raw === 'string') {
-            return {
-                id: raw,
-                name: raw,
-                description: `Use /${cmdId} ${raw}`,
-                commandId: cmdId
-            };
+            return { id: raw, name: raw, description: `Use /${cmdId} ${raw}`, commandId: cmdId };
         }
-
         const id = `${raw.id || raw.value || raw.insertText || raw.name || ''}`.trim();
         if (!id) return null;
-        return {
-            ...raw,
-            id,
-            name: raw.name || id,
-            description: raw.description || `Use /${cmdId} ${id}`,
-            commandId: raw.commandId || cmdId
-        };
+        return { ...raw, id, name: raw.name || id, description: raw.description || `Use /${cmdId} ${id}`, commandId: raw.commandId || cmdId };
     }
 
     function getDefaultSubcommandSuggestions(cmdId = '', args = '') {
@@ -291,12 +279,21 @@ window.ArcadeCommandManager = (function() {
 
     function isBridgeErrorText(value = '') {
         const text = `${value || ''}`.toLowerCase();
-        return text.includes('a.i. bridge error') || text.includes('bridge is unreachable') || text.includes('bridge request failed') || text.includes('failed to fetch bridge') || text.includes('local llm bridge');
+        return text.includes('a.i. bridge error')
+            || text.includes('bridge is unreachable')
+            || text.includes('bridge request failed')
+            || text.includes('failed to fetch bridge')
+            || text.includes('local llm bridge');
     }
 
     function isOfflineArcadeFallback(value = '') {
         const text = `${value || ''}`.toLowerCase();
-        return text.includes('[arcade protocol]') && (text.includes('main intelligence core is unstable') || text.includes('advanced logic core is currently out of range') || text.includes('communication with the main intelligence core') || text.includes('sync failed') || text.includes('bridge unreachable'));
+        return text.includes('[arcade protocol]')
+            && (text.includes('main intelligence core is unstable')
+                || text.includes('advanced logic core is currently out of range')
+                || text.includes('communication with the main intelligence core')
+                || text.includes('sync failed')
+                || text.includes('bridge unreachable'));
     }
 
     function isFreshEditorBridgeFailureWindow() {
@@ -370,80 +367,4 @@ window.ArcadeCommandManager = (function() {
     patchSendChatMessage();
     patchAddChatMessage();
     installDomObserver();
-})();
-
-(function installCommandThinkingIndicator() {
-    if (window.__arcadeCommandThinkingIndicatorInstalled) return;
-    window.__arcadeCommandThinkingIndicatorInstalled = true;
-
-    const THINKING_ID = 'arcade-command-thinking-indicator';
-    let pendingCommand = false;
-
-    function isAiBoundCommand(value = '') {
-        const text = `${value || ''}`.trim().toLowerCase();
-        return /^\/(?:edit|fix|rewrite|publish|plan)\b/.test(text) || /^\[(?:edit|fix|rewrite|publish|plan)\]/.test(text);
-    }
-
-    function getOutgoingText(promptOverride) {
-        if (typeof promptOverride === 'string' && promptOverride.trim()) return promptOverride.trim();
-        const input = document.getElementById('arc-chat-input');
-        return `${input?.value || ''}`.trim();
-    }
-
-    function removeThinking() {
-        const node = document.getElementById(THINKING_ID);
-        if (node) node.remove();
-    }
-
-    function showThinking() {
-        const container = document.getElementById('chat-messages');
-        if (!container || document.getElementById(THINKING_ID)) return;
-        const msg = document.createElement('div');
-        msg.id = THINKING_ID;
-        msg.className = 'chat-message message-ai command-thinking-indicator';
-        msg.setAttribute('aria-label', 'AI is thinking');
-        msg.innerHTML = '<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>';
-        container.appendChild(msg);
-        container.scrollTop = container.scrollHeight;
-    }
-
-    function patchWhenReady() {
-        if (typeof window.sendChatMessage !== 'function' || typeof window.addChatMessage !== 'function') {
-            window.setTimeout(patchWhenReady, 50);
-            return;
-        }
-        if (window.sendChatMessage.__arcadeCommandThinkingPatched) return;
-
-        const originalSendChatMessage = window.sendChatMessage;
-        const originalAddChatMessage = window.addChatMessage;
-
-        window.addChatMessage = function patchedCommandThinkingAddChatMessage(role, content, ...rest) {
-            const normalizedRole = `${role || ''}`.toLowerCase();
-            const isUser = normalizedRole === 'user';
-            const isAssistant = normalizedRole === 'ai' || normalizedRole === 'assistant' || normalizedRole === 'system' || normalizedRole === 'bot';
-            if (pendingCommand && isAssistant) removeThinking();
-            const result = originalAddChatMessage.apply(this, arguments);
-            if (pendingCommand && isUser) showThinking();
-            return result;
-        };
-
-        window.sendChatMessage = async function patchedCommandThinkingSendChatMessage(promptOverride = '') {
-            const outgoing = getOutgoingText(promptOverride);
-            const shouldTrack = isAiBoundCommand(outgoing);
-            if (shouldTrack) pendingCommand = true;
-            try {
-                return await originalSendChatMessage.apply(this, arguments);
-            } finally {
-                if (shouldTrack) {
-                    window.setTimeout(() => {
-                        removeThinking();
-                        pendingCommand = false;
-                    }, 80);
-                }
-            }
-        };
-        window.sendChatMessage.__arcadeCommandThinkingPatched = true;
-    }
-
-    patchWhenReady();
 })();
