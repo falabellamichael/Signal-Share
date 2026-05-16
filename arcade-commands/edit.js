@@ -107,15 +107,16 @@
         description: 'Surgical code modification.',
 
         execute: async (args, inputElement) => {
+            const cleanArgs = `${args || ''}`.trim();
             let selected = null;
 
             if (typeof window.resolveWorkshopEditGameFromPrompt === 'function'
                 && typeof window.setWorkshopEditActiveGame === 'function') {
-                let targetGame = window.resolveWorkshopEditGameFromPrompt(args);
-                if (!targetGame) targetGame = resolveFallbackEditTarget(args);
+                let targetGame = window.resolveWorkshopEditGameFromPrompt(cleanArgs);
+                if (!targetGame) targetGame = resolveFallbackEditTarget(cleanArgs);
 
                 if (targetGame) {
-                    selected = window.setWorkshopEditActiveGame(targetGame.id, { prompt: args });
+                    selected = window.setWorkshopEditActiveGame(targetGame.id, { prompt: cleanArgs });
                     if (selected?.ok) {
                         console.log(`[Command: Edit] Auto-switching context to: ${selected.title} / ${selected.fileName}`);
                     }
@@ -124,8 +125,15 @@
 
             window.activeArcadeCommandMode = '/edit';
 
+            if (inputElement) {
+                // Critical: ArcadeCommandManager.handle() keeps executing while the
+                // input starts with '/'. Strip the command before returning false
+                // so /edit continues to the AI exactly once instead of looping.
+                inputElement.value = cleanArgs;
+            }
+
             // Do not append file contents to inputElement.value.
-            // sendChatMessage will continue with the user's original command, and
+            // sendChatMessage will continue with the stripped user request, and
             // ArcadeChatContext will include bounded Workshop editor context.
             return false;
         },
