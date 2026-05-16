@@ -97,6 +97,14 @@
             
             const updatedMessage = `${args}\n\n[FILE: ${fileName}]\n${content}`;
             
+            if (inputElement) {
+                inputElement.value = ''; // Clear the input
+            }
+            
+            if (typeof window.addChatMessage === 'function') {
+                window.addChatMessage('user', `/edit ${args}`);
+            }
+            
             if (window.showFeedback) window.showFeedback('Calling AI for edit...', false);
             
             try {
@@ -118,6 +126,10 @@
                 if (response.ok) {
                     const data = await response.json();
                     const reply = data.reply || data.message || data; // Handle different response formats
+                    
+                    if (typeof window.addChatMessage === 'function') {
+                        window.addChatMessage('ai', reply);
+                    }
                     
                     const result = await handleResponse(reply, { userPrompt: args });
                     if (result.workshopFileRewriteSucceeded) {
