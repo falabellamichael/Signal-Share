@@ -45,6 +45,9 @@ const CORS_WHITELIST = [
   "http://127.0.0.1"
 ];
 
+const OLLAMA_BASE_URL = process.env.SIGNAL_SHARE_OLLAMA_BASE_URL || process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
+const DEFAULT_OLLAMA_MODEL = process.env.SIGNAL_SHARE_OLLAMA_MODEL || process.env.OLLAMA_MODEL || "llama3.1";
+
 function normalizeBaseUrl(value = "") {
   const raw = `${value || ""}`.trim();
   if (!raw) return "";
@@ -84,6 +87,8 @@ function getConfiguredModel(requestedModel = "") {
   return process.env.SIGNAL_SHARE_AI_MODEL
     || process.env.SIGNAL_SHARE_LOCAL_LLM_MODEL
     || process.env.OPENAI_MODEL
+    || process.env.SIGNAL_SHARE_OLLAMA_MODEL
+    || process.env.OLLAMA_MODEL
     || "";
 }
 
@@ -117,67 +122,202 @@ function buildMessages({ message = "", history = [], pageContext = "", customIns
   return messages;
 }
 
+function messagesToPrompt(messages = []) {
+  return messages
+    .map((message) => `${message.role === "assistant" ? "Assistant" : message.role === "system" ? "System" : "User"}: ${message.content}`)
+    .join("\n\n")
+    .concat("\n\nAssistant:");
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 180000) {
+  const controller = new AbortController();
+  const timeout = Number(timeoutMs) > 0
+    ? setTimeout(() => controller.abort(), Number(timeoutMs))
+    : null;
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: options.signal || controller.signal
+    });
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperature }) {
+  const payload = {
+    messages,
+    temperature,
+    stream: false
+  };
+
+  const selectedModel = `${model || ""}`.trim();
+  if (selectedModel) payload.model = selectedModel;
+
+  const response = await fetchWithTimeout(chatUrl, {
+    method: "POST",
+    headers: getAiHeaders(),
+    body: JSON.stringify(payload)
+  });
+
+  const raw = await response.text();
+  if (!response.ok) {
+    throw new Error(`Configured OpenAI-compatible provider returned HTTP ${response.status}: ${raw.slice(0, 240)}`);
+  }
+
+  let data = null;
+  try {
+    data = JSON.parse(raw);
+  } catch (_error) {
+    return sanitizeModelReply(raw);
+  }
+
+  return sanitizeModelReply(
+    data?.choices?.[0]?.message?.content
+    || data?.choices?.[0]?.text
+    || data?.message?.content
+    || data?.reply
+    || data?.response
+    || ""
+  );
+}
+
+async function getOllamaModelIds() {
+  const base = normalizeBaseUrl(OLLAMA_BASE_URL);
+  if (!base) return [];
+
+  try {
+    const response = await fetchWithTimeout(`${base}/api/tags`, { method: "GET" }, 1500);
+    if (!response.ok) return [];
+    const data = await response.json().catch(() => null);
+    const models = Array.isArray(data?.models) ? data.models : [];
+    return models
+      .map((model) => `${model?.name || model?.model || ""}`.trim())
+      .filter(Boolean);
+  } catch (_error) {
+    return [];
+  }
+}
+
+async function callOllamaProvider({ messages, model, temperature }) {
+  const base = normalizeBaseUrl(OLLAMA_BASE_URL);
+  if (!base) throw new Error("Ollama base URL is not configured.");
+
+  const availableModels = await getOllamaModelIds();
+  const requested = `${model || ""}`.trim();
+  const selectedModel = requested && requested !== "auto"
+    ? requested
+    : (availableModels[0] || DEFAULT_OLLAMA_MODEL);
+
+  if (!selectedModel) throw new Error("No Ollama model is available.");
+
+  const response = await fetchWithTimeout(`${base}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: selectedModel,
+      messages,
+      stream: false,
+      options: {
+        temperature
+      }
+    })
+  });
+
+  const raw = await response.text();
+  if (!response.ok) {
+    throw new Error(`Ollama provider returned HTTP ${response.status}: ${raw.slice(0, 240)}`);
+  }
+
+  let data = null;
+  try {
+    data = JSON.parse(raw);
+  } catch (_error) {
+    return sanitizeModelReply(raw);
+  }
+
+  return sanitizeModelReply(data?.message?.content || data?.response || "");
+}
+
+async function getProviderCandidates(model = "auto") {
+  const candidates = [];
+  const configuredChatUrl = getConfiguredChatUrl();
+  if (configuredChatUrl) {
+    candidates.push({
+      id: "configured-openai-compatible",
+      type: "openai-compatible",
+      chatUrl: configuredChatUrl,
+      model: getConfiguredModel(model)
+    });
+  }
+
+  const ollamaModels = await getOllamaModelIds();
+  if (ollamaModels.length > 0) {
+    candidates.push({
+      id: "ollama",
+      type: "ollama",
+      model: getConfiguredModel(model) || ollamaModels[0]
+    });
+  }
+
+  return candidates;
+}
+
 async function getChatResponse(message, history = [], pageContext = "", _depth = 0, attachment = null, model = "auto", customInstructions = "") {
   if (!message && (!Array.isArray(history) || history.length === 0)) return "No message provided.";
-
-  const chatUrl = getConfiguredChatUrl();
-  if (!chatUrl) {
-    return "Local AI endpoint is not configured. Set SIGNAL_SHARE_AI_BASE_URL or SIGNAL_SHARE_AI_CHAT_URL for the bridge.";
-  }
 
   const messages = buildMessages({ message, history, pageContext, customInstructions });
   if (attachment?.text) {
     messages.push({ role: "user", content: `Attached content:\n${attachment.text}` });
   }
 
-  const payload = {
-    messages,
-    temperature: Number(process.env.SIGNAL_SHARE_AI_TEMPERATURE || 0.7),
-    stream: false
-  };
+  const temperature = Number(process.env.SIGNAL_SHARE_AI_TEMPERATURE || 0.7);
+  const candidates = await getProviderCandidates(model);
 
-  const selectedModel = getConfiguredModel(model);
-  if (selectedModel) payload.model = selectedModel;
-
-  try {
-    const response = await fetch(chatUrl, {
-      method: "POST",
-      headers: getAiHeaders(),
-      body: JSON.stringify(payload)
-    });
-
-    const raw = await response.text();
-    if (!response.ok) {
-      console.warn(`[Chatbot] Configured AI endpoint returned ${response.status}:`, raw.slice(0, 500));
-      return "Configured AI endpoint returned an error. Check the bridge/provider settings and try again.";
-    }
-
-    let data = null;
-    try {
-      data = JSON.parse(raw);
-    } catch (_error) {
-      return sanitizeModelReply(raw) || "The configured AI endpoint returned an empty response.";
-    }
-
-    const reply = data?.choices?.[0]?.message?.content
-      || data?.choices?.[0]?.text
-      || data?.message?.content
-      || data?.reply
-      || data?.response
-      || "";
-
-    return sanitizeModelReply(reply) || "The configured AI endpoint returned an empty response.";
-  } catch (error) {
-    console.warn("[Chatbot] Configured AI endpoint request failed:", error);
-    return "Configured AI endpoint is unavailable. Check the bridge/provider settings and try again.";
+  if (candidates.length === 0) {
+    const error = new Error("No configured or auto-detected AI provider is available.");
+    error.code = "AI_PROVIDER_UNAVAILABLE";
+    throw error;
   }
+
+  const failures = [];
+
+  for (const candidate of candidates) {
+    try {
+      const reply = candidate.type === "ollama"
+        ? await callOllamaProvider({ messages, model: candidate.model, temperature })
+        : await callOpenAiCompatibleProvider({ chatUrl: candidate.chatUrl, messages, model: candidate.model, temperature });
+
+      if (reply) return reply;
+      failures.push(`${candidate.id}: empty response`);
+    } catch (error) {
+      failures.push(`${candidate.id}: ${error?.message || error}`);
+    }
+  }
+
+  const error = new Error(`No AI provider returned a usable reply. ${failures.join(" | ")}`);
+  error.code = "AI_PROVIDER_UNAVAILABLE";
+  throw error;
 }
 
 async function getLocalModelCatalog() {
   const configuredModel = getConfiguredModel("auto");
+  const ollamaModels = await getOllamaModelIds();
+  const rows = [];
+
+  if (configuredModel || getConfiguredChatUrl()) {
+    rows.push({ id: configuredModel || "configured", provider: "configured" });
+  }
+
+  for (const modelId of ollamaModels) {
+    rows.push({ id: modelId, provider: "ollama" });
+  }
+
   return {
-    all: configuredModel ? [configuredModel] : [],
-    configured: Boolean(getConfiguredChatUrl()),
+    all: rows.map((row) => row.id),
+    rows,
+    configured: Boolean(getConfiguredChatUrl() || rows.length > 0),
     checkedAt: new Date().toISOString()
   };
 }
@@ -223,6 +363,11 @@ async function handleChatRoute(req, res) {
     const reply = await getChatResponse(message || "", history || [], pageContext || "", 0, attachment || null, model || "auto", customInstructions || "");
     return res.json({ ok: true, reply });
   } catch (error) {
+    if (error?.code === "AI_PROVIDER_UNAVAILABLE") {
+      console.warn("[Bridge] AI provider unavailable:", error.message);
+      return res.status(503).json({ ok: false, error: "AI provider unavailable." });
+    }
+
     console.error("[Bridge] Chat route error:", error);
     return res.status(500).json({ ok: false, error: "AI processing failed." });
   }
@@ -235,18 +380,19 @@ app.get("/api/llm/chat", (_req, res) => {
   res.json({ ok: true, status: "AI chat bridge is active.", configured: Boolean(getConfiguredChatUrl()) });
 });
 
-app.get("/api/local-llm/health", (_req, res) => {
-  res.json({ ok: true, configured: Boolean(getConfiguredChatUrl()), checkedAt: new Date().toISOString() });
+app.get("/api/local-llm/health", async (_req, res) => {
+  const catalog = await getLocalModelCatalog();
+  res.json({ ok: true, configured: catalog.configured, providers: catalog.rows.map((row) => row.provider), checkedAt: new Date().toISOString() });
 });
 
 app.get("/api/llm/models", async (_req, res) => {
   const catalog = await getLocalModelCatalog();
-  res.json({ ok: true, models: catalog.all.map((id) => ({ id, provider: "configured" })), ...catalog });
+  res.json({ ok: true, models: catalog.rows, ...catalog });
 });
 
 app.get("/api/local-llm/models", async (_req, res) => {
   const catalog = await getLocalModelCatalog();
-  res.json({ ok: true, models: catalog.all.map((id) => ({ id, provider: "configured" })), ...catalog });
+  res.json({ ok: true, models: catalog.rows, ...catalog });
 });
 
 app.get("/api/system-media/current", (_req, res) => {
@@ -293,8 +439,9 @@ app.get("/api/security/audit", (_req, res) => {
   res.json({ ok: true, checks: [], generatedAt: new Date().toISOString() });
 });
 
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, configured: Boolean(getConfiguredChatUrl()), service: "Signal Share Backend", time: new Date().toISOString() });
+app.get("/api/health", async (_req, res) => {
+  const catalog = await getLocalModelCatalog();
+  res.json({ ok: true, configured: catalog.configured, service: "Signal Share Backend", time: new Date().toISOString() });
 });
 
 app.use(express.static(projectRoot));
@@ -309,4 +456,5 @@ app.use((req, res) => {
 app.listen(port, "0.0.0.0", () => {
   console.log(`[Bridge] Signal Share backend listening on http://0.0.0.0:${port}`);
   console.log(`[Bridge] AI endpoint configured: ${getConfiguredChatUrl() ? "YES" : "NO"}`);
+  console.log(`[Bridge] Ollama auto-detect enabled at ${normalizeBaseUrl(OLLAMA_BASE_URL) || "unavailable"}`);
 });
