@@ -1,17 +1,19 @@
 /**
- * /edit or [edit] Command
- * Opens the active Workshop file, keeps /edit routing intact, and applies AI fixes.
+ * /edit Command
  *
- * Design notes:
- * - Keep the slash command visible to downstream intent detection.
- * - Do not inject full source into the chat input.
- * - Read/write through the Workshop editor/Supabase-backed helpers when available.
- * - Force a reliable active editor snapshot so the model can see the open game/file.
- * - Treat raw SEARCH/REPLACE output as executable edits even if the model omits [EDIT] tags.
+ * File-targeted Workshop editor integration.
+ *
+ * Rules:
+ * - If the prompt names a file, switch to that file before sending AI context.
+ * - Apply AI edits to the resolved game + file, not blindly to the visible file.
+ * - Accept [EDIT] blocks, raw SEARCH/REPLACE blocks, and full-file code fences.
+ * - Fall back from exact SEARCH matching to whitespace/function/CSS-block matching.
  */
-(function() {
-    let workshopStateWrapperInstalled = false;
+(function () {
+    const COMMAND_ID = 'edit';
     let originalGetWorkshopEditorState = null;
+    let stateWrapperInstalled = false;
+    let lastResolvedTarget = null;
 
     function normalizeText(value = '') {
         return `${value || ''}`.trim();
@@ -21,20 +23,32 @@
         return `${value || ''}`.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     }
 
-    function stripOuterCodeFence(value = '') {
+    function collapseWhitespace(value = '') {
+        return normalizeNewlines(value).replace(/\s+/g, ' ').trim();
+    }
+
+    function escapeRegex(value = '') {
+        return `${value || ''}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function stripCodeFence(value = '') {
         let text = normalizeNewlines(value).trim();
-        const fenceMatch = text.match(/^```[^\n`]*\n([\s\S]*?)\n?```$/);
-        if (fenceMatch) text = fenceMatch[1].trim();
+        const match = text.match(/^```[^\n`]*\n([\s\S]*?)\n?```$/);
+        if (match) text = match[1].trim();
         return text;
     }
 
-    function cleanPatchText(value = '') {
-        return stripOuterCodeFence(value)
+    function cleanPatchPart(value = '') {
+        return stripCodeFence(value)
+            .replace(/^\s*SEARCH\s*:\s*/i, '')
+            .replace(/^\s*REPLACE\s*:\s*/i, '')
             .replace(/^\s*```[^\n`]*\n?/i, '')
             .replace(/\n?```\s*$/i, '')
-            .replace(/^\s*SEARCH:\s*/i, '')
-            .replace(/^\s*REPLACE:\s*/i, '')
             .trim();
+    }
+
+    function isFileName(value = '') {
+        return /^[\w .()\-]+\.(?:html?|css|js|mjs|cjs|json|svg|txt|xml)$/i.test(normalizeText(value));
     }
 
     function getEditorElement() {
@@ -47,644 +61,662 @@
     }
 
     function getEditorDomContent() {
-        const editorElement = getEditorElement();
-        if (!editorElement) return '';
-        if (typeof editorElement.value === 'string') return editorElement.value;
-        if (typeof editorElement.textContent === 'string') return editorElement.textContent;
+        const editor = getEditorElement();
+        if (!editor) return '';
+        if (typeof editor.value === 'string') return editor.value;
+        if (typeof editor.textContent === 'string') return editor.textContent;
         return '';
     }
 
-    function readDatasetValue(keys = []) {
-        const candidates = [
-            document.querySelector('[data-active-game-id]'),
-            document.querySelector('[data-workshop-game-id]'),
-            document.querySelector('[data-active-file-name]'),
-            document.querySelector('[data-workshop-file-name]'),
-            document.querySelector('.workshop-editor'),
-            document.querySelector('#workshop-editor'),
-            document.body,
-            document.documentElement
-        ].filter(Boolean);
-
-        for (const node of candidates) {
-            for (const key of keys) {
-                const value = normalizeText(node?.dataset?.[key]);
-                if (value) return value;
-            }
-        }
-        return '';
-    }
-
-    function getVisibleEditorFileName(state = null) {
-        const fromState = normalizeText(state?.activeFileName || state?.fileName || state?.selectedFileName);
-        if (fromState) return fromState;
-
-        const fromDataset = readDatasetValue(['activeFileName', 'workshopFileName', 'fileName', 'selectedFileName']);
-        if (fromDataset) return fromDataset;
-
-        const selectedFile = document.querySelector('.workshop-file.active, .workshop-file.selected, [data-file-name].active, [data-file-name].selected, [aria-selected="true"][data-file-name]');
-        const selectedFileName = normalizeText(selectedFile?.dataset?.fileName || selectedFile?.textContent);
-        if (selectedFileName && /\.[a-z0-9]+$/i.test(selectedFileName)) return selectedFileName;
-
-        return 'index.html';
+    function setEditorDomContent(content = '') {
+        const editor = getEditorElement();
+        if (!editor) return false;
+        editor.value = `${content || ''}`;
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        editor.dispatchEvent(new Event('change', { bubbles: true }));
+        if (typeof window.handleWorkshopEditContentInput === 'function') window.handleWorkshopEditContentInput();
+        if (typeof window.syncWorkshopEditorLineNumbers === 'function') window.syncWorkshopEditorLineNumbers();
+        return true;
     }
 
     function getManageableGames() {
         if (typeof window.getWorkshopManageableGames !== 'function') return [];
-        const games = window.getWorkshopManageableGames();
-        return Array.isArray(games) ? games : [];
+        try {
+            const games = window.getWorkshopManageableGames();
+            return Array.isArray(games) ? games : [];
+        } catch (_error) {
+            return [];
+        }
     }
 
-    function getGameFromId(gameId = '') {
+    function getCurrentEditorState() {
+        try {
+            if (originalGetWorkshopEditorState) return originalGetWorkshopEditorState();
+            if (typeof window.getWorkshopEditorState === 'function') return window.getWorkshopEditorState();
+        } catch (_error) {
+            return null;
+        }
+        return null;
+    }
+
+    function getGameById(gameId = '') {
         const id = normalizeText(gameId);
         if (!id) return null;
         return getManageableGames().find((game) => `${game?.id || ''}` === id) || null;
     }
 
-    function getVisibleEditorGame(state = null, selected = null, args = '') {
-        if (selected?.id || selected?.gameId || selected?.activeGameId) {
-            return {
-                id: normalizeText(selected.id || selected.gameId || selected.activeGameId),
-                title: normalizeText(selected.title || selected.name || selected.gameTitle)
-            };
-        }
-
-        const stateGameId = normalizeText(state?.activeGameId || state?.gameId || state?.id);
-        if (stateGameId) {
-            const game = getGameFromId(stateGameId);
-            return {
-                id: stateGameId,
-                title: normalizeText(state?.activeGameTitle || state?.gameTitle || state?.title || game?.title || game?.name)
-            };
-        }
-
-        const datasetGameId = readDatasetValue(['activeGameId', 'workshopGameId', 'gameId', 'selectedGameId']);
-        if (datasetGameId) {
-            const game = getGameFromId(datasetGameId);
-            return {
-                id: datasetGameId,
-                title: normalizeText(game?.title || game?.name)
-            };
-        }
-
-        const games = getManageableGames();
-        const prompt = normalizeText(args).toLowerCase();
-        const promptGame = games.find((game) => {
-            const title = normalizeText(game?.title || game?.name).toLowerCase();
-            return title && prompt.includes(title);
-        });
-        if (promptGame) {
-            return {
-                id: normalizeText(promptGame.id),
-                title: normalizeText(promptGame.title || promptGame.name)
-            };
-        }
-
-        const visibleTitle = normalizeText(
-            document.querySelector('#workshop-edit-game-title')?.textContent
-            || document.querySelector('.workshop-edit-game-title')?.textContent
-            || document.querySelector('[data-workshop-active-title]')?.textContent
-            || document.querySelector('.workshop-editor-title')?.textContent
-        );
-        if (visibleTitle) {
-            const titleGame = games.find((game) => visibleTitle.toLowerCase().includes(normalizeText(game?.title || game?.name).toLowerCase()));
-            return {
-                id: normalizeText(titleGame?.id || window.lastPlayedGameId || ''),
-                title: normalizeText(titleGame?.title || titleGame?.name || visibleTitle)
-            };
-        }
-
-        if (games.length === 1) {
-            return {
-                id: normalizeText(games[0].id),
-                title: normalizeText(games[0].title || games[0].name)
-            };
-        }
-
-        return {
-            id: normalizeText(window.lastPlayedGameId || ''),
-            title: ''
-        };
+    function gameTitle(game = null) {
+        return normalizeText(game?.title || game?.name || game?.gameTitle || '');
     }
 
-    function getWorkshopFileContentSafe(gameId = '', fileName = '', state = null) {
-        const stateContent = state?.activeFileContent ?? state?.content ?? state?.value;
-        if (typeof stateContent === 'string' && stateContent.length > 0) return stateContent;
+    function gameFiles(game = null) {
+        const files = Array.isArray(game?.files) ? game.files : [];
+        return files
+            .map((file) => typeof file === 'string' ? { name: file } : file)
+            .filter((file) => normalizeText(file?.name || file?.fileName));
+    }
 
-        const domContent = getEditorDomContent();
-        if (typeof domContent === 'string' && domContent.length > 0) return domContent;
+    function extractPromptFileName(prompt = '') {
+        const text = normalizeText(prompt);
+        const explicit = text.match(/\b(?:file|filename|path)\s*[:=]?\s*['"]?([\w .()\-]+\.(?:html?|css|js|mjs|cjs|json|svg|txt|xml))['"]?/i)?.[1];
+        if (explicit) return normalizeText(explicit);
 
-        if (gameId && fileName && typeof window.getWorkshopFileContent === 'function') {
+        const bare = text.match(/(?:^|\s)([\w .()\-]+\.(?:html?|css|js|mjs|cjs|json|svg|txt|xml))(?=\s|$)/i)?.[1];
+        return normalizeText(bare || '');
+    }
+
+    function resolveFileNameForGame(game = null, requestedFileName = '', state = null) {
+        const requested = normalizeText(requestedFileName);
+        const files = gameFiles(game);
+        if (requested) {
+            const direct = files.find((file) => normalizeText(file.name || file.fileName).toLowerCase() === requested.toLowerCase());
+            if (direct) return normalizeText(direct.name || direct.fileName);
+            return requested;
+        }
+
+        const fromState = normalizeText(state?.activeFileName || state?.fileName || state?.selectedFileName);
+        if (fromState) return fromState;
+
+        const indexFile = files.find((file) => /^index\.html?$/i.test(normalizeText(file.name || file.fileName)));
+        if (indexFile) return normalizeText(indexFile.name || indexFile.fileName);
+
+        const first = files[0];
+        return normalizeText(first?.name || first?.fileName || 'index.html');
+    }
+
+    function resolveGameFromPrompt(prompt = '', state = null) {
+        const games = getManageableGames();
+        const cleanPrompt = normalizeText(prompt);
+
+        if (typeof window.resolveWorkshopEditGameFromPrompt === 'function') {
             try {
-                const source = window.getWorkshopFileContent(gameId, fileName);
-                if (typeof source === 'string') return source;
-            } catch (error) {
-                console.warn('[Arcade: Edit] getWorkshopFileContent failed:', error);
+                const resolved = window.resolveWorkshopEditGameFromPrompt(cleanPrompt);
+                if (resolved?.id) return resolved;
+            } catch (_error) {
+                // Continue with local resolution.
             }
         }
 
-        return typeof stateContent === 'string' ? stateContent : '';
-    }
+        const stateGame = getGameById(state?.activeGameId || state?.gameId || '');
+        if (stateGame && /\b(this|current|open|opened|selected|active)\b/i.test(cleanPrompt)) return stateGame;
 
-    function buildReliableEditorSnapshot(state = null, selected = null, args = '') {
-        const game = getVisibleEditorGame(state, selected, args);
-        const activeFileName = getVisibleEditorFileName(state);
-        const activeFileContent = getWorkshopFileContentSafe(game.id, activeFileName, state);
+        const promptWithoutFile = cleanPrompt.replace(extractPromptFileName(cleanPrompt), '').toLowerCase();
+        const byTitle = games
+            .slice()
+            .sort((a, b) => gameTitle(b).length - gameTitle(a).length)
+            .find((game) => {
+                const title = gameTitle(game).toLowerCase();
+                return title && promptWithoutFile.includes(title);
+            });
+        if (byTitle) return byTitle;
 
-        const snapshot = {
-            ...(state && typeof state === 'object' ? state : {}),
-            activeGameId: normalizeText(game.id || state?.activeGameId || state?.gameId || ''),
-            activeGameTitle: normalizeText(game.title || state?.activeGameTitle || state?.gameTitle || state?.title || ''),
-            activeFileName,
-            activeFileContent,
-            activeFileContentLength: `${activeFileContent || ''}`.length,
-            activeFileContentProvidedInEditProtocol: true,
-            source: 'edit-command-visible-editor-snapshot'
-        };
-
-        window.__activeWorkshopEditorContext = snapshot;
-        window.__lastWorkshopEditSnapshot = snapshot;
-        return snapshot;
-    }
-
-    function installWorkshopEditorStateFallback() {
-        if (workshopStateWrapperInstalled) return;
-        workshopStateWrapperInstalled = true;
-        originalGetWorkshopEditorState = typeof window.getWorkshopEditorState === 'function'
-            ? window.getWorkshopEditorState.bind(window)
-            : null;
-
-        window.getWorkshopEditorState = function getReliableWorkshopEditorState() {
-            const originalState = originalGetWorkshopEditorState ? originalGetWorkshopEditorState() : null;
-            const fallback = window.__activeWorkshopEditorContext || window.__lastWorkshopEditSnapshot || null;
-            if (!fallback) return originalState;
-
-            const originalHasIdentity = normalizeText(originalState?.activeGameId || originalState?.gameId || '')
-                && normalizeText(originalState?.activeFileName || originalState?.fileName || '');
-            const originalContent = originalState?.activeFileContent ?? originalState?.content ?? originalState?.value;
-            const originalHasContent = typeof originalContent === 'string' && originalContent.length > 0;
-
-            if (originalHasIdentity && originalHasContent) return originalState;
-
-            const merged = {
-                ...(fallback || {}),
-                ...(originalState && typeof originalState === 'object' ? originalState : {})
-            };
-
-            merged.activeGameId = normalizeText(originalState?.activeGameId || originalState?.gameId || fallback?.activeGameId || fallback?.gameId || '');
-            merged.activeGameTitle = normalizeText(originalState?.activeGameTitle || originalState?.gameTitle || originalState?.title || fallback?.activeGameTitle || fallback?.gameTitle || fallback?.title || '');
-            merged.activeFileName = normalizeText(originalState?.activeFileName || originalState?.fileName || fallback?.activeFileName || fallback?.fileName || 'index.html');
-            merged.activeFileContent = typeof originalContent === 'string' && originalContent.length > 0
-                ? originalContent
-                : `${fallback?.activeFileContent || ''}`;
-            merged.activeFileContentLength = merged.activeFileContent.length;
-            merged.activeFileContentProvidedInEditProtocol = true;
-            merged.source = originalState?.source || fallback?.source || 'edit-command-state-wrapper';
-            return merged;
-        };
-    }
-
-    function resolveFallbackEditTarget(args = '') {
-        const games = getManageableGames();
-        if (games.length === 0) return null;
-
-        const editorState = typeof window.getWorkshopEditorState === 'function'
-            ? window.getWorkshopEditorState()
-            : null;
-        const activeGameId = normalizeText(editorState?.activeGameId);
-        const activeGame = activeGameId ? games.find((game) => game.id === activeGameId) : null;
-        if (activeGame) return activeGame;
-
-        const prompt = `${args || ''}`.toLowerCase();
-        const promptGame = games.find((game) => {
-            const title = normalizeText(game?.title || game?.name).toLowerCase();
-            return title && prompt.includes(title);
-        });
-        if (promptGame) return promptGame;
-
-        if (games.length === 1 || /\b(any|whatever|something|one of my|a game|my game|this|current|open|opened|selected)\b/.test(prompt)) {
-            return games[0];
-        }
-
+        if (stateGame) return stateGame;
+        if (games.length === 1) return games[0];
         return null;
     }
 
-    function writeEditorContent(editorElement, content = '') {
-        if (!editorElement) return false;
-        editorElement.value = `${content || ''}`;
-        editorElement.dispatchEvent(new Event('input', { bubbles: true }));
-        editorElement.dispatchEvent(new Event('change', { bubbles: true }));
-        if (typeof window.handleWorkshopEditContentInput === 'function') {
-            window.handleWorkshopEditContentInput();
-        }
-        if (typeof window.syncWorkshopEditorLineNumbers === 'function') {
-            window.syncWorkshopEditorLineNumbers();
-        }
-        return true;
-    }
-
-    function readCurrentWorkshopFileContent(editorState = null) {
-        const state = editorState || (typeof window.getWorkshopEditorState === 'function'
-            ? window.getWorkshopEditorState()
-            : null);
-        const gameId = normalizeText(state?.activeGameId);
-        const fileName = normalizeText(state?.activeFileName || 'index.html');
-        return getWorkshopFileContentSafe(gameId, fileName, state);
-    }
-
-    async function selectWorkshopTargetFromPrompt(args = '') {
-        const cleanArgs = normalizeText(args);
-        if (typeof window.resolveWorkshopEditGameFromPrompt !== 'function'
-            || typeof window.setWorkshopEditActiveGame !== 'function') {
-            return null;
-        }
-
-        let targetGame = window.resolveWorkshopEditGameFromPrompt(cleanArgs);
-        if (!targetGame) targetGame = resolveFallbackEditTarget(cleanArgs);
-        if (!targetGame) return null;
-
-        const selected = await Promise.resolve(window.setWorkshopEditActiveGame(targetGame.id, { prompt: cleanArgs }));
-        if (selected?.ok) {
-            console.log(`[Command: Edit] Auto-switching context to: ${selected.title} / ${selected.fileName}`);
-        }
-        return selected || targetGame;
-    }
-
-    async function hydrateEditorFromWorkshopState(selected = null, args = '') {
-        const editorElement = getEditorElement();
-        const editorState = typeof window.getWorkshopEditorState === 'function'
-            ? await Promise.resolve(window.getWorkshopEditorState())
-            : null;
-
-        const snapshot = buildReliableEditorSnapshot(editorState, selected, args);
-        const content = readCurrentWorkshopFileContent(snapshot);
-
-        if (editorElement && typeof content === 'string' && content.length > 0) {
-            writeEditorContent(editorElement, content);
-        }
-
-        buildReliableEditorSnapshot({ ...snapshot, activeFileContent: content }, selected, args);
-        return true;
-    }
-
-    function extractAiCodeBlocks(text = '') {
-        const blocks = [];
-        const source = `${text || ''}`;
-        const regex = /```([^\n`]*)\n([\s\S]*?)```/g;
-        let match;
-        while ((match = regex.exec(source)) !== null) {
-            const info = `${match[1] || ''}`.trim();
-            const content = `${match[2] || ''}`.trim();
-            if (!content) continue;
-            const fileName = info.match(/\b(?:file(?:name)?|name|path)=['"]?([^'"\s`]+)['"]?/i)?.[1]
-                || info.match(/\b([a-z0-9][\w.-]*\.(?:html?|css|js|mjs|cjs|json|txt|svg|xml))\b/i)?.[1]
-                || '';
-            blocks.push({ info, fileName: fileName.replace(/[/\\]+/g, '_'), content });
-        }
-        return blocks;
-    }
-
-    function extractCandidateTextsForPatchParsing(text = '') {
-        const source = normalizeNewlines(text);
-        const candidates = [source];
-        const fenceRegex = /```[^\n`]*\n([\s\S]*?)```/g;
-        let match;
-        while ((match = fenceRegex.exec(source)) !== null) {
-            if (match[1] && /SEARCH\s*:/i.test(match[1]) && /REPLACE\s*:/i.test(match[1])) {
-                candidates.push(match[1]);
-            }
-        }
-        return candidates;
-    }
-
-    function inferPatchFileName(text = '', fallbackFileName = 'index.html') {
-        const source = normalizeNewlines(text);
-        const editTagFile = source.match(/\[(?:EDIT|EDIT_FILE|FILE_EDIT)\s*:\s*([^\]\n]+)\]/i)?.[1];
-        if (editTagFile) return editTagFile.trim().replace(/^['"]|['"]$/g, '');
-
-        const filenameValue = source.match(/\b(?:file(?:name)?|path)\s*[:=]\s*['"]?([^'"\s`]+\.(?:html?|css|js|mjs|cjs|json|txt|svg|xml))['"]?/i)?.[1];
-        if (filenameValue) return filenameValue.trim();
-
-        const bareFilename = source.match(/\b([a-z0-9][\w.-]*\.(?:html?|css|js|mjs|cjs|json|txt|svg|xml))\b/i)?.[1];
-        if (bareFilename) return bareFilename.trim();
-
-        return fallbackFileName;
-    }
-
-    function parseRawSearchReplaceEdits(text = '', fallbackFileName = 'index.html') {
-        const parsed = [];
-        const seen = new Set();
-        const candidates = extractCandidateTextsForPatchParsing(text);
-
-        for (const candidate of candidates) {
-            const source = stripOuterCodeFence(candidate);
-            if (!/SEARCH\s*:/i.test(source) || !/REPLACE\s*:/i.test(source)) continue;
-
-            const fileName = inferPatchFileName(source, fallbackFileName);
-            const blockRegex = /(?:\[(?:EDIT|EDIT_FILE|FILE_EDIT)(?:\s*:\s*([^\]\n]+))?\]\s*)?SEARCH\s*:\s*([\s\S]*?)\s*REPLACE\s*:\s*([\s\S]*?)(?=\n\s*\[(?:EDIT|EDIT_FILE|FILE_EDIT)(?:\s*:|\])|\n\s*SEARCH\s*:|\s*\[\/(?:EDIT|EDIT_FILE|FILE_EDIT)\]|$)/gi;
-            let match;
-            while ((match = blockRegex.exec(source)) !== null) {
-                const blockFileName = normalizeText(match[1] || fileName).replace(/^['"]|['"]$/g, '') || fallbackFileName;
-                const search = cleanPatchText(match[2] || '');
-                const replace = cleanPatchText(match[3] || '');
-                if (!search && !replace) continue;
-
-                const key = `${blockFileName}\n---SEARCH---\n${search}\n---REPLACE---\n${replace}`;
-                if (seen.has(key)) continue;
-                seen.add(key);
-                parsed.push({ fileName: blockFileName, search, replace, source: 'raw-search-replace' });
-            }
-        }
-
-        return parsed;
-    }
-
-    function removeDisplayedRawEditMessage(text = '') {
-        const source = `${text || ''}`;
-        if (!/SEARCH\s*:/i.test(source) || !/REPLACE\s*:/i.test(source)) return false;
-        const container = document.getElementById('chat-messages');
-        if (!container) return false;
-
-        const messages = Array.from(container.querySelectorAll('.chat-message, .message-ai'));
-        for (let index = messages.length - 1; index >= 0; index -= 1) {
-            const node = messages[index];
-            const content = `${node.textContent || ''}`;
-            if (/SEARCH\s*:/i.test(content) && /REPLACE\s*:/i.test(content)) {
-                node.remove();
-                return true;
-            }
-        }
-        return false;
-    }
-
-    async function saveWholeFile(gameId = '', fileName = '', content = '') {
+    async function switchWorkshopTarget(gameId = '', fileName = '') {
         const targetGameId = normalizeText(gameId);
         const targetFileName = normalizeText(fileName || 'index.html');
-        if (!targetGameId || !targetFileName) return { ok: false, message: 'Missing game or file.' };
-
-        if (typeof window.internalApplyWorkshopFileEdit === 'function') {
-            return await window.internalApplyWorkshopFileEdit(targetGameId, targetFileName, content, { save: true });
+        if (!targetGameId || typeof window.setWorkshopEditActiveGame !== 'function') {
+            return { ok: false, id: targetGameId, fileName: targetFileName };
         }
 
-        const editorElement = getEditorElement();
-        writeEditorContent(editorElement, content);
+        try {
+            let result = await Promise.resolve(window.setWorkshopEditActiveGame(targetGameId, targetFileName));
+            if (result?.ok !== false) return result || { ok: true, id: targetGameId, fileName: targetFileName };
+
+            result = await Promise.resolve(window.setWorkshopEditActiveGame(targetGameId, { fileName: targetFileName }));
+            return result || { ok: true, id: targetGameId, fileName: targetFileName };
+        } catch (error) {
+            console.warn('[Arcade: Edit] Failed to switch Workshop target:', error);
+            return { ok: false, id: targetGameId, fileName: targetFileName, error };
+        }
+    }
+
+    function readWorkshopFile(gameId = '', fileName = '', state = null) {
+        const targetGameId = normalizeText(gameId);
+        const targetFileName = normalizeText(fileName || 'index.html');
+
+        if (targetGameId && targetFileName && typeof window.getWorkshopFileContent === 'function') {
+            try {
+                const content = window.getWorkshopFileContent(targetGameId, targetFileName);
+                if (typeof content === 'string') return content;
+            } catch (_error) {
+                // Fall through.
+            }
+        }
+
+        const stateFile = normalizeText(state?.activeFileName || state?.fileName || '');
+        const stateContent = state?.activeFileContent ?? state?.content ?? state?.value;
+        if ((!stateFile || stateFile === targetFileName) && typeof stateContent === 'string') return stateContent;
+
+        return getEditorDomContent();
+    }
+
+    async function saveWorkshopFile(gameId = '', fileName = '', content = '') {
+        const targetGameId = normalizeText(gameId);
+        const targetFileName = normalizeText(fileName || 'index.html');
+        if (!targetGameId || !targetFileName) return { ok: false, message: 'Missing target game or file.' };
+
+        await switchWorkshopTarget(targetGameId, targetFileName);
+
+        if (typeof window.internalApplyWorkshopFileEdit === 'function') {
+            const result = await window.internalApplyWorkshopFileEdit(targetGameId, targetFileName, `${content || ''}`, { save: true });
+            if (result?.ok !== false) {
+                setEditorDomContent(content);
+                return result || { ok: true };
+            }
+            return result;
+        }
+
+        setEditorDomContent(content);
         if (typeof window.saveWorkshopEditPanel === 'function') {
             const result = await window.saveWorkshopEditPanel();
             return result || { ok: true };
         }
 
-        return { ok: true, message: 'Updated editor content, but no save helper was available.' };
+        return { ok: true, message: 'Updated editor content; save helper unavailable.' };
     }
 
-    async function applyManualSearchReplace(gameId = '', fileName = '', search = '', replace = '') {
-        const editorState = typeof window.getWorkshopEditorState === 'function'
-            ? await Promise.resolve(window.getWorkshopEditorState())
-            : null;
-        const currentContent = getWorkshopFileContentSafe(gameId, fileName, editorState);
-        if (typeof currentContent !== 'string') {
-            return { ok: false, message: 'Could not read current file content.' };
-        }
+    function buildSnapshot(target, state = null) {
+        const game = getGameById(target.gameId) || target.game || null;
+        const content = readWorkshopFile(target.gameId, target.fileName, state);
+        const snapshot = {
+            ...(state && typeof state === 'object' ? state : {}),
+            activeGameId: normalizeText(target.gameId),
+            activeGameTitle: normalizeText(target.gameTitle || gameTitle(game)),
+            activeFileName: normalizeText(target.fileName || 'index.html'),
+            activeFileContent: `${content || ''}`,
+            activeFileContentLength: `${content || ''}`.length,
+            activeFileContentProvidedInEditProtocol: true,
+            source: 'edit-js-targeted-snapshot'
+        };
 
-        const normalizedSearch = normalizeNewlines(search);
-        const normalizedCurrent = normalizeNewlines(currentContent);
-        if (!normalizedSearch) {
-            return saveWholeFile(gameId, fileName, replace);
-        }
-
-        if (currentContent.includes(search)) {
-            return saveWholeFile(gameId, fileName, currentContent.replace(search, replace));
-        }
-
-        if (normalizedCurrent.includes(normalizedSearch)) {
-            const next = normalizedCurrent.replace(normalizedSearch, normalizeNewlines(replace));
-            return saveWholeFile(gameId, fileName, next);
-        }
-
-        return { ok: false, message: `Search block not found in ${fileName}.` };
+        window.__activeWorkshopEditorContext = snapshot;
+        window.__lastWorkshopEditSnapshot = snapshot;
+        lastResolvedTarget = {
+            gameId: snapshot.activeGameId,
+            gameTitle: snapshot.activeGameTitle,
+            fileName: snapshot.activeFileName,
+            prompt: target.prompt || '',
+            content: snapshot.activeFileContent
+        };
+        return snapshot;
     }
 
-    async function applyFullFileCodeBlocks(text = '') {
-        const result = { attempted: false, ok: false };
-        const blocks = extractAiCodeBlocks(text);
-        if (blocks.length === 0) return result;
-
-        const editorState = typeof window.getWorkshopEditorState === 'function'
-            ? await Promise.resolve(window.getWorkshopEditorState())
+    function installStateWrapper() {
+        if (stateWrapperInstalled) return;
+        stateWrapperInstalled = true;
+        originalGetWorkshopEditorState = typeof window.getWorkshopEditorState === 'function'
+            ? window.getWorkshopEditorState.bind(window)
             : null;
-        const gameId = normalizeText(editorState?.activeGameId || window.lastPlayedGameId || '');
-        const fallbackFileName = normalizeText(editorState?.activeFileName || 'index.html');
-        if (!gameId) return result;
+
+        window.getWorkshopEditorState = function targetedWorkshopEditorState() {
+            const original = originalGetWorkshopEditorState ? originalGetWorkshopEditorState() : null;
+            const snapshot = window.__activeWorkshopEditorContext || window.__lastWorkshopEditSnapshot || null;
+            if (!snapshot) return original;
+
+            const originalFile = normalizeText(original?.activeFileName || original?.fileName || '');
+            const originalGame = normalizeText(original?.activeGameId || original?.gameId || '');
+            const originalContent = original?.activeFileContent ?? original?.content ?? original?.value;
+
+            if (originalGame === snapshot.activeGameId
+                && originalFile === snapshot.activeFileName
+                && typeof originalContent === 'string'
+                && originalContent.length > 0) {
+                return original;
+            }
+
+            return {
+                ...(original && typeof original === 'object' ? original : {}),
+                ...snapshot,
+                activeGameId: snapshot.activeGameId,
+                activeGameTitle: snapshot.activeGameTitle,
+                activeFileName: snapshot.activeFileName,
+                activeFileContent: snapshot.activeFileContent,
+                activeFileContentLength: snapshot.activeFileContentLength,
+                activeFileContentProvidedInEditProtocol: true
+            };
+        };
+    }
+
+    async function resolveTarget(prompt = '') {
+        installStateWrapper();
+        const state = getCurrentEditorState();
+        const game = resolveGameFromPrompt(prompt, state);
+        const requestedFileName = extractPromptFileName(prompt);
+        const fileName = resolveFileNameForGame(game, requestedFileName, state);
+        const gameId = normalizeText(game?.id || state?.activeGameId || state?.gameId || window.lastPlayedGameId || '');
+
+        const target = {
+            game,
+            gameId,
+            gameTitle: gameTitle(game) || normalizeText(state?.activeGameTitle || state?.gameTitle || state?.title || ''),
+            fileName,
+            prompt
+        };
+
+        if (gameId) await switchWorkshopTarget(gameId, fileName);
+        const refreshed = getCurrentEditorState();
+        buildSnapshot(target, refreshed);
+        return target;
+    }
+
+    function inferResponseFileName(text = '', fallbackFileName = 'index.html', userPrompt = '') {
+        const source = normalizeNewlines(text);
+        const tagged = source.match(/\[(?:EDIT|EDIT_FILE|FILE_EDIT)\s*:\s*([^\]\n]+)\]/i)?.[1];
+        if (tagged && isFileName(tagged)) return normalizeText(tagged).replace(/^['"]|['"]$/g, '');
+
+        const kv = source.match(/\b(?:file(?:name)?|path)\s*[:=]\s*['"]?([^'"\s`]+\.(?:html?|css|js|mjs|cjs|json|svg|txt|xml))['"]?/i)?.[1];
+        if (kv) return normalizeText(kv);
+
+        const promptFile = extractPromptFileName(userPrompt);
+        if (promptFile) return promptFile;
+
+        return normalizeText(fallbackFileName || 'index.html');
+    }
+
+    function parseSearchReplaceBlocks(text = '', fallbackFileName = 'index.html', userPrompt = '') {
+        const source = normalizeNewlines(text);
+        const candidates = [source];
+        const fenceRegex = /```[^\n`]*\n([\s\S]*?)```/g;
+        let fence;
+        while ((fence = fenceRegex.exec(source)) !== null) {
+            if (/SEARCH\s*:/i.test(fence[1] || '') && /REPLACE\s*:/i.test(fence[1] || '')) candidates.push(fence[1]);
+        }
+
+        const blocks = [];
+        const seen = new Set();
+        for (const candidate of candidates) {
+            if (!/SEARCH\s*:/i.test(candidate) || !/REPLACE\s*:/i.test(candidate)) continue;
+            const defaultFile = inferResponseFileName(candidate, fallbackFileName, userPrompt);
+            const re = /(?:\[(?:EDIT|EDIT_FILE|FILE_EDIT)(?:\s*:\s*([^\]\n]+))?\]\s*)?SEARCH\s*:\s*([\s\S]*?)\s*REPLACE\s*:\s*([\s\S]*?)(?=\n\s*\[(?:EDIT|EDIT_FILE|FILE_EDIT)(?:\s*:|\])|\n\s*SEARCH\s*:|\s*\[\/(?:EDIT|EDIT_FILE|FILE_EDIT)\]|$)/gi;
+            let match;
+            while ((match = re.exec(candidate)) !== null) {
+                const fileName = normalizeText(match[1] || defaultFile).replace(/^['"]|['"]$/g, '') || fallbackFileName;
+                const search = cleanPatchPart(match[2] || '');
+                const replace = cleanPatchPart(match[3] || '');
+                if (!search && !replace) continue;
+                const key = `${fileName}\n${search}\n${replace}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                blocks.push({ fileName, search, replace, kind: 'search-replace' });
+            }
+        }
+        return blocks;
+    }
+
+    function parseFullFileBlocks(text = '', fallbackFileName = 'index.html', userPrompt = '') {
+        const source = normalizeNewlines(text);
+        const blocks = [];
+        const re = /```([^\n`]*)\n([\s\S]*?)```/g;
+        let match;
+        while ((match = re.exec(source)) !== null) {
+            const info = normalizeText(match[1] || '');
+            const content = normalizeText(match[2] || '');
+            if (!content || /SEARCH\s*:/i.test(content) && /REPLACE\s*:/i.test(content)) continue;
+
+            const infoFile = info.match(/\b(?:file(?:name)?|path|name)\s*=?\s*['"]?([^'"\s`]+\.(?:html?|css|js|mjs|cjs|json|svg|txt|xml))['"]?/i)?.[1]
+                || info.match(/\b([^\s`]+\.(?:html?|css|js|mjs|cjs|json|svg|txt|xml))\b/i)?.[1]
+                || inferResponseFileName(source, fallbackFileName, userPrompt);
+
+            const looksWhole = /^\s*<!doctype html/i.test(content)
+                || /^\s*<html[\s>]/i.test(content)
+                || /\bfunction\s+[A-Za-z_$][\w$]*\s*\(/.test(content)
+                || /\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=/.test(content)
+                || /[.#]?[A-Za-z0-9_-]+\s*\{[\s\S]*\}/.test(content);
+
+            if (looksWhole) blocks.push({ fileName: normalizeText(infoFile || fallbackFileName), content, kind: 'full-file' });
+        }
+        return blocks;
+    }
+
+    function findCollapsedWhitespaceRange(content = '', search = '') {
+        const source = normalizeNewlines(content);
+        const target = collapseWhitespace(search);
+        if (!target) return null;
+
+        for (let start = 0; start < source.length; start += 1) {
+            while (start < source.length && /\s/.test(source[start])) start += 1;
+            let normalized = '';
+            let lastSpace = false;
+            for (let end = start; end < source.length; end += 1) {
+                const ch = source[end];
+                if (/\s/.test(ch)) {
+                    if (!lastSpace) normalized += ' ';
+                    lastSpace = true;
+                } else {
+                    normalized += ch;
+                    lastSpace = false;
+                }
+
+                const partial = normalized.trim();
+                if (partial === target) return { start, end: end + 1 };
+                if (partial.length > 32 && !target.startsWith(partial)) break;
+                if (partial.length > target.length + 8) break;
+            }
+        }
+        return null;
+    }
+
+    function extractFunctionName(value = '') {
+        const source = normalizeNewlines(value);
+        return source.match(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\(/)?.[1]
+            || source.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/)?.[1]
+            || '';
+    }
+
+    function findBalancedBraceRange(source = '', openBraceIndex = -1) {
+        if (openBraceIndex < 0) return null;
+        let depth = 0;
+        let quote = '';
+        let escaped = false;
+        let lineComment = false;
+        let blockComment = false;
+
+        for (let i = openBraceIndex; i < source.length; i += 1) {
+            const ch = source[i];
+            const next = source[i + 1];
+
+            if (lineComment) {
+                if (ch === '\n') lineComment = false;
+                continue;
+            }
+            if (blockComment) {
+                if (ch === '*' && next === '/') {
+                    blockComment = false;
+                    i += 1;
+                }
+                continue;
+            }
+            if (quote) {
+                if (escaped) escaped = false;
+                else if (ch === '\\') escaped = true;
+                else if (ch === quote) quote = '';
+                continue;
+            }
+
+            if (ch === '/' && next === '/') {
+                lineComment = true;
+                i += 1;
+                continue;
+            }
+            if (ch === '/' && next === '*') {
+                blockComment = true;
+                i += 1;
+                continue;
+            }
+            if (ch === '"' || ch === "'" || ch === '`') {
+                quote = ch;
+                continue;
+            }
+            if (ch === '{') depth += 1;
+            if (ch === '}') {
+                depth -= 1;
+                if (depth === 0) return { start: openBraceIndex, end: i + 1 };
+            }
+        }
+        return null;
+    }
+
+    function findFunctionRange(content = '', functionName = '') {
+        const source = normalizeNewlines(content);
+        const name = normalizeText(functionName);
+        if (!name) return null;
+
+        const patterns = [
+            new RegExp(`\\bfunction\\s+${escapeRegex(name)}\\s*\\(`, 'm'),
+            new RegExp(`\\b(?:const|let|var)\\s+${escapeRegex(name)}\\s*=\\s*(?:async\\s*)?(?:function\\b|\\([^)]*\\)\\s*=>|[A-Za-z_$][\\w$]*\\s*=>)`, 'm')
+        ];
+
+        for (const pattern of patterns) {
+            const match = pattern.exec(source);
+            if (!match) continue;
+            const start = match.index;
+            const openBrace = source.indexOf('{', start);
+            const range = findBalancedBraceRange(source, openBrace);
+            if (!range) continue;
+            let end = range.end;
+            while (source[end] === ';') end += 1;
+            return { start, end };
+        }
+        return null;
+    }
+
+    function extractCssSelector(value = '') {
+        const source = normalizeNewlines(value).trim();
+        return source.match(/^([^{}@][^{]+)\s*\{/)?.[1]?.trim() || '';
+    }
+
+    function findCssRange(content = '', selector = '') {
+        const source = normalizeNewlines(content);
+        const clean = normalizeText(selector);
+        if (!clean) return null;
+        const selectorIndex = source.indexOf(clean);
+        if (selectorIndex < 0) return null;
+        const openBrace = source.indexOf('{', selectorIndex);
+        const range = findBalancedBraceRange(source, openBrace);
+        if (!range) return null;
+        return { start: selectorIndex, end: range.end };
+    }
+
+    function looksLikeWholeFile(fileName = '', content = '') {
+        const ext = normalizeText(fileName).split('.').pop()?.toLowerCase();
+        const body = normalizeNewlines(content).trim();
+        if (!body) return false;
+        if (ext === 'html' || ext === 'htm') return /^<!doctype html/i.test(body) || /^<html[\s>]/i.test(body) || /<body[\s>]/i.test(body);
+        if (ext === 'js' || ext === 'mjs' || ext === 'cjs') return body.length > 120 && /\b(function|const|let|var|class|import|export)\b/.test(body);
+        if (ext === 'css') return body.length > 40 && /\{[\s\S]*\}/.test(body);
+        return body.length > 20;
+    }
+
+    function applyPatchToContent(content = '', fileName = '', search = '', replace = '') {
+        const current = normalizeNewlines(content);
+        const rawSearch = normalizeNewlines(search);
+        const rawReplace = normalizeNewlines(replace);
+
+        if (!rawSearch.trim()) {
+            return { ok: true, content: rawReplace, method: 'empty-search-full-replace' };
+        }
+
+        if (current.includes(rawSearch)) {
+            return { ok: true, content: current.replace(rawSearch, rawReplace), method: 'exact' };
+        }
+
+        const collapsedRange = findCollapsedWhitespaceRange(current, rawSearch);
+        if (collapsedRange) {
+            return {
+                ok: true,
+                content: `${current.slice(0, collapsedRange.start)}${rawReplace}${current.slice(collapsedRange.end)}`,
+                method: 'whitespace-normalized'
+            };
+        }
+
+        const functionName = extractFunctionName(rawSearch) || extractFunctionName(rawReplace);
+        const functionRange = findFunctionRange(current, functionName);
+        if (functionName && functionRange) {
+            return {
+                ok: true,
+                content: `${current.slice(0, functionRange.start)}${rawReplace}${current.slice(functionRange.end)}`,
+                method: `function:${functionName}`
+            };
+        }
+
+        const selector = extractCssSelector(rawSearch) || extractCssSelector(rawReplace);
+        const cssRange = findCssRange(current, selector);
+        if (selector && cssRange) {
+            return {
+                ok: true,
+                content: `${current.slice(0, cssRange.start)}${rawReplace}${current.slice(cssRange.end)}`,
+                method: `css:${selector}`
+            };
+        }
+
+        if (looksLikeWholeFile(fileName, rawReplace) && rawReplace.length > current.length * 0.5) {
+            return { ok: true, content: rawReplace, method: 'whole-file-replace-fallback' };
+        }
+
+        return { ok: false, content: current, method: 'no-match' };
+    }
+
+    async function applyEditBlocks(blocks = [], originalText = '', userPrompt = '') {
+        const baseTarget = lastResolvedTarget || await resolveTarget(userPrompt || '');
+        const result = {
+            handled: blocks.length > 0,
+            workshopFileRewriteAttempted: blocks.length > 0,
+            workshopFileRewriteSucceeded: false,
+            appliedFiles: []
+        };
 
         for (const block of blocks) {
-            const targetFileName = block.fileName || fallbackFileName;
-            const content = block.content;
-            if (!targetFileName || !content) continue;
+            const targetFileName = normalizeText(block.fileName || baseTarget.fileName || extractPromptFileName(userPrompt) || 'index.html');
+            const targetGameId = normalizeText(baseTarget.gameId || window.lastPlayedGameId || '');
+            if (!targetGameId || !targetFileName) continue;
 
-            result.attempted = true;
+            await switchWorkshopTarget(targetGameId, targetFileName);
+            const state = getCurrentEditorState();
+            const current = readWorkshopFile(targetGameId, targetFileName, state);
 
-            try {
-                if (typeof window.setWorkshopEditActiveGame === 'function') {
-                    await Promise.resolve(window.setWorkshopEditActiveGame(gameId, targetFileName));
+            let next = '';
+            let method = '';
+            if (block.kind === 'full-file') {
+                next = normalizeNewlines(block.content || '');
+                method = 'full-file-code-block';
+            } else {
+                const patched = applyPatchToContent(current, targetFileName, block.search || '', block.replace || '');
+                if (!patched.ok) {
+                    if (window.showFeedback) window.showFeedback(`AI edit did not match ${targetFileName}.`, true);
+                    continue;
                 }
+                next = patched.content;
+                method = patched.method;
+            }
 
-                const applyResult = await saveWholeFile(gameId, targetFileName, content);
-                const applied = applyResult?.ok !== false;
-                result.ok = result.ok || applied;
-                if (window.showFeedback) {
-                    window.showFeedback(
-                        applied ? `Saved AI fix to ${targetFileName}.` : (applyResult?.message || `Failed to save ${targetFileName}.`),
-                        !applied
-                    );
-                }
-            } catch (error) {
-                console.error('[Arcade: Edit] Failed to apply generated code block:', error);
-                if (window.showFeedback) window.showFeedback(`Failed to save ${targetFileName}.`, true);
+            const saveResult = await saveWorkshopFile(targetGameId, targetFileName, next);
+            if (saveResult?.ok !== false) {
+                result.workshopFileRewriteSucceeded = true;
+                result.appliedFiles.push({ fileName: targetFileName, method });
+                buildSnapshot({ ...baseTarget, fileName: targetFileName }, getCurrentEditorState());
+                if (window.showFeedback) window.showFeedback(`Saved AI edit to ${targetFileName}.`, false);
+            } else if (window.showFeedback) {
+                window.showFeedback(saveResult?.message || `Failed to save ${targetFileName}.`, true);
             }
         }
 
         return result;
     }
 
-    async function applySurgicalEditBlocks(editBlocks = [], originalText = '') {
-        const actionResult = {
-            handled: false,
-            workshopFileRewriteAttempted: false,
-            workshopFileRewriteSucceeded: false
-        };
-
-        if (!Array.isArray(editBlocks) || editBlocks.length === 0) return actionResult;
-        if (window.showFeedback) window.showFeedback('Applying surgical edits...', false);
-        actionResult.handled = true;
-
-        const editorState = typeof window.getWorkshopEditorState === 'function'
-            ? await Promise.resolve(window.getWorkshopEditorState())
-            : null;
-        const gameId = normalizeText(editorState?.activeGameId || window.lastPlayedGameId || '');
-        const fallbackFileName = normalizeText(editorState?.activeFileName || 'index.html');
-
-        if (!gameId) {
-            console.warn('[Arcade: Edit] No active Workshop game for surgical edit.');
-            return actionResult;
-        }
-
-        for (const editBlock of editBlocks) {
-            const targetFileName = normalizeText(editBlock?.fileName || fallbackFileName);
-            const search = `${editBlock?.search || ''}`;
-            const replace = `${editBlock?.replace || ''}`;
-            if (!targetFileName || (!search && !replace)) continue;
-
-            actionResult.workshopFileRewriteAttempted = true;
-
-            try {
-                if (typeof window.setWorkshopEditActiveGame === 'function') {
-                    await Promise.resolve(window.setWorkshopEditActiveGame(gameId, targetFileName));
-                }
-
-                let patchResult = null;
-                if (search && typeof window.applyAiFilePatch === 'function') {
-                    patchResult = await window.applyAiFilePatch(
-                        gameId,
-                        targetFileName,
-                        search,
-                        replace,
-                        { save: true }
-                    );
-                }
-
-                if (!patchResult?.ok) {
-                    patchResult = await applyManualSearchReplace(gameId, targetFileName, search, replace);
-                }
-
-                if (patchResult?.ok) {
-                    actionResult.workshopFileRewriteSucceeded = true;
-                    removeDisplayedRawEditMessage(originalText);
-                    if (window.showFeedback) window.showFeedback(`Saved AI edit to ${targetFileName}.`, false);
-                } else if (window.showFeedback) {
-                    window.showFeedback(patchResult?.message || 'Edit failed.', true);
-                }
-            } catch (error) {
-                console.error('[Arcade: Edit] Action failed:', error);
-                if (window.showFeedback) window.showFeedback(`Failed to save ${targetFileName}.`, true);
-            }
-        }
-
-        return actionResult;
-    }
-
     async function handleResponse(text, options = {}) {
-        const editorState = typeof window.getWorkshopEditorState === 'function'
-            ? await Promise.resolve(window.getWorkshopEditorState())
-            : null;
-        const fallbackFileName = normalizeText(editorState?.activeFileName || 'index.html');
+        const userPrompt = options.userPrompt || lastResolvedTarget?.prompt || '';
+        const baseFileName = extractPromptFileName(userPrompt)
+            || lastResolvedTarget?.fileName
+            || normalizeText(getCurrentEditorState()?.activeFileName || 'index.html');
 
-        const structuredEditBlocks = typeof window.extractWorkshopEditBlocks === 'function'
+        const structured = typeof window.extractWorkshopEditBlocks === 'function'
             ? window.extractWorkshopEditBlocks(text)
             : [];
-        const rawEditBlocks = parseRawSearchReplaceEdits(text, fallbackFileName);
-        const editBlocks = structuredEditBlocks.length > 0 ? structuredEditBlocks : rawEditBlocks;
+        const rawBlocks = parseSearchReplaceBlocks(text, baseFileName, userPrompt);
+        const editBlocks = structured.length > 0 ? structured.map((block) => ({
+            fileName: block.fileName || baseFileName,
+            search: block.search || '',
+            replace: block.replace || '',
+            kind: 'search-replace'
+        })) : rawBlocks;
 
         if (editBlocks.length > 0) {
-            return await applySurgicalEditBlocks(editBlocks, text);
+            return await applyEditBlocks(editBlocks, text, userPrompt);
         }
 
-        const actionResult = {
+        const fullFileBlocks = parseFullFileBlocks(text, baseFileName, userPrompt);
+        if (fullFileBlocks.length > 0) {
+            return await applyEditBlocks(fullFileBlocks, text, userPrompt);
+        }
+
+        if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
+            const fallback = await window.tryAutoWorkshopFileRewriteFromReply(text, userPrompt);
+            if (fallback?.attempted) {
+                return {
+                    handled: true,
+                    workshopFileRewriteAttempted: true,
+                    workshopFileRewriteSucceeded: !!fallback.ok
+                };
+            }
+        }
+
+        return {
             handled: false,
             workshopFileRewriteAttempted: false,
             workshopFileRewriteSucceeded: false
         };
-
-        if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
-            if (window.showFeedback) {
-                window.showFeedback('No explicit [EDIT] tags found. Attempting automatic patch...', false);
-            }
-
-            const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(
-                text,
-                options.userPrompt || ''
-            );
-
-            if (fallbackResult?.attempted) {
-                actionResult.handled = true;
-                actionResult.workshopFileRewriteAttempted = true;
-                actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
-                if (fallbackResult.ok) removeDisplayedRawEditMessage(text);
-                return actionResult;
-            }
-        }
-
-        const fullFileResult = await applyFullFileCodeBlocks(text);
-        if (fullFileResult.attempted) {
-            actionResult.handled = true;
-            actionResult.workshopFileRewriteAttempted = true;
-            actionResult.workshopFileRewriteSucceeded = !!fullFileResult.ok;
-            if (fullFileResult.ok) removeDisplayedRawEditMessage(text);
-            return actionResult;
-        }
-
-        return actionResult;
     }
 
     window.ArcadeCommandManager.register({
-        id: 'edit',
-        description: 'Edit the active Workshop file using the Workshop/Supabase editor state.',
+        id: COMMAND_ID,
+        description: 'Edit a targeted Workshop file using the active Workshop/Supabase editor state.',
 
         execute: async (args, inputElement) => {
-            const cleanArgs = normalizeText(args);
+            const prompt = normalizeText(args);
             window.activeArcadeCommandMode = '/edit';
 
             try {
-                installWorkshopEditorStateFallback();
-                const selected = await selectWorkshopTargetFromPrompt(cleanArgs);
-                await hydrateEditorFromWorkshopState(selected, cleanArgs);
+                const target = await resolveTarget(prompt);
+                const snapshot = window.__activeWorkshopEditorContext;
+                if (snapshot?.activeFileContent && getEditorElement()) {
+                    setEditorDomContent(snapshot.activeFileContent);
+                }
+                console.log(`[Command: Edit] Target resolved: ${target.gameTitle || target.gameId || 'current game'} / ${target.fileName}`);
             } catch (error) {
-                console.error('[Arcade: Edit] Failed to prepare Workshop editor:', error);
+                console.error('[Command: Edit] Failed to resolve target:', error);
             }
 
-            // Keep the slash-command text intact. The command manager guards
-            // against no-progress loops, while the downstream Workshop intent
-            // detector still sees /edit exactly as before.
             if (inputElement && !inputElement.value.trim()) {
-                inputElement.value = cleanArgs ? `/edit ${cleanArgs}` : '/edit';
+                inputElement.value = prompt ? `/edit ${prompt}` : '/edit';
             }
 
-            // Do not append file contents to inputElement.value.
             return false;
         },
 
         getSuggestions: (args = '') => {
+            const prompt = normalizeText(args).toLowerCase();
             const games = getManageableGames();
             if (games.length === 0) return [];
 
-            const prompt = `${args || ''}`.trim().toLowerCase();
-
-            if (!prompt) {
-                return games.map((game) => ({
-                    id: game.title,
-                    name: game.title,
-                    description: `Edit files in "${game.title}"`
+            const titleMatch = games.find((game) => prompt.startsWith(gameTitle(game).toLowerCase()));
+            if (titleMatch) {
+                return gameFiles(titleMatch).map((file) => ({
+                    id: `${gameTitle(titleMatch)} ${file.name || file.fileName}`,
+                    name: file.name || file.fileName,
+                    description: `Edit ${file.name || file.fileName} in ${gameTitle(titleMatch)}`
                 }));
             }
 
-            const matchingGame = games.find((game) => prompt.startsWith(normalizeText(game.title).toLowerCase()));
-            if (matchingGame) {
-                const files = Array.isArray(matchingGame.files) ? matchingGame.files : [];
-                const remaining = prompt.substring(normalizeText(matchingGame.title).length).trim();
-
-                return files
-                    .map((file) => ({
-                        id: `${matchingGame.title} ${file.name}`,
-                        name: file.name,
-                        description: `Edit ${file.name} in "${matchingGame.title}"`
-                    }))
-                    .filter((suggestion) => !remaining || suggestion.name.toLowerCase().includes(remaining));
-            }
-
             return games
-                .filter((game) => normalizeText(game.title).toLowerCase().includes(prompt))
+                .filter((game) => !prompt || gameTitle(game).toLowerCase().includes(prompt))
                 .map((game) => ({
-                    id: game.title,
-                    name: game.title,
-                    description: `Edit files in "${game.title}"`
+                    id: gameTitle(game),
+                    name: gameTitle(game),
+                    description: `Edit files in ${gameTitle(game)}`
                 }));
         },
 

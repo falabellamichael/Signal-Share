@@ -25,7 +25,8 @@
     if (window.__arcadeEditRawPatchPreRendererInstalled) return;
     window.__arcadeEditRawPatchPreRendererInstalled = true;
 
-    let lastUserPrompt = '';
+    let pendingEditPrompt = '';
+    let pendingEditStartedAt = 0;
 
     function isPatchText(value = '') {
         const text = `${value || ''}`;
@@ -36,7 +37,47 @@
         const text = `${value || ''}`.trim().toLowerCase();
         return /^\/(?:edit|fix|rewrite)\b/.test(text)
             || /^\[(?:edit|fix|rewrite)\]/.test(text)
-            || /workshop validation|workshop editor/.test(text);
+            || /^fix this workshop validation/i.test(text);
+    }
+
+    function rememberPromptFromOutgoingMessage(value = '') {
+        const text = `${value || ''}`.trim();
+        if (!text) return;
+
+        if (isEditPrompt(text)) {
+            pendingEditPrompt = text;
+            pendingEditStartedAt = Date.now();
+            return;
+        }
+
+        // Any normal user message cancels stale edit mode immediately.
+        pendingEditPrompt = '';
+        pendingEditStartedAt = 0;
+    }
+
+    function hasFreshPendingEditPrompt() {
+        return Boolean(pendingEditPrompt)
+            && isEditPrompt(pendingEditPrompt)
+            && Date.now() - pendingEditStartedAt < 120000;
+    }
+
+    function patchSendChatMessage() {
+        if (typeof window.sendChatMessage !== 'function') {
+            window.setTimeout(patchSendChatMessage, 50);
+            return;
+        }
+        if (window.sendChatMessage.__arcadeEditPromptTracker) return;
+
+        const originalSendChatMessage = window.sendChatMessage;
+        window.sendChatMessage = function patchedSendChatMessage(message, ...rest) {
+            const input = document.getElementById('arc-chat-input');
+            const prompt = typeof message === 'string' && message.trim()
+                ? message
+                : `${input?.value || ''}`;
+            rememberPromptFromOutgoingMessage(prompt);
+            return originalSendChatMessage.apply(this, arguments);
+        };
+        window.sendChatMessage.__arcadeEditPromptTracker = true;
     }
 
     function patchAddChatMessage() {
@@ -52,22 +93,24 @@
             const role = `${sender || ''}`.toLowerCase();
             const text = `${content || ''}`;
 
-            if (role === 'user') {
-                lastUserPrompt = text;
+            // Chat implementations use different labels for user messages. Treat
+            // anything that is not explicitly assistant/AI/system as a user turn.
+            if (role !== 'ai' && role !== 'assistant' && role !== 'system' && role !== 'bot') {
+                rememberPromptFromOutgoingMessage(text);
                 return originalAddChatMessage.apply(this, arguments);
             }
 
-            const editModeActive = isEditPrompt(lastUserPrompt)
-                || window.activeArcadeCommandMode === '/edit'
-                || (Array.isArray(window.activeArcadeCommandModes) && window.activeArcadeCommandModes.includes('/edit'));
-
-            if ((role === 'ai' || role === 'assistant') && editModeActive && isPatchText(text)) {
+            if ((role === 'ai' || role === 'assistant') && hasFreshPendingEditPrompt() && isPatchText(text)) {
                 const editCommand = window.ArcadeCommandManager?.getCommand?.('edit');
                 if (editCommand && typeof editCommand.handleResponse === 'function') {
+                    const userPromptForThisEdit = pendingEditPrompt;
+                    pendingEditPrompt = '';
+                    pendingEditStartedAt = 0;
+
                     window.setTimeout(async () => {
                         let result = null;
                         try {
-                            result = await editCommand.handleResponse(text, { userPrompt: lastUserPrompt });
+                            result = await editCommand.handleResponse(text, { userPrompt: userPromptForThisEdit });
                         } catch (error) {
                             console.error('[Arcade Edit] Failed to apply raw SEARCH/REPLACE reply:', error);
                         }
@@ -92,5 +135,6 @@
         window.addChatMessage.__arcadeEditRawPatchPreRenderer = true;
     }
 
+    patchSendChatMessage();
     patchAddChatMessage();
 })();
