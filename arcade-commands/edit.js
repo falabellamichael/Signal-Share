@@ -125,15 +125,15 @@
 
             window.activeArcadeCommandMode = '/edit';
 
-            if (inputElement) {
-                // Critical: ArcadeCommandManager.handle() keeps executing while the
-                // input starts with '/'. Strip the command before returning false
-                // so /edit continues to the AI exactly once instead of looping.
-                inputElement.value = cleanArgs;
+            // Keep the slash-command text intact. The command manager now guards
+            // against no-progress loops, while the downstream Workshop intent
+            // detector still sees /edit exactly as before.
+            if (inputElement && !inputElement.value.trim()) {
+                inputElement.value = cleanArgs ? `/edit ${cleanArgs}` : '/edit';
             }
 
             // Do not append file contents to inputElement.value.
-            // sendChatMessage will continue with the stripped user request, and
+            // sendChatMessage will continue with the user's /edit command, and
             // ArcadeChatContext will include bounded Workshop editor context.
             return false;
         },
