@@ -41,6 +41,63 @@ window.ArcadeChatContext = (function() {
 })();
 
 /**
+ * Quiet background bridge probes.
+ *
+ * Model dropdown hydration and bridge health polling use GET /models and GET
+ * /health probes. When no local bridge is running, those requests generate noisy
+ * ERR_CONNECTION_REFUSED console entries. Avoid hitting dead localhost model
+ * probes in the background; actual chat POST requests are not intercepted.
+ */
+(function installQuietBridgeProbeGuard() {
+    if (window.__arcadeQuietBridgeProbeGuardInstalled || !window.fetch) return;
+    window.__arcadeQuietBridgeProbeGuardInstalled = true;
+
+    const originalFetch = window.fetch.bind(window);
+
+    function isLoopbackHost(hostname = '') {
+        const host = `${hostname || ''}`.trim().toLowerCase();
+        return host === 'localhost'
+            || host === '127.0.0.1'
+            || host === '::1'
+            || host === '[::1]';
+    }
+
+    function isBackgroundBridgeProbe(input, init = {}) {
+        const method = `${init?.method || input?.method || 'GET'}`.toUpperCase();
+        if (method !== 'GET') return false;
+
+        const rawUrl = typeof input === 'string' ? input : `${input?.url || ''}`;
+        if (!rawUrl) return false;
+
+        try {
+            const url = new URL(rawUrl, window.location.href);
+            if (!isLoopbackHost(url.hostname)) return false;
+            return /^\/api\/(?:local-llm|llm)\/models$/i.test(url.pathname)
+                || /^\/api\/local-llm\/health$/i.test(url.pathname);
+        } catch (_error) {
+            return false;
+        }
+    }
+
+    window.fetch = function arcadeQuietBridgeProbeFetch(input, init = {}) {
+        if (isBackgroundBridgeProbe(input, init)) {
+            return Promise.resolve(new Response(JSON.stringify({
+                ok: false,
+                models: [],
+                quietBridgeProbeSkipped: true,
+                message: 'Background bridge probe skipped because no bridge is currently confirmed online.'
+            }), {
+                status: 503,
+                statusText: 'Bridge probe skipped',
+                headers: { 'Content-Type': 'application/json; charset=utf-8' }
+            }));
+        }
+
+        return originalFetch(input, init);
+    };
+})();
+
+/**
  * Chat latency compatibility patch.
  *
  * arcade-chat.js performs a short bridge preflight when the engine status is
