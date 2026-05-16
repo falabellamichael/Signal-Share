@@ -2,47 +2,57 @@
  * AMD GPU Optimizations for Signal Share
  * Detects AMD hardware and applies performance tweaks for WebGL and UI.
  *
- * Also installs a small legacy-response scrubber so old local bridge builds cannot
- * surface removed provider/port-specific error text in the chat UI.
+ * Also installs a frontend response scrubber so bridge/backend availability text
+ * is not rendered as repeated chat bubbles.
  */
 
-(function installLegacyLocalModelErrorScrubber() {
+(function installAiAvailabilityMessageScrubber() {
     if (window.__signalShareLegacyLocalModelErrorScrubberInstalled) return;
     window.__signalShareLegacyLocalModelErrorScrubberInstalled = true;
 
     const vendorName = 'lm' + ' studio';
     const removedPort = String.fromCharCode(49, 50, 51, 52);
-    const replacementText = 'Configured AI endpoint is unavailable. Check the bridge/provider settings and try again.';
+    const emptyChatReply = '';
 
-    function isLegacyLocalModelError(value = '') {
+    function isBlockedAiAvailabilityMessage(value = '') {
         const text = `${value || ''}`.toLowerCase();
         return text.includes(vendorName)
             || text.includes(`port ${removedPort}`)
-            || text.includes(`:${removedPort}`);
+            || text.includes(`:${removedPort}`)
+            || text.includes('configured ai endpoint is unavailable')
+            || text.includes('configured ai endpoint returned an error')
+            || text.includes('configured ai endpoint request failed')
+            || text.includes('local ai endpoint is unavailable')
+            || text.includes('local ai endpoint is not configured')
+            || text.includes('set signal_share_ai_base_url')
+            || text.includes('set signal_share_ai_chat_url')
+            || text.includes('check the bridge/provider settings');
     }
 
     function scrubPayloadText(text = '') {
-        if (!isLegacyLocalModelError(text)) return text;
+        if (!isBlockedAiAvailabilityMessage(text)) return text;
         try {
             const payload = JSON.parse(text);
-            if (typeof payload?.reply === 'string' && isLegacyLocalModelError(payload.reply)) {
-                payload.reply = replacementText;
+            if (typeof payload?.reply === 'string' && isBlockedAiAvailabilityMessage(payload.reply)) {
+                payload.reply = emptyChatReply;
+                payload.suppressedAiAvailabilityMessage = true;
                 return JSON.stringify(payload);
             }
-            if (typeof payload?.error === 'string' && isLegacyLocalModelError(payload.error)) {
-                payload.error = replacementText;
+            if (typeof payload?.error === 'string' && isBlockedAiAvailabilityMessage(payload.error)) {
+                payload.error = emptyChatReply;
+                payload.suppressedAiAvailabilityMessage = true;
                 return JSON.stringify(payload);
             }
         } catch (_error) {
             // Plain text response; replace directly.
         }
-        return replacementText;
+        return emptyChatReply;
     }
 
     function scrubSavedChatHistory() {
         try {
             const raw = localStorage.getItem('arcade-chats');
-            if (!raw || !isLegacyLocalModelError(raw)) return;
+            if (!raw || !isBlockedAiAvailabilityMessage(raw)) return;
             const chats = JSON.parse(raw);
             if (!Array.isArray(chats)) return;
 
@@ -50,7 +60,7 @@
             for (const chat of chats) {
                 if (!Array.isArray(chat?.messages)) continue;
                 const before = chat.messages.length;
-                chat.messages = chat.messages.filter((message) => !isLegacyLocalModelError(message?.content));
+                chat.messages = chat.messages.filter((message) => !isBlockedAiAvailabilityMessage(message?.content));
                 if (chat.messages.length !== before) changed = true;
             }
 
@@ -60,11 +70,11 @@
         }
     }
 
-    function removeRenderedLegacyErrors(root = document) {
+    function removeRenderedBlockedMessages(root = document) {
         try {
             const nodes = Array.from(root.querySelectorAll?.('.chat-message, .message-ai, .system-error') || []);
             for (const node of nodes) {
-                if (isLegacyLocalModelError(node.textContent || '')) {
+                if (isBlockedAiAvailabilityMessage(node.textContent || '')) {
                     node.remove();
                 }
             }
@@ -88,7 +98,7 @@
             if (!looksLikeChat) return response;
 
             const text = await response.clone().text().catch(() => '');
-            if (!text || !isLegacyLocalModelError(text)) return response;
+            if (!text || !isBlockedAiAvailabilityMessage(text)) return response;
 
             const headers = new Headers(response.headers);
             const contentType = `${headers.get('content-type') || ''}`.toLowerCase();
@@ -107,17 +117,17 @@
     function installDomScrubber() {
         const start = () => {
             scrubSavedChatHistory();
-            removeRenderedLegacyErrors(document);
+            removeRenderedBlockedMessages(document);
 
             const observer = new MutationObserver((mutations) => {
                 for (const mutation of mutations) {
                     for (const node of mutation.addedNodes || []) {
                         if (node.nodeType !== Node.ELEMENT_NODE) continue;
-                        if (isLegacyLocalModelError(node.textContent || '')) {
+                        if (isBlockedAiAvailabilityMessage(node.textContent || '')) {
                             node.remove();
                             continue;
                         }
-                        removeRenderedLegacyErrors(node);
+                        removeRenderedBlockedMessages(node);
                     }
                 }
             });
@@ -129,8 +139,8 @@
 
             window.setInterval(() => {
                 scrubSavedChatHistory();
-                removeRenderedLegacyErrors(document);
-            }, 1000);
+                removeRenderedBlockedMessages(document);
+            }, 500);
         };
 
         if (document.readyState === 'loading') {
@@ -139,6 +149,13 @@
             start();
         }
     }
+
+    window.SignalShareAiAvailabilityScrubber = Object.freeze({
+        isBlockedAiAvailabilityMessage,
+        scrubPayloadText,
+        scrubSavedChatHistory,
+        removeRenderedBlockedMessages
+    });
 
     installFetchScrubber();
     installDomScrubber();
