@@ -1,24 +1,51 @@
 /**
  * /clear Command
- * Locally clears the arcade chat history.
- *
- * This file also installs a small /edit response guard. It loads after
- * arcade-commands/edit.js and before arcade-chat.js, so it can suppress raw
- * SEARCH/REPLACE replies and route them into the edit handler first.
+ * Clears local chat state and installs the edit-patch pre-render guard.
  */
 (function() {
+    function clearMessagesDom() {
+        const container = document.getElementById('chat-messages');
+        if (!container) return false;
+        container.innerHTML = '<div class="chat-message message-ai">Chat cleared. What do you want to do next?</div>';
+        return true;
+    }
+
+    function clearSavedChats(scope = 'chat') {
+        if (scope === 'history' || scope === 'all') {
+            localStorage.removeItem('arcade-chats');
+            localStorage.removeItem('arcade-last-chat-id');
+        }
+    }
+
     window.ArcadeCommandManager.register({
         id: 'clear',
-        description: 'Clear chat history.',
+        description: 'Clear the current chat or saved chat history.',
+
         execute: async (args, inputElement) => {
-            if (typeof window.arcadeChatHistory !== 'undefined') {
+            const scope = `${args || 'chat'}`.trim().toLowerCase();
+            if (scope === 'history' || scope === 'all') clearSavedChats(scope);
+
+            if (Array.isArray(window.arcadeChatHistory)) {
+                window.arcadeChatHistory.length = 0;
+            } else {
                 window.arcadeChatHistory = [];
-                if (typeof window.saveCurrentChat === 'function') window.saveCurrentChat();
-                if (typeof window.renderArcadeChatMessages === 'function') window.renderArcadeChatMessages();
-                inputElement.value = '';
-                return true; // Locally handled
             }
-            return false;
+
+            clearMessagesDom();
+            if (typeof window.saveCurrentChat === 'function' && scope !== 'history' && scope !== 'all') {
+                window.saveCurrentChat();
+            }
+            if (inputElement) inputElement.value = '';
+            return true;
+        },
+
+        getSuggestions: (args = '') => {
+            const prompt = `${args || ''}`.trim().toLowerCase();
+            return [
+                { id: 'chat', name: 'chat', description: 'Clear the visible current chat.' },
+                { id: 'history', name: 'history', description: 'Clear saved chat history.' },
+                { id: 'all', name: 'all', description: 'Clear visible chat and saved history.' }
+            ].filter(item => !prompt || `${item.id} ${item.description}`.toLowerCase().includes(prompt));
         }
     });
 
@@ -50,7 +77,6 @@
             return;
         }
 
-        // Any normal user message cancels stale edit mode immediately.
         pendingEditPrompt = '';
         pendingEditStartedAt = 0;
     }
@@ -93,8 +119,6 @@
             const role = `${sender || ''}`.toLowerCase();
             const text = `${content || ''}`;
 
-            // Chat implementations use different labels for user messages. Treat
-            // anything that is not explicitly assistant/AI/system as a user turn.
             if (role !== 'ai' && role !== 'assistant' && role !== 'system' && role !== 'bot') {
                 rememberPromptFromOutgoingMessage(text);
                 return originalAddChatMessage.apply(this, arguments);
@@ -115,13 +139,13 @@
                             console.error('[Arcade Edit] Failed to apply raw SEARCH/REPLACE reply:', error);
                         }
 
-                        const attempted = !!result?.workshopFileRewriteAttempted;
-                        const saved = !!result?.workshopFileRewriteSucceeded;
+                        const attempted = !!(result?.workshopFileRewriteAttempted || result?.editorEditAttempted || result?.fileAddAttempted);
+                        const saved = !!(result?.workshopFileRewriteSucceeded || result?.editorEditSucceeded || result?.fileAddSucceeded);
                         const message = saved
-                            ? '[Workshop Edit]: Applied and saved the AI edit to the active file.'
+                            ? '[Workshop Edit]: Applied and saved the AI edit.'
                             : attempted
-                                ? '[Workshop Edit]: The AI edit was detected, but the SEARCH text did not match the active file.'
-                                : '[Workshop Edit]: The AI returned an edit block, but I could not apply it to the active file.';
+                                ? '[Workshop Edit]: The AI edit was detected, but it could not be applied to the active target.'
+                                : '[Workshop Edit]: The AI returned an edit block, but no active editable target accepted it.';
 
                         originalAddChatMessage.call(window, 'ai', message);
                     }, 0);
