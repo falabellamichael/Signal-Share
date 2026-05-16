@@ -281,13 +281,14 @@ async function getProviderCandidates(model = "auto") {
     });
   }
 
-  const lmStudioModels = await getLmStudioModelIds();
-  if (lmStudioModels.length > 0) {
+  const lmStudioBase = normalizeBaseUrl(LM_STUDIO_BASE_URL);
+  if (lmStudioBase) {
+    const lmStudioModels = await getLmStudioModelIds();
     const requested = getConfiguredModel(model);
     candidates.push({
       id: "lm-studio",
       type: "openai-compatible",
-      chatUrl: `${normalizeBaseUrl(LM_STUDIO_BASE_URL)}/v1/chat/completions`,
+      chatUrl: `${lmStudioBase}/v1/chat/completions`,
       model: requested || lmStudioModels[0] || DEFAULT_LM_STUDIO_MODEL,
       providerLabel: "LM Studio provider"
     });
@@ -355,6 +356,9 @@ async function getLocalModelCatalog() {
 
   for (const row of configuredRows) rows.push(row);
   for (const modelId of lmStudioModels) rows.push({ id: modelId, provider: "lm-studio" });
+  if (lmStudioModels.length === 0 && normalizeBaseUrl(LM_STUDIO_BASE_URL)) {
+    rows.push({ id: DEFAULT_LM_STUDIO_MODEL, provider: "lm-studio" });
+  }
   for (const modelId of ollamaModels) rows.push({ id: modelId, provider: "ollama" });
 
   return {
