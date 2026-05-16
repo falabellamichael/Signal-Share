@@ -112,9 +112,8 @@ window.ArcadeChatContext = (function() {
 /**
  * Local bridge request guard.
  *
- * The app must not probe localhost/127.0.0.1 LLM routes just because the page is
- * running locally. Bridge traffic is allowed only when the user has actually
- * configured a bridge URL/token/secret or selected a non-auto local model.
+ * Keep the default bridge usable. The app should attempt localhost/127.0.0.1
+ * from a local project page without requiring a saved bridge URL/token first.
  */
 (function installLocalBridgeRequestGuard() {
     if (window.__arcadeLocalBridgeRequestGuardInstalled || !window.fetch) return;
@@ -122,7 +121,7 @@ window.ArcadeChatContext = (function() {
 
     const originalFetch = window.fetch.bind(window);
     const OFFLINE_UNTIL_KEY = 'ss_bridge_offline_until';
-    const OFFLINE_BACKOFF_MS = 60 * 1000;
+    const OFFLINE_BACKOFF_MS = 5 * 1000;
 
     function normalizeBoolean(value) {
         const text = `${value ?? ''}`.trim().toLowerCase();
@@ -140,12 +139,29 @@ window.ArcadeChatContext = (function() {
         return '';
     }
 
-    function hasExplicitBridgeConfig() {
+    function isPrivateHost(hostname = '') {
+        const host = `${hostname || ''}`.trim().toLowerCase();
+        if (!host) return false;
+        if (host === 'localhost' || host.endsWith('.localhost')) return true;
+        if (host === '127.0.0.1' || host === '::1' || host === '[::1]') return true;
+        if (host.startsWith('10.') || host.startsWith('192.168.')) return true;
+        const octets = host.split('.').map((part) => Number.parseInt(part, 10));
+        return octets.length === 4 && octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31;
+    }
+
+    function isLocalProjectOrigin() {
+        const protocol = `${window.location.protocol || ''}`.toLowerCase();
+        if (protocol === 'file:') return true;
+        return isPrivateHost(window.location.hostname || '');
+    }
+
+    function bridgeTrafficAllowed() {
         const explicitEnabled = normalizeBoolean(
             localStorage.getItem('signal-share-bridge-enabled')
             ?? localStorage.getItem('ss_bridge_enabled')
         );
         if (explicitEnabled === false) return false;
+        if (explicitEnabled === true) return true;
 
         const configuredUrl = `${window.SignalShareLocalLlm?.getBridgeBaseUrl?.() || ''}`.trim()
             || getStoredValue('signal-share-bridge-url', 'ss_bridge_url');
@@ -169,7 +185,7 @@ window.ArcadeChatContext = (function() {
         const selectedModel = getStoredValue('arcade-chat-model').toLowerCase();
         if (selectedModel && selectedModel !== 'auto') return true;
 
-        return false;
+        return isLocalProjectOrigin();
     }
 
     function isLoopbackHost(hostname = '') {
@@ -239,8 +255,8 @@ window.ArcadeChatContext = (function() {
 
     function shouldShortCircuitBridgeRequest(url) {
         if (!isLocalBridgeRoute(url)) return false;
-        if (!hasExplicitBridgeConfig()) return true;
-        return isOfflineBackoffActive();
+        if (!bridgeTrafficAllowed()) return true;
+        return isOfflineBackoffActive() && window.__arcadeBridgeConfirmedOnline === false;
     }
 
     function sanitizeChatPostBody(body) {
@@ -274,9 +290,9 @@ window.ArcadeChatContext = (function() {
         const isBridgeRoute = isLocalBridgeRoute(url);
 
         if (shouldShortCircuitBridgeRequest(url)) {
-            const reason = hasExplicitBridgeConfig()
+            const reason = bridgeTrafficAllowed()
                 ? 'Local LLM bridge is temporarily offline.'
-                : 'Local LLM bridge is not configured.';
+                : 'Local LLM bridge is disabled.';
             return Promise.resolve(makeBridgeUnavailableResponse(url, reason));
         }
 
@@ -306,6 +322,18 @@ window.ArcadeChatContext = (function() {
     if (window.__arcadeSendTimePreflightBypassInstalled) return;
     window.__arcadeSendTimePreflightBypassInstalled = true;
 
+    function isPrivateOrLocalOrigin() {
+        const protocol = `${window.location.protocol || ''}`.toLowerCase();
+        const host = `${window.location.hostname || ''}`.trim().toLowerCase();
+        if (protocol === 'file:') return true;
+        if (!host) return false;
+        if (host === 'localhost' || host.endsWith('.localhost')) return true;
+        if (host === '127.0.0.1' || host === '::1' || host === '[::1]') return true;
+        if (host.startsWith('10.') || host.startsWith('192.168.')) return true;
+        const octets = host.split('.').map((part) => Number.parseInt(part, 10));
+        return octets.length === 4 && octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31;
+    }
+
     function patch() {
         if (typeof window.checkBridgeConnectivity !== 'function') {
             window.setTimeout(patch, 50);
@@ -318,23 +346,28 @@ window.ArcadeChatContext = (function() {
         window.checkBridgeConnectivity = async function patchedCheckBridgeConnectivity(options = {}) {
             const timeoutMs = Number(options?.timeoutMs || 0);
             const isSendTimePreflight = timeoutMs > 0 && timeoutMs <= 1500;
-            const bridgeConfigured = typeof window.fetch === 'function'
-                && (localStorage.getItem('signal-share-bridge-url')
-                    || localStorage.getItem('ss_bridge_url')
-                    || localStorage.getItem('SIGNAL_SHARE_BRIDGE_SECRET')
-                    || localStorage.getItem('signal-share-bridge-secret')
-                    || localStorage.getItem('ss_bridge_secret')
-                    || localStorage.getItem('SIGNAL_SHARE_LOCAL_LLM_TOKEN')
-                    || localStorage.getItem('signal-share-local-llm-token')
-                    || localStorage.getItem('ss_local_llm_token'));
+            const explicitEnabled = ['1', 'true', 'yes', 'on', 'enabled'].includes(
+                `${localStorage.getItem('ss_bridge_enabled') ?? localStorage.getItem('signal-share-bridge-enabled') ?? ''}`.trim().toLowerCase()
+            );
+            const explicitDisabled = ['0', 'false', 'no', 'off', 'disabled'].includes(
+                `${localStorage.getItem('ss_bridge_enabled') ?? localStorage.getItem('signal-share-bridge-enabled') ?? ''}`.trim().toLowerCase()
+            );
+            const bridgeConfigured = Boolean(
+                explicitEnabled
+                || isPrivateOrLocalOrigin()
+                || localStorage.getItem('signal-share-bridge-url')
+                || localStorage.getItem('ss_bridge_url')
+                || localStorage.getItem('SIGNAL_SHARE_BRIDGE_SECRET')
+                || localStorage.getItem('signal-share-bridge-secret')
+                || localStorage.getItem('ss_bridge_secret')
+                || localStorage.getItem('SIGNAL_SHARE_LOCAL_LLM_TOKEN')
+                || localStorage.getItem('signal-share-local-llm-token')
+                || localStorage.getItem('ss_local_llm_token')
+            );
 
-            if (isSendTimePreflight && !bridgeConfigured) {
-                return false;
-            }
+            if (explicitDisabled) return false;
+            if (isSendTimePreflight && !bridgeConfigured) return false;
 
-            if (isSendTimePreflight) {
-                return true;
-            }
             return originalCheckBridgeConnectivity.apply(this, arguments);
         };
 
