@@ -28,56 +28,56 @@ The SEARCH block must match the existing file content exactly (including whitesp
 Do not output planning or audits. Just output the code blocks or edit blocks directly.`;
 
 async function getChatResponse(message, history = []) {
-    if (!message && history.length === 0) return "No message provided.";
+  if (!message && history.length === 0) return "No message provided.";
 
-    console.log(`[Chatbot] Processing message: "${message ? message.substring(0, 50) : 'No message'}..."`);
+  console.log(`[Chatbot] Processing message: "${message ? message.substring(0, 50) : 'No message'}..."`);
 
-    const conversation = [];
-    
-    // Add history
-    for (const h of history) {
-        conversation.push({ role: h.role, content: h.content });
+  const conversation = [];
+
+  // Add history
+  for (const h of history) {
+    conversation.push({ role: h.role, content: h.content });
+  }
+
+  // Add current message
+  if (message) {
+    conversation.push({ role: "user", content: message });
+  }
+
+  try {
+    const response = await fetch("http://127.0.0.1:1234/v1/chat/completions", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: conversation,
+        temperature: 0.7,
+        stream: false
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      let reply = data.choices[0].message.content;
+      if (reply.includes("<think>")) {
+        reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+      }
+      return reply;
+    } else {
+      const errText = await response.text();
+      console.warn(`[Chatbot] LM Studio returned ${response.status}:`, errText);
     }
+  } catch (e) {
+    console.warn("[Chatbot] LM Studio connection failed:", e);
+  }
 
-    // Add current message
-    if (message) {
-        conversation.push({ role: "user", content: message });
-    }
-
-    try {
-        const response = await fetch("http://127.0.0.1:1234/v1/chat/completions", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                messages: conversation,
-                temperature: 0.7,
-                stream: false
-            })
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            let reply = data.choices[0].message.content;
-            if (reply.includes("<think>")) {
-                reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-            }
-            return reply;
-        } else {
-            const errText = await response.text();
-            console.warn(`[Chatbot] LM Studio returned ${response.status}:`, errText);
-        }
-    } catch (e) {
-        console.warn("[Chatbot] LM Studio connection failed:", e);
-    }
-
-    return `❌ [Error]: Failed to connect to LM Studio on port 1234. Please ensure it is running.`;
+  return `❌ [Error]: Failed to connect to LM Studio on port 1234. Please ensure it is running.`;
 }
 
 async function getLocalModelCatalog() {
-    return {
-        all: ["Auto-detected"],
-        checkedAt: new Date().toISOString()
-    };
+  return {
+    all: ["Auto-detected"],
+    checkedAt: new Date().toISOString()
+  };
 }
 import { SecurityEngine } from "./security-v3.js";
 import { isMasterAdmin, hasPermission, ADMIN_ROLES } from "./roles-v3.js";
@@ -136,14 +136,14 @@ console.log(`[Bridge] Device Locking: ${DEVICE_ID ? "ENABLED" : "DISABLED"}`);
 
 // AMD GPU Detection for Backend
 try {
-    const gpuName = execSync('powershell -Command "Get-CimInstance Win32_VideoController | Select-Object Name"').toString();
-    if (gpuName.toLowerCase().includes('amd')) {
-        const lines = gpuName.trim().split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('Name') && !l.startsWith('----'));
-        const actualName = lines[0] || gpuName.trim();
-        console.log(`[Bridge] AMD GPU detected in backend: ${actualName}.`);
-    }
+  const gpuName = execSync('powershell -Command "Get-CimInstance Win32_VideoController | Select-Object Name"').toString();
+  if (gpuName.toLowerCase().includes('amd')) {
+    const lines = gpuName.trim().split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('Name') && !l.startsWith('----'));
+    const actualName = lines[0] || gpuName.trim();
+    console.log(`[Bridge] AMD GPU detected in backend: ${actualName}.`);
+  }
 } catch (e) {
-    // Ignore error if powershell fails
+  // Ignore error if powershell fails
 }
 
 const lastMediaActionAtByKey = new Map();
@@ -213,7 +213,7 @@ app.use((req, res, next) => {
     || req.path.startsWith('/api/system-media/action')
     || req.path.startsWith('/api/security/')
     || req.path.startsWith('/api/moderation/');
-  
+
   // 2. Device ID Validation (Hardware-bound)
   if (isSensitive && !security.validateDevice(incomingDevice)) {
     console.warn(`[Bridge] Blocked unauthorized device attempt from ${req.ip}`);
@@ -225,12 +225,12 @@ app.use((req, res, next) => {
   const isLoopback = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
   if (isSensitive && !isLoopback && !security.validateSecret(incomingSecret, BRIDGE_SECRET)) {
     console.warn(`[Bridge] Unauthorized access attempt from ${req.ip} to ${req.path}`);
-    
+
     // Check if we should ban this IP after multiple failures
     if (security.shouldBan(req.ip, 'secret_mismatch')) {
-       return res.status(403).json({ error: "Access denied: Permanent IP ban applied." });
+      return res.status(403).json({ error: "Access denied: Permanent IP ban applied." });
     }
-    
+
     return res.status(401).json({ error: "Unauthorized: Invalid or missing X-Bridge-Secret." });
   }
 
@@ -246,11 +246,11 @@ app.use((req, res, next) => {
 app.post("/api/security/verify-master", (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ isMaster: false });
-  
+
   const isMaster = isMasterAdmin(email);
-  return res.json({ 
-    isMaster, 
-    role: isMaster ? ADMIN_ROLES.MASTER : ADMIN_ROLES.USER 
+  return res.json({
+    isMaster,
+    role: isMaster ? ADMIN_ROLES.MASTER : ADMIN_ROLES.USER
   });
 });
 
@@ -379,7 +379,7 @@ app.get('/api/system/screenshot', async (req, res) => {
 app.get('/api/system/files/list', async (req, res) => {
   const targetPath = req.query.path || '.';
   const fullPath = path.resolve(projectRoot, targetPath);
-  
+
   if (!security.isPathSafe(targetPath, projectRoot)) {
     security.shouldBan(req.ip, 'malicious_traversal');
     return res.status(403).json({ error: "Access denied: Path outside project root." });
@@ -401,7 +401,7 @@ app.get('/api/system/files/list', async (req, res) => {
 app.get('/api/system/files/read', async (req, res) => {
   const targetPath = req.query.path;
   if (!targetPath) return res.status(400).json({ error: "Missing path parameter" });
-  
+
   const fullPath = path.resolve(projectRoot, targetPath);
   if (!security.isPathSafe(targetPath, projectRoot)) {
     return res.status(403).json({ error: "Access denied: Path outside project root." });
@@ -481,7 +481,7 @@ app.post('/api/system/close', async (req, res) => {
     const target = appId.toLowerCase();
     const psCommand = `Get-Process | Where-Object { $_.Name -like "*${target}*" -or $_.MainWindowTitle -like "*${target}*" } | Stop-Process -Force`;
     const ps = spawn("powershell.exe", ["-NoProfile", "-Command", psCommand], { windowsHide: true });
-    
+
     ps.on("close", (code) => {
       res.json({ ok: true, message: `Attempted to close ${appId}` });
     });
@@ -493,9 +493,9 @@ app.post('/api/system/close', async (req, res) => {
 // Catch-all for /api/llm/chat with wrong method
 app.all('/api/llm/chat', (req, res) => {
   console.warn(`[Chatbot] 405 Error: Received ${req.method} request for /api/llm/chat from ${req.ip}`);
-  res.status(405).json({ 
+  res.status(405).json({
     error: `Method ${req.method} not allowed.`,
-    tip: 'The Signal Share AI Companion requires a POST request with a JSON body.' 
+    tip: 'The Signal Share AI Companion requires a POST request with a JSON body.'
   });
 });
 
@@ -1230,7 +1230,7 @@ app.all("/api/system-media/action", (req, res) => {
     }
     const uri = `${req.body?.uri || ""}`.trim();
     if (!uri) return res.status(400).json({ ok: false });
-    
+
     console.log(`[Bridge] Received open_uri request: ${uri}`);
 
     // Protocol Whitelist
@@ -1258,12 +1258,12 @@ app.all("/api/system-media/action", (req, res) => {
 
     try {
       const psProcess = spawn("powershell.exe", ["-NoProfile", "-Command", psCommand], { windowsHide: true });
-      
+
       // Handle errors from the spawned process
       psProcess.on('error', (err) => {
         console.error(`[Bridge] Failed to spawn PowerShell for open_uri: ${err.message}`);
       });
-      
+
       // Capture stderr for debugging
       psProcess.stderr?.on('data', (data) => {
         const error = data.toString().trim();
@@ -1275,14 +1275,14 @@ app.all("/api/system-media/action", (req, res) => {
       console.error(`[Bridge] Exception while spawning PowerShell: ${err.message}`);
       return res.status(500).json({ ok: false, error: "Failed to execute system command" });
     }
-    
+
     return res.json({ ok: true, queued: true });
   }
 
   if (!MEDIA_KEY_CODES[action]) {
-    return res.status(400).json({ 
-      ok: false, 
-      error: `Invalid media action: "${action}". Supported actions are: ${Object.keys(MEDIA_KEY_CODES).join(", ")}. For arcade navigation, use [ARCADE: action] instead.` 
+    return res.status(400).json({
+      ok: false,
+      error: `Invalid media action: "${action}". Supported actions are: ${Object.keys(MEDIA_KEY_CODES).join(", ")}. For arcade navigation, use [ARCADE: action] instead.`
     });
   }
 
@@ -1382,7 +1382,7 @@ app.post("/api/system/launch", (req, res) => {
   }
 
   console.log(`[Bridge] Launching application: ${command}`);
-  
+
   try {
     const psProcess = spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${command}"`], { windowsHide: true });
     psProcess.on('error', (err) => console.error(`[Bridge] Launch failed: ${err.message}`));
@@ -1403,7 +1403,7 @@ app.post("/api/system/shell", (req, res) => {
 
   const shellExec = shell === "bash" ? "bash.exe" : "pwsh.exe";
   console.log(`[Bridge] Executing shell command [${shell}]: ${cmd}`);
-  
+
   exec(`"${shellExec}" -c "${cmd.replace(/"/g, '\\"')}"`, (error, stdout, stderr) => {
     if (error) {
       console.warn(`[Bridge] Shell error: ${error.message}`);
@@ -1447,7 +1447,7 @@ app.get("/api/system/processes", (req, res) => {
 app.post("/api/system/kill", (req, res) => {
   const { id, name } = req.body || {};
   const target = id ? `/pid ${id}` : (name ? `/im ${name}` : null);
-  
+
   if (!target) return res.status(400).json({ error: "No PID or process name provided" });
 
   exec(`taskkill /f ${target}`, (error, stdout) => {
@@ -1502,11 +1502,11 @@ function subscribeToMediaActions() {
       if (payload.new.uri) {
         try {
           const psProcess = spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process "${payload.new.uri.replace(/"/g, '`"')}"`], { windowsHide: true });
-          
+
           psProcess.on('error', (err) => {
             console.error(`[Bridge] Failed to spawn PowerShell for remote open_uri: ${err.message}`);
           });
-          
+
           psProcess.stderr?.on('data', (data) => {
             const error = data.toString().trim();
             if (error && !error.includes("Start-Process")) {
