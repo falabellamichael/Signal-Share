@@ -1,40 +1,28 @@
 /**
  * Arcade Chat Context Manager
- * Handles compact context for the AI model, including Workshop editor data.
+ * Gives the local model the active Workshop editor context, then asks for code
+ * that can be written directly back into the target file.
  */
 
 window.ArcadeChatContext = (function() {
-    const MAX_EDIT_SOURCE_CHARS = 11000;
-    const MAX_EDIT_POST_CONTEXT_CHARS = 14000;
+    const MAX_EDIT_SOURCE_CHARS = 26000;
+    const MAX_EDIT_CONTEXT_CHARS = 36000;
     const MAX_NORMAL_CONTEXT_CHARS = 14000;
 
     function truncateMiddle(value = '', maxChars = 12000) {
         const text = `${value || ''}`;
         const limit = Math.max(1000, Number(maxChars) || 12000);
         if (text.length <= limit) return text;
-        const head = Math.floor(limit * 0.62);
-        const tail = Math.max(500, limit - head - 160);
-        return `${text.slice(0, head)}\n\n[...trimmed ${text.length - head - tail} characters to keep the local-model payload small...]\n\n${text.slice(-tail)}`;
+        const head = Math.floor(limit * 0.65);
+        const tail = Math.max(700, limit - head - 180);
+        return `${text.slice(0, head)}\n\n[...trimmed ${text.length - head - tail} characters to keep the local-model payload inside context...]\n\n${text.slice(-tail)}`;
     }
 
     function isEditLikeMessage(value = '') {
         const text = `${value || ''}`.trim().toLowerCase();
         return /^\/(?:edit|fix|rewrite)\b/.test(text)
             || /^\[(?:edit|fix|rewrite)\]/.test(text)
-            || /workshop validation|workshop editor|active_workshop_editor|active_workshop_editor_code_payload|\[edit\]/i.test(text);
-    }
-
-    function compactWorkshopEditor(editor = null, includeSource = false) {
-        if (!editor) return null;
-        const source = `${editor.activeFileContent || ''}`;
-        return {
-            activeGameId: `${editor.activeGameId || editor.gameId || ''}`.trim(),
-            activeGameTitle: `${editor.activeGameTitle || editor.gameTitle || editor.title || ''}`.trim(),
-            activeFileName: `${editor.activeFileName || editor.fileName || 'index.html'}`.trim(),
-            activeFileContentLength: source.length,
-            activeFileContentProvidedInEditProtocol: Boolean(includeSource),
-            ...(includeSource ? { activeFileContent: truncateMiddle(source, MAX_EDIT_SOURCE_CHARS) } : {})
-        };
+            || /workshop validation|workshop editor|active_workshop_editor|direct_editor_write|\[edit\]/i.test(text);
     }
 
     function languageForFile(fileName = '') {
@@ -47,35 +35,62 @@ window.ArcadeChatContext = (function() {
         return 'text';
     }
 
+    function buildEditorPayload(editor = null) {
+        const source = `${editor?.activeFileContent || ''}`;
+        return {
+            activeGameId: `${editor?.activeGameId || editor?.gameId || ''}`.trim(),
+            activeGameTitle: `${editor?.activeGameTitle || editor?.gameTitle || editor?.title || ''}`.trim(),
+            activeFileName: `${editor?.activeFileName || editor?.fileName || 'index.html'}`.trim(),
+            activeFileContentLength: source.length,
+            activeFileContent: truncateMiddle(source, MAX_EDIT_SOURCE_CHARS),
+            activeFileContentProvidedInEditProtocol: true,
+            source: editor?.source || 'active-workshop-editor'
+        };
+    }
+
     return {
         buildModelContext: function(text, richContext, options = {}) {
             const { editRequestActive, attachment, sharedAiContext } = options;
             const safeRichContext = richContext || {};
-            const compactEditor = compactWorkshopEditor(safeRichContext.workshopEditor, editRequestActive);
+            const editorPayload = buildEditorPayload(safeRichContext.workshopEditor || {});
 
             if (editRequestActive) {
-                const fileName = compactEditor?.activeFileName || 'index.html';
+                const fileName = editorPayload.activeFileName || 'index.html';
                 const language = languageForFile(fileName);
-                return [
-                    '[ACTIVE_WORKSHOP_EDITOR_CODE_PAYLOAD]',
-                    JSON.stringify(compactEditor || null),
+                const editorContext = {
+                    request: `${text || ''}`,
+                    workshopEditor: editorPayload,
+                    visibleEditorAvailable: true,
+                    directEditorWriteMode: true
+                };
+
+                return truncateMiddle([
+                    '[DIRECT_EDITOR_WRITE_CONTEXT]',
+                    'The active Workshop editor is already open. Use the file content below as the source of truth.',
+                    JSON.stringify(editorContext),
                     '',
-                    'EDIT MODE RULES:',
-                    `You are editing exactly this file: ${fileName}`,
-                    'Write the corrected code for that file.',
-                    'Return code only in one markdown code block.',
-                    `Use this code-fence header: \`\`\`${language} filename=${fileName}`,
+                    `[CURRENT_TARGET_FILE: ${fileName}]`,
+                    `\`\`\`${language}`,
+                    editorPayload.activeFileContent || '',
+                    '```',
+                    '',
+                    'DIRECT WRITE RULES:',
+                    `Edit exactly this target file: ${fileName}`,
+                    'Return the complete final code for that file in one markdown code block.',
+                    `Use this code-fence header exactly: \`\`\`${language} filename=${fileName}`,
                     'Do not return SEARCH text.',
                     'Do not return REPLACE text.',
                     'Do not return [EDIT] tags.',
-                    'Do not explain. Do not ask for pasted code.',
-                    'The app will save the returned code directly into the target file.'
-                ].join('\n');
+                    'Do not return a diff or snippet.',
+                    'Do not ask me to paste code.',
+                    'Do not explain outside the code block.',
+                    'The app will save your returned code directly into the target Workshop file.'
+                ].join('\n'), MAX_EDIT_CONTEXT_CHARS);
             }
 
             const contextForModel = {
                 ...safeRichContext,
-                workshopEditor: compactEditor
+                workshopEditor: safeRichContext.workshopEditor ? editorPayload : null
             };
             const protocolDirectives = typeof window.getProtocolDirectives === 'function'
                 ? window.getProtocolDirectives(text, safeRichContext, attachment)
@@ -88,7 +103,7 @@ window.ArcadeChatContext = (function() {
         isEditLikeMessage,
         limits: {
             MAX_EDIT_SOURCE_CHARS,
-            MAX_EDIT_POST_CONTEXT_CHARS,
+            MAX_EDIT_CONTEXT_CHARS,
             MAX_NORMAL_CONTEXT_CHARS
         }
     };
@@ -147,19 +162,19 @@ window.ArcadeChatContext = (function() {
             const message = `${payload.message || ''}`;
             const context = `${payload.pageContext || ''}`;
             const isEditPayload = window.ArcadeChatContext?.isEditLikeMessage?.(message)
-                || /active_workshop_editor|active_workshop_editor_code_payload|workshop edit|\[edit\]/i.test(context);
+                || /direct_editor_write|active_workshop_editor|workshop edit|\[edit\]/i.test(context);
             if (!isEditPayload) return body;
 
             payload.history = [];
             payload.attachment = null;
-            payload.customInstructions = 'For edit requests, return only code in one markdown code block. Do not return SEARCH/REPLACE or [EDIT] patches.';
+            payload.customInstructions = 'For edit requests, use the active Workshop editor content provided in context and return only the complete final code for the target file in one markdown code block. Do not return SEARCH/REPLACE, [EDIT] tags, diffs, snippets, or prose.';
             payload.message = window.ArcadeChatContext.truncateMiddle(message, 3500);
             payload.pageContext = window.ArcadeChatContext.truncateMiddle(
                 context,
-                window.ArcadeChatContext.limits.MAX_EDIT_POST_CONTEXT_CHARS
+                window.ArcadeChatContext.limits.MAX_EDIT_CONTEXT_CHARS
             );
             payload.optimizedForLocalEditModel = true;
-            payload.directCodeEditMode = true;
+            payload.directEditorWriteMode = true;
             return JSON.stringify(payload);
         } catch (_error) {
             return body;
