@@ -533,7 +533,7 @@
                     ? manager.extractBalancedJsonTagPayload(text, "PUBLISH")
                     : null;
 
-                // Fallback: If AI forgot the [PUBLISH] tag but outputted the JSON in a code block
+                // Fallback 1: If AI forgot the [PUBLISH] tag but outputted the JSON in a code block
                 if (!publishPayload?.jsonText) {
                     const codeBlockMatch = text.match(/```json\s*([\s\S]*?)```/);
                     if (codeBlockMatch) {
@@ -541,6 +541,19 @@
                         if (possibleJson.includes('"title"') && possibleJson.includes('"files"')) {
                             publishPayload = { jsonText: possibleJson };
                             console.log("[Arcade: Publish] Recovered publish JSON from raw code block.");
+                        }
+                    }
+                }
+
+                // Fallback 2: Find ANY JSON-like structure if still not found (handles tag at the end)
+                if (!publishPayload?.jsonText) {
+                    const firstBrace = text.indexOf('{');
+                    const lastBrace = text.lastIndexOf('}');
+                    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                        const possibleJson = text.substring(firstBrace, lastBrace + 1);
+                        if (possibleJson.includes('"title"') && possibleJson.includes('"files"')) {
+                            publishPayload = { jsonText: possibleJson };
+                            console.log("[Arcade: Publish] Recovered publish JSON from raw text braces.");
                         }
                     }
                 }
