@@ -1818,7 +1818,8 @@ async function publishCustomGameFromAi(payload = {}) {
         thumbnail: payload.thumbnail,
         tags: payload.tags,
         existingGameId,
-        mergeExistingFiles: !!existingGameId
+        mergeExistingFiles: !!existingGameId,
+        validateGame: false // Skip validation per user request to ensure it publishes
     });
 
     if (!publishResult.ok) {
