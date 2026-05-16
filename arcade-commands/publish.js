@@ -337,30 +337,50 @@
         workshopFiles = mergeMissingReferencedFilesFromEditor(workshopFiles, editorState);
 
         if (workshopFiles.length === 0 && !targetGameId) {
-            console.log("[Arcade: Publish] No files found. Attempting to use entire response as index.html.");
+            console.log("[Arcade: Publish] No files found. Checking for markdown code blocks...");
             
-            let contentToUse = text;
-            
-            // If the text appears to be JSON-escaped string content
-            if (text.includes('\\n') && text.includes('\\"')) {
-                try {
-                    // Try to unescape it properly by parsing it as a JSON string
-                    contentToUse = JSON.parse(`"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
-                } catch (e) {
-                    // Fallback to simple regex replace if parsing fails
-                    contentToUse = text.replace(/\\n/g, '\n').replace(/\\"/g, '"');
-                }
+            // Fallback: Extract files from markdown code blocks (as instructed in getPublishDirective)
+            const codeBlockRegex = /```(\w+)(?:\s+filename=([^\s]+))?\s*([\s\S]*?)```/g;
+            let match;
+            while ((match = codeBlockRegex.exec(text)) !== null) {
+                const lang = match[1];
+                const filename = match[2] || (workshopFiles.length === 0 ? "index.html" : `file_${workshopFiles.length}.${lang}`);
+                const content = match[3].trim();
+                
+                workshopFiles.push({
+                    name: filename,
+                    type: lang,
+                    content: content
+                });
+                console.log(`[Arcade: Publish] Extracted file from code block: ${filename}`);
             }
 
-            workshopFiles = [
-                {
-                    name: "index.html",
-                    type: "html",
-                    content: contentToUse
+            // If still no files found, fall back to using the entire response
+            if (workshopFiles.length === 0) {
+                console.log("[Arcade: Publish] No files or code blocks found. Using entire response as index.html.");
+                let contentToUse = text;
+                
+                // If the text appears to be JSON-escaped string content
+                if (text.includes('\\n') && text.includes('\\"')) {
+                    try {
+                        // Try to unescape it properly by parsing it as a JSON string
+                        contentToUse = JSON.parse(`"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
+                    } catch (e) {
+                        // Fallback to simple regex replace if parsing fails
+                        contentToUse = text.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                    }
                 }
-            ];
-            data.mode = "create";
-            data.title = data.title || "AI Generated Game";
+
+                workshopFiles = [
+                    {
+                        name: "index.html",
+                        type: "html",
+                        content: contentToUse
+                    }
+                ];
+                data.mode = "create";
+                data.title = data.title || "AI Generated Game";
+            }
         }
 
         if (workshopFiles.length === 0) {
