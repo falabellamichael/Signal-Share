@@ -800,7 +800,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                         messages: openAiMessages,
                         temperature: (workshopEditActive || publishIntentActive) ? 0.3 : 0.7,
                         // VRAM LIFTING: Increase tokens for Workshop code generation
-                        max_tokens: (workshopEditActive || publishIntentActive) ? 4096 : 2048,
+                        max_tokens: (workshopEditActive || publishIntentActive) ? 8192 : 2048,
                         stream: false
                     };
                 } else {
@@ -811,7 +811,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                         // VRAM LIFTING: Ollama specific context capping
                         options: {
                             num_ctx: MAX_CONTEXT_TOKENS,
-                            num_predict: (workshopEditActive || publishIntentActive) ? 4096 : 2048,
+                            num_predict: (workshopEditActive || publishIntentActive) ? 8192 : 2048,
                             num_gpu: 99, // Maximize GPU offload
                             low_vram: false // We want performance if we are loading it
                         }
