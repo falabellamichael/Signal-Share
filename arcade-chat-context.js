@@ -48,6 +48,19 @@ window.ArcadeChatContext = (function() {
         };
     }
 
+    function buildAiChatbotSupportContext(text, richContext, options = {}) {
+        if (!window.AIChatbotSupport || typeof window.AIChatbotSupport.buildSupportContext !== 'function') return '';
+        try {
+            return window.AIChatbotSupport.buildSupportContext(text, richContext, {
+                maxChars: Math.max(12000, Math.floor(MAX_EDIT_CONTEXT_CHARS * 0.72)),
+                ...options
+            });
+        } catch (error) {
+            console.warn('[Arcade Chat Context] AI chatbot support context failed:', error);
+            return '';
+        }
+    }
+
     return {
         buildModelContext: function(text, richContext, options = {}) {
             const { editRequestActive, attachment, sharedAiContext } = options;
@@ -57,34 +70,40 @@ window.ArcadeChatContext = (function() {
             if (editRequestActive) {
                 const fileName = editorPayload.activeFileName || 'index.html';
                 const language = languageForFile(fileName);
+                const supportContext = buildAiChatbotSupportContext(text, safeRichContext);
                 const editorContext = {
                     request: `${text || ''}`,
                     workshopEditor: editorPayload,
                     visibleEditorAvailable: true,
-                    directEditorWriteMode: true
+                    directEditorWriteMode: true,
+                    aiChatbotSupportEnabled: !!supportContext
                 };
 
                 return truncateMiddle([
                     '[DIRECT_EDITOR_WRITE_CONTEXT]',
                     'The active Workshop editor is already open. Use the file content below as the source of truth.',
+                    'AI_CHATBOT_SUPPORT_V1, when present, is the compact file map and implementation scaffold. Trust it before asking for files.',
                     JSON.stringify(editorContext),
                     '',
+                    supportContext,
+                    '',
                     `[CURRENT_TARGET_FILE: ${fileName}]`,
-                    `\`\`\`${language}`,
+                    `\`\`\`${language} filename=${fileName}`,
                     editorPayload.activeFileContent || '',
                     '```',
                     '',
                     'DIRECT WRITE RULES:',
-                    `Edit exactly this target file: ${fileName}`,
-                    'Return the complete final code for that file in one markdown code block.',
-                    `Use this code-fence header exactly: \`\`\`${language} filename=${fileName}`,
+                    `Edit exactly this target file unless AI_CHATBOT_SUPPORT_V1 says this is an add-file request: ${fileName}`,
+                    'For normal edits, return the complete final code for that file in one markdown code block.',
+                    `For normal edits, use this code-fence header exactly: \`\`\`${language} filename=${fileName}`,
+                    'For add-file requests, return only the new file block(s), each with filename=<name.ext>.',
                     'Do not return SEARCH text.',
                     'Do not return REPLACE text.',
                     'Do not return [EDIT] tags.',
                     'Do not return a diff or snippet.',
-                    'Do not ask me to paste code.',
-                    'Do not explain outside the code block.',
-                    'The app will save your returned code directly into the target Workshop file.'
+                    'Do not ask me to paste code or list files.',
+                    'Do not explain outside the required code block(s).',
+                    'The app will save your returned code directly into the target Workshop file or queued new file.'
                 ].join('\n'), MAX_EDIT_CONTEXT_CHARS);
             }
 
@@ -101,6 +120,7 @@ window.ArcadeChatContext = (function() {
         },
         truncateMiddle,
         isEditLikeMessage,
+        buildAiChatbotSupportContext,
         limits: {
             MAX_EDIT_SOURCE_CHARS,
             MAX_EDIT_CONTEXT_CHARS,
@@ -266,20 +286,25 @@ window.ArcadeChatContext = (function() {
             const message = `${payload.message || ''}`;
             const context = `${payload.pageContext || ''}`;
             const isEditPayload = window.ArcadeChatContext?.isEditLikeMessage?.(message)
-                || /direct_editor_write|active_workshop_editor|workshop edit|\[edit\]/i.test(context);
+                || /direct_editor_write|active_workshop_editor|workshop edit|\[edit\]|AI_CHATBOT_SUPPORT/i.test(context);
             if (!isEditPayload) return body;
 
-            payload.history = [];
-            payload.attachment = null;
-            payload.customInstructions = 'For edit requests, use the active Workshop editor content provided in context and return only the complete final code for the target file in one markdown code block. Do not return SEARCH/REPLACE, [EDIT] tags, diffs, snippets, or prose.';
-            payload.message = window.ArcadeChatContext.truncateMiddle(message, 3500);
-            payload.pageContext = window.ArcadeChatContext.truncateMiddle(
-                context,
+            const optimizedPayload = window.AIChatbotSupport?.optimizeChatPayload?.(payload) || payload;
+            optimizedPayload.history = [];
+            optimizedPayload.attachment = null;
+            optimizedPayload.customInstructions = [
+                optimizedPayload.customInstructions || '',
+                'For edit requests, use the active Workshop editor content and AI_CHATBOT_SUPPORT_V1 file map. Return only the complete final code for the target file, or new file block(s) for add-file requests. Do not return SEARCH/REPLACE, [EDIT] tags, diffs, snippets, or prose.'
+            ].filter(Boolean).join('\n\n').slice(0, 2600);
+            optimizedPayload.message = window.ArcadeChatContext.truncateMiddle(optimizedPayload.message || message, 3500);
+            optimizedPayload.pageContext = window.ArcadeChatContext.truncateMiddle(
+                optimizedPayload.pageContext || context,
                 window.ArcadeChatContext.limits.MAX_EDIT_CONTEXT_CHARS
             );
-            payload.optimizedForLocalEditModel = true;
-            payload.directEditorWriteMode = true;
-            return JSON.stringify(payload);
+            optimizedPayload.optimizedForLocalEditModel = true;
+            optimizedPayload.directEditorWriteMode = true;
+            optimizedPayload.aiChatbotSupport = true;
+            return JSON.stringify(optimizedPayload);
         } catch (_error) {
             return body;
         }
