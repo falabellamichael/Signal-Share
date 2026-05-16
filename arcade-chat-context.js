@@ -47,7 +47,7 @@ window.ArcadeChatContext = (function() {
  * offline. That preflight can fail after ~1500ms and abort the real chat POST,
  * making the typing dots disappear almost immediately. This patch keeps health
  * polling intact, but makes send-time preflight advisory by returning true for
- * the short timeout call. The actual /api/*/chat request still runs and remains
+ * the short timeout call. The actual chat API request still runs and remains
  * responsible for success/failure.
  */
 (function installSendTimePreflightBypass() {
