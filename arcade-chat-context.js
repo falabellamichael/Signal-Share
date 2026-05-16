@@ -4,17 +4,25 @@
  */
 
 window.ArcadeChatContext = (function() {
-    const MAX_EDIT_SOURCE_CHARS = 12000;
-    const MAX_EDIT_DIRECTIVES_CHARS = 4500;
-    const MAX_NORMAL_CONTEXT_CHARS = 16000;
+    const MAX_EDIT_SOURCE_CHARS = 7000;
+    const MAX_EDIT_DIRECTIVES_CHARS = 2500;
+    const MAX_EDIT_POST_CONTEXT_CHARS = 7800;
+    const MAX_NORMAL_CONTEXT_CHARS = 14000;
 
     function truncateMiddle(value = '', maxChars = 12000) {
         const text = `${value || ''}`;
         const limit = Math.max(1000, Number(maxChars) || 12000);
         if (text.length <= limit) return text;
-        const head = Math.floor(limit * 0.65);
+        const head = Math.floor(limit * 0.62);
         const tail = Math.max(500, limit - head - 160);
-        return `${text.slice(0, head)}\n\n[...trimmed ${text.length - head - tail} characters to keep /edit payload small...]\n\n${text.slice(-tail)}`;
+        return `${text.slice(0, head)}\n\n[...trimmed ${text.length - head - tail} characters to keep the local-model payload small...]\n\n${text.slice(-tail)}`;
+    }
+
+    function isEditLikeMessage(value = '') {
+        const text = `${value || ''}`.trim().toLowerCase();
+        return /^\/(?:edit|fix|rewrite)\b/.test(text)
+            || /^\[(?:edit|fix|rewrite)\]/.test(text)
+            || /workshop validation|workshop editor|active_workshop_editor|active_workshop_editor_compact|\[edit\]/i.test(text);
     }
 
     function compactWorkshopEditor(editor = null, includeSource = false) {
@@ -58,17 +66,26 @@ window.ArcadeChatContext = (function() {
             const pageContext = truncateMiddle(JSON.stringify(contextForModel), MAX_NORMAL_CONTEXT_CHARS);
             const pageText = safeRichContext.workshopEditor ? '' : document.body.innerText.substring(0, 300);
             return `${protocolDirectives ? `${protocolDirectives}\n\n` : ''}${sharedAiContext ? `${sharedAiContext}\n\n` : ''}${pageContext} (Visible text: ${pageText})`;
+        },
+        truncateMiddle,
+        isEditLikeMessage,
+        limits: {
+            MAX_EDIT_SOURCE_CHARS,
+            MAX_EDIT_DIRECTIVES_CHARS,
+            MAX_EDIT_POST_CONTEXT_CHARS,
+            MAX_NORMAL_CONTEXT_CHARS
         }
     };
 })();
 
 /**
- * Quiet background bridge probes.
+ * Quiet bridge probe and compact /edit POST guard.
  *
- * Model dropdown hydration and bridge health polling use GET /models and GET
- * /health probes. When no local bridge is running, those requests generate noisy
- * ERR_CONNECTION_REFUSED console entries. Avoid hitting dead localhost model
- * probes in the background; actual chat POST requests are not intercepted.
+ * This wrapper does two things before arcade-chat.js sends requests:
+ * - GET /models and GET /health localhost probes are answered quietly when no
+ *   bridge is confirmed online, avoiding noisy connection-refused loops.
+ * - /edit, /fix, and /rewrite POST bodies are stripped of stale history,
+ *   attachments, and oversized page context before they reach LM Studio.
  */
 (function installQuietBridgeProbeGuard() {
     if (window.__arcadeQuietBridgeProbeGuardInstalled || !window.fetch) return;
@@ -84,20 +101,57 @@ window.ArcadeChatContext = (function() {
             || host === '[::1]';
     }
 
-    function isBackgroundBridgeProbe(input, init = {}) {
-        const method = `${init?.method || input?.method || 'GET'}`.toUpperCase();
-        if (method !== 'GET') return false;
+    function getRequestMethod(input, init = {}) {
+        return `${init?.method || input?.method || 'GET'}`.toUpperCase();
+    }
 
+    function parseUrl(input) {
         const rawUrl = typeof input === 'string' ? input : `${input?.url || ''}`;
-        if (!rawUrl) return false;
-
+        if (!rawUrl) return null;
         try {
-            const url = new URL(rawUrl, window.location.href);
-            if (!isLoopbackHost(url.hostname)) return false;
-            return /^\/api\/(?:local-llm|llm)\/models$/i.test(url.pathname)
-                || /^\/api\/local-llm\/health$/i.test(url.pathname);
+            return new URL(rawUrl, window.location.href);
         } catch (_error) {
-            return false;
+            return null;
+        }
+    }
+
+    function isBackgroundBridgeProbe(input, init = {}) {
+        if (getRequestMethod(input, init) !== 'GET') return false;
+        const url = parseUrl(input);
+        if (!url || !isLoopbackHost(url.hostname)) return false;
+        return /^\/api\/(?:local-llm|llm)\/models$/i.test(url.pathname)
+            || /^\/api\/local-llm\/health$/i.test(url.pathname);
+    }
+
+    function isChatPost(input, init = {}) {
+        if (getRequestMethod(input, init) !== 'POST') return false;
+        const url = parseUrl(input);
+        if (!url) return false;
+        return /^\/api\/(?:local-llm|llm)\/chat$/i.test(url.pathname);
+    }
+
+    function sanitizeChatPostBody(body) {
+        if (typeof body !== 'string' || !body.trim()) return body;
+        try {
+            const payload = JSON.parse(body);
+            const message = `${payload.message || ''}`;
+            const context = `${payload.pageContext || ''}`;
+            const isEditPayload = window.ArcadeChatContext?.isEditLikeMessage?.(message)
+                || /active_workshop_editor|active_workshop_editor_compact|workshop edit|\[edit\]/i.test(context);
+            if (!isEditPayload) return body;
+
+            payload.history = [];
+            payload.attachment = null;
+            payload.customInstructions = `${payload.customInstructions || ''}`.slice(0, 1000);
+            payload.message = window.ArcadeChatContext.truncateMiddle(message, 3500);
+            payload.pageContext = window.ArcadeChatContext.truncateMiddle(
+                context,
+                window.ArcadeChatContext.limits.MAX_EDIT_POST_CONTEXT_CHARS
+            );
+            payload.optimizedForLocalEditModel = true;
+            return JSON.stringify(payload);
+        } catch (_error) {
+            return body;
         }
     }
 
@@ -113,6 +167,13 @@ window.ArcadeChatContext = (function() {
                 statusText: 'Bridge probe skipped',
                 headers: { 'Content-Type': 'application/json; charset=utf-8' }
             }));
+        }
+
+        if (isChatPost(input, init) && typeof init?.body === 'string') {
+            return originalFetch(input, {
+                ...init,
+                body: sanitizeChatPostBody(init.body)
+            });
         }
 
         return originalFetch(input, init);
