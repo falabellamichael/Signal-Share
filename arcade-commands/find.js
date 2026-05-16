@@ -7,7 +7,7 @@
         id: 'find',
         description: 'Search for text in the editor. Usage: /find <text>',
         execute: async (args, inputElement) => {
-            const query = args.join(' ').trim();
+            const query = `${args || ''}`.trim();
             if (!query) {
                 if (typeof window.addChatMessage === 'function') {
                     window.addChatMessage('ai', '⚠️ Please provide a search term. Example: /find updateScore');
@@ -27,7 +27,7 @@
             if (typeof window.addChatMessage === 'function') {
                 if (result.ok) {
                     window.addChatMessage('ai', `🔍 **Found it!** "${result.match}" is on line **${result.line}**. I've scrolled the editor there for you.`);
-                    inputElement.value = '';
+                    if (inputElement) inputElement.value = '';
                 } else {
                     window.addChatMessage('ai', `🚫 **No matches found** for "${query}". Check your spelling or try a different term.`);
                 }
@@ -37,22 +37,29 @@
         },
         getSuggestions: (args = "") => {
             const prompt = `${args || ""}`.trim().toLowerCase();
-            if (!prompt) return [];
-
             const editorState = typeof window.getWorkshopEditorState === "function"
                 ? window.getWorkshopEditorState()
                 : null;
 
             const content = editorState?.activeFileContent || "";
-            if (!content) return [];
+            if (!content) {
+                const defaults = ['function', 'button', 'style', 'score', 'error'];
+                return defaults
+                    .filter(word => !prompt || word.includes(prompt))
+                    .map(word => ({
+                        id: word,
+                        name: word,
+                        description: `Search for "${word}"`
+                    }));
+            }
 
             // Extract unique words longer than 3 chars
             const words = content.match(/\b[a-zA-Z_]\w{3,}\b/g) || [];
             const uniqueWords = [...new Set(words)];
 
             return uniqueWords
-                .filter(word => word.toLowerCase().includes(prompt))
-                .slice(0, 5)
+                .filter(word => !prompt || word.toLowerCase().includes(prompt))
+                .slice(0, 8)
                 .map(word => ({
                     id: word,
                     name: word,
