@@ -23,6 +23,53 @@
         return null;
     }
 
+    async function handleResponse(text, options = {}) {
+        const actionResult = {
+            handled: false,
+            workshopFileRewriteAttempted: false,
+            workshopFileRewriteSucceeded: false
+        };
+
+        const editBlocks = typeof window.extractWorkshopEditBlocks === 'function' ? window.extractWorkshopEditBlocks(text) : [];
+        
+        if (editBlocks.length === 0) {
+            if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
+                if (window.showFeedback) window.showFeedback('No explicit [EDIT] tags found. Attempting automatic patch...', false);
+                const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(text, options.userPrompt || '');
+                if (fallbackResult.attempted) {
+                    actionResult.handled = true;
+                    actionResult.workshopFileRewriteAttempted = true;
+                    actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
+                    return actionResult;
+                }
+            }
+            return actionResult;
+        }
+
+        if (window.showFeedback) window.showFeedback('Applying surgical edits...', false);
+        actionResult.handled = true;
+        const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
+        const gameId = editorState?.activeGameId || window.lastPlayedGameId || "";
+        const fileName = editorState?.activeFileName || "index.html";
+
+        for (const editBlock of editBlocks) {
+            try {
+                if (editBlock?.search && typeof window.applyAiFilePatch === 'function') {
+                    actionResult.workshopFileRewriteAttempted = true;
+                    const targetFileName = editBlock.fileName || fileName;
+                    const patchResult = await window.applyAiFilePatch(gameId, targetFileName, editBlock.search, editBlock.replace, { save: true });
+                    if (patchResult?.ok) {
+                        actionResult.workshopFileRewriteSucceeded = true;
+                    }
+                }
+            } catch (e) {
+                console.error("[Arcade: Edit] Action failed:", e);
+            }
+        }
+
+        return actionResult;
+    }
+
     window.ArcadeCommandManager.register({
         id: 'edit',
         description: 'Surgical code modification.',
@@ -42,7 +89,45 @@
             }
 
             window.activeArcadeCommandMode = '/edit';
-            return false; // Let normal flow continue to AI
+            
+            // Read file content
+            const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
+            const content = editorState?.content || editorState?.value || "";
+            const fileName = editorState?.activeFileName || "index.html";
+            
+            const updatedMessage = `${args}\n\n[FILE: ${fileName}]\n${content}`;
+            
+            if (window.showFeedback) window.showFeedback('Calling AI for edit...', false);
+            
+            try {
+                const response = await fetch('/api/local-llm/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: updatedMessage,
+                        history: []
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const reply = data.reply || data.message || data; // Handle different response formats
+                    
+                    const result = await handleResponse(reply, { userPrompt: args });
+                    if (result.workshopFileRewriteSucceeded) {
+                        if (window.showFeedback) window.showFeedback('Edit applied successfully!', false);
+                    } else {
+                        if (window.showFeedback) window.showFeedback('Failed to apply edit.', true);
+                    }
+                } else {
+                    if (window.showFeedback) window.showFeedback('AI request failed.', true);
+                }
+            } catch (e) {
+                console.error("[Command: Edit] AI call failed:", e);
+                if (window.showFeedback) window.showFeedback('Failed to connect to AI.', true);
+            }
+            
+            return true; // Stop processing in manager
         },
         getSuggestions: (args = '') => {
             if (typeof window.getWorkshopManageableGames !== 'function') return [];
@@ -79,51 +164,6 @@
                     description: `Edit files in "${g.title}"`
                 }));
         },
-        handleResponse: async (text, options = {}) => {
-            const actionResult = {
-                handled: false,
-                workshopFileRewriteAttempted: false,
-                workshopFileRewriteSucceeded: false
-            };
-
-            const editBlocks = typeof window.extractWorkshopEditBlocks === 'function' ? window.extractWorkshopEditBlocks(text) : [];
-            
-            if (editBlocks.length === 0) {
-                if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
-                    if (window.showFeedback) window.showFeedback('No explicit [EDIT] tags found. Attempting automatic patch...', false);
-                    const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(text, options.userPrompt || '');
-                    if (fallbackResult.attempted) {
-                        actionResult.handled = true;
-                        actionResult.workshopFileRewriteAttempted = true;
-                        actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
-                        return actionResult;
-                    }
-                }
-                return actionResult;
-            }
-
-            if (window.showFeedback) window.showFeedback('Applying surgical edits...', false);
-            actionResult.handled = true;
-            const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
-            const gameId = editorState?.activeGameId || window.lastPlayedGameId || "";
-            const fileName = editorState?.activeFileName || "index.html";
-
-            for (const editBlock of editBlocks) {
-                try {
-                    if (editBlock?.search && typeof window.applyAiFilePatch === 'function') {
-                        actionResult.workshopFileRewriteAttempted = true;
-                        const targetFileName = editBlock.fileName || fileName;
-                        const patchResult = await window.applyAiFilePatch(gameId, targetFileName, editBlock.search, editBlock.replace, { save: true });
-                        if (patchResult?.ok) {
-                            actionResult.workshopFileRewriteSucceeded = true;
-                        }
-                    }
-                } catch (e) {
-                    console.error("[Arcade: Edit] Action failed:", e);
-                }
-            }
-
-            return actionResult;
-        }
+        handleResponse: handleResponse
     });
 })();
