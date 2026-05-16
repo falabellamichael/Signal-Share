@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
 import { SMTCMonitor, PlaybackStatus } from "@coooookies/windows-smtc-monitor";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
@@ -60,6 +60,18 @@ const BRIDGE_HOST = resolveBridgeListenHost(process.env);
 const security = new SecurityEngine(BRIDGE_SECRET, DEVICE_ID);
 console.log(`[Bridge] Security Core v3 initialized.`);
 console.log(`[Bridge] Device Locking: ${DEVICE_ID ? "ENABLED" : "DISABLED"}`);
+
+// AMD GPU Detection for Backend
+try {
+    const gpuName = execSync('powershell -Command "Get-CimInstance Win32_VideoController | Select-Object Name"').toString();
+    if (gpuName.toLowerCase().includes('amd')) {
+        const lines = gpuName.trim().split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('Name') && !l.startsWith('----'));
+        const actualName = lines[0] || gpuName.trim();
+        console.log(`[Bridge] AMD GPU detected in backend: ${actualName}.`);
+    }
+} catch (e) {
+    // Ignore error if powershell fails
+}
 
 const lastMediaActionAtByKey = new Map();
 
