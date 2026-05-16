@@ -95,10 +95,8 @@
             const content = editorState?.content || editorState?.value || "";
             const fileName = editorState?.activeFileName || "index.html";
             
-            if (content && inputElement) {
-                // Modify the input value to include the file content!
-                inputElement.value = `${args}\n\n[FILE: ${fileName}]\n${content}`;
-            }
+            // Do not append content to input to avoid crashing the page
+            console.log(`[Edit] Content length: ${content.length}`);
             
             return false; // Let normal flow continue to AI!
         },
