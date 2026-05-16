@@ -2329,6 +2329,87 @@ function triggerWorkshopEditAddFilesPicker() {
     if (input) input.click();
 }
 
+async function deleteCurrentWorkshopFile() {
+    const gameId = workshopEditActiveGameId;
+    const fileName = workshopEditActiveFileName;
+    
+    if (!gameId || !fileName) {
+        alert("No file selected to delete.");
+        return;
+    }
+
+    if (fileName === 'index.html') {
+        alert("You cannot delete the entry file (index.html).");
+        return;
+    }
+
+    const games = getWorkshopManageableGames();
+    const activeGame = games.find((game) => game.id === gameId);
+    if (!activeGame) {
+        alert("Game not found.");
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
+        return;
+    }
+
+    const updatedFiles = activeGame.files.filter(f => f.name !== fileName);
+    
+    // Save to Supabase if available
+    if (supabaseClient && currentUser.id) {
+        try {
+            const { error } = await supabaseClient
+                .from(WORKSHOP_GAMES_TABLE)
+                .update({ files: updatedFiles })
+                .eq('id', gameId);
+
+            if (error) {
+                console.error('[Mini-Games] Failed to delete file from Supabase:', error);
+                alert(`Failed to delete file: ${error.message}`);
+                return;
+            }
+        } catch (err) {
+            console.error('[Mini-Games] Error deleting file:', err);
+            alert("An error occurred while deleting the file.");
+            return;
+        }
+    }
+
+    // Update local state
+    activeGame.files = updatedFiles;
+    
+    // Switch to index.html or first available
+    const nextFile = updatedFiles.find(f => f.name === 'index.html') || updatedFiles[0];
+    
+    workshopEditActiveFileName = nextFile ? nextFile.name : '';
+    
+    const editorEl = document.getElementById('workshop-edit-file-content');
+    if (editorEl) {
+        if (nextFile) {
+            let content = nextFile.content || '';
+            if (content.startsWith('data:')) {
+                if (typeof window.decodeWorkshopFileContent === 'function') {
+                    content = window.decodeWorkshopFileContent(nextFile);
+                } else {
+                    try {
+                        const base64 = content.split(',')[1];
+                        content = atob(base64);
+                    } catch (e) {
+                        content = 'Error decoding file content.';
+                    }
+                }
+            }
+            editorEl.value = content;
+        } else {
+            editorEl.value = '';
+        }
+    }
+    
+    refreshWorkshopEditMeta();
+    setWorkshopEditStatus(`Deleted file "${fileName}".`);
+}
+
 function handleWorkshopEditCoverInput() {
     if (!workshopEditActiveGameId) return;
     const coverInput = document.getElementById('workshop-edit-cover-url');

@@ -1831,6 +1831,10 @@
                                 <button type="button" class="workshop-edit-secondary-btn" onclick="triggerWorkshopEditAddFilesPicker()">Add Files</button>
                                 <input id="workshop-edit-add-files" type="file" hidden multiple onchange="handleWorkshopEditAddFiles(event)">
                             </div>
+                            <div class="workshop-edit-asset-block">
+                                <label class="setting-label">Delete File</label>
+                                <button type="button" class="workshop-edit-secondary-btn" onclick="deleteCurrentWorkshopFile()" style="background: rgba(255, 50, 50, 0.15); color: #ff5555; border: 1px solid rgba(255, 50, 50, 0.2);">Delete File</button>
+                            </div>
                         </div>
 
                         <div class="workshop-edit-assets-grid">
