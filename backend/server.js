@@ -21,13 +21,21 @@ async function getChatResponse(message, history = []) {
 
     console.log(`[Chatbot] Processing message: "${message ? message.substring(0, 50) : 'No message'}..."`);
 
-    const conversation = [
-        { role: "system", content: SYSTEM_PROMPT },
-        ...history.map(h => ({ role: h.role, content: h.content }))
-    ];
+    const conversation = [];
     
+    // Add history
+    for (const h of history) {
+        conversation.push({ role: h.role, content: h.content });
+    }
+
+    // Add current message
     if (message) {
-        conversation.push({ role: "user", content: message });
+        let content = message;
+        // If history is empty, prepend the system prompt to the user message
+        if (conversation.length === 0) {
+            content = `${SYSTEM_PROMPT}\n\n[Instruction]: ${message}`;
+        }
+        conversation.push({ role: "user", content: content });
     }
 
     try {
