@@ -578,6 +578,16 @@
                     }
                 }
 
+                // Fallback 3: Handle [PUBLISH: Title] format (not full JSON)
+                if (!publishPayload?.jsonText) {
+                    const publishTagMatch = text.match(/\[PUBLISH:\s*([^\]]+)\]/i);
+                    if (publishTagMatch) {
+                        const title = publishTagMatch[1].trim();
+                        publishPayload = { jsonText: JSON.stringify({ title, files: [] }) };
+                        console.log(`[Arcade: Publish] Recovered title "${title}" from [PUBLISH: Title] tag.`);
+                    }
+                }
+
                 const explicitPublish = isExplicitPublishPrompt(userPrompt);
 
                 if (publishPayload?.jsonText) {

@@ -842,13 +842,25 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                 lmResponse = `${messageText}`.trim();
 
                 // DeepSeek R1 / Reasoning model cleanup: Strip <think> blocks
+                // DeepSeek R1 / Reasoning model cleanup: Strip <think> blocks
                 if (lmResponse.includes("<think>")) {
                     lmResponse = lmResponse.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-                    if (!lmResponse) {
-                        lastEndpointError = `${endpoint.provider}:${model} returned only reasoning text`;
-                        console.warn(`[Chatbot] Ignoring empty response after reasoning cleanup from ${endpoint.provider}:${model}`);
-                        continue;
-                    }
+                }
+                
+                // Strip [PLANNING] blocks per user request
+                if (lmResponse.includes("[PLANNING")) {
+                    lmResponse = lmResponse.replace(/\[PLANNING[\s\S]*?\[\/PLANNING\]/gi, "").trim();
+                }
+
+                // Strip [REASONING_ORCHESTRATOR_V2] blocks per user request
+                if (lmResponse.includes("[REASONING_ORCHESTRATOR_V2]")) {
+                    lmResponse = lmResponse.replace(/\[REASONING_ORCHESTRATOR_V2\][\s\S]*?\[\/REASONING_ORCHESTRATOR_V2\]/gi, "").trim();
+                }
+
+                if (!lmResponse.trim()) {
+                    lastEndpointError = `${endpoint.provider}:${model} returned only reasoning/planning text`;
+                    console.warn(`[Chatbot] Ignoring empty response after cleanup from ${endpoint.provider}:${model}`);
+                    continue;
                 }
 
                 lastSuccessfulModelByProvider[endpoint.provider] = `${model}`.trim();
