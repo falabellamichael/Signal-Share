@@ -2329,6 +2329,71 @@ function triggerWorkshopEditAddFilesPicker() {
     if (input) input.click();
 }
 
+function showCustomConfirm(message, callback) {
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.backgroundColor = 'rgba(0,0,0,0.7)';
+    overlay.style.zIndex = '99999';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    
+    const box = document.createElement('div');
+    box.style.backgroundColor = '#1a1a1a';
+    box.style.padding = '20px';
+    box.style.borderRadius = '8px';
+    box.style.color = '#fff';
+    box.style.maxWidth = '400px';
+    box.style.width = '90%';
+    box.style.border = '1px solid #333';
+    
+    const text = document.createElement('p');
+    text.textContent = message;
+    text.style.margin = '0 0 20px 0';
+    box.appendChild(text);
+    
+    const buttons = document.createElement('div');
+    buttons.style.display = 'flex';
+    buttons.style.justifyContent = 'flex-end';
+    buttons.style.gap = '10px';
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.backgroundColor = '#333';
+    cancelBtn.style.color = '#fff';
+    cancelBtn.style.border = 'none';
+    cancelBtn.style.padding = '8px 16px';
+    cancelBtn.style.borderRadius = '4px';
+    cancelBtn.style.cursor = 'pointer';
+    cancelBtn.onclick = () => {
+        document.body.removeChild(overlay);
+        callback(false);
+    };
+    
+    const okBtn = document.createElement('button');
+    okBtn.textContent = 'OK';
+    okBtn.style.backgroundColor = '#ff4444';
+    okBtn.style.color = '#fff';
+    okBtn.style.border = 'none';
+    okBtn.style.padding = '8px 16px';
+    okBtn.style.borderRadius = '4px';
+    okBtn.style.cursor = 'pointer';
+    okBtn.onclick = () => {
+        document.body.removeChild(overlay);
+        callback(true);
+    };
+    
+    buttons.appendChild(cancelBtn);
+    buttons.appendChild(okBtn);
+    box.appendChild(buttons);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+}
+
 async function deleteCurrentWorkshopFile() {
     const gameId = workshopEditActiveGameId;
     const fileName = workshopEditActiveFileName;
@@ -2350,9 +2415,10 @@ async function deleteCurrentWorkshopFile() {
         return;
     }
 
-    if (!confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
-        return;
-    }
+    const confirmed = await new Promise((resolve) => {
+        showCustomConfirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`, resolve);
+    });
+    if (!confirmed) return;
 
     const updatedFiles = activeGame.files.filter(f => f.name !== fileName);
     
