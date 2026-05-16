@@ -91,10 +91,7 @@ PROTOCOLS:
 - Use [SEARCH] for factual/live info.
 - Use [EDIT] for surgical changes (small snippets).
 - Use [REWRITE] for full file replacements (complete code).
-- For /publish, you MUST provide the complete game architecture in the [PUBLISH] tag.
-- EVERY Workshop change must be wrapped in [PUBLISH], [EDIT], or [REWRITE] tags. NO SILENT OUTPUT.
-- Trigger [REASONING_ORCHESTRATOR_V2] for ANY task involving code or complex logic.
-- If a message starts with [PLAN_REQUEST], provide the [PLANNING] block and then STOP. Otherwise, always follow the plan with action.
+- For /publish, output the game code in standard markdown code blocks with the file name specified in the block info (e.g. ```html filename=index.html).
 - If /deep is detected, prioritize ARCHITECTURAL AUDIT above all else, but still implement.
 `;
 
