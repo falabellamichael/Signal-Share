@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LLM Tools - Arcade Commands | Deep Dive</title>
+    <link rel="stylesheet" href="./questions-guide.css?v=1.3">
+    <link rel="icon" href="./icons/icon.svg?v=5" type="image/svg+xml" />
+    <style>
+        :root {
+            --accent-primary: #50fa7b;
+            --accent-secondary: #ffb86c;
+            --accent-tertiary: #ff5555;
+            --surface-glass: rgba(255, 255, 255, 0.03);
+            --border-glass: rgba(255, 255, 255, 0.12);
+        }
+
+        .commands-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 18px;
+            margin: 24px 0;
+        }
+
+        .command-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.2s ease;
+        }
+
+        .command-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .command-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .command-id {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 8px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            color: var(--accent-secondary);
+            font-family: "JetBrains Mono", monospace;
+        }
+
+        .command-description {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .commands-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 16px 0;
+        }
+
+        .commands-list code {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: var(--accent-primary);
+            font-family: "JetBrains Mono", monospace;
+        }
+
+        .command-meta {
+            margin-top: auto;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+    </style>
+</head>
+<body class="questions-page">
+    <main class="questions-page-shell">
+        <a class="questions-back-link" href="./llm-tools-context.html">← Back to Part 3</a>
+
+        <p class="questions-page-topline">Local AI Architecture Deep Dive / Part 4</p>
+        <h1>Arcade Commands & Tools</h1>
+        <p class="questions-page-lede">
+            A collection of slash commands for the Workshop editor. Use these commands to manage your games, 
+            edit files, and interact with the AI assistant effectively.
+        </p>
+
+        <div class="commands-grid">
+            <!-- clear.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">clear</span>
+                    <span class="command-id">clear.js</span>
+                </div>
+                <p class="command-description">
+                    Locally clears the arcade chat history. Useful for starting fresh or when you want to reset your conversation context.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/clear</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: clear.js</span>
+                </div>
+            </article>
+
+            <!-- deep.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">deep</span>
+                    <span class="command-id">deep.js</span>
+                </div>
+                <p class="command-description">
+                    Triggers a Deep Reasoning session for high-complexity architectural tasks. Reuses the edit command logic 
+                    to target resolution while allowing AI to take over with the new mode.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/deep</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: deep.js</span>
+                </div>
+            </article>
+
+            <!-- edit.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">edit</span>
+                    <span class="command-id">edit.js</span>
+                </div>
+                <p class="command-description">
+                    Opens the editor to the active game, reads its contents, and lets AI decide what changes are needed. 
+                    Specialized for Workshop file editing with surgical patching support.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/edit</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: edit.js</span>
+                </div>
+            </article>
+
+            <!-- find.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">find</span>
+                    <span class="command-id">find.js</span>
+                </div>
+                <p class="command-description">
+                    Searches the Workshop editor for a specific string and navigates to it. 
+                    Usage: <code>/find &lt;text&gt;</code>. Shows line numbers when found.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/find &lt;text&gt;</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: find.js</span>
+                </div>
+            </article>
+
+            <!-- fix.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">fix</span>
+                    <span class="command-id">fix.js</span>
+                </div>
+                <p class="command-description">
+                    Specialized protocol for rapid bug fixing. Uses a token-based system to identify target files and 
+                    surgical edits, allowing quick resolution of issues without full file replacement.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/fix &lt;title&gt; &lt;description&gt;</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: fix.js</span>
+                </div>
+            </article>
+
+            <!-- help.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">help</span>
+                    <span class="command-id">help.js</span>
+                </div>
+                <p class="command-description">
+                    Displays a dynamic list of all registered commands. Shows descriptions and usage examples for each command.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/help</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: help.js</span>
+                </div>
+            </article>
+
+            <!-- idea.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">idea</span>
+                    <span class="command-id">idea.js</span>
+                </div>
+                <p class="command-description">
+                    Triggers the AI to brainstorm 3 unique game ideas based on a genre or topic. 
+                    Useful for generating new concepts when stuck.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/idea &lt;genre&gt;</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: idea.js</span>
+                </div>
+            </article>
+
+            <!-- manager.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">manager</span>
+                    <span class="command-id">manager.js</span>
+                </div>
+                <p class="command-description">
+                    The central orchestrator for all Arcade commands. Handles command parsing, stacking (e.g., /edit /fix), 
+                    and routing to the appropriate handler based on user input.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/manager</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: manager.js</span>
+                </div>
+            </article>
+
+            <!-- plan.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">plan</span>
+                    <span class="command-id">plan.js</span>
+                </div>
+                <p class="command-description">
+                    Requests a detailed pseudocode planning block from the AI before any implementation. 
+                    Uses the REASONING_ORCHESTRATOR_V1 protocol to ensure structured thinking and avoid common pitfalls.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/plan &lt;topic&gt;</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: plan.js</span>
+                </div>
+            </article>
+
+            <!-- publish.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">publish</span>
+                    <span class="command-id">publish.js</span>
+                </div>
+                <p class="command-description">
+                    Handles Workshop Arcade publish actions. If called without arguments, it triggers a random game 
+                    generation; with arguments, it lets the AI handle publishing. Supports markdown code blocks for file content.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/publish</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: publish.js</span>
+                </div>
+            </article>
+
+            <!-- rewrite.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">rewrite</span>
+                    <span class="command-id">rewrite.js</span>
+                </div>
+                <p class="command-description">
+                    Requests a complete replacement for the active Workshop editor file. 
+                    Uses surgical patching to apply targeted changes while maintaining context from the original file.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/rewrite &lt;title&gt; &lt;description&gt;</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: rewrite.js</span>
+                </div>
+            </article>
+
+            <!-- vram.js -->
+            <article class="command-card">
+                <div class="card-header">
+                    <span class="command-title">vram</span>
+                    <span class="command-id">vram.js</span>
+                </div>
+                <p class="command-description">
+                    Flushes VRAM by unloading models from the local inference server. Useful for freeing up memory when 
+                    you're working with large models or have low RAM. Requires bridge communication to function properly.
+                </p>
+                <ul class="commands-list">
+                    <li><code>/vram</code></li>
+                </ul>
+                <div class="command-meta">
+                    <span>File: vram.js</span>
+                </div>
+            </article>
+        </div>
+
+        <div class="pagination-nav" style="display: flex; justify-content: space-between; margin-top: 40px;">
+            <a class="questions-page-button" href="./llm-tools-context.html" style="border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.08); color: #fff; text-decoration: none; border-radius: 999px; padding: 10px 20px;">← Back to Part 3</a>
+            <a class="questions-page-button" href="./how-to-guide.html" style="background: var(--accent-primary); color: #000; font-weight: 700; border: none; border-radius: 999px; padding: 10px 20px; text-decoration: none;">Finish Guide →</a>
+        </div>
+    </main>
+</body>
+</html>

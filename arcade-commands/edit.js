@@ -24,10 +24,8 @@
             const content = editorState?.content || editorState?.value || "";
             const fileName = editorState?.activeFileName || "index.html";
 
-            // 3. Pass content to AI by injecting it into the input
-            if (content && inputElement) {
-                inputElement.value = `${args}\n\n[FILE: ${fileName}]\n${content}`;
-            }
+            // Disabled content injection to prevent crashing
+            console.log(`[Edit] Content length: ${content.length}`);
 
             return false; // Let the AI generate the response
         },
