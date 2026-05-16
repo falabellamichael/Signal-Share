@@ -12,7 +12,7 @@
 
     const vendorName = 'lm' + ' studio';
     const removedPort = String.fromCharCode(49, 50, 51, 52);
-    const emptyChatReply = '';
+    const suppressedReplyMarker = '[AI_AVAILABILITY_SUPPRESSED]';
 
     function isBlockedAiAvailabilityMessage(value = '') {
         const text = `${value || ''}`.toLowerCase();
@@ -26,7 +26,8 @@
             || text.includes('local ai endpoint is not configured')
             || text.includes('set signal_share_ai_base_url')
             || text.includes('set signal_share_ai_chat_url')
-            || text.includes('check the bridge/provider settings');
+            || text.includes('check the bridge/provider settings')
+            || text.includes('ai_availability_suppressed');
     }
 
     function scrubPayloadText(text = '') {
@@ -34,19 +35,20 @@
         try {
             const payload = JSON.parse(text);
             if (typeof payload?.reply === 'string' && isBlockedAiAvailabilityMessage(payload.reply)) {
-                payload.reply = emptyChatReply;
+                payload.reply = suppressedReplyMarker;
                 payload.suppressedAiAvailabilityMessage = true;
                 return JSON.stringify(payload);
             }
             if (typeof payload?.error === 'string' && isBlockedAiAvailabilityMessage(payload.error)) {
-                payload.error = emptyChatReply;
+                payload.reply = suppressedReplyMarker;
+                payload.error = '';
                 payload.suppressedAiAvailabilityMessage = true;
                 return JSON.stringify(payload);
             }
         } catch (_error) {
             // Plain text response; replace directly.
         }
-        return emptyChatReply;
+        return suppressedReplyMarker;
     }
 
     function scrubSavedChatHistory() {
@@ -154,7 +156,8 @@
         isBlockedAiAvailabilityMessage,
         scrubPayloadText,
         scrubSavedChatHistory,
-        removeRenderedBlockedMessages
+        removeRenderedBlockedMessages,
+        suppressedReplyMarker
     });
 
     installFetchScrubber();
