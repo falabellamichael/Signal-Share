@@ -1,147 +1,96 @@
 /**
- * /rewrite or [rewrite] Command
+ * /rewrite Command
  * Requests a complete replacement for the active Workshop editor file.
  */
 (function() {
-    const ACTION_WORDS = new Set([
-        'add', 'insert', 'create', 'make', 'build', 'change', 'update', 'modify', 'replace',
-        'remove', 'delete', 'fix', 'repair', 'debug', 'style', 'styles', 'css', 'javascript',
-        'js', 'stopwatch', 'timer', 'score', 'button', 'layout', 'color', 'colour', 'work',
-        'working', 'better', 'new', 'feature', 'rebuild', 'redesign'
-    ]);
-    const FILLER_WORDS = new Set([
-        'a', 'an', 'and', 'the', 'to', 'for', 'in', 'on', 'of', 'my', 'game', 'workshop',
-        'editor', 'file', 'index', 'html', 'please'
-    ]);
-
-    function tokenize(value = '') {
-        return `${value || ''}`.toLowerCase().match(/[a-z0-9]+/g) || [];
+    function normalize(value = '') {
+        return `${value || ''}`.trim();
     }
 
-    function isTargetOnlyRewriteRequest(args = '', selected = null) {
-        const argTokens = tokenize(args);
-        if (argTokens.length === 0) return true;
-
-        const titleTokens = new Set(tokenize(selected?.title || ''));
-        const fileTokens = new Set(tokenize(selected?.fileName || ''));
-        const remaining = argTokens.filter((token) => {
-            return !titleTokens.has(token)
-                && !fileTokens.has(token)
-                && !FILLER_WORDS.has(token);
-        });
-
-        if (remaining.length === 0) return true;
-        return !remaining.some((token) => ACTION_WORDS.has(token));
-    }
-
-    function replyLocally(inputElement, message) {
+    function replyLocally(inputElement, message, isError = false) {
         if (typeof window.addChatMessage === 'function') {
-            window.addChatMessage('ai', message);
+            window.addChatMessage('ai', isError ? `⚠️ ${message}` : message);
+        } else if (typeof window.showFeedback === 'function') {
+            window.showFeedback(message, isError);
         }
         if (inputElement) inputElement.value = '';
-        if (typeof window.updateChatStatus === 'function') window.updateChatStatus('active');
         return true;
     }
 
-    function resolveFallbackRewriteTarget(args = '') {
-        if (typeof window.getWorkshopManageableGames !== 'function') return null;
-        const games = window.getWorkshopManageableGames();
-        if (!Array.isArray(games) || games.length === 0) return null;
+    function getEditCommand() {
+        return window.ArcadeCommandManager?.getCommand?.('edit') || null;
+    }
 
-        const editorState = typeof window.getWorkshopEditorState === 'function'
-            ? window.getWorkshopEditorState()
-            : null;
-        const activeGameId = `${editorState?.activeGameId || ''}`.trim();
-        const activeGame = activeGameId ? games.find((game) => game.id === activeGameId) : null;
-        if (activeGame) return activeGame;
-
-        const prompt = `${args || ''}`.toLowerCase();
-        if (games.length === 1 || /\b(any|whatever|something|one of my|a game|my game)\b/.test(prompt)) {
-            return games[0];
+    function getEditorState() {
+        if (typeof window.getWorkshopEditorState !== 'function') return null;
+        try {
+            return window.getWorkshopEditorState();
+        } catch (_error) {
+            return null;
         }
+    }
 
-        return null;
+    function hasActiveEditor() {
+        const state = getEditorState();
+        return Boolean(`${state?.activeGameId || ''}`.trim() && `${state?.activeFileName || ''}`.trim());
+    }
+
+    function hasRewriteInstruction(args = '') {
+        const text = normalize(args).toLowerCase();
+        if (!text) return false;
+        return /\b(?:rewrite|rebuild|redesign|replace|full|from scratch|complete|entire|split|refactor|make it|turn it into|convert)\b/.test(text);
     }
 
     window.ArcadeCommandManager.register({
         id: 'rewrite',
-        description: 'Rewrite the active Workshop file.',
+        description: 'Rewrite the selected Workshop editor file.',
+
         execute: async (args, inputElement) => {
-            let selected = null;
-            if (typeof window.resolveWorkshopEditGameFromPrompt === 'function'
-                && typeof window.setWorkshopEditActiveGame === 'function') {
-                let targetGame = window.resolveWorkshopEditGameFromPrompt(args);
-                if (!targetGame) targetGame = resolveFallbackRewriteTarget(args);
-                if (targetGame) {
-                    selected = window.setWorkshopEditActiveGame(targetGame.id, { prompt: args });
-                    if (selected?.ok) {
-                        console.log(`[Command: Rewrite] Auto-switching context to: ${selected.title} / ${selected.fileName}`);
-                    }
-                }
+            const prompt = normalize(args);
+            const editCmd = getEditCommand();
+
+            if (!prompt && !hasActiveEditor()) {
+                return replyLocally(inputElement, 'Open a Workshop game/file first, or choose one after /rewrite.');
             }
 
-            if (selected?.ok && isTargetOnlyRewriteRequest(args, selected)) {
-                // Clear modes if we are just replying with info
-                window.activeArcadeCommandModes = [];
+            if (editCmd && typeof editCmd.execute === 'function') {
+                const result = await editCmd.execute(prompt, inputElement);
+                if (result === true) return true;
+            }
+
+            if (!hasRewriteInstruction(prompt)) {
                 return replyLocally(
                     inputElement,
-                    `[Workshop Edit]: Opened "${selected.title}" in Rewrite Mode (${selected.fileName}). Tell me what the full rewrite should do, for example: /rewrite ${selected.title} add a stopwatch and split CSS/JS into separate files.`
+                    'Opened the target. Now describe the rewrite, for example: /rewrite make the whole game cleaner and mobile friendly.'
                 );
             }
 
-            if (!selected?.ok && isTargetOnlyRewriteRequest(args, selected)) {
-                window.activeArcadeCommandModes = [];
-                return replyLocally(
-                    inputElement,
-                    '[Workshop Edit]: I need a matching Workshop game and rewrite instructions. Try: /rewrite Random Number Guessing Game add a stopwatch and split CSS/JS into separate files.'
-                );
-            }
+            window.activeArcadeCommandMode = '/rewrite';
+            window.activeArcadeCommandModes = Array.isArray(window.activeArcadeCommandModes)
+                ? Array.from(new Set([...window.activeArcadeCommandModes, '/rewrite', '/edit']))
+                : ['/rewrite', '/edit'];
 
-            // Command mode is already added by the manager, but we can ensure it's here
-            if (window.activeArcadeCommandModes && !window.activeArcadeCommandModes.includes('/rewrite')) {
-                window.activeArcadeCommandModes.push('/rewrite');
+            if (inputElement && !inputElement.value.trim()) {
+                inputElement.value = `/rewrite ${prompt}`;
             }
-
             return false;
         },
+
         getSuggestions: (args = '') => {
-            if (typeof window.getWorkshopManageableGames !== 'function') return [];
-            const games = window.getWorkshopManageableGames();
-            if (!Array.isArray(games) || games.length === 0) return [];
-
-            const prompt = `${args || ''}`.trim().toLowerCase();
-            
-            if (!prompt) {
-                return games.map(g => ({
-                    id: g.title,
-                    name: g.title,
-                    description: `Rewrite files in "${g.title}"`
+            const editCmd = getEditCommand();
+            if (editCmd && typeof editCmd.getSuggestions === 'function') {
+                return editCmd.getSuggestions(args).map((suggestion) => ({
+                    ...suggestion,
+                    description: `${suggestion.description || ''}`.replace(/^Edit\b/i, 'Rewrite') || 'Rewrite this Workshop target.'
                 }));
             }
-
-            const matchingGame = games.find(g => prompt.startsWith(g.title.toLowerCase()));
-            if (matchingGame) {
-                const files = Array.isArray(matchingGame.files) ? matchingGame.files : [];
-                const remaining = prompt.substring(matchingGame.title.length).trim();
-                
-                return files.map(f => ({
-                    id: `${matchingGame.title} ${f.name}`,
-                    name: f.name,
-                    description: `Rewrite ${f.name} in "${matchingGame.title}"`
-                })).filter(s => !remaining || s.name.toLowerCase().includes(remaining));
-            }
-
-            return games
-                .filter(g => g.title.toLowerCase().includes(prompt))
-                .map(g => ({
-                    id: g.title,
-                    name: g.title,
-                    description: `Rewrite files in "${g.title}"`
-                }));
+            return [
+                { id: 'current editor', name: 'current editor', description: 'Rewrite the active editor file.' },
+                { id: 'split files', name: 'split files', description: 'Rewrite into separated HTML/CSS/JS files.' },
+                { id: 'polish', name: 'polish', description: 'Rewrite with better structure and polish.' }
+            ];
         },
-        /**
-         * The response handler handles full-file rewrites from the AI reply.
-         */
+
         handleResponse: async (text, options = {}) => {
             const actionResult = {
                 handled: false,
@@ -150,27 +99,40 @@
                 errorReason: null
             };
 
-            // 1. Explicit check for rewrite intent
-            const isExplicitRewrite = window.ArcadeWorkshopManager.isWorkshopRewriteIntentPrompt(options.userPrompt || '');
-            if (!isExplicitRewrite && !text.includes('[REWRITE]')) {
-                return actionResult;
-            }
+            const userPrompt = options.userPrompt || '/rewrite';
+            const isRewritePrompt = /^\s*\/rewrite\b/i.test(userPrompt)
+                || /\b(?:rewrite|rebuild|redesign|full\s+rewrite|from scratch)\b/i.test(userPrompt)
+                || /\[REWRITE\]/i.test(text);
+            if (!isRewritePrompt) return actionResult;
 
-            if (window.showFeedback) window.showFeedback('Processing Workshop rewrite...', false);
-
-            // 2. Try the automatic rewrite logic
             if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
-                const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(text, options.userPrompt || '');
-                if (fallbackResult.attempted) {
+                const result = await window.tryAutoWorkshopFileRewriteFromReply(text, userPrompt);
+                if (result?.attempted) {
                     actionResult.handled = true;
                     actionResult.workshopFileRewriteAttempted = true;
-                    actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
-                    
-                    if (!fallbackResult.ok) {
-                        actionResult.errorReason = fallbackResult.reason || 'Rewrite failed';
-                        if (window.showFeedback) window.showFeedback(`Rewrite Failed: ${actionResult.errorReason}`, true);
+                    actionResult.workshopFileRewriteSucceeded = !!result.ok;
+                    actionResult.errorReason = result.ok ? null : (result.reason || result.message || 'Rewrite failed');
+                    if (window.showFeedback) {
+                        window.showFeedback(
+                            result.ok ? (result.message || 'Rewrote the active file.') : actionResult.errorReason,
+                            !result.ok
+                        );
                     }
                     return actionResult;
+                }
+            }
+
+            const editCmd = getEditCommand();
+            if (editCmd && typeof editCmd.handleResponse === 'function') {
+                const editResult = await editCmd.handleResponse(text, { ...options, userPrompt });
+                if (editResult?.handled) {
+                    return {
+                        ...actionResult,
+                        ...editResult,
+                        handled: true,
+                        workshopFileRewriteAttempted: !!(editResult.workshopFileRewriteAttempted || editResult.editorEditAttempted),
+                        workshopFileRewriteSucceeded: !!(editResult.workshopFileRewriteSucceeded || editResult.editorEditSucceeded)
+                    };
                 }
             }
 
