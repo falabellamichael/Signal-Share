@@ -43,14 +43,7 @@
 
     function pushCommandMode(mode) {
         window.activeArcadeCommandMode = mode;
-
-        if (!Array.isArray(window.activeArcadeCommandModes)) {
-            window.activeArcadeCommandModes = [];
-        }
-
-        if (!window.activeArcadeCommandModes.includes(mode)) {
-            window.activeArcadeCommandModes.push(mode);
-        }
+        window.activeArcadeCommandModes = [mode]; // Overwrite instead of pushing to prevent mixing
     }
 
     function showPublishFeedback(message, isError = false) {

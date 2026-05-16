@@ -30,6 +30,7 @@ class GPUScrollManager {
         this.attachEvents();
         this.resize();
         
+        this.container.classList.add('gpu-scroll-container');
         console.log("[GPU Scroll] Initialized on container:", this.container);
     }
     
@@ -58,7 +59,7 @@ class GPUScrollManager {
         this.mutationObserver = new MutationObserver((mutations) => {
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
-                    if (node.nodeType === 1 && this.selector && node.matches(this.selector)) {
+                    if (node.nodeType === 1 && (!this.selector || node.matches(this.selector))) {
                         node.classList.add('gpu-optimized-element');
                         this.observer.observe(node);
                     }
@@ -338,13 +339,32 @@ class GPUScrollManager {
      */
     observe(selector) {
         this.selector = selector;
-        const elements = this.container.querySelectorAll(selector);
-        elements.forEach(el => {
-            el.classList.add('gpu-optimized-element');
-            this.observer.observe(el);
+        const elements = selector ? this.container.querySelectorAll(selector) : this.container.children;
+        Array.from(elements).forEach(el => {
+            if (el.nodeType === 1) {
+                el.classList.add('gpu-optimized-element');
+                this.observer.observe(el);
+            }
         });
     }
 }
 
 // Export for use in project
 window.GPUScrollManager = GPUScrollManager;
+
+// Auto-apply to elements with class 'gpu-scroll' or 'gpu-scroll-auto'
+document.addEventListener('DOMContentLoaded', () => {
+    // Wait a bit for dynamic content to load
+    setTimeout(() => {
+        const containers = document.querySelectorAll('.gpu-scroll, [data-gpu-scroll]');
+        containers.forEach(container => {
+            if (container.classList.contains('gpu-scroll-container')) return; // Already initialized
+            const selector = container.getAttribute('data-gpu-selector');
+            const manager = new GPUScrollManager(container);
+            manager.observe(selector);
+            
+            // Store reference
+            container.__gpuScrollManager = manager;
+        });
+    }, 1000);
+});

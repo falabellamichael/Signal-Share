@@ -684,6 +684,55 @@ function buildWorkshopRewriteRetryContext(userPrompt = '', richContext = null) {
     ].join('\n');
 }
 
+async function retryPublishWithAI(userPrompt = '', richContext = null, signal = null) {
+    const retryContext = [
+        '[WORKSHOP_PUBLISH_RETRY]',
+        'CRITICAL: You previously provided a plan or audit instead of code.',
+        'The user wants you to IMMEDIATELY write the full, working game code and output the [PUBLISH] block.',
+        'Do NOT plan, do NOT audit, and do NOT ask for confirmation.',
+        'Example:',
+        '[PUBLISH: { "title": "My Game", "category": "GAME", "description": "A cool game", "files": [{ "name": "index.html", "content": "<!DOCTYPE html>..." }] }]'
+    ].join('\n');
+
+    const modelSelect = document.getElementById('chat-model-select');
+    const selectedModel = modelSelect ? modelSelect.value : 'auto';
+    const requestModel = resolveChatRequestModel(selectedModel);
+    const customInstructions = typeof getAiCore()?.getStoredCustomInstructions === 'function'
+        ? getAiCore().getStoredCustomInstructions()
+        : `${localStorage.getItem('ss_ai_custom_instructions') || ''}`.trim().slice(0, 2000);
+    const payload = JSON.stringify({
+        message: buildProtocolAwareUserMessage(userPrompt),
+        model: requestModel,
+        customInstructions,
+        attachment: null,
+        history: [],
+        pageContext: retryContext
+    });
+
+    const chatPaths = ['/api/local-llm/chat', '/api/llm/chat'];
+    for (const chatPath of chatPaths) {
+        try {
+            const response = await bridgeFetch(chatPath, {
+                method: 'POST',
+                timeoutMs: 0,
+                signal,
+                body: payload
+            });
+            if (!response?.ok) continue;
+            const data = await response.json().catch(() => null);
+            const retryReply = typeof data?.reply === 'string' ? data.reply.trim() : '';
+            if (retryReply && !isBridgeLightweightOfflineReply(retryReply)) {
+                return retryReply;
+            }
+        } catch (error) {
+            if (signal?.aborted) throw error;
+            console.warn('[Arcade Chat] Workshop publish retry failed:', error);
+        }
+    }
+
+    return '';
+}
+
 async function retryWorkshopEditWithEditorContext(userPrompt = '', richContext = null, signal = null) {
     const retryContext = buildWorkshopEditRetryContext(userPrompt, richContext);
     if (!retryContext) return '';
@@ -2714,6 +2763,13 @@ window.sendChatMessage = async function (promptOverride = '') {
                     ? await retryWorkshopRewriteWithEditorContext(text, richContext, signal)
                     : await retryWorkshopEditWithEditorContext(text, richContext, signal);
                 if (retryReply && !isUnhelpfulWorkshopEditReply(retryReply)) {
+                    reply = retryReply;
+                }
+            }
+
+            if (window.activeArcadeCommandMode === '/publish' && (reply.toLowerCase().includes('audit:') || reply.toLowerCase().includes('logic:'))) {
+                const retryReply = await retryPublishWithAI(text, richContext, signal);
+                if (retryReply) {
                     reply = retryReply;
                 }
             }
