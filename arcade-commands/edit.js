@@ -95,57 +95,12 @@
             const content = editorState?.content || editorState?.value || "";
             const fileName = editorState?.activeFileName || "index.html";
             
-            const updatedMessage = `${args}\n\n[FILE: ${fileName}]\n${content}`;
-            
-            if (inputElement) {
-                inputElement.value = ''; // Clear the input
+            if (content && inputElement) {
+                // Modify the input value to include the file content!
+                inputElement.value = `${args}\n\n[FILE: ${fileName}]\n${content}`;
             }
             
-            if (typeof window.addChatMessage === 'function') {
-                window.addChatMessage('user', `/edit ${args}`);
-            }
-            
-            if (window.showFeedback) window.showFeedback('Calling AI for edit...', false);
-            
-            try {
-                const bridgeUrl = window.SignalShareLocalLlm?.getBridgeBaseUrl() || "http://localhost:3000";
-                const headers = window.SignalShareLocalLlm?.getRequestHeaders() || {};
-                
-                const response = await fetch(`${bridgeUrl}/api/local-llm/chat`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        ...headers
-                    },
-                    body: JSON.stringify({
-                        message: updatedMessage,
-                        history: []
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    const reply = data.reply || data.message || data; // Handle different response formats
-                    
-                    if (typeof window.addChatMessage === 'function') {
-                        window.addChatMessage('ai', reply);
-                    }
-                    
-                    const result = await handleResponse(reply, { userPrompt: args });
-                    if (result.workshopFileRewriteSucceeded) {
-                        if (window.showFeedback) window.showFeedback('Edit applied successfully!', false);
-                    } else {
-                        if (window.showFeedback) window.showFeedback('Failed to apply edit.', true);
-                    }
-                } else {
-                    if (window.showFeedback) window.showFeedback('AI request failed.', true);
-                }
-            } catch (e) {
-                console.error("[Command: Edit] AI call failed:", e);
-                if (window.showFeedback) window.showFeedback('Failed to connect to AI.', true);
-            }
-            
-            return true; // Stop processing in manager
+            return false; // Let normal flow continue to AI!
         },
         getSuggestions: (args = '') => {
             if (typeof window.getWorkshopManageableGames !== 'function') return [];

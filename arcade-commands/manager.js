@@ -60,7 +60,7 @@ window.ArcadeCommandManager = (function() {
                 if (lastResult === true) return true;
                 
                 // If it returns false, it means "continue to AI or next command"
-                currentText = args;
+                currentText = inputElement ? inputElement.value : args;
                 if (!currentText) break;
             } else {
                 break; // Unknown command
