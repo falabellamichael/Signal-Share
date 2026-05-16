@@ -129,7 +129,11 @@ function buildMessages({ message = "", history = [], pageContext = "", customIns
   }
 
   const userMessage = `${message || ""}`.trim();
-  if (userMessage) messages.push({ role: "user", content: userMessage });
+  if (userMessage) {
+    messages.push({ role: "user", content: userMessage });
+  } else if (!messages.some(m => m.role === "user")) {
+    messages.push({ role: "user", content: "Continue" });
+  }
   return messages;
 }
 
