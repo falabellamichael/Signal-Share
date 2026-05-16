@@ -78,10 +78,8 @@
 
         const prompt = `${args || ""}`.toLowerCase();
 
-        if (games.length === 1 || /\b(any|whatever|something|one of my|a game|my game)\b/.test(prompt)) {
-            return games[0];
-        }
-
+        // Removed aggressive fallback to games[0] to prevent accidental updates.
+        // It should only update if explicitly targeted by name.
         return null;
     }
 
