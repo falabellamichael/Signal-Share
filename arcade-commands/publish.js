@@ -511,6 +511,24 @@
                     return actionResult;
                 }
 
+                // Check for unhelpful replies in /publish mode
+                if (window.activeArcadeCommandMode === '/publish') {
+                    if (text.toLowerCase().includes('audit:') || text.toLowerCase().includes('logic:')) {
+                        return {
+                            ...actionResult,
+                            requiresRetry: true,
+                            retryPrompt: 'CRITICAL: You provided a plan instead of code. Stop planning and IMMEDIATELY write the full game code and output the [PUBLISH] block.'
+                        };
+                    }
+                    if (!publishPayload?.jsonText && text.includes('```')) {
+                        return {
+                            ...actionResult,
+                            requiresRetry: true,
+                            retryPrompt: 'CRITICAL: You provided code but forgot to wrap it in the [PUBLISH] protocol. Please output the code inside a [PUBLISH: {...}] block.'
+                        };
+                    }
+                }
+
                 const editorState = typeof window.getWorkshopEditorState === "function"
                     ? window.getWorkshopEditorState()
                     : null;

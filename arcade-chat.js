@@ -684,8 +684,8 @@ function buildWorkshopRewriteRetryContext(userPrompt = '', richContext = null) {
     ].join('\n');
 }
 
-async function retryPublishWithAI(userPrompt = '', richContext = null, signal = null) {
-    const retryContext = [
+async function retryPublishWithAI(userPrompt = '', customRetryPrompt = '', signal = null) {
+    const retryContext = customRetryPrompt || [
         '[WORKSHOP_PUBLISH_RETRY]',
         'CRITICAL: You previously provided a plan or audit instead of code.',
         'The user wants you to IMMEDIATELY write the full, working game code and output the [PUBLISH] block.',
@@ -732,6 +732,8 @@ async function retryPublishWithAI(userPrompt = '', richContext = null, signal = 
 
     return '';
 }
+
+
 
 async function retryWorkshopEditWithEditorContext(userPrompt = '', richContext = null, signal = null) {
     const retryContext = buildWorkshopEditRetryContext(userPrompt, richContext);
@@ -2767,10 +2769,14 @@ window.sendChatMessage = async function (promptOverride = '') {
                 }
             }
 
-            if (window.activeArcadeCommandMode === '/publish' && (reply.toLowerCase().includes('audit:') || reply.toLowerCase().includes('logic:'))) {
-                const retryReply = await retryPublishWithAI(text, richContext, signal);
-                if (retryReply) {
-                    reply = retryReply;
+            const publishCmd = window.ArcadeCommandManager.getCommand('publish');
+            if (publishCmd && typeof publishCmd.handleResponse === 'function') {
+                const publishResult = await publishCmd.handleResponse(reply, { userPrompt: text });
+                if (publishResult.requiresRetry && publishResult.retryPrompt) {
+                    const retryReply = await retryPublishWithAI(text, publishResult.retryPrompt, signal);
+                    if (retryReply) {
+                        reply = retryReply;
+                    }
                 }
             }
 
