@@ -24,7 +24,7 @@ function isUrlSafe(urlStr) {
         if (!['http:', 'https:'].includes(url.protocol)) return false;
 
         const hostname = url.hostname.toLowerCase();
-        
+
         // Allow localhost for the internal bridge only
         if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') {
             // Only allow the bridge port (3000) or standard web ports
@@ -63,11 +63,15 @@ CAPABILITIES:
 
 GUIDELINES:
 - Your games must be REAL and FUNCTIONAL. No placeholders and no incomplete logic.
-- UI must feel "premium" and "alive". Prioritize Minimalist, Glass, or Brutalist styles over Neon for long-term visual comfort.
+- UI must feel "premium" and "alive". Prioritize Minimalist, Glass, or Brutalist styles.
 - JSON inside [PUBLISH] or other tags MUST NOT contain unescaped newlines; use \\n for newlines in strings.
+
+CORE DIRECTIVES:
 - Use modern ESNext features (Optional chaining, Nullish coalescing, Proxy, Async/Await).
 - Avoid generic patterns. Use specialized, performant logic.
-- If you reference a file in HTML (like a script or stylesheet), you MUST provide that file in the response or code blocks. Do not reference files that you do not generate.
+- UI must feel "premium" and "alive". Prioritize Minimalist, Glass, or Brutalist styles over Neon for long-term visual comfort.
+- ALWAYS provide the complete code implementation in the same response as the plan. DO NOT wait for confirmation.
+- JSON inside [PUBLISH] or other tags MUST NOT contain unescaped newlines; use \\n for newlines in strings.
 
 SYSTEM TOOLS:
 1. [SEARCH: query] | 2. [FETCH: url] | 3. [OPEN: url]
@@ -470,7 +474,7 @@ async function ensureLmStudioExclusiveModel(targetModel) {
         if (!targetLoaded) {
             await fetchLmStudioJson("/models/load", {
                 method: "POST",
-                body: { 
+                body: {
                     model: resolvedTarget
                 },
                 timeoutMs: 120000
@@ -607,7 +611,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
     if (!message && iteration === 0) return "I didn't receive a message to process.";
     const workshopEditActive = isWorkshopEditContext(pageContext);
     const publishIntentActive = /\b(publish|upload|create\s+game|new\s+game|build\s+game|package|workshop)\b/i.test(message || "");
-    
+
     // Safety check for infinite recursion - reduced for memory pressure
     const MAX_ITERATIONS = 2;
     if (iteration >= MAX_ITERATIONS) {
@@ -659,19 +663,19 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
 
     const visionModels = ['qwen3-vl-4b', 'llava', 'llava:7b', 'moondream', 'bakllava', 'minicpm-v'];
     const standardModels = [
-        'qwen3.5-9b', 
-        'deepseek-r1-0528-qwen3-8b', 
-        'DeepSeek-R1-Distill-Qwen-1.5B-GGUF', 
-        'qwen3-4b-thinking-2507', 
-        'qwen3-4b', 
-        'qwen2.5-coder', 
+        'qwen3.5-9b',
+        'deepseek-r1-0528-qwen3-8b',
+        'DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
+        'qwen3-4b-thinking-2507',
+        'qwen3-4b',
+        'qwen2.5-coder',
         'Qwen2.5-Coder-7B-Instruct-GGUF',
         'gemma-4-e4b',
         'gemma-4-e2b',
-        'llama3', 
+        'llama3',
         'mistral'
     ];
-    
+
     let models = [];
     if (preferredModel && preferredModel !== 'auto') {
         models.push(preferredModel);
@@ -836,7 +840,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                     await ensureLmStudioExclusiveModel(model);
                 }
                 lmResponse = `${messageText}`.trim();
-                
+
                 // DeepSeek R1 / Reasoning model cleanup: Strip <think> blocks
                 if (lmResponse.includes("<think>")) {
                     lmResponse = lmResponse.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
@@ -846,7 +850,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
                         continue;
                     }
                 }
-                
+
                 lastSuccessfulModelByProvider[endpoint.provider] = `${model}`.trim();
                 activeRuntimeProvider = `${endpoint.provider || "unknown"}`.trim();
                 activeRuntimeModel = `${model || "unknown"}`.trim();
@@ -880,26 +884,26 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         return `🧠 [Model Status]: Using ${activeRuntimeModel} via ${activeRuntimeProvider} (${mode} mode).`;
     }
     if (lmResponse) {
-        const hasTools = lmResponse.includes('[SEARCH:') || 
-                         lmResponse.includes('[FETCH:') || 
-                         lmResponse.includes('[OPEN:') || 
-                         lmResponse.includes('[PLAY:') ||
-                         lmResponse.includes('[SCREENSHOT]') ||
-                         lmResponse.includes('[LIST_TABS]') ||
-                         lmResponse.includes('[LIST_APPS]') ||
-                         lmResponse.includes('[LIST_FILES:') ||
-                         lmResponse.includes('[READ_FILE:') ||
-                         lmResponse.includes('[WRITE_FILE:') ||
-                         lmResponse.includes('[LAUNCH:') ||
-                         lmResponse.includes('[CLOSE:');
+        const hasTools = lmResponse.includes('[SEARCH:') ||
+            lmResponse.includes('[FETCH:') ||
+            lmResponse.includes('[OPEN:') ||
+            lmResponse.includes('[PLAY:') ||
+            lmResponse.includes('[SCREENSHOT]') ||
+            lmResponse.includes('[LIST_TABS]') ||
+            lmResponse.includes('[LIST_APPS]') ||
+            lmResponse.includes('[LIST_FILES:') ||
+            lmResponse.includes('[READ_FILE:') ||
+            lmResponse.includes('[WRITE_FILE:') ||
+            lmResponse.includes('[LAUNCH:') ||
+            lmResponse.includes('[CLOSE:');
 
         // Protocol tags are handled by the frontend; they should NOT trigger a backend tool iteration loop
-        const isProtocolTag = lmResponse.includes('[PUBLISH:') || 
-                              lmResponse.includes('[ARCADE:') || 
-                              lmResponse.includes('[COMPOSE:') ||
-                              lmResponse.includes('[EDIT]') ||
-                              lmResponse.includes('[/EDIT]');
-        
+        const isProtocolTag = lmResponse.includes('[PUBLISH:') ||
+            lmResponse.includes('[ARCADE:') ||
+            lmResponse.includes('[COMPOSE:') ||
+            lmResponse.includes('[EDIT]') ||
+            lmResponse.includes('[/EDIT]');
+
         const effectiveHasTools = hasTools && !isProtocolTag;
         const shouldForceSearchTool = !workshopEditActive && iteration === 0 && isLiveWebInfoRequest(message || "");
         const shouldBlockWorkshopFileTool = iteration === 0
@@ -920,10 +924,10 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
             ], pageContext, iteration + 1, attachment, preferredModel, customInstructions);
         }
 
-        const isClaimingToSearch = lmResponse.toLowerCase().includes('search') || 
-                                   lmResponse.toLowerCase().includes('pulling up') ||
-                                   lmResponse.toLowerCase().includes('checking');
-        
+        const isClaimingToSearch = lmResponse.toLowerCase().includes('search') ||
+            lmResponse.toLowerCase().includes('pulling up') ||
+            lmResponse.toLowerCase().includes('checking');
+
         if (!workshopEditActive && isClaimingToSearch && !effectiveHasTools && iteration === 0) {
             console.log("[Chatbot] Auto-correcting missing search tag...");
             return getChatResponse(null, [
@@ -936,16 +940,16 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
         if (effectiveHasTools) {
             console.log(`[Chatbot] Tool detected (Iteration ${iteration + 1}). Executing...`);
             const toolResult = await executeWebTools(lmResponse);
-            
+
             let nextAttachment = attachment;
             if (toolResult.includes('[SYSTEM_IMAGE_ATTACHED]')) {
                 try {
                     const bridgeUrl = `http://127.0.0.1:3000/api/system/screenshot`;
-                    const response = await fetch(bridgeUrl, { 
-                        headers: { 
+                    const response = await fetch(bridgeUrl, {
+                        headers: {
                             'X-Bridge-Secret': BRIDGE_SECRET,
                             'X-Device-Id': DEVICE_ID
-                        } 
+                        }
                     });
                     if (response.ok) {
                         const data = await response.json();
@@ -997,7 +1001,7 @@ export async function getChatResponse(message, history = [], pageContext = 'Sign
  */
 async function executeWebTools(text) {
     let results = [];
-      // Handle [SEARCH: query]
+    // Handle [SEARCH: query]
     const searchMatch = text.match(/\[SEARCH:\s*([^\]]+)\]/i);
     if (searchMatch) {
         const query = searchMatch[1].trim().slice(0, 240);
@@ -1046,7 +1050,7 @@ async function executeWebTools(text) {
                     throw new Error(`Search HTTP ${response.status}`);
                 }
                 const html = await response.text();
-                
+
                 // Extract search results using multiple pattern variants.
                 const resultsList = [];
                 const seenLinks = new Set();
@@ -1068,7 +1072,7 @@ async function executeWebTools(text) {
                     }
                     if (resultsList.length >= 5) break;
                 }
-                
+
                 if (resultsList.length > 0) {
                     results.push(`[SEARCH_RESULTS_FOR_${query.toUpperCase()}]:\n${resultsList.join('\n\n')}\n\n(AI Instruction: Summarize these results for the user with a direct answer first, then optionally mention one source link.)`);
                 } else {
@@ -1097,15 +1101,15 @@ async function executeWebTools(text) {
                     throw new Error(`HTTP ${resp.status}`);
                 }
                 const html = await resp.text();
-                
+
                 // Very basic text extraction: strip scripts, styles, and tags
                 let cleanText = stripHtmlTags(
                     html
-                    .replace(/<script[\s\S]*?<\/script>/gi, "")
-                    .replace(/<style[\s\S]*?<\/style>/gi, "")
-                    .replace(/\s+/g, " ")
+                        .replace(/<script[\s\S]*?<\/script>/gi, "")
+                        .replace(/<style[\s\S]*?<\/style>/gi, "")
+                        .replace(/\s+/g, " ")
                 );
-                
+
                 // Truncate to avoid context window overflow
                 const snippet = cleanText.substring(0, 4000);
                 results.push(`[ARTICLE_CONTENT_FROM_${url}]:\n${snippet}...\n\n(AI Instruction: Summarize this content for the user.)`);
@@ -1121,13 +1125,13 @@ async function executeWebTools(text) {
         const url = openMatch[1].trim();
         const isMediaLink = url.startsWith('spotify:') || url.includes('youtube.com') || url.includes('youtu.be') || url.startsWith('mailto:');
         if (!isUrlSafe(url) && !isMediaLink) {
-             results.push(`SECURITY ERROR: Opening ${url} is restricted to protect your network privacy.`);
+            results.push(`SECURITY ERROR: Opening ${url} is restricted to protect your network privacy.`);
         } else {
             try {
                 const bridgeUrl = `http://127.0.0.1:3000/api/system-media/action`;
                 const response = await fetch(bridgeUrl, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'X-Bridge-Secret': BRIDGE_SECRET,
                         'X-Device-Id': DEVICE_ID
@@ -1153,7 +1157,7 @@ async function executeWebTools(text) {
             const bridgeUrl = `http://localhost:3000/api/system-media/action`;
             const response = await fetch(bridgeUrl, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-Bridge-Secret': BRIDGE_SECRET,
                     'X-Device-Id': DEVICE_ID
@@ -1174,11 +1178,11 @@ async function executeWebTools(text) {
     if (text.includes('[SCREENSHOT]')) {
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/screenshot`;
-            const response = await fetch(bridgeUrl, { 
-                headers: { 
+            const response = await fetch(bridgeUrl, {
+                headers: {
                     'X-Bridge-Secret': BRIDGE_SECRET,
                     'X-Device-Id': DEVICE_ID
-                } 
+                }
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
@@ -1196,11 +1200,11 @@ async function executeWebTools(text) {
     if (text.includes('[LIST_TABS]')) {
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/tabs`;
-            const response = await fetch(bridgeUrl, { 
-                headers: { 
+            const response = await fetch(bridgeUrl, {
+                headers: {
                     'X-Bridge-Secret': BRIDGE_SECRET,
                     'X-Device-Id': DEVICE_ID
-                } 
+                }
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
@@ -1214,11 +1218,11 @@ async function executeWebTools(text) {
     if (text.includes('[LIST_APPS]')) {
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/apps`;
-            const response = await fetch(bridgeUrl, { 
-                headers: { 
+            const response = await fetch(bridgeUrl, {
+                headers: {
                     'X-Bridge-Secret': BRIDGE_SECRET,
                     'X-Device-Id': DEVICE_ID
-                } 
+                }
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
@@ -1232,11 +1236,11 @@ async function executeWebTools(text) {
     if (text.includes('[SYS_INFO]')) {
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/telemetry`;
-            const response = await fetch(bridgeUrl, { 
-                headers: { 
+            const response = await fetch(bridgeUrl, {
+                headers: {
                     'X-Bridge-Secret': BRIDGE_SECRET,
                     'X-Device-Id': DEVICE_ID
-                } 
+                }
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
@@ -1253,11 +1257,11 @@ async function executeWebTools(text) {
         try {
             if (action === 'list') {
                 const bridgeUrl = `http://127.0.0.1:3000/api/system/processes`;
-                const response = await fetch(bridgeUrl, { 
-                    headers: { 
+                const response = await fetch(bridgeUrl, {
+                    headers: {
                         'X-Bridge-Secret': BRIDGE_SECRET,
                         'X-Device-Id': DEVICE_ID
-                    } 
+                    }
                 });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
@@ -1268,7 +1272,7 @@ async function executeWebTools(text) {
                 const bridgeUrl = `http://127.0.0.1:3000/api/system/kill`;
                 const response = await fetch(bridgeUrl, {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'X-Bridge-Secret': BRIDGE_SECRET,
                         'X-Device-Id': DEVICE_ID
@@ -1292,7 +1296,7 @@ async function executeWebTools(text) {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/shell`;
             const response = await fetch(bridgeUrl, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-Bridge-Secret': BRIDGE_SECRET,
                     'X-Device-Id': DEVICE_ID
@@ -1313,11 +1317,11 @@ async function executeWebTools(text) {
         const path = listFilesMatch[1].trim();
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/files/list?path=${encodeURIComponent(path)}`;
-            const response = await fetch(bridgeUrl, { 
-                headers: { 
+            const response = await fetch(bridgeUrl, {
+                headers: {
                     'X-Bridge-Secret': BRIDGE_SECRET,
                     'X-Device-Id': DEVICE_ID
-                } 
+                }
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
@@ -1333,11 +1337,11 @@ async function executeWebTools(text) {
         const path = readFileMatch[1].trim();
         try {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/files/read?path=${encodeURIComponent(path)}`;
-            const response = await fetch(bridgeUrl, { 
-                headers: { 
+            const response = await fetch(bridgeUrl, {
+                headers: {
                     'X-Bridge-Secret': BRIDGE_SECRET,
                     'X-Device-Id': DEVICE_ID
-                } 
+                }
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
@@ -1355,7 +1359,7 @@ async function executeWebTools(text) {
             const bridgeUrl = `http://127.0.0.1:3000/api/system/files/write`;
             const response = await fetch(bridgeUrl, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-Bridge-Secret': BRIDGE_SECRET,
                     'X-Device-Id': DEVICE_ID
@@ -1378,7 +1382,7 @@ async function executeWebTools(text) {
             const bridgeUrl = `http://localhost:3000/api/system/launch`;
             const response = await fetch(bridgeUrl, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-Bridge-Secret': BRIDGE_SECRET,
                     'X-Device-Id': DEVICE_ID
@@ -1403,7 +1407,7 @@ async function executeWebTools(text) {
             const bridgeUrl = `http://localhost:3000/api/system/close`;
             const response = await fetch(bridgeUrl, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-Bridge-Secret': BRIDGE_SECRET,
                     'X-Device-Id': DEVICE_ID
