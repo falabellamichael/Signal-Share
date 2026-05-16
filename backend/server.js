@@ -53,31 +53,10 @@ async function getChatResponse(message, history = []) {
             console.warn(`[Chatbot] LM Studio returned ${response.status}:`, errText);
         }
     } catch (e) {
-        console.warn("[Chatbot] LM Studio connection failed:", e.message);
+        console.warn("[Chatbot] LM Studio connection failed:", e);
     }
 
-    // Fallback to Ollama
-    console.log("[Chatbot] Falling back to Ollama...");
-    try {
-        const response = await fetch("http://127.0.0.1:11434/api/chat", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: "qwen2.5-coder",
-                messages: conversation,
-                stream: false
-            })
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            return data.message.content;
-        }
-    } catch (e) {
-        console.warn("[Chatbot] Ollama connection failed:", e.message);
-    }
-
-    return `❌ [Error]: Failed to connect to local AI servers (LM Studio on 1234 or Ollama on 11434). Please ensure one of them is running.`;
+    return `❌ [Error]: Failed to connect to LM Studio on port 1234. Please ensure it is running.`;
 }
 
 async function getLocalModelCatalog() {
