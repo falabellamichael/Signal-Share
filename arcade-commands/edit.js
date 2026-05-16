@@ -1,135 +1,75 @@
 /**
- * /edit or [edit] Command
- * Triggers the surgical code modification protocol.
+ * /edit Command
+ * Opens the editor to the game, reads contents, and lets AI decide the fix.
  */
 (function() {
-    function resolveFallbackEditTarget(args = '') {
-        if (typeof window.getWorkshopManageableGames !== 'function') return null;
-        const games = window.getWorkshopManageableGames();
-        if (!Array.isArray(games) || games.length === 0) return null;
-
-        const editorState = typeof window.getWorkshopEditorState === 'function'
-            ? window.getWorkshopEditorState()
-            : null;
-        const activeGameId = `${editorState?.activeGameId || ''}`.trim();
-        const activeGame = activeGameId ? games.find((game) => game.id === activeGameId) : null;
-        if (activeGame) return activeGame;
-
-        const prompt = `${args || ''}`.toLowerCase();
-        if (games.length === 1 || /\b(any|whatever|something|one of my|a game|my game)\b/.test(prompt)) {
-            return games[0];
-        }
-
-        return null;
-    }
-
-    async function handleResponse(text, options = {}) {
-        const actionResult = {
-            handled: false,
-            workshopFileRewriteAttempted: false,
-            workshopFileRewriteSucceeded: false
-        };
-
-        const editBlocks = typeof window.extractWorkshopEditBlocks === 'function' ? window.extractWorkshopEditBlocks(text) : [];
-        
-        if (editBlocks.length === 0) {
-            if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
-                if (window.showFeedback) window.showFeedback('No explicit [EDIT] tags found. Attempting automatic patch...', false);
-                const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(text, options.userPrompt || '');
-                if (fallbackResult.attempted) {
-                    actionResult.handled = true;
-                    actionResult.workshopFileRewriteAttempted = true;
-                    actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
-                    return actionResult;
-                }
-            }
-            return actionResult;
-        }
-
-        if (window.showFeedback) window.showFeedback('Applying surgical edits...', false);
-        actionResult.handled = true;
-        const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
-        const gameId = editorState?.activeGameId || window.lastPlayedGameId || "";
-        const fileName = editorState?.activeFileName || "index.html";
-
-        for (const editBlock of editBlocks) {
-            try {
-                if (editBlock?.search && typeof window.applyAiFilePatch === 'function') {
-                    actionResult.workshopFileRewriteAttempted = true;
-                    const targetFileName = editBlock.fileName || fileName;
-                    const patchResult = await window.applyAiFilePatch(gameId, targetFileName, editBlock.search, editBlock.replace, { save: true });
-                    if (patchResult?.ok) {
-                        actionResult.workshopFileRewriteSucceeded = true;
-                    }
-                }
-            } catch (e) {
-                console.error("[Arcade: Edit] Action failed:", e);
-            }
-        }
-
-        return actionResult;
-    }
-
     window.ArcadeCommandManager.register({
-        id: 'edit',
-        description: 'Surgical code modification.',
+        id: "edit",
+        description: "Edit the active file in the Workshop.",
+
         execute: async (args, inputElement) => {
-            // SMART CONTEXT: If args mention a known game, try to switch to it
-            let selected = null;
+            window.activeArcadeCommandMode = "/edit";
+
+            // 1. Open the editor to the corresponding game
             if (typeof window.resolveWorkshopEditGameFromPrompt === 'function'
                 && typeof window.setWorkshopEditActiveGame === 'function') {
-                let targetGame = window.resolveWorkshopEditGameFromPrompt(args);
-                if (!targetGame) targetGame = resolveFallbackEditTarget(args);
+                const targetGame = window.resolveWorkshopEditGameFromPrompt(args);
                 if (targetGame) {
-                    selected = window.setWorkshopEditActiveGame(targetGame.id, { prompt: args });
-                    if (selected?.ok) {
-                        console.log(`[Command: Edit] Auto-switching context to: ${selected.title} / ${selected.fileName}`);
-                    }
+                    window.setWorkshopEditActiveGame(targetGame.id);
                 }
             }
 
-            window.activeArcadeCommandMode = '/edit';
-            
-            // Do not append content to input to avoid crashing the page
-            console.log(`[Edit] Ready to let chat handle the message.`);
-            
-            return false; // Let normal flow continue to AI!
-        },
-        getSuggestions: (args = '') => {
-            if (typeof window.getWorkshopManageableGames !== 'function') return [];
-            const games = window.getWorkshopManageableGames();
-            if (!Array.isArray(games) || games.length === 0) return [];
+            // 2. Read all the contents
+            const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
+            const content = editorState?.content || editorState?.value || "";
+            const fileName = editorState?.activeFileName || "index.html";
 
-            const prompt = `${args || ''}`.trim().toLowerCase();
-            
-            if (!prompt) {
-                return games.map(g => ({
-                    id: g.title,
-                    name: g.title,
-                    description: `Edit files in "${g.title}"`
-                }));
+            // 3. Pass content to AI by injecting it into the input
+            if (content && inputElement) {
+                inputElement.value = `${args}\n\n[FILE: ${fileName}]\n${content}`;
             }
 
-            const matchingGame = games.find(g => prompt.startsWith(g.title.toLowerCase()));
-            if (matchingGame) {
-                const files = Array.isArray(matchingGame.files) ? matchingGame.files : [];
-                const remaining = prompt.substring(matchingGame.title.length).trim();
+            return false; // Let the AI generate the response
+        },
+
+        handleResponse: async (text, options = {}) => {
+            // 4. Save the fix
+            // Look for code blocks in the AI response
+            const codeBlockRegex = /```(\w+)(?:\s+filename=([^\s]+))?\s*([\s\S]*?)```/g;
+            let match;
+            let fixApplied = false;
+
+            while ((match = codeBlockRegex.exec(text)) !== null) {
+                const lang = match[1];
+                const filename = match[2] || "index.html";
+                const content = match[3].trim();
+
+                const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
+                const gameId = editorState?.activeGameId;
                 
-                return files.map(f => ({
-                    id: `${matchingGame.title} ${f.name}`,
-                    name: f.name,
-                    description: `Edit ${f.name} in "${matchingGame.title}"`
-                })).filter(s => !remaining || s.name.toLowerCase().includes(remaining));
+                if (gameId && typeof window.setWorkshopEditActiveGame === 'function') {
+                    // Switch to the file specified by the AI (or default to index.html)
+                    window.setWorkshopEditActiveGame(gameId, filename);
+                    
+                    // Wait a bit for the editor to load the file (if async)
+                    setTimeout(async () => {
+                        const editor = document.getElementById('workshop-edit-file-content');
+                        if (editor) {
+                            editor.value = content;
+                            
+                            // Call the save function
+                            if (typeof window.saveWorkshopEditPanel === 'function') {
+                                await window.saveWorkshopEditPanel();
+                                if (window.showFeedback) window.showFeedback(`Saved fix to ${filename}`);
+                            }
+                        }
+                    }, 100);
+                    
+                    fixApplied = true;
+                }
             }
 
-            return games
-                .filter(g => g.title.toLowerCase().includes(prompt))
-                .map(g => ({
-                    id: g.title,
-                    name: g.title,
-                    description: `Edit files in "${g.title}"`
-                }));
-        },
-        handleResponse: handleResponse
+            return { handled: fixApplied };
+        }
     });
 })();
