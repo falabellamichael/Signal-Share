@@ -3740,22 +3740,6 @@ window.applyAiFilePatch = async function(gameId, fileName, search, replace, opti
         if (match) { matchIdx = i; break; }
     }
 
-    // 2. Fuzzy Matching (Fallback)
-    if (matchIdx === -1) {
-        console.log("[AI Workshop] Exact match failed. Trying fuzzy match...");
-        const normalizeFuzzy = (s) => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-        const searchFuzzy = searchLines.map(normalizeFuzzy).join('');
-        
-        for (let i = 0; i <= fileLines.length - searchLen; i++) {
-            const fileBlockFuzzy = fileLines.slice(i, i + searchLen).map(normalizeFuzzy).join('');
-            if (fileBlockFuzzy === searchFuzzy && searchFuzzy.length > 0) {
-                matchIdx = i;
-                console.log(`[AI Workshop] Fuzzy match found at line ${i}`);
-                break;
-            }
-        }
-    }
-
     if (matchIdx !== -1) {
         const lineEnding = oldContent.includes('\r\n') ? '\r\n' : '\n';
         const before = fileLines.slice(0, matchIdx);

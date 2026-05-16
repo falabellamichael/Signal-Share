@@ -2501,18 +2501,6 @@ window.sendChatMessage = async function (promptOverride = '') {
             updateChatStatus('idle');
             return;
         }
-        const contextForModel = {
-            ...richContext,
-            workshopEditor: richContext.workshopEditor ? {
-                ...richContext.workshopEditor,
-                activeFileContent: undefined,
-                activeFileContentLength: `${richContext.workshopEditor.activeFileContent || ''}`.length,
-                ...(editRequestActive ? { activeFileContentProvidedInEditProtocol: true } : {})
-            } : null
-        };
-        const pageContext = JSON.stringify(contextForModel);
-        // Omit visible page text if we are in the editor to save tokens
-        const pageText = richContext.workshopEditor ? "" : document.body.innerText.substring(0, 300);
         // Keep only the most recent messages to prevent context window overflow on small local models
         const maxHistory = editRequestActive ? (editorReferenceActive ? 6 : 2) : 6;
         const recentHistory = arcadeChatHistory.slice(-maxHistory);
@@ -2520,6 +2508,8 @@ window.sendChatMessage = async function (promptOverride = '') {
         const normalizedHistory = window.SignalShareAiCore
             ? window.SignalShareAiCore.normalizeHistory(recentHistory, { aiSenderId: 'assistant' })
             : recentHistory.map(m => ({ role: m.role, content: m.content }));
+
+        const pageText = richContext.workshopEditor ? "" : document.body.innerText.substring(0, 300);
         const sharedAiContext = window.SignalShareAiCore
             ? window.SignalShareAiCore.buildCompanionContext({
                 surface: 'mini-games',
@@ -2530,14 +2520,30 @@ window.sendChatMessage = async function (promptOverride = '') {
                 attachment: arcadeChatHistory[arcadeChatHistory.length - 1]?.attachment || null
             })
             : '';
+
         const attachment = attachmentSnapshot;
-        const protocolDirectives = getProtocolDirectives(text, richContext, attachment);
-        const workshopEditContext = editRequestActive
-            ? `[ACTIVE_WORKSHOP_EDITOR]\n${JSON.stringify(contextForModel.workshopEditor || null)}`
-            : '';
-        const fullPageContext = editRequestActive
-            ? `${protocolDirectives ? `${protocolDirectives}\n\n` : ''}${workshopEditContext}`
-            : `${protocolDirectives ? `${protocolDirectives}\n\n` : ''}${sharedAiContext ? `${sharedAiContext}\n\n` : ''}${pageContext} (Visible text: ${pageText})`;
+        
+        // Use the new file for building context as requested by the user
+        const fullPageContext = typeof window.ArcadeChatContext?.buildModelContext === 'function'
+            ? window.ArcadeChatContext.buildModelContext(text, richContext, { editRequestActive, attachment, sharedAiContext })
+            : (function() {
+                // Fallback inline if file didn't load
+                const contextForModel = {
+                    ...richContext,
+                    workshopEditor: richContext.workshopEditor ? {
+                        ...richContext.workshopEditor,
+                        activeFileContent: richContext.workshopEditor.activeFileContent,
+                        activeFileContentLength: `${richContext.workshopEditor.activeFileContent || ''}`.length,
+                        ...(editRequestActive ? { activeFileContentProvidedInEditProtocol: true } : {})
+                    } : null
+                };
+                const pageContext = JSON.stringify(contextForModel);
+                const protocolDirectives = typeof window.getProtocolDirectives === 'function' ? window.getProtocolDirectives(text, richContext, attachment) : '';
+                const workshopEditContext = editRequestActive ? `[ACTIVE_WORKSHOP_EDITOR]\n${JSON.stringify(contextForModel.workshopEditor || null)}` : '';
+                return editRequestActive
+                    ? `${protocolDirectives ? `${protocolDirectives}\n\n` : ''}${workshopEditContext}`
+                    : `${protocolDirectives ? `${protocolDirectives}\n\n` : ''}${sharedAiContext ? `${sharedAiContext}\n\n` : ''}${pageContext} (Visible text: ${pageText})`;
+              })();
 
         try {
             const modelSelect = document.getElementById('chat-model-select');
@@ -3602,8 +3608,8 @@ window.tryAutoWorkshopFileRewriteFromReply = async function (replyText, userProm
     }
 
     const editorState = getActiveWorkshopEditorContext(richContext);
-    const gameId = `${editorState?.activeGameId || ''}`.trim();
-    const fileName = `${editorState?.activeFileName || ''}`.trim();
+    const gameId = `${editorState?.activeGameId || window.lastPlayedGameId || ''}`.trim();
+    const fileName = `${editorState?.activeFileName || 'index.html'}`.trim();
     if (!gameId || !fileName) {
         result.reason = 'no-active-editor-file';
         return result;

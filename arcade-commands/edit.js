@@ -150,41 +150,11 @@
             };
 
             const editBlocks = typeof window.extractWorkshopEditBlocks === 'function' ? window.extractWorkshopEditBlocks(text) : [];
-            let editSucceeded = false;
             
-            if (editBlocks.length > 0) {
-                if (window.showFeedback) window.showFeedback('Applying surgical edits...', false);
-                actionResult.handled = true;
-                const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
-                const gameId = editorState?.activeGameId || window.lastPlayedGameId || "";
-                const fileName = editorState?.activeFileName || "index.html";
-
-                if (!gameId || !fileName) {
-                    console.warn('[Arcade: Edit] No active game/file for surgical edit.');
-                } else {
-                    for (const editBlock of editBlocks) {
-                        try {
-                            if (editBlock?.search && typeof window.applyAiFilePatch === 'function') {
-                                actionResult.workshopFileRewriteAttempted = true;
-                                const targetFileName = editBlock.fileName || fileName;
-                                console.log(`[Arcade: Edit] Applying patch to ${targetFileName}`);
-                                const patchResult = await window.applyAiFilePatch(gameId, targetFileName, editBlock.search, editBlock.replace, { save: true });
-                                if (patchResult?.ok) {
-                                    actionResult.workshopFileRewriteSucceeded = true;
-                                    editSucceeded = true;
-                                }
-                            }
-                        } catch (e) {
-                            console.error("[Arcade: Edit] Action failed:", e);
-                        }
-                    }
-                }
-            }
-
-            if (!editSucceeded) {
-                // FALLBACK: If no tags were found OR all edits failed, try the automatic rewrite/patch logic
+            if (editBlocks.length === 0) {
+                // FALLBACK: If no tags were found, try the automatic rewrite/patch logic
                 if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
-                    if (window.showFeedback) window.showFeedback('Edits failed or not found. Attempting automatic patch...', false);
+                    if (window.showFeedback) window.showFeedback('No explicit [EDIT] tags found. Attempting automatic patch...', false);
                     const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(text, options.userPrompt || '');
                     if (fallbackResult.attempted) {
                         actionResult.handled = true;
@@ -197,6 +167,36 @@
                         }
                         return actionResult;
                     }
+                }
+                return actionResult;
+            }
+
+            if (window.showFeedback) window.showFeedback('Applying surgical edits...', false);
+            actionResult.handled = true;
+            const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
+            const gameId = editorState?.activeGameId || window.lastPlayedGameId || "";
+            const fileName = editorState?.activeFileName || "index.html";
+
+            if (!gameId || !fileName) {
+                console.warn('[Arcade: Edit] No active game/file for surgical edit.');
+                return actionResult;
+            }
+
+            for (const editBlock of editBlocks) {
+                try {
+                    if (editBlock?.search && typeof window.applyAiFilePatch === 'function') {
+                        actionResult.workshopFileRewriteAttempted = true;
+                        const targetFileName = editBlock.fileName || fileName;
+                        console.log(`[Arcade: Edit] Applying patch to ${targetFileName}`);
+                        const patchResult = await window.applyAiFilePatch(gameId, targetFileName, editBlock.search, editBlock.replace, { save: true });
+                        if (patchResult?.ok) {
+                            actionResult.workshopFileRewriteSucceeded = true;
+                        } else if (window.showFeedback) {
+                            window.showFeedback(patchResult?.message || `Edit failed for ${targetFileName}`, true);
+                        }
+                    }
+                } catch (e) {
+                    console.error("[Arcade: Edit] Action failed:", e);
                 }
             }
 

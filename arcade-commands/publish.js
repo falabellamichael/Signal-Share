@@ -163,14 +163,14 @@
             );
     }
 
-    function getEditorFilesFallback(editorState) {
-        if (!editorState?.activeGameId) return [];
+    function getEditorFilesFallback(gameId) {
+        if (!gameId) return [];
         if (typeof window.getWorkshopManageableGames !== "function") return [];
         if (typeof window.getWorkshopEditableFiles !== "function") return [];
 
         const games = window.getWorkshopManageableGames();
         const activeGame = Array.isArray(games)
-            ? games.find((game) => game.id === editorState.activeGameId)
+            ? games.find((game) => game.id === gameId)
             : null;
 
         if (!activeGame) return [];
@@ -320,6 +320,14 @@
             return actionResult;
         }
 
+        const targetGameId = data.gameId
+            || data.id
+            || data.updateId
+            || data.existingGameId
+            || window.activeArcadePublishTarget?.id
+            || editorState?.activeGameId
+            || "";
+
         let workshopFiles = typeof manager?.buildPublishFiles === "function"
             ? manager.buildPublishFiles(data, text)
             : [];
@@ -328,12 +336,30 @@
             workshopFiles = window.buildAiWorkshopFilesFromText(text);
         }
 
-        if (workshopFiles.length === 0 && editorState?.activeGameId) {
-            console.log("[Arcade: Publish] No files in AI response, falling back to editor state.");
-            workshopFiles = getEditorFilesFallback(editorState);
+        if (workshopFiles.length === 0 && targetGameId) {
+            console.log(`[Arcade: Publish] No files in AI response, falling back to editor state for game: ${targetGameId}`);
+            workshopFiles = getEditorFilesFallback(targetGameId);
         }
 
         workshopFiles = mergeMissingReferencedFilesFromEditor(workshopFiles, editorState);
+
+        if (workshopFiles.length === 0 && !targetGameId) {
+            console.log("[Arcade: Publish] No files found. Attempting to use entire response as index.html.");
+            const trimmedText = text.trim();
+            const hasHtml = trimmedText.includes("<!DOCTYPE html>") || trimmedText.includes("<html") || trimmedText.includes("<body");
+            
+            if (hasHtml) {
+                workshopFiles = [
+                    {
+                        name: "index.html",
+                        type: "html",
+                        content: text
+                    }
+                ];
+                data.mode = "create";
+                data.title = data.title || "AI Generated Game";
+            }
+        }
 
         if (workshopFiles.length === 0) {
             const feedbackMsg = "Couldn't find game code to publish. Try telling me to write the full code and publish.";
@@ -342,13 +368,6 @@
             actionResult.errorReason = feedbackMsg;
             return actionResult;
         }
-
-        const targetGameId = data.gameId
-            || data.id
-            || data.updateId
-            || data.existingGameId
-            || window.activeArcadePublishTarget?.id
-            || "";
 
         const isNewGameRequest = /\b(new|create|fresh|brand new)\b/i.test(userPrompt);
 
