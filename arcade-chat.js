@@ -715,7 +715,7 @@ async function retryPublishWithAI(userPrompt = '', customRetryPrompt = '', signa
             const response = await bridgeFetch(chatPath, {
                 method: 'POST',
                 timeoutMs: 0,
-                signal,
+                // Do not pass signal here to prevent "signal is aborted without reason" errors during auto-retry
                 body: payload
             });
             if (!response?.ok) continue;

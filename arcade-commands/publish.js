@@ -338,42 +338,29 @@
 
         if (workshopFiles.length === 0 && !targetGameId) {
             console.log("[Arcade: Publish] No files found. Attempting to use entire response as index.html.");
-            const trimmedText = text.trim();
             
-            // Check for both raw and escaped HTML markers
-            const hasHtml = trimmedText.includes("<!DOCTYPE html>") 
-                || trimmedText.includes("<html") 
-                || trimmedText.includes("<body")
-                || trimmedText.includes("<head>")
-                || trimmedText.includes("<style>")
-                || trimmedText.includes("<script")
-                || trimmedText.includes("\\n<head>")
-                || trimmedText.includes("\\n<style>");
-
-            if (hasHtml) {
-                let contentToUse = text;
-                
-                // If the text appears to be JSON-escaped string content
-                if (text.includes('\\n') && text.includes('\\"')) {
-                    try {
-                        // Try to unescape it properly by parsing it as a JSON string
-                        contentToUse = JSON.parse(`"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
-                    } catch (e) {
-                        // Fallback to simple regex replace if parsing fails
-                        contentToUse = text.replace(/\\n/g, '\n').replace(/\\"/g, '"');
-                    }
+            let contentToUse = text;
+            
+            // If the text appears to be JSON-escaped string content
+            if (text.includes('\\n') && text.includes('\\"')) {
+                try {
+                    // Try to unescape it properly by parsing it as a JSON string
+                    contentToUse = JSON.parse(`"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
+                } catch (e) {
+                    // Fallback to simple regex replace if parsing fails
+                    contentToUse = text.replace(/\\n/g, '\n').replace(/\\"/g, '"');
                 }
-
-                workshopFiles = [
-                    {
-                        name: "index.html",
-                        type: "html",
-                        content: contentToUse
-                    }
-                ];
-                data.mode = "create";
-                data.title = data.title || "AI Generated Game";
             }
+
+            workshopFiles = [
+                {
+                    name: "index.html",
+                    type: "html",
+                    content: contentToUse
+                }
+            ];
+            data.mode = "create";
+            data.title = data.title || "AI Generated Game";
         }
 
         if (workshopFiles.length === 0) {
