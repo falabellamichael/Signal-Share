@@ -4143,6 +4143,14 @@ function setupCloseParityHandlers() {
     startDesktopBridgePolling();
     updateChatStatus('idle');
 
+    // Initialize GPU Scroll Manager on chat messages
+    const chatContainer = document.getElementById('chat-messages');
+    if (chatContainer && window.GPUScrollManager) {
+        window.chatScrollManager = new GPUScrollManager(chatContainer);
+        // Observe messages (assuming they are divs directly inside #chat-messages)
+        window.chatScrollManager.observe('#chat-messages > div');
+    }
+
     // Restore collapsed state
     const isSteamShell = document.querySelector('.steam-shell') || document.documentElement.classList.contains('is-steam-shell');
     const isAndroidPlatform = document.documentElement.classList.contains('platform-android');
