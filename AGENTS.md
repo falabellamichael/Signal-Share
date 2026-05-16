@@ -6,7 +6,7 @@ PROJECT PRIORITIES
 
 1. Preserve existing functionality unless I specifically ask you to change it.
 2. Do not change the visual design, layout, styling, colors, spacing, or animations unless I explicitly request design changes.
-3. Make targeted edits instead of rewriting entire files when a smaller fix is safer.
+3. Make small surgical edits when needed.  removing old bad logic that is not needed and/or causing problems.
 4. Avoid creating more global variables unless absolutely necessary.
 5. Prefer modular, reusable functions over large procedural blocks.
 6. Keep code readable, organized, and easy to debug.
