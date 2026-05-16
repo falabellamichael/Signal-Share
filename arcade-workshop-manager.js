@@ -632,9 +632,9 @@ window.ArcadeWorkshopManager = {
         return [
             '[WORKSHOP_PUBLISH]',
             'CRITICAL: The user has requested an IMMEDIATE publish. Do NOT output a plan, do NOT output an audit, and do NOT provide a breakdown.',
-            'Just output the code blocks or the [PUBLISH] JSON payload immediately. Any text outside the code blocks or JSON should be minimal or omitted.',
-            'You can publish a game by outputting standard markdown code blocks with the file name specified in the block info (e.g. ```html filename=index.html), or by using the [PUBLISH] JSON payload.',
-            'Example using code blocks (Preferred):',
+            'Just output the code blocks immediately. Any text outside the code blocks should be minimal or omitted.',
+            'You MUST specify the filename in the code block info string (e.g. ```html filename=index.html). All game files must be provided this way.',
+            'Example:',
             '```html filename=index.html',
             '<!DOCTYPE html>...',
             '```',
