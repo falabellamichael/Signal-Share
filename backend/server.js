@@ -47,6 +47,14 @@ const CORS_WHITELIST = [
 
 const OLLAMA_BASE_URL = process.env.SIGNAL_SHARE_OLLAMA_BASE_URL || process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
 const DEFAULT_OLLAMA_MODEL = process.env.SIGNAL_SHARE_OLLAMA_MODEL || process.env.OLLAMA_MODEL || "llama3.1";
+const LM_STUDIO_BASE_URL = process.env.SIGNAL_SHARE_LM_STUDIO_BASE_URL
+  || process.env.LM_STUDIO_BASE_URL
+  || process.env.LMSTUDIO_BASE_URL
+  || "http://127.0.0.1:1234";
+const DEFAULT_LM_STUDIO_MODEL = process.env.SIGNAL_SHARE_LM_STUDIO_MODEL
+  || process.env.LM_STUDIO_MODEL
+  || process.env.LMSTUDIO_MODEL
+  || "local-model";
 
 function normalizeBaseUrl(value = "") {
   const raw = `${value || ""}`.trim();
@@ -87,6 +95,9 @@ function getConfiguredModel(requestedModel = "") {
   return process.env.SIGNAL_SHARE_AI_MODEL
     || process.env.SIGNAL_SHARE_LOCAL_LLM_MODEL
     || process.env.OPENAI_MODEL
+    || process.env.SIGNAL_SHARE_LM_STUDIO_MODEL
+    || process.env.LM_STUDIO_MODEL
+    || process.env.LMSTUDIO_MODEL
     || process.env.SIGNAL_SHARE_OLLAMA_MODEL
     || process.env.OLLAMA_MODEL
     || "";
@@ -122,13 +133,6 @@ function buildMessages({ message = "", history = [], pageContext = "", customIns
   return messages;
 }
 
-function messagesToPrompt(messages = []) {
-  return messages
-    .map((message) => `${message.role === "assistant" ? "Assistant" : message.role === "system" ? "System" : "User"}: ${message.content}`)
-    .join("\n\n")
-    .concat("\n\nAssistant:");
-}
-
 async function fetchWithTimeout(url, options = {}, timeoutMs = 180000) {
   const controller = new AbortController();
   const timeout = Number(timeoutMs) > 0
@@ -145,7 +149,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 180000) {
   }
 }
 
-async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperature }) {
+async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperature, providerLabel = "OpenAI-compatible provider" }) {
   const payload = {
     messages,
     temperature,
@@ -163,7 +167,7 @@ async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperat
 
   const raw = await response.text();
   if (!response.ok) {
-    throw new Error(`Configured OpenAI-compatible provider returned HTTP ${response.status}: ${raw.slice(0, 240)}`);
+    throw new Error(`${providerLabel} returned HTTP ${response.status}: ${raw.slice(0, 240)}`);
   }
 
   let data = null;
@@ -181,6 +185,30 @@ async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperat
     || data?.response
     || ""
   );
+}
+
+async function getOpenAiCompatibleModelIds(baseUrl = "") {
+  const base = normalizeBaseUrl(baseUrl);
+  if (!base) return [];
+
+  try {
+    const response = await fetchWithTimeout(`${base}/v1/models`, {
+      method: "GET",
+      headers: getAiHeaders()
+    }, 1500);
+    if (!response.ok) return [];
+    const data = await response.json().catch(() => null);
+    const rows = Array.isArray(data?.data) ? data.data : [];
+    return rows
+      .map((row) => `${row?.id || row?.model || ""}`.trim())
+      .filter(Boolean);
+  } catch (_error) {
+    return [];
+  }
+}
+
+async function getLmStudioModelIds() {
+  return getOpenAiCompatibleModelIds(LM_STUDIO_BASE_URL);
 }
 
 async function getOllamaModelIds() {
@@ -248,7 +276,20 @@ async function getProviderCandidates(model = "auto") {
       id: "configured-openai-compatible",
       type: "openai-compatible",
       chatUrl: configuredChatUrl,
-      model: getConfiguredModel(model)
+      model: getConfiguredModel(model),
+      providerLabel: "configured OpenAI-compatible provider"
+    });
+  }
+
+  const lmStudioModels = await getLmStudioModelIds();
+  if (lmStudioModels.length > 0) {
+    const requested = getConfiguredModel(model);
+    candidates.push({
+      id: "lm-studio",
+      type: "openai-compatible",
+      chatUrl: `${normalizeBaseUrl(LM_STUDIO_BASE_URL)}/v1/chat/completions`,
+      model: requested || lmStudioModels[0] || DEFAULT_LM_STUDIO_MODEL,
+      providerLabel: "LM Studio provider"
     });
   }
 
@@ -287,7 +328,7 @@ async function getChatResponse(message, history = [], pageContext = "", _depth =
     try {
       const reply = candidate.type === "ollama"
         ? await callOllamaProvider({ messages, model: candidate.model, temperature })
-        : await callOpenAiCompatibleProvider({ chatUrl: candidate.chatUrl, messages, model: candidate.model, temperature });
+        : await callOpenAiCompatibleProvider({ chatUrl: candidate.chatUrl, messages, model: candidate.model, temperature, providerLabel: candidate.providerLabel });
 
       if (reply) return reply;
       failures.push(`${candidate.id}: empty response`);
@@ -303,16 +344,18 @@ async function getChatResponse(message, history = [], pageContext = "", _depth =
 
 async function getLocalModelCatalog() {
   const configuredModel = getConfiguredModel("auto");
+  const configuredRows = [];
+  const lmStudioModels = await getLmStudioModelIds();
   const ollamaModels = await getOllamaModelIds();
   const rows = [];
 
   if (configuredModel || getConfiguredChatUrl()) {
-    rows.push({ id: configuredModel || "configured", provider: "configured" });
+    configuredRows.push({ id: configuredModel || "configured", provider: "configured" });
   }
 
-  for (const modelId of ollamaModels) {
-    rows.push({ id: modelId, provider: "ollama" });
-  }
+  for (const row of configuredRows) rows.push(row);
+  for (const modelId of lmStudioModels) rows.push({ id: modelId, provider: "lm-studio" });
+  for (const modelId of ollamaModels) rows.push({ id: modelId, provider: "ollama" });
 
   return {
     all: rows.map((row) => row.id),
@@ -456,5 +499,6 @@ app.use((req, res) => {
 app.listen(port, "0.0.0.0", () => {
   console.log(`[Bridge] Signal Share backend listening on http://0.0.0.0:${port}`);
   console.log(`[Bridge] AI endpoint configured: ${getConfiguredChatUrl() ? "YES" : "NO"}`);
+  console.log(`[Bridge] LM Studio auto-detect enabled at ${normalizeBaseUrl(LM_STUDIO_BASE_URL) || "unavailable"}`);
   console.log(`[Bridge] Ollama auto-detect enabled at ${normalizeBaseUrl(OLLAMA_BASE_URL) || "unavailable"}`);
 });
