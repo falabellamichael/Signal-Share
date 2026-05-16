@@ -15,6 +15,16 @@
     let stateWrapperInstalled = false;
     let lastResolvedTarget = null;
 
+    const STEAM_COMING_SOON_SAFETY = Object.freeze({
+        steamComingSoonIsReleasedGame: false,
+        steamComingSoonIsQualitySignal: false,
+        defaultImportedSteamVisibility: 'needs_review',
+        allowedAutoStates: ['detected', 'coming_soon', 'needs_review'],
+        blockedAutoStates: ['published', 'approved', 'featured', 'recommended'],
+        requiresManualApprovalBeforePublicPromotion: true,
+        rule: 'Never auto-publish, auto-approve, feature, or recommend a Steam Coming Soon title from Steam visibility alone.'
+    });
+
     function normalizeText(value = '') {
         return `${value || ''}`.trim();
     }
@@ -49,6 +59,71 @@
 
     function isFileName(value = '') {
         return /^[\w .()\-]+\.(?:html?|css|js|mjs|cjs|json|svg|txt|xml)$/i.test(normalizeText(value));
+    }
+
+    function getSteamComingSoonSafetyContext() {
+        return {
+            ...STEAM_COMING_SOON_SAFETY,
+            quarantineStatus: 'needs_review',
+            manualGateRequiredFor: STEAM_COMING_SOON_SAFETY.blockedAutoStates.slice()
+        };
+    }
+
+    function includesSteamComingSoonReference(value = '') {
+        const source = normalizeNewlines(value).toLowerCase();
+        return /\bsteam\b/.test(source) && /\bcoming[\s_-]*soon\b/.test(source);
+    }
+
+    function hasPublishSurfaceIntent(value = '') {
+        return /\b(?:publish(?:ed|ing)?|approve(?:d)?|feature(?:d)?|recommend(?:ed)?|promote(?:d)?|release(?:d)?|ship(?:ped)?|live|public|visible)\b/i.test(value);
+    }
+
+    function hasPreventionIntent(value = '') {
+        return /\b(?:prevent|block|stop|disable|deny|guard|quarantine|review|manual|manually|needs_review|never|not|no|don't|do\s+not|cannot|can't|shouldn't|wont|won't|fix)\b/i.test(value);
+    }
+
+    function isUnsafeSteamComingSoonPublishPrompt(prompt = '') {
+        return includesSteamComingSoonReference(prompt)
+            && hasPublishSurfaceIntent(prompt)
+            && !hasPreventionIntent(prompt);
+    }
+
+    function findSteamComingSoonAutoPublishRisk(content = '', fileName = '') {
+        const targetFileName = normalizeText(fileName);
+        if (/^edit\.js$/i.test(targetFileName) || /(?:^|[\\/])edit\.js$/i.test(targetFileName)) return null;
+
+        const source = normalizeNewlines(content);
+        const dangerousPatterns = [
+            {
+                reason: 'Steam Coming Soon state appears to set a public/published/approved state directly.',
+                pattern: /\bsteam(?:Status|State|ReleaseState)?\b[\s\S]{0,240}\bcoming[\s_-]*soon\b[\s\S]{0,240}\b(?:published|approved|featured|recommended|visible|live|public)\s*[:=]\s*(?:true|['"`](?:true|published|approved|featured|recommended|visible|live|public)['"`])/i
+            },
+            {
+                reason: 'Coming Soon appears to map to a published/approved/featured status.',
+                pattern: /\bcoming[\s_-]*soon\b[\s\S]{0,240}\b(?:status|state|visibility|surface)\s*[:=]\s*['"`](?:published|approved|featured|recommended|visible|live|public)['"`]/i
+            },
+            {
+                reason: 'Steam page detection appears to auto-mark an item as public/published/approved.',
+                pattern: /\b(?:steamPageExists|hasSteamPage|steamStorePage|steamAppId|steamUrl)\b[\s\S]{0,240}\b(?:published|approved|featured|recommended|visible|live|public)\s*[:=]\s*(?:true|['"`](?:true|published|approved|featured|recommended|visible|live|public)['"`])/i
+            },
+            {
+                reason: 'Steam Coming Soon appears to call a publish/approve/feature action.',
+                pattern: /\bsteam\b[\s\S]{0,240}\bcoming[\s_-]*soon\b[\s\S]{0,240}\b(?:publish|approve|feature|recommend|promote)(?:Game|Title|Item|Entry|ToSite)?\s*\(/i
+            }
+        ];
+
+        const hit = dangerousPatterns.find((entry) => entry.pattern.test(source));
+        return hit ? hit.reason : null;
+    }
+
+    function enforceSteamComingSoonPublishGuard(fileName = '', content = '') {
+        const risk = findSteamComingSoonAutoPublishRisk(content, fileName);
+        if (!risk) return { ok: true };
+
+        const message = `${risk} Steam Coming Soon imports must stay in needs_review until manually approved.`;
+        console.warn('[Arcade: Edit] Blocked unsafe Steam Coming Soon publish edit:', { fileName, message });
+        if (typeof window.showFeedback === 'function') window.showFeedback(message, true);
+        return { ok: false, message, steamComingSoonPublishGuardBlocked: true };
     }
 
     function getEditorElement() {
@@ -219,6 +294,9 @@
         const targetFileName = normalizeText(fileName || 'index.html');
         if (!targetGameId || !targetFileName) return { ok: false, message: 'Missing target game or file.' };
 
+        const safetyCheck = enforceSteamComingSoonPublishGuard(targetFileName, content);
+        if (!safetyCheck.ok) return safetyCheck;
+
         await switchWorkshopTarget(targetGameId, targetFileName);
 
         if (typeof window.internalApplyWorkshopFileEdit === 'function') {
@@ -250,11 +328,13 @@
             activeFileContent: `${content || ''}`,
             activeFileContentLength: `${content || ''}`.length,
             activeFileContentProvidedInEditProtocol: true,
+            steamComingSoonSafety: getSteamComingSoonSafetyContext(),
             source: 'edit-js-targeted-snapshot'
         };
 
         window.__activeWorkshopEditorContext = snapshot;
         window.__lastWorkshopEditSnapshot = snapshot;
+        window.__arcadeSteamComingSoonSafety = snapshot.steamComingSoonSafety;
         lastResolvedTarget = {
             gameId: snapshot.activeGameId,
             gameTitle: snapshot.activeGameTitle,
@@ -296,7 +376,8 @@
                 activeFileName: snapshot.activeFileName,
                 activeFileContent: snapshot.activeFileContent,
                 activeFileContentLength: snapshot.activeFileContentLength,
-                activeFileContentProvidedInEditProtocol: true
+                activeFileContentProvidedInEditProtocol: true,
+                steamComingSoonSafety: snapshot.steamComingSoonSafety || getSteamComingSoonSafetyContext()
             };
         };
     }
@@ -678,6 +759,14 @@
         execute: async (args, inputElement) => {
             const prompt = normalizeText(args);
             window.activeArcadeCommandMode = '/edit';
+
+            if (isUnsafeSteamComingSoonPublishPrompt(prompt)) {
+                const message = 'Blocked: Steam Coming Soon titles cannot be auto-published, approved, featured, or recommended. Put them in needs_review and require manual approval.';
+                window.activeArcadeCommandMode = null;
+                if (typeof window.showFeedback === 'function') window.showFeedback(message, true);
+                if (typeof window.addChatMessage === 'function') window.addChatMessage('ai', `⚠️ ${message}`);
+                return true;
+            }
 
             try {
                 const target = await resolveTarget(prompt);
