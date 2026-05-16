@@ -1,11 +1,11 @@
 /**
  * /edit or [edit] Command
- * Triggers the surgical Workshop code modification protocol.
+ * Opens the active Workshop file, keeps /edit routing intact, and applies AI fixes.
  *
- * Important: do not inject full file contents into the chat input.
- * arcade-chat.js already passes active Workshop editor content through
- * bounded model context for edit requests. Injecting source into the input
- * can make the command reprocess a huge prompt and freeze the page.
+ * Design notes:
+ * - Keep the slash command visible to downstream intent detection.
+ * - Do not inject full source into the chat input.
+ * - Read/write through the Workshop editor/Supabase-backed helpers when available.
  */
 (function() {
     function resolveFallbackEditTarget(args = '') {
@@ -26,6 +26,144 @@
         }
 
         return null;
+    }
+
+    function getEditorElement() {
+        return document.getElementById('workshop-edit-file-content');
+    }
+
+    function writeEditorContent(editorElement, content = '') {
+        if (!editorElement) return false;
+        editorElement.value = `${content || ''}`;
+        editorElement.dispatchEvent(new Event('input', { bubbles: true }));
+        editorElement.dispatchEvent(new Event('change', { bubbles: true }));
+        if (typeof window.handleWorkshopEditContentInput === 'function') {
+            window.handleWorkshopEditContentInput();
+        }
+        if (typeof window.syncWorkshopEditorLineNumbers === 'function') {
+            window.syncWorkshopEditorLineNumbers();
+        }
+        return true;
+    }
+
+    function readCurrentWorkshopFileContent(editorState = null) {
+        const state = editorState || (typeof window.getWorkshopEditorState === 'function'
+            ? window.getWorkshopEditorState()
+            : null);
+        const gameId = `${state?.activeGameId || ''}`.trim();
+        const fileName = `${state?.activeFileName || 'index.html'}`.trim();
+
+        if (gameId && fileName && typeof window.getWorkshopFileContent === 'function') {
+            const source = window.getWorkshopFileContent(gameId, fileName);
+            if (typeof source === 'string') return source;
+        }
+
+        const stateContent = state?.activeFileContent ?? state?.content ?? state?.value;
+        if (typeof stateContent === 'string') return stateContent;
+
+        const editorElement = getEditorElement();
+        return typeof editorElement?.value === 'string' ? editorElement.value : '';
+    }
+
+    async function selectWorkshopTargetFromPrompt(args = '') {
+        const cleanArgs = `${args || ''}`.trim();
+        if (typeof window.resolveWorkshopEditGameFromPrompt !== 'function'
+            || typeof window.setWorkshopEditActiveGame !== 'function') {
+            return null;
+        }
+
+        let targetGame = window.resolveWorkshopEditGameFromPrompt(cleanArgs);
+        if (!targetGame) targetGame = resolveFallbackEditTarget(cleanArgs);
+        if (!targetGame) return null;
+
+        const selected = await Promise.resolve(window.setWorkshopEditActiveGame(targetGame.id, { prompt: cleanArgs }));
+        if (selected?.ok) {
+            console.log(`[Command: Edit] Auto-switching context to: ${selected.title} / ${selected.fileName}`);
+        }
+        return selected || targetGame;
+    }
+
+    async function hydrateEditorFromWorkshopState() {
+        const editorElement = getEditorElement();
+        if (!editorElement) return false;
+
+        const editorState = typeof window.getWorkshopEditorState === 'function'
+            ? await Promise.resolve(window.getWorkshopEditorState())
+            : null;
+        const content = readCurrentWorkshopFileContent(editorState);
+        if (typeof content !== 'string') return false;
+
+        writeEditorContent(editorElement, content);
+        return true;
+    }
+
+    function extractAiCodeBlocks(text = '') {
+        const blocks = [];
+        const source = `${text || ''}`;
+        const regex = /```([^\n`]*)\n([\s\S]*?)```/g;
+        let match;
+        while ((match = regex.exec(source)) !== null) {
+            const info = `${match[1] || ''}`.trim();
+            const content = `${match[2] || ''}`.trim();
+            if (!content) continue;
+            const fileName = info.match(/\b(?:file(?:name)?|name|path)=['"]?([^'"\s`]+)['"]?/i)?.[1]
+                || info.match(/\b([a-z0-9][\w.-]*\.(?:html?|css|js|mjs|cjs|json|txt|svg|xml))\b/i)?.[1]
+                || '';
+            blocks.push({ info, fileName: fileName.replace(/[/\\]+/g, '_'), content });
+        }
+        return blocks;
+    }
+
+    async function applyFullFileCodeBlocks(text = '') {
+        const result = { attempted: false, ok: false };
+        const blocks = extractAiCodeBlocks(text);
+        if (blocks.length === 0) return result;
+
+        const editorState = typeof window.getWorkshopEditorState === 'function'
+            ? await Promise.resolve(window.getWorkshopEditorState())
+            : null;
+        const gameId = `${editorState?.activeGameId || window.lastPlayedGameId || ''}`.trim();
+        const fallbackFileName = `${editorState?.activeFileName || 'index.html'}`.trim();
+        if (!gameId) return result;
+
+        for (const block of blocks) {
+            const targetFileName = block.fileName || fallbackFileName;
+            const content = block.content;
+            if (!targetFileName || !content) continue;
+
+            result.attempted = true;
+
+            try {
+                if (typeof window.setWorkshopEditActiveGame === 'function') {
+                    await Promise.resolve(window.setWorkshopEditActiveGame(gameId, targetFileName));
+                }
+
+                let applyResult = null;
+                if (typeof window.internalApplyWorkshopFileEdit === 'function') {
+                    applyResult = await window.internalApplyWorkshopFileEdit(gameId, targetFileName, content, { save: true });
+                } else {
+                    const editorElement = getEditorElement();
+                    writeEditorContent(editorElement, content);
+                    if (typeof window.saveWorkshopEditPanel === 'function') {
+                        applyResult = await window.saveWorkshopEditPanel();
+                    }
+                }
+
+                const applied = applyResult?.ok !== false;
+                result.ok = result.ok || applied;
+                if (window.showFeedback) {
+                    window.showFeedback(
+                        applied ? `Saved AI fix to ${targetFileName}.` : (applyResult?.message || `Failed to save ${targetFileName}.`),
+                        !applied
+                    );
+                }
+            } catch (error) {
+                console.error('[Arcade: Edit] Failed to apply generated code block:', error);
+                if (window.showFeedback) window.showFeedback(`Failed to save ${targetFileName}.`, true);
+            }
+        }
+
+        return result;
     }
 
     async function handleResponse(text, options = {}) {
@@ -56,6 +194,14 @@
                     actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
                     return actionResult;
                 }
+            }
+
+            const fullFileResult = await applyFullFileCodeBlocks(text);
+            if (fullFileResult.attempted) {
+                actionResult.handled = true;
+                actionResult.workshopFileRewriteAttempted = true;
+                actionResult.workshopFileRewriteSucceeded = !!fullFileResult.ok;
+                return actionResult;
             }
 
             return actionResult;
@@ -104,28 +250,20 @@
 
     window.ArcadeCommandManager.register({
         id: 'edit',
-        description: 'Surgical code modification.',
+        description: 'Edit the active Workshop file using the Workshop/Supabase editor state.',
 
         execute: async (args, inputElement) => {
             const cleanArgs = `${args || ''}`.trim();
-            let selected = null;
-
-            if (typeof window.resolveWorkshopEditGameFromPrompt === 'function'
-                && typeof window.setWorkshopEditActiveGame === 'function') {
-                let targetGame = window.resolveWorkshopEditGameFromPrompt(cleanArgs);
-                if (!targetGame) targetGame = resolveFallbackEditTarget(cleanArgs);
-
-                if (targetGame) {
-                    selected = window.setWorkshopEditActiveGame(targetGame.id, { prompt: cleanArgs });
-                    if (selected?.ok) {
-                        console.log(`[Command: Edit] Auto-switching context to: ${selected.title} / ${selected.fileName}`);
-                    }
-                }
-            }
-
             window.activeArcadeCommandMode = '/edit';
 
-            // Keep the slash-command text intact. The command manager now guards
+            try {
+                await selectWorkshopTargetFromPrompt(cleanArgs);
+                await hydrateEditorFromWorkshopState();
+            } catch (error) {
+                console.error('[Arcade: Edit] Failed to prepare Workshop editor:', error);
+            }
+
+            // Keep the slash-command text intact. The command manager guards
             // against no-progress loops, while the downstream Workshop intent
             // detector still sees /edit exactly as before.
             if (inputElement && !inputElement.value.trim()) {
@@ -133,8 +271,6 @@
             }
 
             // Do not append file contents to inputElement.value.
-            // sendChatMessage will continue with the user's /edit command, and
-            // ArcadeChatContext will include bounded Workshop editor context.
             return false;
         },
 
