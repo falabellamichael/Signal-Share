@@ -1826,6 +1826,10 @@ async function publishCustomGameFromAi(payload = {}) {
         return { ok: false, error: publishResult.error || 'publish-failed', message: publishResult.message || 'Unable to publish the generated game.' };
     }
 
+    // Automatically open the editor with the published game per user request
+    workshopEditActiveGameId = publishResult.game.id;
+    setWorkshopTileMode('edit');
+
     return {
         ok: true,
         gameId: publishResult.game.id,
