@@ -1,1673 +1,322 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Signal Share</title>
-    <meta
-      name="description"
-      content="Signal Share is a bold media-sharing website for images, video, and audio."
-    />
-    <meta name="theme-color" content="#0f1720" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Signal Share" />
-    <link rel="manifest" href="./site.webmanifest" />
-    <link rel="icon" href="./icons/icon.svg?v=5" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=5" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="./styles.css?v=122" />
-    <style>
-      @keyframes optimistic-pulse {
-        0% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.15); opacity: 0.8; }
-        100% { transform: scale(1); opacity: 1; }
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Chatbot</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background-color: #f5f7fa;
+      color: #333;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-container {
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+      background-color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .chat-header {
+      padding: 16px 20px;
+      background-color: #f5f7fa;
+      border-bottom: 1px solid #e4e8eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chat-header h1 {
+      font-size: 16px;
+      color: #333;
+      margin-right: 12px;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: #4caf50;
+      border-radius: 50%;
+      margin-left: 8px;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 75%;
+      padding: 14px 18px;
+      border-radius: 12px;
+      line-height: 1.5;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.ai {
+      align-self: flex-start;
+      background-color: #e8f5e9;
+      border-top-left-radius: 4px;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background-color: #fff3cd;
+      border-top-right-radius: 4px;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message .role-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .chat-input-area {
+      padding: 16px 20px;
+      background-color: #f5f7fa;
+      border-top: 1px solid #e4e8eb;
+    }
+
+    .input-wrapper {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      outline: none;
+      transition: box-shadow 0.2s ease;
+    }
+
+    input[type="text"]:focus {
+      box-shadow: 0 0 0 3px rgba(79, 175, 87, 0.4);
+    }
+
+    .send-btn {
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s ease;
+    }
+
+    .send-btn:hover {
+      background-color: #45a046;
+    }
+
+    .gpu-usage {
+      position: absolute;
+      top: 80px;
+      right: 16px;
+      font-size: 12px;
+      color: #666;
+      background-color: #fff;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .gpu-usage span {
+      display: block;
+      margin-top: 2px;
+    }
+
+    .loading-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      color: #666;
+      display: none;
+    }
+
+    .loading-indicator.active {
+      display: block;
+    }
+
+    .typing-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      color: #666;
+      display: none;
+    }
+
+    .typing-indicator.active {
+      display: block;
+    }
+
+    .chat-input-area input[type="text"] {
+      width: 100%;
+    }
+
+    @media (max-width: 768px) {
+      .chat-container {
+        height: 95vh;
       }
-      .optimistic-pulse {
-        animation: optimistic-pulse 0.3s ease-out;
+
+      .message {
+        max-width: 90%;
       }
-    </style>
-    <link rel="stylesheet" href="./notifications.css?v=1.3" />
-    <link rel="stylesheet" href="./android-optimizations.css?v=1.7" />
-    <link rel="stylesheet" href="arcade-chat.css?v=1.14">
-    <link rel="stylesheet" href="./questions-guide.css?v=1.6">
-    <script>
-      // Early SDK placeholders for async script loading
-      window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || (() => {});
-      window.onYouTubeIframeAPIReady = window.onYouTubeIframeAPIReady || (() => {});
-    </script>
 
-    <script src="https://www.youtube.com/iframe_api" async></script>
-    <script src="https://sdk.scdn.co/spotify-player.js" async></script>
-    <script>
-      // Visible error reporter for Android debugging
-      window.onerror = function(msg, url, lineNo, columnNo, error) {
-        const errorDiv = document.getElementById('debug-error-reporter');
-        if (errorDiv) {
-          errorDiv.style.display = 'block';
-          const pre = document.createElement('pre');
-          pre.textContent = `[Error] ${msg}\nAt: ${url}:${lineNo}:${columnNo}\nStack: ${error?.stack || 'No stack'}`;
-          errorDiv.appendChild(pre);
-        }
-        return false;
-      };
-      window.onunhandledrejection = function(event) {
-        const errorDiv = document.getElementById('debug-error-reporter');
-        if (errorDiv) {
-          errorDiv.style.display = 'block';
-          const pre = document.createElement('pre');
-          pre.textContent = `[Unhandled Rejection] ${event.reason?.message || event.reason}\nStack: ${event.reason?.stack || 'No stack'}`;
-          errorDiv.appendChild(pre);
-        }
-      };
-    </script>
-    <style>
-      #debug-error-reporter {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.9);
-        color: #ff5555;
-        padding: 20px;
-        z-index: 10000000;
-        overflow: auto;
-        font-family: monospace;
-        font-size: 12px;
-        pointer-events: auto;
+      .gpu-usage {
+        top: 120px;
+        right: 16px;
       }
-      #debug-error-reporter h3 { color: white; margin-top: 0; }
-      #debug-error-reporter pre { background: #1a1a1a; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-all; margin-bottom: 10px; border: 1px solid #333; }
-      #debug-error-reporter button { background: white; color: black; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; margin-bottom: 10px; }
-    </style>
-  </head>
-  <body class="main-page">
-    <div id="debug-error-reporter">
-      <h3>Runtime Error Detected</h3>
-      <button onclick="this.parentElement.style.display='none'">Dismiss</button>
-    </div>
-    <div class="page-shell">
-      <header class="site-header">
-        <a class="brand" href="#top" aria-label="Signal Share home">
-          <span class="brand-mark" aria-hidden="true">
-            <span class="brand-glyph brand-glyph-back">S</span>
-            <span class="brand-glyph brand-glyph-front">S</span>
-          </span>
-          <span class="brand-copy">
-            <strong>Signal Share</strong>
-            <span>Media in motion</span>
-          </span>
-        </a>
-
-        <div class="header-tools">
-          <nav class="site-nav" aria-label="Primary">
-            <a href="#compose">Upload</a>
-            <a href="#messages" id="messagesNavLink" aria-controls="messages" aria-expanded="false">
-              Messages
-            </a>
-            <a href="#feed">Feed</a>
-            <a href="#account">Account</a>
-            <a href="./mini-games.html" id="gamesNavLink">Games</a>
-            <button id="notificationBell" class="notification-bell bell-icon" aria-controls="notificationsPanel" aria-expanded="false" title="Notifications" style="position: relative; flex: 0 0 auto; margin-left: 4px;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-              </svg>
-              <span id="notificationBadge" style="display: none; position: absolute; bottom: 0px; right: 4px; background: var(--color-error, #e53e3e); color: white; border-radius: 50%; font-size: 10px; width: 16px; height: 16px; justify-content: center; align-items: center; font-weight: bold; line-height: 1; pointer-events: none; z-index: 1000000; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1.5px solid var(--bg-main, #1a1a1a);">0</span>
-            </button>
-          </nav>
-
-          <a href="#profileView" id="profileNavLink" aria-controls="profileView" aria-expanded="false" title="Profile" style="display: flex; align-items: center; position: relative; text-decoration: none;">
-            <span class="profile-badge profile-nav-avatar" id="profileNavAvatar" style="width: 32px; height: 32px; font-size: 0.95rem; border-radius: 50%; margin: 0; padding: 0;">--</span>
-          </a>
-
-          <button
-            class="button button-secondary settings-toggle"
-            id="settingsToggleButton"
-            type="button"
-            aria-expanded="false"
-            aria-controls="settingsPanel"
-          >
-            Settings
-          </button>
-        </div>
-      </header>
-
-
-
-      <section class="settings-panel" id="settingsPanel" aria-hidden="true" hidden>
-        <div class="settings-backdrop" id="settingsBackdrop"></div>
-
-        <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-          <button
-            class="settings-close"
-            id="settingsCloseButton"
-            type="button"
-            aria-label="Close settings"
-          >
-            Close
-          </button>
-
-          <div class="settings-head">
-            <p class="eyebrow">Preferences</p>
-            <h2 id="settingsTitle">Shape your view</h2>
-            <p>
-              Personalize the interface without changing the shared feed. Theme, motion, spacing,
-              and dock position stay saved in this browser.
-            </p>
-          </div>
-
-          <div id="settingsMainPage">
-            <div class="settings-section">
-              <div class="settings-section-head">
-                <strong>Theme</strong>
-                <span>Pick the room you want to work in.</span>
-              </div>
-
-              <div class="theme-picker" id="themePicker">
-                <button
-                  class="theme-picker-trigger"
-                  id="themePickerButton"
-                  type="button"
-                  aria-haspopup="listbox"
-                  aria-expanded="false"
-                  aria-controls="themePickerMenu"
-                >
-                  <span class="theme-preview theme-preview-sunset" id="themePickerPreview" aria-hidden="true"></span>
-                  <span class="theme-picker-copy">
-                    <strong id="themePickerLabel">Sunset</strong>
-                    <span id="themePickerDescription">Warm default</span>
-                  </span>
-                  <span class="theme-picker-chevron" aria-hidden="true">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="m6 9 6 6 6-9"/>
-                    </svg>
-                  </span>
-                </button>
-
-                <div class="theme-picker-menu" id="themePickerMenu" role="listbox" aria-label="Theme" hidden>
-                  <button class="theme-option-tile" data-theme-option="sunset" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-sunset" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>Sunset</strong>
-                      <span>Warm default</span>
-                    </span>
-                  </button>
-
-                  <button class="theme-option-tile" data-theme-option="midnight" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-midnight" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>Midnight</strong>
-                      <span>Dark mode</span>
-                    </span>
-                  </button>
-
-                  <button class="theme-option-tile" data-theme-option="gallery" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-gallery" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>Gallery</strong>
-                      <span>Neutral light</span>
-                    </span>
-                  </button>
-
-                  <button class="theme-option-tile" data-theme-option="aurora" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-aurora" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>Aurora</strong>
-                      <span>Cool studio</span>
-                    </span>
-                  </button>
-
-                  <button class="theme-option-tile" data-theme-option="contrast" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-contrast" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>High Contrast</strong>
-                      <span>Blackout signal</span>
-                    </span>
-                  </button>
-
-                  <button class="theme-option-tile" data-theme-option="ember" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-ember" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>Ember Red</strong>
-                      <span>Companion glow</span>
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div class="settings-fields">
-              <label class="settings-field">
-                <span>Density</span>
-                <select id="densitySelect">
-                  <option value="airy">Airy</option>
-                  <option value="compact">Compact</option>
-                </select>
-              </label>
-
-              <label class="settings-field">
-                <span>Motion</span>
-                <select id="motionSelect">
-                  <option value="full">Full motion</option>
-                  <option value="calm">Calm motion</option>
-                </select>
-              </label>
-
-              <label class="settings-field settings-toggle-field" for="statusBarStripToggle">
-                <span>Status bar strip</span>
-                <span class="settings-field-copy">Reserve a black strip at the top, or let the theme background show through.</span>
-                <span class="settings-switch">
-                  <input id="statusBarStripToggle" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-              
-              <label class="settings-field settings-toggle-field" for="notificationHideSenderToggle">
-                <span>Hide sender name</span>
-                <span class="settings-field-copy">Show "Someone" instead of the sender's name in notifications.</span>
-                <span class="settings-switch">
-                  <input id="notificationHideSenderToggle" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-
-              <label class="settings-field settings-toggle-field" for="notificationHideBodyToggle">
-                <span>Hide message text</span>
-                <span class="settings-field-copy">Show "New message" instead of the message content in notifications.</span>
-                <span class="settings-switch">
-                  <input id="notificationHideBodyToggle" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-
-              <label class="settings-field settings-toggle-field" for="showEmailToggle">
-                <span>Show Email</span>
-                <span class="settings-field-copy">Admins see full emails. Other members see encrypted email masks.</span>
-                <span class="settings-switch">
-                  <input id="showEmailToggle" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-
-              <label class="settings-field" style="margin-top: 10px;">
-                <span>Bridge Secret</span>
-                <span class="settings-field-copy" style="margin-bottom: 8px;">Key for local media bridge. Default: ss_bridge_secret_v1</span>
-                <input
-                  id="bridgeSecretInput"
-                  type="password"
-                  placeholder="Enter bridge secret"
-                  style="width: 100%;"
-                />
-              </label>
-
-              <label class="settings-field" style="margin-top: 10px;">
-                <span>Bridge URL (PC IP)</span>
-                <span class="settings-field-copy" style="margin-bottom: 8px;">Example: http://192.168.1.50:3000</span>
-                <input
-                  id="bridgeUrlInput"
-                  type="text"
-                  placeholder="http://192.168.x.x:3000"
-                  style="width: 100%;"
-                />
-              </label>
-
-              <label class="settings-field" style="margin-top: 10px;">
-                <span>Local LLM Token</span>
-                <span class="settings-field-copy" style="margin-bottom: 8px;">Optional shared token for secure LAN access.</span>
-                <input
-                  id="localLlmTokenInput"
-                  type="password"
-                  placeholder="Optional local LLM token"
-                  style="width: 100%;"
-                />
-              </label>
-
-
-              <label class="settings-field" style="margin-top: 10px;">
-                <span>AI Custom Instructions</span>
-                <span class="settings-field-copy" style="margin-bottom: 8px;">Optional behavior rules used by both companions (main page and mini-games).</span>
-                <textarea
-                  id="aiCustomInstructionsInput"
-                  rows="5"
-                  placeholder="Example: Always include model/provider when asked which model you are using."
-                  style="width: 100%; resize: vertical;"
-                ></textarea>
-              </label>
-            </div>
-
-            <div class="settings-actions">
-              <button
-                class="button button-secondary"
-                id="resetPlayerPositionButton"
-                type="button"
-              >
-                Reset player dock
-              </button>
-              <button
-                class="button button-secondary"
-                id="resetPreferencesButton"
-                type="button"
-              >
-                Reset preferences
-              </button>
-              <button
-                class="button button-secondary button-full"
-                id="keyboardShortcutsButton"
-                type="button"
-              >
-                Keyboard shortcuts
-              </button>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-
-
-      <main id="top">
-        <section class="hero">
-          <div class="hero-copy">
-            <p class="eyebrow">Independent media publishing</p>
-            <h1>Share the image, video, or sound that moves the room.</h1>
-            <p class="hero-text">
-              Publish visual drops, rough cuts, and audio moments in a living
-              feed. Start locally in one browser, or connect Supabase for a
-              shared feed that follows you across devices.
-            </p>
-
-            <div class="hero-visual" aria-hidden="true">
-              <div class="hero-orb hero-orb-primary"></div>
-              <div class="hero-orb hero-orb-secondary"></div>
-              <div class="hero-dot-grid">
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            </div>
-
-            <div class="hero-actions">
-              <a class="button button-primary" href="#compose">Start sharing</a>
-              <a class="button button-secondary" href="#feed">Browse feed</a>
-            </div>
-
-            <dl class="hero-stats" id="statsPanel">
-              <div>
-                <dt>Posts</dt>
-                <dd data-stat="posts">0</dd>
-              </div>
-              <div>
-                <dt>Creators</dt>
-                <dd data-stat="creators">0</dd>
-              </div>
-            </dl>
-          </div>
-
-          <aside class="hero-panel" aria-label="Platform highlights">
-            <div class="panel-card panel-card-large panel-card-device-player">
-              <span id="heroPlayerHeader">On-device media</span>
-              <strong id="heroPlayerTitle">Ready to play</strong>
-              <p id="heroPlayerCaption"></p>
-              <div class="hero-player-stage" id="heroPlayerStage">
-                <p class="hero-player-status" id="heroPlayerStatus">
-                  Use any Play button in the feed to start.
-                </p>
-              </div>
-              <div class="hero-player-controls">
-                <div class="hero-player-controls-col">
-                  <button class="button button-secondary" id="heroPlayerOpenPhoneButton" type="button" hidden>
-                    Open Phone
-                  </button>
-                  <button class="button button-secondary" id="heroPlayerRefreshButton" type="button">
-                    Refresh
-                  </button>
-                </div>
-                <div class="hero-player-controls-col">
-                  <button class="button button-secondary" id="heroPlayerPlayPauseButton" type="button">
-                    Play
-                  </button>
-                  <button class="button button-secondary" id="heroPlayerOpenMediaButton" type="button">
-                    Open Media
-                  </button>
-                </div>
-                <div class="hero-player-controls-col">
-                  <button class="button button-secondary" id="heroPlayerPrevButton" type="button">
-                    Previous
-                  </button>
-                  <button class="button button-secondary" id="heroPlayerNextButton" type="button">
-                    Next
-                  </button>
-                </div>
-              </div>
-
-              <div class="hero-player-options">
-                <button class="button button-secondary" id="heroPlayerOpenMiniButton" type="button">
-                  Open Player
-                </button>
-                <button class="button button-secondary" id="toggleHeroDeepDive" type="button" style="border-color: rgba(70, 130, 180, 0.4);" onclick="const p = document.getElementById('heroDeepDivePanel'); if(p) { const isH = p.style.display === 'none'; p.style.display = isH ? 'block' : 'none'; if(isH) p.scrollIntoView({behavior:'smooth', block:'nearest'}); }">
-                  Dev Tools
-                </button>
-                <div class="hero-player-toggles-stack">
-                  <div class="hero-player-mode-toggle">
-                    <button class="mode-toggle-button is-active" id="heroModeFeed" type="button">Feed</button>
-                    <button class="mode-toggle-button" id="heroModeMedia" type="button">Media</button>
-                  </div>
-                  <div class="hero-player-source-toggle">
-                    <button class="source-toggle-button is-active" id="heroSourceYoutube" type="button">YouTube</button>
-                    <button class="source-toggle-button" id="heroSourceSpotify" type="button">Spotify</button>
-                  </div>
-                </div>
-              </div>
-              <div class="hero-player-volume">
-                <label class="hero-player-volume-label" for="heroPlayerVolumeSlider">Volume</label>
-                <input
-                  class="hero-player-volume-slider"
-                  id="heroPlayerVolumeSlider"
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value="100"
-                />
-                <span class="hero-player-volume-value" id="heroPlayerVolumeValue">100%</span>
-              </div>
-              <div id="heroDeepDivePanel" style="display: none; margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 12px; font-size: 0.85rem; border: 1px solid rgba(70, 130, 180, 0.3);">
-                <div style="margin-bottom: 12px;">
-                  <strong style="color: #4682b4; display: block; margin-bottom: 4px;">Hero Architecture</strong>
-                  <p style="margin: 0 0 8px; opacity: 0.8;">Isolated media handlers using Supabase & Desktop Bridge.</p>
-                  <a href="./hero-player-deepdive.html" target="_blank" style="color: white; text-decoration: underline;">Open Technical Deep Dive</a>
-                </div>
-                <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px; margin-top: 10px;">
-                  <strong style="color: #a4d007; display: block; margin-bottom: 4px;">Arcade AI Workshop</strong>
-                  <p style="margin: 0 0 8px; opacity: 0.8;">Guide for AI commands, workshop editing, and media controls.</p>
-                  <a href="./arcade-guide.html" target="_blank" style="color: white; text-decoration: underline;">Open Arcade & AI Guide</a>
-                </div>
-              </div>
-            </div>
-            <div class="panel-card">
-              <span>Flexible media</span>
-              <strong>Images, video, audio</strong>
-            </div>
-            <div class="panel-card">
-              <span>Discovery</span>
-              <strong>Search, tags, sort, filter</strong>
-            </div>
-          </aside>
-        </section>
-
-        <section class="composer-grid" id="compose">
-          <div class="compose-card">
-            <div class="section-heading">
-              <p class="eyebrow">Compose</p>
-              <h2>Publish a new post</h2>
-            </div>
-
-            <form id="postForm" class="post-form">
-              <label>
-                Creator
-                <input
-                  id="creatorInput"
-                  name="creator"
-                  type="text"
-                  maxlength="40"
-                  placeholder="Your display name"
-                  required
-                />
-              </label>
-
-              <label>
-                Title
-                <input
-                  id="titleInput"
-                  name="title"
-                  type="text"
-                  maxlength="70"
-                  placeholder="Name the drop"
-                  required
-                />
-              </label>
-
-              <label>
-                Caption
-                <textarea
-                  id="captionInput"
-                  name="caption"
-                  rows="4"
-                  maxlength="280"
-                  placeholder="Say what makes this worth opening."
-                  required
-                ></textarea>
-              </label>
-
-              <label>
-                Tags
-                <input
-                  id="tagsInput"
-                  name="tags"
-                  type="text"
-                  maxlength="80"
-                  placeholder="portrait, live set, backstage"
-                />
-              </label>
-
-              <label>
-                Media Link
-                <input
-                  id="externalUrlInput"
-                  name="externalUrl"
-                  type="url"
-                  maxlength="300"
-                  placeholder="Paste a YouTube or Spotify link instead of uploading a file"
-                />
-              </label>
-
-              <p class="field-help" id="sourceHelp">
-                Use one source per post: upload a file, or paste a YouTube / Spotify link.
-              </p>
-
-              <div class="dropzone" id="dropzone" tabindex="0" role="button">
-                <input
-                  id="mediaInput"
-                  name="media"
-                  type="file"
-                  accept="image/*,video/*,audio/*"
-                  hidden
-                />
-                <div class="dropzone-graphic" aria-hidden="true">
-                  <span class="dropzone-tile dropzone-tile-primary"></span>
-                  <span class="dropzone-tile dropzone-tile-secondary"></span>
-                  <span class="dropzone-tile dropzone-tile-tertiary"></span>
-                </div>
-                <div class="dropzone-copy">
-                  <p class="dropzone-title">Drop media here</p>
-                  <p>Or click to choose an image, video, or audio file.</p>
-                  <span class="dropzone-note">Up to 50 GB per post</span>
-                </div>
-                <div class="preview-shell" id="previewShell" hidden></div>
-              </div>
-
-              <div class="form-actions">
-                <button class="button button-primary" type="submit">
-                  Publish post
-                </button>
-                <button
-                  class="button button-secondary"
-                  type="button"
-                  id="resetFormButton"
-                >
-                  Reset
-                </button>
-              </div>
-            </form>
-
-            <p
-              class="form-feedback"
-              id="formFeedback"
-              role="status"
-              aria-live="polite"
-            ></p>
-          </div>
-
-          <aside class="account-card" id="account">
-            <div class="section-heading">
-              <p class="eyebrow">Account</p>
-              <h2>Sign in and activate posting</h2>
-            </div>
-
-            <div class="auth-state">
-              <div class="auth-badge-row">
-                <span class="status-pill" id="authStatusPill">Local mode</span>
-                <span class="status-copy" id="authStatusCopy">
-                  Connect Supabase to enable login and live posting.
-                </span>
-              </div>
-              <p class="auth-hint" id="authHint">
-                Signed-in and activated accounts can publish to the shared feed.
-              </p>
-            </div>
-
-            <form id="authForm" class="auth-form">
-              <label>
-                Account name
-                <input
-                  id="authDisplayNameInput"
-                  name="authDisplayName"
-                  type="text"
-                  minlength="2"
-                  maxlength="40"
-                  placeholder="How your name appears on posts"
-                  autocomplete="nickname"
-                />
-              </label>
-
-              <label>
-                Email
-                <input
-                  id="authEmailInput"
-                  name="authEmail"
-                  type="email"
-                  maxlength="120"
-                  placeholder="you@example.com"
-                  autocomplete="email"
-                />
-              </label>
-
-              <label>
-                Password
-                <input
-                  id="authPasswordInput"
-                  name="authPassword"
-                  type="password"
-                  minlength="8"
-                  maxlength="120"
-                  placeholder="At least 8 characters"
-                  autocomplete="current-password"
-                />
-              </label>
-
-              <label class="auth-legal" for="authTermsCheckbox">
-                <span class="auth-legal-checkbox">
-                  <input id="authTermsCheckbox" name="authTermsCheckbox" type="checkbox" />
-                  <span>I agree to the <a href="./terms.html">Terms</a> and <a href="./privacy.html">Privacy Policy</a>.</span>
-                </span>
-                <span class="auth-legal-note">Existing accounts keep working as they are. This is required only for new signups.</span>
-              </label>
-
-              <div class="auth-actions">
-                <button class="button button-primary" id="signInButton" type="submit">
-                  Sign in
-                </button>
-                <button class="button button-secondary" id="signUpButton" type="button">
-                  Create account
-                </button>
-              </div>
-            </form>
-
-            <div class="auth-account" id="authAccount" hidden>
-              <div class="account-summary">
-                <strong id="accountEmail">Not signed in</strong>
-                <p id="accountMeta">Publish to the live feed after activation.</p>
-              </div>
-
-              <div class="auth-actions">
-                <button
-                  class="button button-secondary"
-                  id="openOwnProfileButton"
-                  type="button"
-                >
-                  View your profile
-                </button>
-                <button
-                  class="button button-secondary"
-                  id="signOutButton"
-                  type="button"
-                >
-                  Sign out
-                </button>
-              </div>
-            </div>
-
-            <div class="activation-panel" id="activationPanel" hidden>
-              <strong id="activationTitle">Check your inbox</strong>
-              <p id="activationMessage">
-                Confirm your email address to activate posting on the shared feed.
-              </p>
-              <div class="auth-actions">
-                <button
-                  class="button button-secondary"
-                  id="resendActivationButton"
-                  type="button"
-                >
-                  Resend activation email
-                </button>
-              </div>
-            </div>
-
-            <p
-              class="form-feedback auth-feedback"
-              id="authFeedback"
-              role="status"
-              aria-live="polite"
-            ></p>
-
-            <section class="admin-editor" id="adminEditor" hidden>
-              <div class="admin-editor-head">
-                <p class="eyebrow">Admin studio</p>
-                <h3>Layout and crop fit</h3>
-                <p>
-                  These controls publish a shared shell width, spacing, corner radius, and media fit
-                  mode for everyone on the live site.
-                </p>
-              </div>
-
-              <form id="adminSettingsForm" class="admin-settings-form">
-                <label class="setting-row">
-                  <span class="setting-row-head">
-                    <span>Shell width</span>
-                    <strong id="layoutWidthValue">1200px</strong>
-                  </span>
-                  <input
-                    id="layoutWidthInput"
-                    name="layoutWidth"
-                    type="range"
-                    min="960"
-                    max="1440"
-                    step="20"
-                    value="1200"
-                  />
-                </label>
-
-                <label class="setting-row">
-                  <span class="setting-row-head">
-                    <span>Section gap</span>
-                    <strong id="layoutGapValue">24px</strong>
-                  </span>
-                  <input
-                    id="layoutGapInput"
-                    name="layoutGap"
-                    type="range"
-                    min="16"
-                    max="40"
-                    step="2"
-                    value="24"
-                  />
-                </label>
-
-                <label class="setting-row">
-                  <span class="setting-row-head">
-                    <span>Surface radius</span>
-                    <strong id="layoutRadiusValue">32px</strong>
-                  </span>
-                  <input
-                    id="layoutRadiusInput"
-                    name="layoutRadius"
-                    type="range"
-                    min="22"
-                    max="44"
-                    step="1"
-                    value="32"
-                  />
-                </label>
-
-                <label class="setting-row">
-                  <span class="setting-row-head">
-                    <span>Media fit</span>
-                  </span>
-                  <select id="mediaFitSelect" name="mediaFit">
-                    <option value="cover">Crop to fill</option>
-                    <option value="contain">Contain full frame</option>
-                  </select>
-                </label>
-
-                <div class="auth-actions">
-                  <button class="button button-primary" id="saveSettingsButton" type="submit">
-                    Save live layout
-                  </button>
-                  <button
-                    class="button button-secondary"
-                    id="resetSettingsButton"
-                    type="button"
-                  >
-                    Reset preview
-                  </button>
-                </div>
-              </form>
-
-              <p
-                class="form-feedback auth-feedback"
-                id="adminSettingsFeedback"
-                role="status"
-                aria-live="polite"
-              ></p>
-            </section>
-          </aside>
-        </section>
-
-        <section class="messenger-section" id="messages" aria-label="Messenger" aria-expanded="false">
-          <div class="messenger-floating-controls" aria-hidden="false">
-            <button
-              class="button button-secondary messenger-minimize"
-              id="messengerMinimizeButton"
-              type="button"
-              aria-controls="messages"
-              aria-label="Minimize Direct Messenger"
-            >
-              <svg viewBox="0 0 24 24" role="presentation" focusable="false" aria-hidden="true">
-                <path d="M6 12.75a.75.75 0 0 1 0-1.5h12a.75.75 0 0 1 0 1.5z" fill="currentColor" />
-              </svg>
-            </button>
-
-            <button
-              class="button button-secondary messenger-expand-icon"
-              id="messengerExpandButton"
-              type="button"
-              aria-controls="messages"
-              aria-expanded="false"
-              aria-label="Expand Direct Messenger"
-            >
-              <svg viewBox="0 0 24 24" role="presentation" focusable="false" aria-hidden="true">
-                <path
-                  d="M8 4.75A.75.75 0 0 1 8.75 4h3.5a.75.75 0 0 1 0 1.5H10.56l3.22 3.22a.75.75 0 1 1-1.06 1.06L9.5 6.56v1.69a.75.75 0 0 1-1.5 0zm8 10a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-1.69l-3.22 3.22a.75.75 0 0 1-1.06-1.06l3.22-3.22H12.5a.75.75 0 0 1 0-1.5zm-8 .75a.75.75 0 0 1 .75.75v1.69l3.22-3.22a.75.75 0 1 1 1.06 1.06l-3.22 3.22h1.69a.75.75 0 0 1 0 1.5H8.75A.75.75 0 0 1 8 19zm8-10a.75.75 0 0 1-.75-.75V3.75A.75.75 0 0 1 16 3h3.25a.75.75 0 0 1 0 1.5h-1.69l3.22 3.22a.75.75 0 0 1-1.06 1.06L16.5 5.56v1.69a.75.75 0 0 1-.75.75"
-                  fill="currentColor"
-                />
-              </svg>
-            </button>
-          </div>
-
-          <div class="feed-toolbar messenger-toolbar">
-            <div class="section-heading messenger-heading sr-only">
-              <p class="eyebrow">Messenger</p>
-              <h2>Direct Messenger</h2>
-            </div>
-
-            <div class="messenger-toolbar-side">
-              <div class="messenger-status">
-                <span class="status-pill" id="messengerStatusPill">Offline</span>
-                <span class="status-copy" id="messengerStatusCopy">
-                  Messenger needs Supabase, signed-in accounts, and the chat tables enabled.
-                </span>
-              </div>
-
-              <div class="messenger-dock-actions">
-                <button
-                  class="button button-secondary messenger-hide"
-                  id="messengerHideButton"
-                  type="button"
-                  aria-controls="messages"
-                >
-                  Hide
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="messenger-grid">
-            <aside class="messenger-sidebar">
-              <section class="messenger-card messenger-profile">
-                <div class="messenger-card-head">
-                  <strong>Your profile</strong>
-                  <span>Choose the display name other signed-in members will see.</span>
-                </div>
-
-                <label class="settings-field">
-                  <span>Display name</span>
-                  <input
-                    id="profileDisplayNameInput"
-                    type="text"
-                    maxlength="40"
-                    placeholder="How should people know you?"
-                  />
-                </label>
-
-                <div class="auth-actions">
-                  <button class="button button-primary" id="saveProfileButton" type="button">
-                    Save profile
-                  </button>
-                </div>
-
-                <p
-                  class="form-feedback auth-feedback"
-                  id="profileFeedback"
-                  role="status"
-                  aria-live="polite"
-                ></p>
-              </section>
-
-              <section class="messenger-card messenger-people">
-                <div class="messenger-card-head">
-                  <strong>People</strong>
-                  <span>Start a direct conversation with another member.</span>
-                </div>
-
-                <label class="search-field messenger-list-search">
-                  <span class="sr-only">Search people</span>
-                  <input
-                    id="peopleSearchInput"
-                    type="search"
-                    inputmode="search"
-                    autocomplete="off"
-                    placeholder="Search people"
-                  />
-                </label>
-
-                <div class="people-list" id="peopleList"></div>
-                <p class="messenger-empty" id="peopleEmpty">Your member directory loads here.</p>
-              </section>
-
-              <section class="messenger-card messenger-conversations">
-                <div class="messenger-card-head">
-                  <strong>Conversations</strong>
-                  <span>Recent threads stay ordered by the latest activity.</span>
-                </div>
-
-                <label class="search-field messenger-list-search">
-                  <span class="sr-only">Search conversations</span>
-                  <input
-                    id="conversationSearchInput"
-                    type="search"
-                    inputmode="search"
-                    autocomplete="off"
-                    placeholder="Search conversations"
-                  />
-                </label>
-
-                <div class="conversation-list" id="conversationList"></div>
-                <p class="messenger-empty" id="conversationEmpty">
-                  Your direct conversations will appear here.
-                </p>
-              </section>
-            </aside>
-
-            <section class="messenger-thread">
-              <div class="messenger-thread-head">
-                <div class="messenger-thread-copy">
-                  <strong id="activeThreadLabel">Sign in to open inbox</strong>
-                  <span id="activeThreadMeta">Live messaging is available only for activated accounts.</span>
-                </div>
-              </div>
-
-              <div class="message-list" id="messageList"></div>
-              <p class="messenger-empty" id="messageEmpty">
-                Messaging stays disabled until you sign in and confirm your email.
-              </p>
-
-              <form class="message-form" id="messageForm">
-                <label class="sr-only" for="messageInput">Write a message</label>
-                <textarea
-                  id="messageInput"
-                  rows="1"
-                  maxlength="2000"
-                  placeholder="Write a message"
-                ></textarea>
-
-                <input id="messageAttachmentInput" type="file" hidden />
-                <div class="message-attachment-preview" id="messageAttachmentPreview" hidden></div>
-                <div class="message-emoji-panel" id="messageEmojiPanel" hidden>
-                  <!-- Emojis rendered dynamically from emojis.js -->
-                </div>
-
-
-                <div class="message-form-actions">
-                  <div class="message-form-tools">
-                    <button
-                      class="button button-secondary"
-                      id="messageEmojiButton"
-                      type="button"
-                      aria-expanded="false"
-                      aria-controls="messageEmojiPanel"
-                    >
-                      Emoji
-                    </button>
-                    <button class="button button-secondary" id="messageAttachButton" type="button">
-                      Attach
-                    </button>
-                    <button
-                      class="button button-secondary"
-                      id="messageAttachmentClearButton"
-                      type="button"
-                      hidden
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <button class="button button-primary" id="sendMessageButton" type="submit">
-                    Send
-                  </button>
-                </div>
-              </form>
-
-              <p
-                class="form-feedback auth-feedback messenger-feedback"
-                id="messengerFeedback"
-                role="status"
-                aria-live="polite"
-              ></p>
-            </section>
-          </div>
-        </section>
-
-        <section class="feed-section" id="feed">
-          <div class="feed-toolbar">
-            <div class="section-heading">
-              <p class="eyebrow">Feed</p>
-              <h2>Fresh uploads and featured drops</h2>
-            </div>
-
-            <div class="toolbar-controls">
-              <label class="search-field">
-                <span class="sr-only">Search posts</span>
-                <input
-                  id="searchInput"
-                  type="search"
-                  placeholder="Search titles, captions, or tags"
-                />
-              </label>
-
-              <label class="select-field">
-                <span class="sr-only">Sort feed</span>
-                <select id="sortSelect">
-                  <option value="newest">Newest first</option>
-                  <option value="popular">Most liked</option>
-                  <option value="oldest">Oldest first</option>
-                </select>
-              </label>
-            </div>
-          </div>
-
-          <div class="filter-row" id="filterRow" aria-label="Media filters">
-            <button
-              class="filter-chip is-active"
-              data-filter="all"
-              type="button"
-              aria-pressed="true"
-            >
-              All
-            </button>
-            <button
-              class="filter-chip"
-              data-filter="image"
-              type="button"
-              aria-pressed="false"
-            >
-              Images
-            </button>
-            <button
-              class="filter-chip"
-              data-filter="video"
-              type="button"
-              aria-pressed="false"
-            >
-              Video
-            </button>
-            <button
-              class="filter-chip"
-              data-filter="audio"
-              type="button"
-              aria-pressed="false"
-            >
-              Audio
-            </button>
-            <button
-              class="filter-chip"
-              data-filter="saved"
-              type="button"
-              aria-pressed="false"
-            >
-              Saved
-            </button>
-          </div>
-
-          <div class="tag-cloud" id="tagCloud" aria-label="Trending tags"></div>
-
-          <div class="feed-overview">
-            <article class="spotlight-card" id="spotlightCard"></article>
-
-            <div class="insight-stack">
-              <section class="mini-panel" aria-labelledby="creatorBoardHeading">
-                <div class="mini-panel-head">
-                  <p class="eyebrow">Creator board</p>
-                  <h3 id="creatorBoardHeading">Who is moving</h3>
-                </div>
-                <div class="mini-panel-body" id="creatorBoard"></div>
-              </section>
-            </div>
-          </div>
-
-          <div class="feed-grid" id="feedGrid" aria-live="polite"></div>
-          <nav class="feed-pagination" id="feedPagination" aria-label="Feed pages" hidden></nav>
-          <p class="empty-state" id="emptyState" hidden>
-            No posts match the current filter. Try another search or publish a
-            fresh drop.
-          </p>
-        </section>
-      </main>
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+      <h1>AI Chatbot</h1>
+      <span class="status-indicator"></span>
     </div>
 
-    <template id="feedCardTemplate">
-      <article class="feed-card">
-        <div class="card-media"></div>
-        <div class="card-body">
-          <div class="card-meta">
-            <p class="card-kind"></p>
-            <p class="card-signal"></p>
-          </div>
-          <h3 class="card-title"></h3>
-          <p class="card-caption"></p>
-          <div class="card-actions">
-            <button class="open-button" type="button">Open</button>
-            <button class="save-button" type="button"></button>
-            <button class="like-button" type="button"></button>
-          </div>
-          <div class="card-footer">
-            <div>
-              <button class="card-creator profile-trigger" type="button"></button>
-              <p class="card-time"></p>
-            </div>
-            <button class="delete-button" type="button" hidden>Delete</button>
-          </div>
-          <div class="card-tags"></div>
-        </div>
-      </article>
-    </template>
-
-    <section class="viewer" id="viewer" aria-hidden="true">
-      <div class="viewer-backdrop" data-close-viewer></div>
-      <div
-        class="viewer-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="viewerTitle"
-      >
-        <button class="viewer-close" id="viewerCloseButton" type="button" aria-label="Close viewer">
-          Close
-        </button>
-
-        <div class="viewer-stage" id="viewerStage">
-          <div class="viewer-zoom-controls" id="viewerZoomControls" hidden>
-            <button class="zoom-btn" id="viewerZoomOut" type="button" title="Zoom Out">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            </button>
-            <span class="zoom-level" id="viewerZoomLevel">100%</span>
-            <button class="zoom-btn" id="viewerZoomIn" type="button" title="Zoom In">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            </button>
-            <button class="zoom-btn" id="viewerZoomReset" type="button" title="Fit to Screen">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h6v6M9 21H3v-6M21 15v6h-6M3 9V3h6"></path></svg>
-            </button>
-          </div>
-          <div class="viewer-media-scroller" id="viewerMediaScroller">
-            <div class="viewer-media-container" id="viewerMediaContainer"></div>
-          </div>
-        </div>
-
-        <aside class="viewer-panel">
-          <p class="viewer-kind" id="viewerKind"></p>
-          <h3 id="viewerTitle"></h3>
-          <p class="viewer-caption" id="viewerCaption"></p>
-
-          <div class="viewer-meta">
-            <button class="viewer-creator profile-trigger" id="viewerCreator" type="button"></button>
-            <p class="viewer-time" id="viewerTime"></p>
-          </div>
-
-          <div class="viewer-tags" id="viewerTags"></div>
-
-          <div class="viewer-actions">
-            <button class="button button-secondary" id="viewerCollapseButton" type="button">
-              Minimize
-            </button>
-            <button class="button button-secondary" id="viewerPrevButton" type="button">
-              Previous
-            </button>
-            <button class="button button-secondary" id="viewerNextButton" type="button">
-              Next
-            </button>
-          </div>
-        </aside>
-      </div>
-    </section>
-
-    <section class="profile-view" id="profileView" aria-hidden="true">
-      <div class="profile-view-backdrop" data-close-profile></div>
-      <div
-        class="profile-view-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="profileTitle"
-      >
-        <button class="viewer-close profile-view-close" id="profileCloseButton" type="button" aria-label="Close profile">
-          Close
-        </button>
-
-        <div class="profile-hero">
-          <div class="profile-identity">
-            <span class="profile-badge" id="profileBadge" aria-hidden="true">SS</span>
-            <div class="profile-copy">
-              <p class="eyebrow">Profile</p>
-              <h3 id="profileTitle">Member profile</h3>
-              <p class="profile-meta" id="profileMeta">Live member profile</p>
-            </div>
-          </div>
-
-          <div class="profile-stats" id="profileStats"></div>
-        </div>
-
-        <section class="profile-feed">
-          <div class="profile-feed-head">
-            <div>
-              <p class="eyebrow">Latest feed</p>
-              <h4>Posts from this profile</h4>
-            </div>
-          </div>
-
-          <div class="profile-feed-grid" id="profileFeedGrid" aria-live="polite"></div>
-          <nav class="feed-pagination" id="profileFeedPagination" aria-label="Profile feed pages" hidden></nav>
-          <p class="empty-state profile-empty" id="profileEmpty" hidden>
-            No posts yet.
-          </p>
-        </section>
-      </div>
-    </section>
-
-    <section class="mini-player" id="miniPlayer" aria-hidden="true">
-      <div class="mini-player-head" id="miniPlayerHead" title="Drag to move the player">
-        <div class="mini-player-copy">
-          <p class="mini-player-kind" id="miniPlayerKind"></p>
-          <strong id="miniPlayerTitle">Nothing playing</strong>
-        </div>
-
-        <div class="mini-player-actions">
-          <button class="button button-secondary" id="miniExpandButton" type="button">
-            Expand
-          </button>
-          <button class="button button-secondary" id="miniCloseButton" type="button">
-            Close
-          </button>
-        </div>
-      </div>
-
-      <div class="mini-player-stage" id="miniPlayerStage"></div>
-
-      <div class="mini-player-nav">
-        <button class="button button-secondary" id="miniPrevButton" type="button">
-          Previous
-        </button>
-        <button class="button button-secondary" id="miniPlayPauseButton" type="button">
-          Play
-        </button>
-        <button class="button button-secondary" id="miniRefreshButton" type="button">
-          Refresh
-        </button>
-        <button class="button button-secondary" id="miniNextButton" type="button">
-          Next
-        </button>
-      </div>
-
-      <div class="mini-player-volume" id="miniPlayerVolume" hidden>
-        <label class="mini-player-volume-label" for="miniPlayerVolumeSlider">Volume</label>
-        <input
-          class="mini-player-volume-slider"
-          id="miniPlayerVolumeSlider"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          value="100"
-        />
-        <span class="mini-player-volume-value" id="miniPlayerVolumeValue">100%</span>
-      </div>
-
-      <div class="mini-player-detail" id="miniPlayerDetail">
-        <p class="mini-player-caption" id="miniPlayerCaption"></p>
-
-        <div class="mini-player-meta">
-          <button class="mini-player-creator profile-trigger" id="miniPlayerCreator" type="button"></button>
-          <p class="mini-player-time" id="miniPlayerTime"></p>
-        </div>
-
-        <div class="mini-player-tags" id="miniPlayerTags"></div>
-      </div>
-    </section>
-
-    <section class="admin-ban-panel" id="adminBanPanel" aria-hidden="true" hidden>
-      <div class="admin-ban-head">
-        <div>
-          <p class="eyebrow">Admin</p>
-          <h2>Ban Members</h2>
-        </div>
-        <button class="button button-secondary admin-ban-close" id="adminBanCloseButton" type="button">
-          Close
-        </button>
-      </div>
-
-      <p class="admin-ban-copy">
-        Banned accounts cannot post to the live feed or use Direct Messenger.
-      </p>
-
-      <label class="search-field admin-ban-search">
-        <span class="sr-only">Search members to ban</span>
-        <input
-          id="adminBanSearchInput"
-          type="search"
-          inputmode="search"
-          autocomplete="off"
-          placeholder="Search members"
-        />
-      </label>
-
-      <div class="admin-ban-list" id="adminBanList"></div>
-      <p class="messenger-empty admin-ban-empty" id="adminBanEmpty">Admin ban controls load here.</p>
-
-      <div class="admin-ban-actions">
-        <button class="button button-secondary" id="adminBanRefreshButton" type="button">
-          Refresh
-        </button>
-      </div>
-
-      <p
-        class="form-feedback auth-feedback admin-ban-feedback"
-        id="adminBanFeedback"
-        role="status"
-        aria-live="polite"
-      ></p>
-    </section>
-
-    <button
-      class="admin-ban-launcher"
-      id="adminBanLauncherButton"
-      type="button"
-      aria-controls="adminBanPanel"
-      aria-expanded="false"
-      aria-label="Open admin ban menu"
-      hidden
-    >
-      <span class="admin-ban-launcher-badge" aria-hidden="true">
-        <svg viewBox="0 0 24 24" role="presentation" focusable="false">
-          <path
-            d="M12 3.25 18.75 6v5.4c0 4.28-2.7 7.92-6.75 9.35-4.05-1.43-6.75-5.07-6.75-9.35V6L12 3.25Zm0 2.16L7.25 7.34v4.06c0 3.11 1.8 5.9 4.75 7.2 2.95-1.3 4.75-4.09 4.75-7.2V7.34L12 5.41Zm-2.6 5.42h5.2v1.84H9.4v-1.84Z"
-            fill="currentColor"
-          />
-        </svg>
-      </span>
-      <span class="sr-only">Open admin ban menu</span>
-    </button>
-
-    <button
-      class="messenger-launcher"
-      id="messengerLauncherButton"
-      type="button"
-      aria-controls="messages"
-      aria-expanded="false"
-      aria-label="Open messenger"
-    >
-      <span class="messenger-launcher-badge" aria-hidden="true">
-        <svg viewBox="0 0 24 24" role="presentation" focusable="false">
-          <path
-            d="M5 6.5C5 5.12 6.12 4 7.5 4h9C17.88 4 19 5.12 19 6.5v6c0 1.38-1.12 2.5-2.5 2.5H11l-3.62 3.02A.75.75 0 0 1 6 17.44V15H7.5C6.12 15 5 13.88 5 12.5z"
-            fill="currentColor"
-          />
-        </svg>
-      </span>
-      <span class="sr-only">Open messenger</span>
-    </button>
-
-    <script type="module" src="./config.js?v=1.5"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4.2.3/dist/tus.min.js"></script>
-    <script src="notifications.js?v=1.5"></script>
-    <script src="keyboard-bindings-v3.js?v=1.5"></script>
-    <script src="notification-keyboard-integration.js?v=1.5"></script>
-    <!-- Global Overlay Panels -->
-    <section class="settings-panel" id="notificationsPanel" aria-hidden="true" hidden>
-      <div class="settings-backdrop" id="notificationsBackdrop"></div>
-      <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle">
-        <button class="settings-close" id="notificationsCloseButton" type="button" aria-label="Close notifications">Close</button>
-        <div class="settings-head">
-          <p class="eyebrow">Activity</p>
-          <h2 id="notificationsTitle">Notifications</h2>
-          <div class="notifications-head-tools">
-            <p>Recent messages and likes</p>
-            <button id="clearNotificationsButton" class="button-clear-all" onclick="if(window.notifications){window.notifications.clearHistory(); if(window.renderNotificationsHistory)window.renderNotificationsHistory();}">Clear All</button>
-          </div>
-        </div>
-        <div class="settings-section">
-          <ul id="notificationsList">
-            <!-- Notifications will be injected here -->
-          </ul>
-          <p id="notificationsEmptyState">No new notifications</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="settings-panel" id="keyboardShortcutsPanel" aria-hidden="true" hidden>
-      <div class="settings-backdrop" id="keyboardShortcutsBackdrop"></div>
-      <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
-        <button class="settings-close" id="keyboardShortcutsCloseButton" type="button" aria-label="Close shortcuts">Close</button>
-        <div class="settings-head">
-          <p class="eyebrow">Accessibility</p>
-          <h2 id="shortcutsTitle">Keyboard shortcuts</h2>
-          <p>Use these keys to navigate Signal Share faster.</p>
-        </div>
-        <div class="settings-section" style="padding-top: 0;">
-          <div id="shortcutsList" style="display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; margin-bottom: 10px;">
-            <!-- Shortcuts will be injected here -->
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <script src="config.js?v=1.5"></script>
-    <script src="local-llm-connectivity.js?v=1.0"></script>
-    <script src="api-v3.js?v=1.20" type="module"></script>
-    <script src="messenger-realtime.js?v=1.5"></script>
-    <script src="companion-ai-core.js?v=1.5"></script>
-    <script src="arcade-commands/manager.js?v=1.2"></script>
-    <script src="arcade-commands/edit.js?v=1.4"></script>
-    <script src="arcade-commands/fix.js?v=1.3"></script>
-    <script src="arcade-commands/deep.js?v=1.0"></script>
-    <script src="arcade-commands/publish.js?v=1.2"></script>
-    <script src="arcade-commands/clear.js?v=1.1"></script>
-    <script src="arcade-commands/vram.js?v=1.0"></script>
-    <script src="arcade-commands/idea.js?v=1.0"></script>
-    <script src="arcade-commands/help.js?v=1.1"></script>
-    <script src="arcade-workshop-manager.js?v=1.0"></script>
-    <script src="amd-optimizations.js?v=1.0"></script>
-    <script src="arcade-chat-context.js?v=1.0"></script>
-    <script src="arcade-chat.js?v=1.50" defer></script>
-    <script type="module" src="app-v3.js?v=1.23"></script>
-    <script>
-        // Signal Share Android Optimization Suite - Detection
-        (function() {
-            const isNative = !!window.Capacitor
-                && typeof window.Capacitor.getPlatform === 'function'
-                && window.Capacitor.getPlatform() !== 'web';
-            if (isNative || /Android/i.test(navigator.userAgent)) {
-                document.documentElement.classList.add('platform-android');
-            }
-        })();
-    </script>
-
-    <section class="companion-prompt-overlay" id="companionPromptOverlay" hidden>
-      <div class="companion-prompt-dialog">
-        <h3>Companion Bridge</h3>
-        <p>Would you like to setup the optional companion bridge to control PC media from the Media Player?</p>
-        <p style="font-size: 0.85rem; opacity: 0.7; margin-top: -12px; margin-bottom: 20px;">OR use our Android App or Webview on Mobile to control PC/Phone media</p>
-        <div class="companion-prompt-actions">
-          <button class="button button-primary" id="companionPromptYes">Download Now</button>
-          <button class="button button-secondary" id="companionPromptInstructions">How to Install</button>
-          <button class="button button-secondary" id="companionPromptNo">No Thanks</button>
-        </div>
-      </div>
-    </section>
-
-    <section class="companion-prompt-overlay" id="companionSetupOverlay" hidden>
-      <div class="companion-prompt-dialog companion-setup-dialog">
-        <h3>Setup Companion</h3>
-        <p style="font-size: 0.85rem; opacity: 0.7; margin-top: -12px; margin-bottom: 20px; text-align: center; width: 100%;">OR use our Android App or Webview on Mobile to control PC/Phone media</p>
-        <div class="setup-steps">
-          <div class="setup-step">
-            <strong>1. Install Node.js</strong>
-            <p>Ensure you have <a href="https://nodejs.org/" target="_blank" style="color: var(--accent); text-decoration: underline;">Node.js</a> installed on your PC.</p>
-          </div>
-          <div class="setup-step">
-            <strong>2. Download Script</strong>
-            <p>Click <a href="#" id="companionDownloadLink" style="color: var(--accent); text-decoration: underline; font-weight: bold;">HERE</a> to get the <code>setup-companion.bat</code> file.</p>
-          </div>
-          <div class="setup-step">
-            <strong>3. Keep Open</strong>
-            <p>Leave the terminal window open while you use the player.</p>
-          </div>
-          <div class="setup-step">
-            <strong>Security & Privacy</strong>
-            <p>
-              <a href="#" id="companionSecurityLink" style="color: var(--accent); text-decoration: underline;">download safety measures HERE</a> 
-              or 
-              <a href="security.html" target="_blank" style="color: var(--accent); text-decoration: underline;">read in browser HERE</a>.
-            </p>
-          </div>
-        </div>
-        <div class="setup-command-box">
-          <p>Run in terminal:</p>
-          <code id="setupCommand">npm install && npm start</code>
-          <button class="button button-secondary button-small" id="copySetupCommand">Copy</button>
-        </div>
-        <div class="companion-prompt-actions">
-          <button class="button button-primary" id="companionSetupClose">Got it</button>
-        </div>
-      </div>
-    </section>
-    <div id="toastContainer" class="toast-container"></div>
-
-    <!-- Questions Guide fine-print footer -->
-
-
-    <div class="questions-guide-footer">
-        <div class="footer-links">
-            <a href="./index.html">Back to Site</a>
-            <a href="./how-to-guide.html">Back to How-To</a>
-            <a href="./hero-player-deepdive.html">Back to Dev Tools</a>
-        </div>
-        <span>Signal Share Engineering Documentation</span><br>
-        <span>&copy; 2026 Deep Dive Series</span>
+    <div class="gpu-usage" id="gpuUsage">
+      GPU: 0% | VRAM: 0MB
     </div>
-    <div class="chat-resize-handle" id="chat-resize-handle"></div>
-    <aside class="steam-chat-sidebar" id="arcadeCompanionSidebar">
-                <div class="chat-header">
-            <!-- Title & Status Group -->
-            <div style="display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 120px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div id="chat-status-dot" style="width: 8px; height: 8px; background: #67c1f5; border-radius: 50%; box-shadow: 0 0 8px #67c1f5; transition: all 0.3s ease; flex-shrink: 0;"></div>
-                    <span id="chat-mode-title" style="font-weight: 800; font-size: 0.65rem; letter-spacing: 1px; text-transform: uppercase; color: #67c1f5;">Companion</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 8px; height: 8px; flex-shrink: 0;"></div>
-                    <select id="chat-model-select" style="background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 0.6rem; font-weight: 700; padding: 0; cursor: pointer; outline: none; text-transform: uppercase; margin: 0;">
-                        <option value="auto" style="background: #1a1a1a;">Auto-Select</option>
-                        <option value="deepseek-r1-distill-qwen-1.5b" style="background: #1a1a1a;">DeepSeek R1 Distill (1.5B)</option>
-                        <option value="google/gemma-4-e2b" style="background: #1a1a1a;">Gemma 4 E2B</option>
-                        <option value="google/gemma-4-e4b" style="background: #1a1a1a;">Gemma 4 E4B</option>
-                        <option value="qwen/qwen3.5-9b" style="background: #1a1a1a;">Qwen 3.5 (9B)</option>
-                    </select>
-                </div>
-                <div id="engine-status-container" style="display: flex; align-items: center; gap: 8px; font-size: 0.55rem; font-weight: 700; color: rgba(255,255,255,0.3);">
-                    <div id="engine-status-dot" style="width: 8px; height: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; flex-shrink: 0;"></div>
-                    <span id="engine-status-text">LLM BRIDGE DISCONNECTED</span>
-                </div>
-            </div>
 
-            <!-- Action Buttons (Flattened for better wrapping) -->
-            <button class="history-btn" onclick="toggleChatSecurity()" title="Security Dashboard" style="border: 2px solid #67c1f5; color: #67c1f5; background: rgba(103, 193, 245, 0.1); flex-shrink: 0;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                Security
-            </button>
-            <button class="history-btn" onclick="toggleChatHistory()" title="View History" style="flex-shrink: 0;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                History
-            </button>
-            <button id="new-chat-btn" class="history-btn" onclick="startNewChat()" style="flex-shrink: 0;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            </button>
-            <button class="close-chat-btn" onclick="toggleChat()" title="Hide Chat" style="flex-shrink: 0;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-        </div>
-        </div>
+    <div class="chat-messages" id="messagesContainer">
+      <div class="message ai">Hello! How can I help you today?</div>
+    </div>
 
-                <div id="chat-security" class="chat-security-view" style="display: none; flex: 1; flex-direction: column; padding: 15px; overflow-y: auto; background: rgba(0,0,0,0.85); color: #fff; font-family: 'Space Grotesk', sans-serif;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#67c1f5" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                <h3 style="margin: 0; font-size: 1.1rem; color: #67c1f5;">Security Dashboard</h3>
-            </div>
+    <div class="loading-indicator" id="loadingIndicator">Loading...</div>
+    <div class="typing-indicator" id="typingIndicator"></div>
 
-            <div style="margin-bottom: 20px; padding: 12px; background: rgba(103, 193, 245, 0.1); border-radius: 8px; border: 1px solid rgba(103, 193, 245, 0.2);">
-                <p style="margin: 0; font-size: 0.8rem; line-height: 1.4; color: #ccc;">
-                    Manage your bridge handshake and lock this PC to your specific device. Settings are saved only in this browser.
-                </p>
-            </div>
+    <div class="chat-input-area">
+      <div class="input-wrapper">
+        <input type="text" id="messageInput" placeholder="Type your message..." autocomplete="off"/>
+        <button class="send-btn" onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  </div>
 
-            <div style="display: flex; flex-direction: column; gap: 15px;">
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Bridge Handshake Secret</label>
-                    <input type="password" id="sidebar-bridge-secret" placeholder="Optional secret key" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none;">
-                </div>
+  <script>
+    const messagesContainer = document.getElementById('messagesContainer');
+    const messageInput = document.getElementById('messageInput');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const typingIndicator = document.getElementById('typingIndicator');
+    const gpuUsageEl = document.getElementById('gpuUsage');
 
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Bridge URL (PC IP)</label>
-                    <input type="text" id="sidebar-bridge-url" placeholder="http://192.168.x.x:3000" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none;">
-                </div>
+    let currentAiResponse = null;
+    let isTyping = false;
+    let aiIntervalId = null;
 
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Local LLM Token</label>
-                    <input type="password" id="sidebar-local-llm-token" placeholder="Optional LAN auth token" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none;">
-                </div>
+    function updateGpuUsage() {
+      // Simulate GPU usage based on message length (mock data)
+      const mockVramUsage = Math.floor(Math.random() * 1024);
+      gpuUsageEl.innerHTML = `GPU: ${Math.round((mockVramUsage / 512) * 100)}% | VRAM: ${mockVramUsage}MB`;
+    }
 
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Device ID (Hardware Lock)</label>
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" id="sidebar-device-id" placeholder="Optional device token" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none; font-size: 0.75rem;">
-                        <button onclick="lockToThisDevice()" style="padding: 0 12px; background: #333; border: none; border-radius: 6px; color: #67c1f5; font-size: 0.7rem; font-weight: 700; cursor: pointer;">This PC</button>
-                    </div>
-                </div>
+    function addMessage(role, text) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${role}`;
+      messageDiv.innerHTML = `<span class="role-label">${role === 'ai' ? 'AI Assistant' : 'You'}</span>${text.replace(/\n/g, '<br>')}</span>`;
+      messagesContainer.appendChild(messageDiv);
 
-                <button onclick="saveSecurityDashboard()" style="width: 100%; padding: 12px; background: #67c1f5; border: none; border-radius: 6px; color: #000; font-weight: 800; text-transform: uppercase; margin-top: 10px; cursor: pointer;">Save Security Settings</button>
-                
-                <div id="security-save-status" style="text-align: center; font-size: 0.75rem; height: 1.2rem;"></div>
+      // Scroll to bottom
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
 
-                <hr style="border: 0; border-top: 1px solid #222; margin: 15px 0;">
+    function showLoading() {
+      loadingIndicator.classList.add('active');
+      typingIndicator.classList.remove('active');
+    }
 
-                <div id="banned-ips-section">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Active IP Bans</label>
-                    <div id="banned-ips-list" style="margin-top: 10px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 0.75rem; color: #ff5555; border: 1px solid #440000; min-height: 40px; display: flex; align-items: center; justify-content: center;">
-                        No IPs currently banned.
-                    </div>
-                    <button onclick="refreshBannedIps()" style="width: 100%; margin-top: 10px; padding: 8px; background: transparent; border: 1px solid #333; border-radius: 6px; color: rgba(255,255,255,0.5); font-size: 0.7rem; cursor: pointer;">Refresh Ban List</button>
-                </div>
-            </div>
-        </div>
-        <div id="chat-messages" class="chat-messages">
-            <!-- Messages injected here -->
-        </div>
+    function hideLoading() {
+      loadingIndicator.classList.remove('active');
+      typingIndicator.classList.remove('active');
+    }
 
-        <div id="chat-history" class="chat-history-view">
-            <!-- History items injected here -->
-        </div>
+    async function sendMessage() {
+      const text = messageInput.value.trim();
+      if (!text) return;
 
-        <div class="chat-input-area">
-            <div id="chat-attachment-preview" class="chat-attachment-preview" hidden>
-                <div class="preview-content">
-                    <img id="chat-preview-img" src="" alt="Preview" style="display:none">
-                    <video id="chat-preview-video" src="" muted style="display:none"></video>
-                    <div id="chat-preview-file" class="file-preview-icon" style="display:none">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-                        <span id="chat-preview-filename">file.pdf</span>
-                    </div>
-                    <button onclick="clearChatAttachment()" class="clear-attachment-btn">&times;</button>
-                </div>
-            </div>
-            <div class="chat-input-wrapper">
-                <input type="file" id="chat-file-input" accept="image/*,video/*,.pdf,.doc,.docx,.txt,.js,.html,.css,.json" hidden onchange="handleChatFileSelect(event)">
-                <button onclick="document.getElementById('chat-file-input').click()" class="chat-attach-btn" title="Attach Media">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                </button>
-                <input type="text" id="arc-chat-input" class="chat-input" placeholder="Ask for advice or code...">
-                <button onclick="sendChatMessage()" class="chat-send-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
-                </button>
-            </div>
-        </div>
-    </aside>
+      // Add user message
+      addMessage('user', text);
+      messageInput.value = '';
+      hideLoading();
 
+      // Show loading indicator
+      showLoading();
+
+      // Simulate AI response delay (mock)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Mock AI response based on input length
+      const mockResponse = `Here's a helpful answer to your question: ${text.substring(0, 50)}...`;
+
+      addMessage('ai', mockResponse);
+      currentAiResponse = mockResponse;
+    }
+
+    function startTyping() {
+      isTyping = true;
+      typingIndicator.classList.add('active');
+      hideLoading();
+
+      // Simulate AI response delay (mock)
+      setTimeout(() => {
+        isTyping = false;
+        typingIndicator.classList.remove('active');
+        addMessage('ai', currentAiResponse);
+        currentAiResponse = null;
+      }, 1500);
+    }
+
+    // Auto-scroll to bottom on new message
+    messagesContainer.addEventListener('scroll', () => {
+      if (messagesContainer.scrollTop === messagesContainer.scrollHeight) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight - 20;
+      }
+    });
+
+    // Send message when Enter key is pressed
+    messageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Auto-update GPU usage every second
+    setInterval(updateGpuUsage, 1000);
+  </script>
 </body>
 </html>

@@ -308,5 +308,7 @@ app.use((req, res) => {
 
 app.listen(port, "0.0.0.0", () => {
   console.log(`[Bridge] Signal Share backend listening on http://0.0.0.0:${port}`);
+  console.log(`DEBUG process.env.SIGNAL_SHARE_AI_BASE_URL: ${process.env.SIGNAL_SHARE_AI_BASE_URL}`);
+  console.log(`DEBUG getConfiguredChatUrl(): ${getConfiguredChatUrl()}`);
   console.log(`[Bridge] AI endpoint configured: ${getConfiguredChatUrl() ? "YES" : "NO"}`);
 });
