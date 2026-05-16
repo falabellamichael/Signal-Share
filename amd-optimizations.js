@@ -7,7 +7,7 @@
  * - no polling loops
  * - no deleting assistant bubbles
  * - trims poisoned/oversized saved history before chat POSTs
- * - rewrites legacy provider/port availability text into one clear reply
+ * - converts provider availability replies into failed provider attempts
  */
 
 (function installChatBridgeGuard() {
@@ -16,7 +16,7 @@
 
     const vendorName = 'lm' + ' studio';
     const removedPort = String.fromCharCode(49, 50, 51, 52);
-    const bridgeUnavailableReply = 'AI bridge is unavailable or not configured. Check the selected bridge/provider, then try again.';
+    const bridgeUnavailableReply = 'AI bridge unavailable';
     const MAX_HISTORY_MESSAGES = 4;
     const MAX_HISTORY_CONTENT_CHARS = 1800;
     const MAX_NORMAL_MESSAGE_CHARS = 6000;
@@ -38,7 +38,9 @@
             || text.includes('check the bridge/provider settings')
             || text.includes('ai_availability_suppressed')
             || text.includes('[ai_availability_suppressed]')
-            || text.includes('empty ai reply');
+            || text.includes('empty ai reply')
+            || text.includes('ai bridge is unavailable')
+            || text.includes('ai bridge unavailable');
     }
 
     function isEditLikeMessage(value = '') {
@@ -108,43 +110,20 @@
         }
     }
 
-    function buildScrubbedResponse(response, text) {
+    function buildUnavailableProviderResponse(response, text) {
         const headers = new Headers(response.headers);
-        const contentType = `${headers.get('content-type') || ''}`.toLowerCase();
+        headers.set('content-type', 'application/json; charset=utf-8');
 
-        try {
-            const payload = JSON.parse(text);
-            if (typeof payload?.reply === 'string' && isBridgeAvailabilityText(payload.reply)) {
-                payload.reply = bridgeUnavailableReply;
-                payload.bridgeUnavailable = true;
-                headers.set('content-type', 'application/json; charset=utf-8');
-                return new Response(JSON.stringify(payload), {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers
-                });
-            }
-            if (typeof payload?.error === 'string' && isBridgeAvailabilityText(payload.error)) {
-                payload.reply = bridgeUnavailableReply;
-                payload.error = '';
-                payload.bridgeUnavailable = true;
-                headers.set('content-type', 'application/json; charset=utf-8');
-                return new Response(JSON.stringify(payload), {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers
-                });
-            }
-        } catch (_error) {
-            // Plain text response.
-        }
-
-        headers.set('content-type', contentType.includes('application/json')
-            ? 'application/json; charset=utf-8'
-            : 'text/plain; charset=utf-8');
-        return new Response(bridgeUnavailableReply, {
-            status: response.status,
-            statusText: response.statusText,
+        return new Response(JSON.stringify({
+            ok: false,
+            bridgeUnavailable: true,
+            error: bridgeUnavailableReply,
+            sourceStatus: response.status,
+            sourceStatusText: response.statusText,
+            suppressedText: true
+        }), {
+            status: 503,
+            statusText: 'AI bridge unavailable',
             headers
         });
     }
@@ -192,7 +171,6 @@
             const method = `${init?.method || input?.method || 'GET'}`.toUpperCase();
             const looksLikeChat = method === 'POST' && /\/api\/(?:local-llm|llm)\/chat(?:\?|$)/i.test(url);
 
-            let guardedInput = input;
             let guardedInit = init;
 
             if (looksLikeChat && typeof init?.body === 'string') {
@@ -202,12 +180,12 @@
                 };
             }
 
-            const response = await originalFetch(guardedInput, guardedInit);
+            const response = await originalFetch(input, guardedInit);
             if (!looksLikeChat) return response;
 
             const text = await response.clone().text().catch(() => '');
             if (!text || !isBridgeAvailabilityText(text)) return response;
-            return buildScrubbedResponse(response, text);
+            return buildUnavailableProviderResponse(response, text);
         };
     }
 
