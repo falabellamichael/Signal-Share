@@ -2,19 +2,28 @@
  * AMD GPU Optimizations for Signal Share
  * Detects AMD hardware and applies performance tweaks for WebGL and UI.
  *
- * Also installs a frontend response scrubber so bridge/backend availability text
- * is not rendered as repeated chat bubbles.
+ * Also installs a lightweight chat request/response guard:
+ * - no DOM observers
+ * - no polling loops
+ * - no deleting assistant bubbles
+ * - trims poisoned/oversized saved history before chat POSTs
+ * - converts provider availability replies into failed provider attempts
  */
 
-(function installAiAvailabilityMessageScrubber() {
-    if (window.__signalShareLegacyLocalModelErrorScrubberInstalled) return;
-    window.__signalShareLegacyLocalModelErrorScrubberInstalled = true;
+(function installChatBridgeGuard() {
+    if (window.__signalShareChatBridgeGuardInstalled) return;
+    window.__signalShareChatBridgeGuardInstalled = true;
 
     const vendorName = 'lm' + ' studio';
     const removedPort = String.fromCharCode(49, 50, 51, 52);
-    const suppressedReplyMarker = '[AI_AVAILABILITY_SUPPRESSED]';
+    const bridgeUnavailableReply = 'AI bridge unavailable';
+    const MAX_HISTORY_MESSAGES = 4;
+    const MAX_HISTORY_CONTENT_CHARS = 1800;
+    const MAX_NORMAL_MESSAGE_CHARS = 6000;
+    const MAX_PAGE_CONTEXT_CHARS = 14000;
+    const MAX_EDIT_PAGE_CONTEXT_CHARS = 22000;
 
-    function isBlockedAiAvailabilityMessage(value = '') {
+    function isBridgeAvailabilityText(value = '') {
         const text = `${value || ''}`.toLowerCase();
         return text.includes(vendorName)
             || text.includes(`port ${removedPort}`)
@@ -27,34 +36,102 @@
             || text.includes('set signal_share_ai_base_url')
             || text.includes('set signal_share_ai_chat_url')
             || text.includes('check the bridge/provider settings')
-            || text.includes('ai_availability_suppressed');
+            || text.includes('ai_availability_suppressed')
+            || text.includes('[ai_availability_suppressed]')
+            || text.includes('empty ai reply')
+            || text.includes('ai bridge is unavailable')
+            || text.includes('ai bridge unavailable');
     }
 
-    function scrubPayloadText(text = '') {
-        if (!isBlockedAiAvailabilityMessage(text)) return text;
+    function isEditLikeMessage(value = '') {
+        const text = `${value || ''}`.trim().toLowerCase();
+        return /^\/(?:edit|fix|rewrite)\b/.test(text)
+            || /^\[(?:edit|fix|rewrite)\]/.test(text)
+            || /workshop validation|workshop editor|active workshop|index\.html|game\.js/.test(text);
+    }
+
+    function truncateContent(value = '', maxChars = MAX_HISTORY_CONTENT_CHARS) {
+        const text = `${value || ''}`;
+        if (text.length <= maxChars) return text;
+        return `${text.slice(0, maxChars)}\n\n[Trimmed by chat bridge guard: original message was ${text.length} characters.]`;
+    }
+
+    function sanitizeHistory(history = [], currentMessage = '') {
+        if (!Array.isArray(history)) return [];
+        const editLike = isEditLikeMessage(currentMessage);
+        if (editLike) return [];
+
+        return history
+            .filter((entry) => entry && typeof entry === 'object')
+            .filter((entry) => !isBridgeAvailabilityText(entry.content || entry.text || ''))
+            .slice(-MAX_HISTORY_MESSAGES)
+            .map((entry) => ({
+                ...entry,
+                content: truncateContent(entry.content || entry.text || '', MAX_HISTORY_CONTENT_CHARS)
+            }))
+            .filter((entry) => `${entry.content || ''}`.trim());
+    }
+
+    function sanitizeChatBody(bodyText = '') {
+        if (!bodyText || typeof bodyText !== 'string') return bodyText;
+
         try {
-            const payload = JSON.parse(text);
-            if (typeof payload?.reply === 'string' && isBlockedAiAvailabilityMessage(payload.reply)) {
-                payload.reply = suppressedReplyMarker;
-                payload.suppressedAiAvailabilityMessage = true;
-                return JSON.stringify(payload);
+            const payload = JSON.parse(bodyText);
+            const message = `${payload.message || ''}`;
+            const editLike = isEditLikeMessage(message);
+
+            if (Array.isArray(payload.history)) {
+                payload.history = sanitizeHistory(payload.history, message);
             }
-            if (typeof payload?.error === 'string' && isBlockedAiAvailabilityMessage(payload.error)) {
-                payload.reply = suppressedReplyMarker;
-                payload.error = '';
-                payload.suppressedAiAvailabilityMessage = true;
-                return JSON.stringify(payload);
+
+            if (typeof payload.message === 'string' && payload.message.length > MAX_NORMAL_MESSAGE_CHARS && !editLike) {
+                payload.message = truncateContent(payload.message, MAX_NORMAL_MESSAGE_CHARS);
             }
+
+            if (typeof payload.pageContext === 'string') {
+                const maxPageContext = editLike ? MAX_EDIT_PAGE_CONTEXT_CHARS : MAX_PAGE_CONTEXT_CHARS;
+                if (payload.pageContext.length > maxPageContext) {
+                    payload.pageContext = truncateContent(payload.pageContext, maxPageContext);
+                }
+            }
+
+            if (payload.attachment && typeof payload.attachment.data === 'string' && payload.attachment.data.length > 2_000_000) {
+                payload.attachment = {
+                    type: payload.attachment.type || 'file',
+                    name: payload.attachment.name || 'large-attachment',
+                    omitted: true,
+                    reason: 'Attachment omitted by chat bridge guard because it exceeded 2 MB.'
+                };
+            }
+
+            return JSON.stringify(payload);
         } catch (_error) {
-            // Plain text response; replace directly.
+            return bodyText;
         }
-        return suppressedReplyMarker;
     }
 
-    function scrubSavedChatHistory() {
+    function buildUnavailableProviderResponse(response, text) {
+        const headers = new Headers(response.headers);
+        headers.set('content-type', 'application/json; charset=utf-8');
+
+        return new Response(JSON.stringify({
+            ok: false,
+            bridgeUnavailable: true,
+            error: bridgeUnavailableReply,
+            sourceStatus: response.status,
+            sourceStatusText: response.statusText,
+            suppressedText: true
+        }), {
+            status: 503,
+            statusText: 'AI bridge unavailable',
+            headers
+        });
+    }
+
+    function scrubSavedChatHistoryOnce() {
         try {
             const raw = localStorage.getItem('arcade-chats');
-            if (!raw || !isBlockedAiAvailabilityMessage(raw)) return;
+            if (!raw) return;
             const chats = JSON.parse(raw);
             if (!Array.isArray(chats)) return;
 
@@ -62,7 +139,17 @@
             for (const chat of chats) {
                 if (!Array.isArray(chat?.messages)) continue;
                 const before = chat.messages.length;
-                chat.messages = chat.messages.filter((message) => !isBlockedAiAvailabilityMessage(message?.content));
+                chat.messages = chat.messages
+                    .filter((message) => !isBridgeAvailabilityText(message?.content || ''))
+                    .map((message) => {
+                        const content = `${message?.content || ''}`;
+                        if (content.length <= 12000) return message;
+                        changed = true;
+                        return {
+                            ...message,
+                            content: truncateContent(content, 4000)
+                        };
+                    });
                 if (chat.messages.length !== before) changed = true;
             }
 
@@ -72,96 +159,47 @@
         }
     }
 
-    function removeRenderedBlockedMessages(root = document) {
-        try {
-            const nodes = Array.from(root.querySelectorAll?.('.chat-message, .message-ai, .system-error') || []);
-            for (const node of nodes) {
-                if (isBlockedAiAvailabilityMessage(node.textContent || '')) {
-                    node.remove();
-                }
-            }
-        } catch (_error) {
-            // Ignore DOM timing issues.
-        }
-    }
-
-    function installFetchScrubber() {
+    function installFetchGuard() {
         if (!window.fetch || window.__signalShareFetchScrubberInstalled) return;
         window.__signalShareFetchScrubberInstalled = true;
         const originalFetch = window.fetch.bind(window);
 
-        window.fetch = async function signalShareScrubbedFetch(input, init) {
-            const response = await originalFetch(input, init);
+        window.fetch = async function signalShareGuardedFetch(input, init = {}) {
             const url = typeof input === 'string'
                 ? input
                 : `${input?.url || ''}`;
             const method = `${init?.method || input?.method || 'GET'}`.toUpperCase();
             const looksLikeChat = method === 'POST' && /\/api\/(?:local-llm|llm)\/chat(?:\?|$)/i.test(url);
+
+            let guardedInit = init;
+
+            if (looksLikeChat && typeof init?.body === 'string') {
+                guardedInit = {
+                    ...init,
+                    body: sanitizeChatBody(init.body)
+                };
+            }
+
+            const response = await originalFetch(input, guardedInit);
             if (!looksLikeChat) return response;
 
             const text = await response.clone().text().catch(() => '');
-            if (!text || !isBlockedAiAvailabilityMessage(text)) return response;
-
-            const headers = new Headers(response.headers);
-            const contentType = `${headers.get('content-type') || ''}`.toLowerCase();
-            headers.set('content-type', contentType.includes('application/json')
-                ? 'application/json; charset=utf-8'
-                : 'text/plain; charset=utf-8');
-
-            return new Response(scrubPayloadText(text), {
-                status: response.status,
-                statusText: response.statusText,
-                headers
-            });
+            if (!text || !isBridgeAvailabilityText(text)) return response;
+            return buildUnavailableProviderResponse(response, text);
         };
-    }
-
-    function installDomScrubber() {
-        const start = () => {
-            scrubSavedChatHistory();
-            removeRenderedBlockedMessages(document);
-
-            const observer = new MutationObserver((mutations) => {
-                for (const mutation of mutations) {
-                    for (const node of mutation.addedNodes || []) {
-                        if (node.nodeType !== Node.ELEMENT_NODE) continue;
-                        if (isBlockedAiAvailabilityMessage(node.textContent || '')) {
-                            node.remove();
-                            continue;
-                        }
-                        removeRenderedBlockedMessages(node);
-                    }
-                }
-            });
-
-            observer.observe(document.documentElement, {
-                childList: true,
-                subtree: true
-            });
-
-            window.setInterval(() => {
-                scrubSavedChatHistory();
-                removeRenderedBlockedMessages(document);
-            }, 500);
-        };
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', start, { once: true });
-        } else {
-            start();
-        }
     }
 
     window.SignalShareAiAvailabilityScrubber = Object.freeze({
-        isBlockedAiAvailabilityMessage,
-        scrubPayloadText,
-        scrubSavedChatHistory,
-        removeRenderedBlockedMessages,
-        suppressedReplyMarker
+        isBlockedAiAvailabilityMessage: isBridgeAvailabilityText,
+        isBridgeAvailabilityText,
+        sanitizeChatBody,
+        sanitizeHistory,
+        scrubSavedChatHistory: scrubSavedChatHistoryOnce,
+        bridgeUnavailableReply
     });
 
-    installFetchScrubber();
-    installDomScrubber();
+    scrubSavedChatHistoryOnce();
+    installFetchGuard();
 })();
 
 window.AMDOptimizations = (function() {
