@@ -243,9 +243,7 @@ class GPUScrollManager {
         // Clear viewport
         ctx.clearRect(0, 0, width, height);
         
-        // Draw Glassmorphism Background
-        ctx.fillStyle = this.options.glassColor;
-        ctx.fillRect(0, 0, width, height);
+
         
         const containerRect = this.container.getBoundingClientRect();
         
@@ -273,15 +271,7 @@ class GPUScrollManager {
                 
                 ctx.drawImage(data.bitmap, -w/2, -h/2, w, h);
             } else {
-                // For non-images, we just let the DOM render or draw a glass box
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-                ctx.lineWidth = 1;
-                
-                // Draw rounded glass box
-                this.drawRoundedRect(ctx, -w/2, -h/2, w, h, 8);
-                ctx.fill();
-                ctx.stroke();
+
             }
             
             ctx.restore();
@@ -327,8 +317,6 @@ class GPUScrollManager {
                 left: 0;
                 pointer-events: none;
                 z-index: 1;
-                backdrop-filter: blur(${this.options.blurAmount}px);
-                -webkit-backdrop-filter: blur(${this.options.blurAmount}px);
                 mix-blend-mode: overlay;
             }
             
@@ -336,15 +324,6 @@ class GPUScrollManager {
                 position: relative;
                 z-index: 2;
                 transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease;
-            }
-            
-            .glass-card {
-                background: rgba(255, 255, 255, 0.05);
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-                border-radius: 12px;
             }
         `;
         document.head.appendChild(style);
