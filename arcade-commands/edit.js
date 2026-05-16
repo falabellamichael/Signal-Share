@@ -7,6 +7,7 @@
  * - Suggestions may read the current user's editable Workshop games/files.
  * - Execution may open a selected Workshop game/file in the editor.
  * - Saves only write back through the currently open editor.
+ * - Can add generated files to the active Workshop game when requested.
  * - Does not publish, import, or touch external store state.
  * - Accepts SEARCH/REPLACE blocks and single full-file code fences.
  */
@@ -19,7 +20,8 @@
         'add', 'insert', 'create', 'make', 'build', 'change', 'update', 'modify', 'replace',
         'remove', 'delete', 'fix', 'repair', 'debug', 'style', 'styles', 'css', 'javascript',
         'js', 'button', 'layout', 'color', 'colour', 'work', 'working', 'better', 'new',
-        'feature', 'refactor', 'rename', 'rewrite', 'polish', 'improve', 'tweak', 'adjust'
+        'feature', 'refactor', 'rename', 'rewrite', 'polish', 'improve', 'tweak', 'adjust',
+        'file'
     ]);
 
     const FILLER_WORDS = new Set([
@@ -145,6 +147,18 @@
         return getEditableGames().find((game) => `${game?.id || ''}` === activeId) || null;
     }
 
+    function getActiveEditorTarget() {
+        const state = getEditorState() || {};
+        const activeGame = getActiveEditableGame();
+        return {
+            gameId: normalizeText(state.activeGameId || state.gameId || activeGame?.id || ''),
+            gameTitle: normalizeText(state.activeGameTitle || state.gameTitle || gameTitle(activeGame)),
+            fileName: normalizeText(state.activeFileName || state.fileName || ''),
+            fileType: normalizeText(state.activeFileType || state.fileType || ''),
+            fileContent: readEditorContent() || `${state.activeFileContent || state.content || ''}`
+        };
+    }
+
     function stripLeadingTarget(args = '', target = null) {
         let remaining = normalizeText(args);
         if (!remaining || !target) return remaining;
@@ -165,6 +179,128 @@
         const tokens = tokenize(remaining).filter((token) => !FILLER_WORDS.has(token));
         if (tokens.length === 0) return true;
         return !tokens.some((token) => ACTION_WORDS.has(token));
+    }
+
+    function isAddFileRequest(value = '') {
+        const text = normalizeText(value).toLowerCase();
+        if (!text) return false;
+        return /(?:^|\s)(?:add|create|make|generate)\s+(?:a\s+|new\s+|another\s+)?file\b/.test(text)
+            || /(?:^|\s)new\s+(?:html|css|js|javascript|json|svg|txt)\s+file\b/.test(text)
+            || /(?:^|\s)(?:add|create|make|generate)\s+[^\s]+\.(?:html?|css|js|mjs|cjs|json|svg|txt|xml)\b/.test(text);
+    }
+
+    function requestedFileNameFromPrompt(value = '') {
+        const text = normalizeText(value);
+        return text.match(/\b([a-z0-9][\w.-]*\.(?:html?|css|js|mjs|cjs|json|svg|txt|xml))\b/i)?.[1] || '';
+    }
+
+    function inferFileNameFromPrompt(value = '') {
+        const explicit = requestedFileNameFromPrompt(value);
+        if (explicit) return explicit.replace(/[\\/]+/g, '_');
+        const text = normalizeText(value).toLowerCase();
+        if (/\b(?:css|style|stylesheet)\b/.test(text)) return 'styles.css';
+        if (/\b(?:js|javascript|script)\b/.test(text)) return 'script.js';
+        if (/\b(?:json|data)\b/.test(text)) return 'data.json';
+        if (/\b(?:svg|icon|image)\b/.test(text)) return 'asset.svg';
+        return 'new-file.js';
+    }
+
+    function inferFileType(name = '') {
+        const lower = normalizeText(name).toLowerCase();
+        if (/\.html?$/.test(lower)) return 'text/html';
+        if (/\.css$/.test(lower)) return 'text/css';
+        if (/\.(?:js|mjs|cjs)$/.test(lower)) return 'text/javascript';
+        if (/\.json$/.test(lower)) return 'application/json';
+        if (/\.svg$/.test(lower)) return 'image/svg+xml';
+        if (/\.xml$/.test(lower)) return 'application/xml';
+        return 'text/plain';
+    }
+
+    function inferCodeKind(lang = '', content = '') {
+        const hint = normalizeText(lang).toLowerCase();
+        const code = `${content || ''}`.trim();
+        if (/html|htm/.test(hint) || /^<!doctype html|^<html[\s>]/i.test(code)) return 'html';
+        if (/css/.test(hint) || /^[.#]?[a-z0-9_-]+[\s\S]*\{[\s\S]*\}/i.test(code)) return 'css';
+        if (/javascript|\bjs\b|mjs|cjs/.test(hint) || /\b(function|const|let|var|class|import|export)\b/.test(code)) return 'js';
+        if (/json/.test(hint)) return 'json';
+        if (/svg|xml/.test(hint)) return 'svg';
+        return 'txt';
+    }
+
+    function defaultNameForKind(kind = 'txt') {
+        if (kind === 'html') return 'new-file.html';
+        if (kind === 'css') return 'styles.css';
+        if (kind === 'js') return 'script.js';
+        if (kind === 'json') return 'data.json';
+        if (kind === 'svg') return 'asset.svg';
+        return 'new-file.txt';
+    }
+
+    function fileNameFromFenceInfo(info = '') {
+        const text = normalizeText(info);
+        return text.match(/\b(?:filename|file|name|path)\s*=\s*["']?([^"'\s`]+\.(?:html?|css|js|mjs|cjs|json|svg|txt|xml))\b/i)?.[1]
+            || text.match(/\b([a-z0-9][\w.-]*\.(?:html?|css|js|mjs|cjs|json|svg|txt|xml))\b/i)?.[1]
+            || '';
+    }
+
+    function extractGeneratedFiles(replyText = '', userPrompt = '') {
+        if (typeof window.buildAiWorkshopFilesFromText === 'function') {
+            const files = window.buildAiWorkshopFilesFromText(replyText);
+            if (Array.isArray(files) && files.length > 0) return files;
+        }
+
+        const source = normalizeNewlines(replyText);
+        const blocks = [];
+        const fenceRegex = /```([^\n`]*)\n([\s\S]*?)```/g;
+        let match;
+        let unnamedCount = 0;
+        while ((match = fenceRegex.exec(source)) !== null) {
+            const info = normalizeText(match[1] || '');
+            const content = normalizeNewlines(match[2] || '').trim();
+            if (!content) continue;
+            const kind = inferCodeKind(info, content);
+            const name = fileNameFromFenceInfo(info)
+                || (unnamedCount === 0 ? inferFileNameFromPrompt(userPrompt) : defaultNameForKind(kind).replace(/^(.*?)(\.[^.]+)$/, `$1-${unnamedCount + 1}$2`));
+            unnamedCount += 1;
+            blocks.push({
+                name: name.replace(/[\\/]+/g, '_'),
+                type: inferFileType(name),
+                content
+            });
+        }
+        return blocks;
+    }
+
+    async function addGeneratedFilesToActiveGame(replyText = '', userPrompt = '') {
+        const target = getActiveEditorTarget();
+        if (!target.gameId) {
+            return { ok: false, message: 'Open a Workshop game in the editor before adding a file.' };
+        }
+        if (typeof window.addAiWorkshopFilesToGame !== 'function') {
+            return { ok: false, message: 'Workshop add-file function is unavailable.' };
+        }
+
+        const files = extractGeneratedFiles(replyText, userPrompt)
+            .filter((file) => normalizeText(file?.name) && `${file?.content || ''}`.trim());
+
+        if (files.length === 0) {
+            return { ok: false, message: 'No generated file code was found to add.' };
+        }
+
+        const activeFileName = target.fileName || 'index.html';
+        const result = await window.addAiWorkshopFilesToGame(target.gameId, files, {
+            activeFileName,
+            activeFileType: target.fileType || inferFileType(activeFileName),
+            activeFileContent: target.fileContent || readEditorContent()
+        });
+
+        if (result?.ok === false) return result;
+        return {
+            ok: true,
+            count: files.length,
+            files,
+            message: `Added ${files.length} file${files.length === 1 ? '' : 's'}: ${files.map((file) => file.name).join(', ')}.`
+        };
     }
 
     function resolveEditTarget(args = '') {
@@ -225,6 +361,8 @@
             activeFileContent: content,
             activeFileContentLength: content.length,
             activeFileContentProvidedInEditProtocol: true,
+            addFileRequested: isAddFileRequest(lastEditPrompt),
+            requestedNewFileName: isAddFileRequest(lastEditPrompt) ? inferFileNameFromPrompt(lastEditPrompt) : '',
             source: 'edit-js-editor-scoped-snapshot'
         };
         window.__activeWorkshopEditorContext = snapshot;
@@ -362,11 +500,26 @@
         return modes.has('/edit') || /^\s*\/edit\b/i.test(text);
     }
 
+    function getAddFileSuggestion(idPrefix = '') {
+        const prefix = normalizeText(idPrefix);
+        return {
+            id: prefix ? `${prefix} add a file` : 'add a file',
+            name: 'Add a file',
+            description: prefix
+                ? `Create a new file in "${prefix}".`
+                : 'Create a new file in the current Workshop game.'
+        };
+    }
+
     function getGameSuggestions(args = '') {
         const prompt = normalizeText(args).toLowerCase();
         const games = getEditableGames();
         const activeGame = getActiveEditableGame();
         const suggestions = [];
+
+        if (!prompt || 'add a file'.includes(prompt)) {
+            suggestions.push(getAddFileSuggestion());
+        }
 
         if (!prompt && activeGame) {
             const activeState = getEditorState();
@@ -391,14 +544,19 @@
             const title = gameTitle(matchingGame);
             const remaining = prompt.slice(title.length).trim();
             const files = gameFiles(matchingGame);
-            return files
+            const fileSuggestions = files
                 .filter((file) => !remaining || fileName(file).toLowerCase().includes(remaining))
-                .slice(0, 10)
+                .slice(0, 9)
                 .map((file) => ({
                     id: `${title} ${fileName(file)}`,
                     name: fileName(file),
                     description: `Open ${fileName(file)} in "${title}" for editing.`
                 }));
+
+            if (!remaining || 'add a file'.includes(remaining)) {
+                return [getAddFileSuggestion(title), ...fileSuggestions].slice(0, 10);
+            }
+            return fileSuggestions;
         }
 
         const gameMatches = sortedGames
@@ -425,7 +583,7 @@
 
     window.ArcadeCommandManager.register({
         id: COMMAND_ID,
-        description: 'Edit the current editor or choose one of your editable Workshop games.',
+        description: 'Edit the current editor, add a file, or choose one of your editable Workshop games.',
 
         execute: async (args, inputElement) => {
             const prompt = normalizeText(args);
@@ -475,11 +633,32 @@
                 handled: false,
                 editorEditAttempted: false,
                 editorEditSucceeded: false,
+                fileAddAttempted: false,
+                fileAddSucceeded: false,
                 errorReason: null
             };
 
             const userPrompt = options.userPrompt || lastEditPrompt || '';
             if (!isEditActive(userPrompt)) return actionResult;
+
+            if (isAddFileRequest(userPrompt)) {
+                actionResult.handled = true;
+                actionResult.fileAddAttempted = true;
+                const addResult = await addGeneratedFilesToActiveGame(text, userPrompt);
+                if (addResult?.ok === false) {
+                    actionResult.errorReason = addResult?.message || 'Failed to add generated file.';
+                    showEditFeedback(actionResult.errorReason, true);
+                    return actionResult;
+                }
+
+                actionResult.fileAddSucceeded = true;
+                showEditFeedback(addResult.message || 'Added generated file.', false);
+                window.activeArcadeCommandMode = null;
+                window.activeArcadeCommandModes = Array.isArray(window.activeArcadeCommandModes)
+                    ? window.activeArcadeCommandModes.filter((mode) => mode !== '/edit')
+                    : [];
+                return actionResult;
+            }
 
             const current = readEditorContent();
             if (!getEditorElement()) {
