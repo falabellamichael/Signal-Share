@@ -19,14 +19,33 @@ window.ArcadeCommandManager = (function() {
         return Array.from(commands.values());
     }
 
+    function clearCommandModes() {
+        window.activeArcadeCommandMode = '';
+        window.activeArcadeCommandModes = [];
+        window.__arcadeCommandModeTurnActive = false;
+    }
+
+    function markCommandMode(cmdId) {
+        const mode = `/${cmdId}`;
+        window.activeArcadeCommandMode = mode;
+        window.__arcadeCommandModeTurnActive = true;
+        if (!Array.isArray(window.activeArcadeCommandModes)) {
+            window.activeArcadeCommandModes = [];
+        }
+        if (!window.activeArcadeCommandModes.includes(mode)) {
+            window.activeArcadeCommandModes.push(mode);
+        }
+    }
+
     async function handle(text, inputElement) {
         let currentText = text.trim();
         let handledSomething = false;
         let lastResult = false;
         let safetyCounter = 0;
         
-        // Initialize or clear command modes stack
-        window.activeArcadeCommandModes = [];
+        // Command modes are one-shot per send. Clear stale /edit or /fix state
+        // before parsing this message so normal chat cannot inherit old modes.
+        clearCommandModes();
 
         // Support stacked commands (e.g. /edit /fix)
         while (currentText.startsWith('/') || currentText.startsWith('[')) {
@@ -57,11 +76,7 @@ window.ArcadeCommandManager = (function() {
             const command = getCommand(cmdId);
             if (command) {
                 handledSomething = true;
-                
-                // Track all commands in the chain
-                if (!window.activeArcadeCommandModes.includes(`/${cmdId}`)) {
-                    window.activeArcadeCommandModes.push(`/${cmdId}`);
-                }
+                markCommandMode(cmdId);
 
                 // If execute returns true, it means it handled everything (no AI needed)
                 lastResult = await command.execute(args, inputElement);
@@ -86,7 +101,7 @@ window.ArcadeCommandManager = (function() {
                 const cmdId = aliasMatch[1].toLowerCase();
                 const command = getCommand(cmdId);
                 if (command) {
-                    window.activeArcadeCommandModes = [`/${cmdId}`];
+                    markCommandMode(cmdId);
                     return await command.execute(aliasMatch[2].trim(), inputElement);
                 }
             }
@@ -138,6 +153,7 @@ window.ArcadeCommandManager = (function() {
         getCommand,
         getAllCommands,
         handle,
-        getSuggestions
+        getSuggestions,
+        clearCommandModes
     };
 })();
