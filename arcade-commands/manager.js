@@ -289,3 +289,40 @@ window.ArcadeCommandManager = (function() {
         clearCommandModes
     };
 })();
+
+/**
+ * Disable native browser text-history suggestions on the chat input.
+ * This keeps the custom slash-command panel while removing remembered entries.
+ */
+(function disableNativeChatInputAutocomplete() {
+    if (window.__arcadeCommandManagerAutocompletePatchInstalled) return;
+    window.__arcadeCommandManagerAutocompletePatchInstalled = true;
+
+    function patchInput() {
+        const input = document.getElementById('arc-chat-input');
+        if (!input) return false;
+
+        input.setAttribute('autocomplete', 'off');
+        input.setAttribute('autocorrect', 'off');
+        input.setAttribute('autocapitalize', 'off');
+        input.setAttribute('spellcheck', 'false');
+        input.setAttribute('data-lpignore', 'true');
+        input.setAttribute('data-form-type', 'other');
+        input.setAttribute('aria-autocomplete', 'list');
+
+        // Chrome sometimes keys saved suggestions off the name attribute.
+        input.name = `arc_chat_input_${Date.now()}`;
+
+        const form = input.closest('form');
+        if (form) form.setAttribute('autocomplete', 'off');
+        return true;
+    }
+
+    if (!patchInput()) {
+        document.addEventListener('DOMContentLoaded', patchInput, { once: true });
+        const timer = window.setInterval(() => {
+            if (patchInput()) window.clearInterval(timer);
+        }, 250);
+        window.setTimeout(() => window.clearInterval(timer), 10000);
+    }
+})();
