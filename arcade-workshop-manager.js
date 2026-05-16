@@ -269,19 +269,8 @@ window.ArcadeWorkshopManager = {
         });
     },
 
-    /**
-     * Generates the system directive for workshop publishing.
-     */
-    getPublishDirective: function() {
-        return [
-            '[WORKSHOP_PROTOCOL]',
-            'You can publish a game to the workshop by outputting the [PUBLISH] tag containing the JSON payload with: { "target": "workshop", "title": "...", "files": [{ "name": "...", "content": "..." }] }, OR simply output standard markdown code blocks with the file name specified in the block info (e.g. ```html filename=index.html). For large files, code blocks are highly recommended to prevent the response from being cut off.',
-            'Generate a functional, playable, self-contained browser game. It could be just a single HTML file or a multi-file package. At least 1 file must be generated (images are always optional).',
-            'Use plain browser APIs only; no external libraries, CDNs, or module syntax.',
-            'You can include a brief explanation or introductory text if needed, but make sure to output the code blocks clearly. If using code blocks, make sure to include the file name in the info string so the system can extract it.',
-            '[/WORKSHOP_PROTOCOL]'
-        ].join('\n');
-    },
+    // Duplicate getPublishDirective removed to prevent confusion.
+    // The active one is defined later in the file.
 
     /**
      * Determines if a prompt indicates an intent to publish a game to the workshop.
@@ -642,15 +631,13 @@ window.ArcadeWorkshopManager = {
     getPublishDirective: function() {
         return [
             '[WORKSHOP_PUBLISH]',
-            'CRITICAL: The user has requested an IMMEDIATE publish. You MUST NOT plan, you MUST NOT audit, and you MUST NOT provide a breakdown.',
-            'You MUST IMMEDIATELY write the full, complete, working game code and output a [PUBLISH] block with a valid JSON payload.',
-            'The JSON must contain:',
-            '  "title": The name of the game.',
-            '  "category": "GAME" or "UTILITY".',
-            '  "description": A short description.',
-            '  "files": An array of file objects with "name" and "content".',
-            'Example:',
-            '[PUBLISH: { "title": "My Game", "category": "GAME", "description": "A cool game", "files": [{ "name": "index.html", "content": "<!DOCTYPE html>..." }] }]',
+            'CRITICAL: The user has requested an IMMEDIATE publish. Do NOT output a plan, do NOT output an audit, and do NOT provide a breakdown.',
+            'Just output the code blocks or the [PUBLISH] JSON payload immediately. Any text outside the code blocks or JSON should be minimal or omitted.',
+            'You can publish a game by outputting standard markdown code blocks with the file name specified in the block info (e.g. ```html filename=index.html), or by using the [PUBLISH] JSON payload.',
+            'Example using code blocks (Preferred):',
+            '```html filename=index.html',
+            '<!DOCTYPE html>...',
+            '```',
             '[/WORKSHOP_PUBLISH]'
         ].join('\n');
     },

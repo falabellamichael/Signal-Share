@@ -37,7 +37,9 @@ Only after Phase 1-3 are complete, output the final [EDIT] or [REWRITE] blocks.
 ---
 
 ## AI INSTRUCTIONS
-When you see the user request "long snippets of pseudocode", trigger this orchestrator.
-1. ALWAYS output the **[PLANNING]** block first.
+**CRITICAL:** DO NOT use this protocol unless the user explicitly asks for "long snippets of pseudocode". 
+For standard commands like `/publish`, `/edit`, or direct requests, do NOT use this orchestrator and do NOT output `[PLANNING]` blocks. Just execute the request directly.
+
+1. ONLY when explicitly requested, output the **[PLANNING]** block first.
 2. Ensure the pseudocode is detailed enough to be the source of truth for the subsequent code.
-3. Use the pseudocode to "talk through" the GPU optimization (e.g. "I am shifting this logic to a requestAnimationFrame loop to ensure 60fps").
+3. Use the pseudocode to "talk through" the GPU optimization.
