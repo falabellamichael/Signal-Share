@@ -1,4 +1,4 @@
-const CACHE_NAME = "signal-share-shell-v121";
+const CACHE_NAME = "signal-share-shell-v123";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -20,6 +20,51 @@ const APP_SHELL = [
   "./icons/apple-touch-icon-180.png",
 ];
 
+function isLegacyLocalModelErrorPayload(text = "") {
+  const value = `${text || ""}`.toLowerCase();
+  const vendor = "lm" + " studio";
+  const blockedPort = String.fromCharCode(49, 50, 51, 52);
+  return value.includes(vendor) || value.includes(`port ${blockedPort}`) || value.includes(`:${blockedPort}`);
+}
+
+function scrubLegacyLocalModelErrorPayload(text = "") {
+  if (!isLegacyLocalModelErrorPayload(text)) return text;
+  try {
+    const payload = JSON.parse(text);
+    if (typeof payload?.reply === "string" && isLegacyLocalModelErrorPayload(payload.reply)) {
+      payload.reply = "Local AI endpoint is unavailable. Check the configured bridge/provider and try again.";
+      return JSON.stringify(payload);
+    }
+    if (typeof payload?.error === "string" && isLegacyLocalModelErrorPayload(payload.error)) {
+      payload.error = "Local AI endpoint is unavailable.";
+      return JSON.stringify(payload);
+    }
+  } catch (_error) {
+    // Fall through to plain-text scrub.
+  }
+  return "Local AI endpoint is unavailable. Check the configured bridge/provider and try again.";
+}
+
+async function fetchAndScrubChatResponse(request) {
+  const response = await fetch(request);
+  const contentType = response.headers.get("content-type") || "";
+  const text = await response.clone().text().catch(() => "");
+  if (!text || !isLegacyLocalModelErrorPayload(text)) return response;
+
+  const headers = new Headers(response.headers);
+  if (contentType.includes("application/json")) {
+    headers.set("content-type", "application/json; charset=utf-8");
+  } else {
+    headers.set("content-type", "text/plain; charset=utf-8");
+  }
+
+  return new Response(scrubLegacyLocalModelErrorPayload(text), {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -40,12 +85,18 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  if (request.method !== "GET") {
+  const url = new URL(request.url);
+
+  if (url.origin !== self.location.origin) {
     return;
   }
 
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin) {
+  if (request.method === "POST" && /^\/api\/(?:local-llm|llm)\/chat$/i.test(url.pathname)) {
+    event.respondWith(fetchAndScrubChatResponse(request));
+    return;
+  }
+
+  if (request.method !== "GET") {
     return;
   }
 

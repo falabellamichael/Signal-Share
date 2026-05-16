@@ -39,3 +39,42 @@ window.ArcadeChatContext = (function() {
         }
     };
 })();
+
+/**
+ * Chat latency compatibility patch.
+ *
+ * arcade-chat.js performs a short bridge preflight when the engine status is
+ * offline. That preflight can fail after ~1500ms and abort the real chat POST,
+ * making the typing dots disappear almost immediately. This patch keeps health
+ * polling intact, but makes send-time preflight advisory by returning true for
+ * the short timeout call. The actual /api/*/chat request still runs and remains
+ * responsible for success/failure.
+ */
+(function installSendTimePreflightBypass() {
+    if (window.__arcadeSendTimePreflightBypassInstalled) return;
+    window.__arcadeSendTimePreflightBypassInstalled = true;
+
+    function patch() {
+        if (typeof window.checkBridgeConnectivity !== 'function') {
+            window.setTimeout(patch, 50);
+            return;
+        }
+
+        if (window.checkBridgeConnectivity.__sendTimePreflightBypass) return;
+        const originalCheckBridgeConnectivity = window.checkBridgeConnectivity;
+
+        window.checkBridgeConnectivity = async function patchedCheckBridgeConnectivity(options = {}) {
+            const timeoutMs = Number(options?.timeoutMs || 0);
+            const isSendTimePreflight = timeoutMs > 0 && timeoutMs <= 1500;
+            if (isSendTimePreflight) {
+                console.log('[Arcade Chat] Skipping blocking send-time bridge preflight; allowing chat request to proceed.');
+                return true;
+            }
+            return originalCheckBridgeConnectivity.apply(this, arguments);
+        };
+
+        window.checkBridgeConnectivity.__sendTimePreflightBypass = true;
+    }
+
+    patch();
+})();

@@ -23,12 +23,20 @@ window.ArcadeCommandManager = (function() {
         let currentText = text.trim();
         let handledSomething = false;
         let lastResult = false;
+        let safetyCounter = 0;
         
         // Initialize or clear command modes stack
         window.activeArcadeCommandModes = [];
 
         // Support stacked commands (e.g. /edit /fix)
         while (currentText.startsWith('/') || currentText.startsWith('[')) {
+            safetyCounter += 1;
+            if (safetyCounter > 10) {
+                console.warn('[Command Manager] Stopped command chain after 10 iterations:', currentText);
+                break;
+            }
+
+            const previousText = currentText;
             let cmdId = "";
             let args = "";
 
@@ -59,9 +67,13 @@ window.ArcadeCommandManager = (function() {
                 lastResult = await command.execute(args, inputElement);
                 if (lastResult === true) return true;
                 
-                // If it returns false, it means "continue to AI or next command"
-                currentText = inputElement ? inputElement.value : args;
+                // If it returns false, it means "continue to AI or next command".
+                // A command may intentionally preserve the slash text so the AI/context
+                // layer can still see the command intent. If no progress was made, stop
+                // parsing here instead of executing the same command forever.
+                currentText = inputElement ? inputElement.value.trim() : args;
                 if (!currentText) break;
+                if (currentText === previousText) break;
             } else {
                 break; // Unknown command
             }
