@@ -41,12 +41,7 @@ async function getChatResponse(message, history = []) {
 
     // Add current message
     if (message) {
-        let content = message;
-        // If history is empty, prepend the system prompt to the user message
-        if (conversation.length === 0) {
-            content = `${SYSTEM_PROMPT}\n\n[Instruction]: ${message}`;
-        }
-        conversation.push({ role: "user", content: content });
+        conversation.push({ role: "user", content: message });
     }
 
     try {
@@ -80,9 +75,7 @@ async function getChatResponse(message, history = []) {
 
 async function getLocalModelCatalog() {
     return {
-        lmstudio: ["Auto-detected"],
-        ollama: ["qwen2.5-coder"],
-        all: ["Auto-detected", "qwen2.5-coder"],
+        all: ["Auto-detected"],
         checkedAt: new Date().toISOString()
     };
 }
