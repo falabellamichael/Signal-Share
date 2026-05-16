@@ -5,7 +5,89 @@ import { spawn, execSync } from "node:child_process";
 import { SMTCMonitor, PlaybackStatus } from "@coooookies/windows-smtc-monitor";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
-import { getChatResponse, getLocalModelCatalog } from "./chatbot.js";
+const SYSTEM_PROMPT = `You are a helpful assistant for the Signal Share Arcade.
+When the user asks to publish a game, output the code inside markdown code blocks with filename annotations.
+Example:
+\`\`\`html filename=index.html
+<!DOCTYPE html>
+<html>
+...
+</html>
+\`\`\`
+Do not output planning or audits. Just output the code directly.`;
+
+async function getChatResponse(message, history = []) {
+    if (!message && history.length === 0) return "No message provided.";
+
+    console.log(`[Chatbot] Processing message: "${message ? message.substring(0, 50) : 'No message'}..."`);
+
+    const conversation = [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...history.map(h => ({ role: h.role, content: h.content }))
+    ];
+    
+    if (message) {
+        conversation.push({ role: "user", content: message });
+    }
+
+    try {
+        const response = await fetch("http://127.0.0.1:1234/v1/chat/completions", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: conversation,
+                temperature: 0.7,
+                stream: false
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            let reply = data.choices[0].message.content;
+            if (reply.includes("<think>")) {
+                reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+            }
+            return reply;
+        } else {
+            const errText = await response.text();
+            console.warn(`[Chatbot] LM Studio returned ${response.status}:`, errText);
+        }
+    } catch (e) {
+        console.warn("[Chatbot] LM Studio connection failed:", e.message);
+    }
+
+    // Fallback to Ollama
+    console.log("[Chatbot] Falling back to Ollama...");
+    try {
+        const response = await fetch("http://127.0.0.1:11434/api/chat", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: "qwen2.5-coder",
+                messages: conversation,
+                stream: false
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            return data.message.content;
+        }
+    } catch (e) {
+        console.warn("[Chatbot] Ollama connection failed:", e.message);
+    }
+
+    return `❌ [Error]: Failed to connect to local AI servers (LM Studio on 1234 or Ollama on 11434). Please ensure one of them is running.`;
+}
+
+async function getLocalModelCatalog() {
+    return {
+        lmstudio: ["Auto-detected"],
+        ollama: ["qwen2.5-coder"],
+        all: ["Auto-detected", "qwen2.5-coder"],
+        checkedAt: new Date().toISOString()
+    };
+}
 import { SecurityEngine } from "./security-v3.js";
 import { isMasterAdmin, hasPermission, ADMIN_ROLES } from "./roles-v3.js";
 import { registerModerationRoutes } from "./moderation-api-v3.js";
