@@ -32,7 +32,7 @@ export async function getLocalModelCatalog() {
 
 async function callLMStudio(messages) {
     try {
-        const response = await fetch("http://localhost:1234/v1/chat/completions", {
+        const response = await fetch("http://127.0.0.1:1234/v1/chat/completions", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -53,7 +53,7 @@ async function callLMStudio(messages) {
 
 async function callOllama(messages) {
     try {
-        const response = await fetch("http://localhost:11434/api/chat", {
+        const response = await fetch("http://127.0.0.1:11434/api/chat", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
