@@ -32,10 +32,21 @@ export async function getLocalModelCatalog() {
 
 async function callLMStudio(messages) {
     try {
+        // Fetch loaded models to get the model ID
+        const modelsRes = await fetch("http://127.0.0.1:1234/v1/models");
+        let modelId = "qwen3.5-2b-uncensored-hauhaucs-aggressive"; // Fallback
+        if (modelsRes.ok) {
+            const modelsData = await modelsRes.json();
+            if (modelsData.data && modelsData.data.length > 0) {
+                modelId = modelsData.data[0].id;
+            }
+        }
+
         const response = await fetch("http://127.0.0.1:1234/v1/chat/completions", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                model: modelId,
                 messages: messages,
                 temperature: 0.7,
                 stream: false
