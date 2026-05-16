@@ -640,6 +640,21 @@ window.ArcadeWorkshopManager = {
         return text;
     },
 
+    getPublishDirective: function() {
+        return [
+            '[WORKSHOP_PUBLISH]',
+            'To publish or update a game, you MUST include a [PUBLISH] block with a valid JSON payload at the end of your response.',
+            'The JSON must contain:',
+            '  "title": The name of the game.',
+            '  "category": "GAME" or "UTILITY".',
+            '  "description": A short description.',
+            '  "files": An array of file objects with "name" and "content".',
+            'Example:',
+            '[PUBLISH: { "title": "My Game", "category": "GAME", "description": "A cool game", "files": [{ "name": "index.html", "content": "<!DOCTYPE html>..." }] }]',
+            '[/WORKSHOP_PUBLISH]'
+        ].join('\n');
+    },
+
     getProtocolDirectives: function(userPrompt = "", workshopContext = null, attachment = null) {
         try {
             const text = `${userPrompt || ''}`.trim().toLowerCase();
