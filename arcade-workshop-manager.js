@@ -631,9 +631,7 @@ window.ArcadeWorkshopManager = {
     getPublishDirective: function() {
         return [
             '[WORKSHOP_PUBLISH]',
-            'CRITICAL: The user has requested an IMMEDIATE publish. Do NOT output a plan, do NOT output an audit, and do NOT provide a breakdown.',
-            'Just output the code blocks immediately. Any text outside the code blocks should be minimal or omitted.',
-            'You MUST specify the filename in the code block info string (e.g. ```html filename=index.html). All game files must be provided this way.',
+            'Output the full game code in standard markdown code blocks with the file name specified in the block info (e.g. ```html filename=index.html).',
             'Example:',
             '```html filename=index.html',
             '<!DOCTYPE html>...',
