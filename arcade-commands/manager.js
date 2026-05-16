@@ -104,11 +104,8 @@ window.ArcadeCommandManager = (function() {
         let lastResult = false;
         let safetyCounter = 0;
         
-        // Command modes are one-shot per send. Clear stale /edit or /fix state
-        // before parsing this message so normal chat cannot inherit old modes.
         clearCommandModes();
 
-        // Support stacked commands (e.g. /edit /fix)
         while (currentText.startsWith('/') || currentText.startsWith('[')) {
             safetyCounter += 1;
             if (safetyCounter > 10) {
@@ -138,24 +135,16 @@ window.ArcadeCommandManager = (function() {
             if (command) {
                 handledSomething = true;
                 markCommandMode(cmdId);
-
-                // If execute returns true, it means it handled everything (no AI needed)
                 lastResult = await command.execute(args, inputElement);
                 if (lastResult === true) return true;
-                
-                // If it returns false, it means "continue to AI or next command".
-                // A command may intentionally preserve the slash text so the AI/context
-                // layer can still see the command intent. If no progress was made, stop
-                // parsing here instead of executing the same command forever.
                 currentText = inputElement ? inputElement.value.trim() : args;
                 if (!currentText) break;
                 if (currentText === previousText) break;
             } else {
-                break; // Unknown command
+                break;
             }
         }
 
-        // Handle Alias (legacy support)
         if (!handledSomething) {
             const aliasMatch = currentText.match(/^([a-z][a-z0-9_-]*)\s*\/\s*(.*)$/i);
             if (aliasMatch) {
@@ -172,7 +161,7 @@ window.ArcadeCommandManager = (function() {
             inputElement.value = currentText;
         }
 
-        return lastResult; // Return the result of the last command (e.g. false for AI commands)
+        return lastResult;
     }
 
     function normalizeSuggestion(raw, cmdId = '') {
@@ -222,14 +211,8 @@ window.ArcadeCommandManager = (function() {
             provided = command.subcommands;
         }
 
-        const normalizedProvided = provided
-            .map((item) => normalizeSuggestion(item, cmdId))
-            .filter(Boolean);
-
-        const defaults = getDefaultSubcommandSuggestions(cmdId, args)
-            .map((item) => normalizeSuggestion(item, cmdId))
-            .filter(Boolean);
-
+        const normalizedProvided = provided.map((item) => normalizeSuggestion(item, cmdId)).filter(Boolean);
+        const defaults = getDefaultSubcommandSuggestions(cmdId, args).map((item) => normalizeSuggestion(item, cmdId)).filter(Boolean);
         const seen = new Set();
         return [...normalizedProvided, ...defaults].filter((item) => {
             const key = `${item.commandId}::${item.id}`.toLowerCase();
@@ -242,58 +225,30 @@ window.ArcadeCommandManager = (function() {
     function getTopLevelSuggestions(query = '') {
         return getAllCommands()
             .filter(c => c.id.toLowerCase().startsWith(query))
-            .map(c => ({
-                id: c.id,
-                name: `/${c.id}`,
-                description: c.description,
-                isTopLevel: true
-            }));
+            .map(c => ({ id: c.id, name: `/${c.id}`, description: c.description, isTopLevel: true }));
     }
 
     function getSuggestions(text) {
         const cleanText = `${text || ''}`.trim();
         if (!cleanText.startsWith('/')) return [];
-
         const parts = cleanText.split(/\s+/);
         const cmdId = parts[0].substring(1).toLowerCase();
         const args = parts.slice(1).join(' ');
         const command = getCommand(cmdId);
         const hasSpace = /\s$/.test(text) || cleanText.includes(' ');
-
         if (!cmdId) return getTopLevelSuggestions('');
-
-        // Partial command: show top-level matches.
-        if (!hasSpace && !command) {
-            return getTopLevelSuggestions(cmdId);
-        }
-
-        // Exact command, even before the trailing space: show command-scoped options.
+        if (!hasSpace && !command) return getTopLevelSuggestions(cmdId);
         if (command && !hasSpace) {
             const commandSuggestions = getCommandArgSuggestions(command, cmdId, '');
             return commandSuggestions.length > 0 ? commandSuggestions : getTopLevelSuggestions(cmdId);
         }
-
-        if (command) {
-            return getCommandArgSuggestions(command, cmdId, args);
-        }
-
+        if (command) return getCommandArgSuggestions(command, cmdId, args);
         return [];
     }
 
-    return {
-        register,
-        getCommand,
-        getAllCommands,
-        handle,
-        getSuggestions,
-        clearCommandModes
-    };
+    return { register, getCommand, getAllCommands, handle, getSuggestions, clearCommandModes };
 })();
 
-/**
- * Disable native browser text-history suggestions on the chat input.
- * This keeps the custom slash-command panel while removing remembered entries.
- */
 (function disableNativeChatInputAutocomplete() {
     if (window.__arcadeCommandManagerAutocompletePatchInstalled) return;
     window.__arcadeCommandManagerAutocompletePatchInstalled = true;
@@ -301,7 +256,6 @@ window.ArcadeCommandManager = (function() {
     function patchInput() {
         const input = document.getElementById('arc-chat-input');
         if (!input) return false;
-
         input.setAttribute('autocomplete', 'off');
         input.setAttribute('autocorrect', 'off');
         input.setAttribute('autocapitalize', 'off');
@@ -309,10 +263,7 @@ window.ArcadeCommandManager = (function() {
         input.setAttribute('data-lpignore', 'true');
         input.setAttribute('data-form-type', 'other');
         input.setAttribute('aria-autocomplete', 'list');
-
-        // Chrome sometimes keys saved suggestions off the name attribute.
         input.name = `arc_chat_input_${Date.now()}`;
-
         const form = input.closest('form');
         if (form) form.setAttribute('autocomplete', 'off');
         return true;
@@ -327,12 +278,6 @@ window.ArcadeCommandManager = (function() {
     }
 })();
 
-/**
- * Suppress expected bridge-failure noise for editor commands.
- * /edit can select/open a target locally, but actual AI edits require the bridge.
- * When the bridge is down, do not render red bridge cards or generic offline
- * arcade fallback replies into the chat transcript.
- */
 (function suppressEditorBridgeFailureNoise() {
     if (window.__arcadeEditorBridgeNoiseSuppressionInstalled) return;
     window.__arcadeEditorBridgeNoiseSuppressionInstalled = true;
@@ -346,23 +291,12 @@ window.ArcadeCommandManager = (function() {
 
     function isBridgeErrorText(value = '') {
         const text = `${value || ''}`.toLowerCase();
-        return text.includes('a.i. bridge error')
-            || text.includes('bridge is unreachable')
-            || text.includes('bridge request failed')
-            || text.includes('failed to fetch bridge')
-            || text.includes('local llm bridge');
+        return text.includes('a.i. bridge error') || text.includes('bridge is unreachable') || text.includes('bridge request failed') || text.includes('failed to fetch bridge') || text.includes('local llm bridge');
     }
 
     function isOfflineArcadeFallback(value = '') {
         const text = `${value || ''}`.toLowerCase();
-        return text.includes('[arcade protocol]')
-            && (
-                text.includes('main intelligence core is unstable')
-                || text.includes('advanced logic core is currently out of range')
-                || text.includes('communication with the main intelligence core')
-                || text.includes('sync failed')
-                || text.includes('bridge unreachable')
-            );
+        return text.includes('[arcade protocol]') && (text.includes('main intelligence core is unstable') || text.includes('advanced logic core is currently out of range') || text.includes('communication with the main intelligence core') || text.includes('sync failed') || text.includes('bridge unreachable'));
     }
 
     function isFreshEditorBridgeFailureWindow() {
@@ -378,9 +312,7 @@ window.ArcadeCommandManager = (function() {
             node.remove();
             return;
         }
-        if (isOfflineArcadeFallback(text) && isFreshEditorBridgeFailureWindow()) {
-            node.remove();
-        }
+        if (isOfflineArcadeFallback(text) && isFreshEditorBridgeFailureWindow()) node.remove();
     }
 
     function patchSendChatMessage() {
@@ -389,13 +321,10 @@ window.ArcadeCommandManager = (function() {
             return;
         }
         if (window.sendChatMessage.__arcadeEditorBridgeNoiseTracker) return;
-
         const originalSendChatMessage = window.sendChatMessage;
         window.sendChatMessage = function patchedEditorBridgeNoiseSend(message, ...rest) {
             const input = document.getElementById('arc-chat-input');
-            const outgoing = typeof message === 'string' && message.trim()
-                ? message
-                : `${input?.value || ''}`;
+            const outgoing = typeof message === 'string' && message.trim() ? message : `${input?.value || ''}`;
             if (isEditorCommand(outgoing)) lastEditorCommandAt = Date.now();
             return originalSendChatMessage.apply(this, arguments);
         };
@@ -408,22 +337,18 @@ window.ArcadeCommandManager = (function() {
             return;
         }
         if (window.addChatMessage.__arcadeEditorBridgeNoiseSuppression) return;
-
         const originalAddChatMessage = window.addChatMessage;
         window.addChatMessage = function patchedEditorBridgeNoiseAdd(sender, content, ...rest) {
             const role = `${sender || ''}`.toLowerCase();
             const text = `${content || ''}`;
-
             if (role !== 'ai' && role !== 'assistant' && role !== 'system' && role !== 'bot') {
                 if (isEditorCommand(text)) lastEditorCommandAt = Date.now();
                 return originalAddChatMessage.apply(this, arguments);
             }
-
             if (isFreshEditorBridgeFailureWindow() && (isBridgeErrorText(text) || isOfflineArcadeFallback(text))) {
                 suppressedBridgeErrorAt = Date.now();
                 return null;
             }
-
             return originalAddChatMessage.apply(this, arguments);
         };
         window.addChatMessage.__arcadeEditorBridgeNoiseSuppression = true;
@@ -435,12 +360,9 @@ window.ArcadeCommandManager = (function() {
             window.setTimeout(installDomObserver, 100);
             return;
         }
-
         Array.from(container.children).forEach(removeBridgeNoiseNode);
         const observer = new MutationObserver((mutations) => {
-            for (const mutation of mutations) {
-                mutation.addedNodes.forEach(removeBridgeNoiseNode);
-            }
+            for (const mutation of mutations) mutation.addedNodes.forEach(removeBridgeNoiseNode);
         });
         observer.observe(container, { childList: true, subtree: false });
     }
@@ -448,4 +370,80 @@ window.ArcadeCommandManager = (function() {
     patchSendChatMessage();
     patchAddChatMessage();
     installDomObserver();
+})();
+
+(function installCommandThinkingIndicator() {
+    if (window.__arcadeCommandThinkingIndicatorInstalled) return;
+    window.__arcadeCommandThinkingIndicatorInstalled = true;
+
+    const THINKING_ID = 'arcade-command-thinking-indicator';
+    let pendingCommand = false;
+
+    function isAiBoundCommand(value = '') {
+        const text = `${value || ''}`.trim().toLowerCase();
+        return /^\/(?:edit|fix|rewrite|publish|plan)\b/.test(text) || /^\[(?:edit|fix|rewrite|publish|plan)\]/.test(text);
+    }
+
+    function getOutgoingText(promptOverride) {
+        if (typeof promptOverride === 'string' && promptOverride.trim()) return promptOverride.trim();
+        const input = document.getElementById('arc-chat-input');
+        return `${input?.value || ''}`.trim();
+    }
+
+    function removeThinking() {
+        const node = document.getElementById(THINKING_ID);
+        if (node) node.remove();
+    }
+
+    function showThinking() {
+        const container = document.getElementById('chat-messages');
+        if (!container || document.getElementById(THINKING_ID)) return;
+        const msg = document.createElement('div');
+        msg.id = THINKING_ID;
+        msg.className = 'chat-message message-ai command-thinking-indicator';
+        msg.setAttribute('aria-label', 'AI is thinking');
+        msg.innerHTML = '<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>';
+        container.appendChild(msg);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function patchWhenReady() {
+        if (typeof window.sendChatMessage !== 'function' || typeof window.addChatMessage !== 'function') {
+            window.setTimeout(patchWhenReady, 50);
+            return;
+        }
+        if (window.sendChatMessage.__arcadeCommandThinkingPatched) return;
+
+        const originalSendChatMessage = window.sendChatMessage;
+        const originalAddChatMessage = window.addChatMessage;
+
+        window.addChatMessage = function patchedCommandThinkingAddChatMessage(role, content, ...rest) {
+            const normalizedRole = `${role || ''}`.toLowerCase();
+            const isUser = normalizedRole === 'user';
+            const isAssistant = normalizedRole === 'ai' || normalizedRole === 'assistant' || normalizedRole === 'system' || normalizedRole === 'bot';
+            if (pendingCommand && isAssistant) removeThinking();
+            const result = originalAddChatMessage.apply(this, arguments);
+            if (pendingCommand && isUser) showThinking();
+            return result;
+        };
+
+        window.sendChatMessage = async function patchedCommandThinkingSendChatMessage(promptOverride = '') {
+            const outgoing = getOutgoingText(promptOverride);
+            const shouldTrack = isAiBoundCommand(outgoing);
+            if (shouldTrack) pendingCommand = true;
+            try {
+                return await originalSendChatMessage.apply(this, arguments);
+            } finally {
+                if (shouldTrack) {
+                    window.setTimeout(() => {
+                        removeThinking();
+                        pendingCommand = false;
+                    }, 80);
+                }
+            }
+        };
+        window.sendChatMessage.__arcadeCommandThinkingPatched = true;
+    }
+
+    patchWhenReady();
 })();
