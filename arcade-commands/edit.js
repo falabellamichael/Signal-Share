@@ -100,9 +100,15 @@
             if (window.showFeedback) window.showFeedback('Calling AI for edit...', false);
             
             try {
-                const response = await fetch('/api/local-llm/chat', {
+                const bridgeUrl = window.SignalShareLocalLlm?.getBridgeBaseUrl() || "http://localhost:3000";
+                const headers = window.SignalShareLocalLlm?.getRequestHeaders() || {};
+                
+                const response = await fetch(`${bridgeUrl}/api/local-llm/chat`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...headers
+                    },
                     body: JSON.stringify({
                         message: updatedMessage,
                         history: []
