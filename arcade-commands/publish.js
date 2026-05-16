@@ -520,9 +520,21 @@
                     return actionResult;
                 }
 
-                const publishPayload = typeof manager.extractBalancedJsonTagPayload === "function"
+                let publishPayload = typeof manager.extractBalancedJsonTagPayload === "function"
                     ? manager.extractBalancedJsonTagPayload(text, "PUBLISH")
                     : null;
+
+                // Fallback: If AI forgot the [PUBLISH] tag but outputted the JSON in a code block
+                if (!publishPayload?.jsonText) {
+                    const codeBlockMatch = text.match(/```json\s*([\s\S]*?)```/);
+                    if (codeBlockMatch) {
+                        const possibleJson = codeBlockMatch[1].trim();
+                        if (possibleJson.includes('"title"') && possibleJson.includes('"files"')) {
+                            publishPayload = { jsonText: possibleJson };
+                            console.log("[Arcade: Publish] Recovered publish JSON from raw code block.");
+                        }
+                    }
+                }
 
                 const explicitPublish = isExplicitPublishPrompt(userPrompt);
 
