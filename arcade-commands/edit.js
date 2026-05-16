@@ -7,6 +7,7 @@
  * - Do not inject full source into the chat input.
  * - Read/write through the Workshop editor/Supabase-backed helpers when available.
  * - Force a reliable active editor snapshot so the model can see the open game/file.
+ * - Treat raw SEARCH/REPLACE output as executable edits even if the model omits [EDIT] tags.
  */
 (function() {
     let workshopStateWrapperInstalled = false;
@@ -14,6 +15,26 @@
 
     function normalizeText(value = '') {
         return `${value || ''}`.trim();
+    }
+
+    function normalizeNewlines(value = '') {
+        return `${value || ''}`.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    }
+
+    function stripOuterCodeFence(value = '') {
+        let text = normalizeNewlines(value).trim();
+        const fenceMatch = text.match(/^```[^\n`]*\n([\s\S]*?)\n?```$/);
+        if (fenceMatch) text = fenceMatch[1].trim();
+        return text;
+    }
+
+    function cleanPatchText(value = '') {
+        return stripOuterCodeFence(value)
+            .replace(/^\s*```[^\n`]*\n?/i, '')
+            .replace(/\n?```\s*$/i, '')
+            .replace(/^\s*SEARCH:\s*/i, '')
+            .replace(/^\s*REPLACE:\s*/i, '')
+            .trim();
     }
 
     function getEditorElement() {
@@ -323,6 +344,125 @@
         return blocks;
     }
 
+    function extractCandidateTextsForPatchParsing(text = '') {
+        const source = normalizeNewlines(text);
+        const candidates = [source];
+        const fenceRegex = /```[^\n`]*\n([\s\S]*?)```/g;
+        let match;
+        while ((match = fenceRegex.exec(source)) !== null) {
+            if (match[1] && /SEARCH\s*:/i.test(match[1]) && /REPLACE\s*:/i.test(match[1])) {
+                candidates.push(match[1]);
+            }
+        }
+        return candidates;
+    }
+
+    function inferPatchFileName(text = '', fallbackFileName = 'index.html') {
+        const source = normalizeNewlines(text);
+        const editTagFile = source.match(/\[(?:EDIT|EDIT_FILE|FILE_EDIT)\s*:\s*([^\]\n]+)\]/i)?.[1];
+        if (editTagFile) return editTagFile.trim().replace(/^['"]|['"]$/g, '');
+
+        const filenameValue = source.match(/\b(?:file(?:name)?|path)\s*[:=]\s*['"]?([^'"\s`]+\.(?:html?|css|js|mjs|cjs|json|txt|svg|xml))['"]?/i)?.[1];
+        if (filenameValue) return filenameValue.trim();
+
+        const bareFilename = source.match(/\b([a-z0-9][\w.-]*\.(?:html?|css|js|mjs|cjs|json|txt|svg|xml))\b/i)?.[1];
+        if (bareFilename) return bareFilename.trim();
+
+        return fallbackFileName;
+    }
+
+    function parseRawSearchReplaceEdits(text = '', fallbackFileName = 'index.html') {
+        const parsed = [];
+        const seen = new Set();
+        const candidates = extractCandidateTextsForPatchParsing(text);
+
+        for (const candidate of candidates) {
+            const source = stripOuterCodeFence(candidate);
+            if (!/SEARCH\s*:/i.test(source) || !/REPLACE\s*:/i.test(source)) continue;
+
+            const fileName = inferPatchFileName(source, fallbackFileName);
+            const blockRegex = /(?:\[(?:EDIT|EDIT_FILE|FILE_EDIT)(?:\s*:\s*([^\]\n]+))?\]\s*)?SEARCH\s*:\s*([\s\S]*?)\s*REPLACE\s*:\s*([\s\S]*?)(?=\n\s*\[(?:EDIT|EDIT_FILE|FILE_EDIT)(?:\s*:|\])|\n\s*SEARCH\s*:|\s*\[\/(?:EDIT|EDIT_FILE|FILE_EDIT)\]|$)/gi;
+            let match;
+            while ((match = blockRegex.exec(source)) !== null) {
+                const blockFileName = normalizeText(match[1] || fileName).replace(/^['"]|['"]$/g, '') || fallbackFileName;
+                const search = cleanPatchText(match[2] || '');
+                const replace = cleanPatchText(match[3] || '');
+                if (!search && !replace) continue;
+
+                const key = `${blockFileName}\n---SEARCH---\n${search}\n---REPLACE---\n${replace}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                parsed.push({ fileName: blockFileName, search, replace, source: 'raw-search-replace' });
+            }
+        }
+
+        return parsed;
+    }
+
+    function removeDisplayedRawEditMessage(text = '') {
+        const source = `${text || ''}`;
+        if (!/SEARCH\s*:/i.test(source) || !/REPLACE\s*:/i.test(source)) return false;
+        const container = document.getElementById('chat-messages');
+        if (!container) return false;
+
+        const messages = Array.from(container.querySelectorAll('.chat-message, .message-ai'));
+        for (let index = messages.length - 1; index >= 0; index -= 1) {
+            const node = messages[index];
+            const content = `${node.textContent || ''}`;
+            if (/SEARCH\s*:/i.test(content) && /REPLACE\s*:/i.test(content)) {
+                node.remove();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    async function saveWholeFile(gameId = '', fileName = '', content = '') {
+        const targetGameId = normalizeText(gameId);
+        const targetFileName = normalizeText(fileName || 'index.html');
+        if (!targetGameId || !targetFileName) return { ok: false, message: 'Missing game or file.' };
+
+        if (typeof window.internalApplyWorkshopFileEdit === 'function') {
+            return await window.internalApplyWorkshopFileEdit(targetGameId, targetFileName, content, { save: true });
+        }
+
+        const editorElement = getEditorElement();
+        writeEditorContent(editorElement, content);
+        if (typeof window.saveWorkshopEditPanel === 'function') {
+            const result = await window.saveWorkshopEditPanel();
+            return result || { ok: true };
+        }
+
+        return { ok: true, message: 'Updated editor content, but no save helper was available.' };
+    }
+
+    async function applyManualSearchReplace(gameId = '', fileName = '', search = '', replace = '') {
+        const editorState = typeof window.getWorkshopEditorState === 'function'
+            ? await Promise.resolve(window.getWorkshopEditorState())
+            : null;
+        const currentContent = getWorkshopFileContentSafe(gameId, fileName, editorState);
+        if (typeof currentContent !== 'string') {
+            return { ok: false, message: 'Could not read current file content.' };
+        }
+
+        const normalizedSearch = normalizeNewlines(search);
+        const normalizedCurrent = normalizeNewlines(currentContent);
+        if (!normalizedSearch) {
+            return saveWholeFile(gameId, fileName, replace);
+        }
+
+        if (currentContent.includes(search)) {
+            return saveWholeFile(gameId, fileName, currentContent.replace(search, replace));
+        }
+
+        if (normalizedCurrent.includes(normalizedSearch)) {
+            const next = normalizedCurrent.replace(normalizedSearch, normalizeNewlines(replace));
+            return saveWholeFile(gameId, fileName, next);
+        }
+
+        return { ok: false, message: `Search block not found in ${fileName}.` };
+    }
+
     async function applyFullFileCodeBlocks(text = '') {
         const result = { attempted: false, ok: false };
         const blocks = extractAiCodeBlocks(text);
@@ -347,17 +487,7 @@
                     await Promise.resolve(window.setWorkshopEditActiveGame(gameId, targetFileName));
                 }
 
-                let applyResult = null;
-                if (typeof window.internalApplyWorkshopFileEdit === 'function') {
-                    applyResult = await window.internalApplyWorkshopFileEdit(gameId, targetFileName, content, { save: true });
-                } else {
-                    const editorElement = getEditorElement();
-                    writeEditorContent(editorElement, content);
-                    if (typeof window.saveWorkshopEditPanel === 'function') {
-                        applyResult = await window.saveWorkshopEditPanel();
-                    }
-                }
-
+                const applyResult = await saveWholeFile(gameId, targetFileName, content);
                 const applied = applyResult?.ok !== false;
                 result.ok = result.ok || applied;
                 if (window.showFeedback) {
@@ -375,55 +505,22 @@
         return result;
     }
 
-    async function handleResponse(text, options = {}) {
+    async function applySurgicalEditBlocks(editBlocks = [], originalText = '') {
         const actionResult = {
             handled: false,
             workshopFileRewriteAttempted: false,
             workshopFileRewriteSucceeded: false
         };
 
-        const editBlocks = typeof window.extractWorkshopEditBlocks === 'function'
-            ? window.extractWorkshopEditBlocks(text)
-            : [];
-
-        if (editBlocks.length === 0) {
-            if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
-                if (window.showFeedback) {
-                    window.showFeedback('No explicit [EDIT] tags found. Attempting automatic patch...', false);
-                }
-
-                const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(
-                    text,
-                    options.userPrompt || ''
-                );
-
-                if (fallbackResult?.attempted) {
-                    actionResult.handled = true;
-                    actionResult.workshopFileRewriteAttempted = true;
-                    actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
-                    return actionResult;
-                }
-            }
-
-            const fullFileResult = await applyFullFileCodeBlocks(text);
-            if (fullFileResult.attempted) {
-                actionResult.handled = true;
-                actionResult.workshopFileRewriteAttempted = true;
-                actionResult.workshopFileRewriteSucceeded = !!fullFileResult.ok;
-                return actionResult;
-            }
-
-            return actionResult;
-        }
-
+        if (!Array.isArray(editBlocks) || editBlocks.length === 0) return actionResult;
         if (window.showFeedback) window.showFeedback('Applying surgical edits...', false);
         actionResult.handled = true;
 
         const editorState = typeof window.getWorkshopEditorState === 'function'
-            ? window.getWorkshopEditorState()
+            ? await Promise.resolve(window.getWorkshopEditorState())
             : null;
-        const gameId = editorState?.activeGameId || window.lastPlayedGameId || '';
-        const fallbackFileName = editorState?.activeFileName || 'index.html';
+        const gameId = normalizeText(editorState?.activeGameId || window.lastPlayedGameId || '');
+        const fallbackFileName = normalizeText(editorState?.activeFileName || 'index.html');
 
         if (!gameId) {
             console.warn('[Arcade: Edit] No active Workshop game for surgical edit.');
@@ -431,27 +528,97 @@
         }
 
         for (const editBlock of editBlocks) {
+            const targetFileName = normalizeText(editBlock?.fileName || fallbackFileName);
+            const search = `${editBlock?.search || ''}`;
+            const replace = `${editBlock?.replace || ''}`;
+            if (!targetFileName || (!search && !replace)) continue;
+
+            actionResult.workshopFileRewriteAttempted = true;
+
             try {
-                if (editBlock?.search && typeof window.applyAiFilePatch === 'function') {
-                    actionResult.workshopFileRewriteAttempted = true;
-                    const targetFileName = editBlock.fileName || fallbackFileName;
-                    const patchResult = await window.applyAiFilePatch(
+                if (typeof window.setWorkshopEditActiveGame === 'function') {
+                    await Promise.resolve(window.setWorkshopEditActiveGame(gameId, targetFileName));
+                }
+
+                let patchResult = null;
+                if (search && typeof window.applyAiFilePatch === 'function') {
+                    patchResult = await window.applyAiFilePatch(
                         gameId,
                         targetFileName,
-                        editBlock.search,
-                        editBlock.replace,
+                        search,
+                        replace,
                         { save: true }
                     );
+                }
 
-                    if (patchResult?.ok) {
-                        actionResult.workshopFileRewriteSucceeded = true;
-                    } else if (window.showFeedback) {
-                        window.showFeedback(patchResult?.message || 'Edit failed.', true);
-                    }
+                if (!patchResult?.ok) {
+                    patchResult = await applyManualSearchReplace(gameId, targetFileName, search, replace);
+                }
+
+                if (patchResult?.ok) {
+                    actionResult.workshopFileRewriteSucceeded = true;
+                    removeDisplayedRawEditMessage(originalText);
+                    if (window.showFeedback) window.showFeedback(`Saved AI edit to ${targetFileName}.`, false);
+                } else if (window.showFeedback) {
+                    window.showFeedback(patchResult?.message || 'Edit failed.', true);
                 }
             } catch (error) {
                 console.error('[Arcade: Edit] Action failed:', error);
+                if (window.showFeedback) window.showFeedback(`Failed to save ${targetFileName}.`, true);
             }
+        }
+
+        return actionResult;
+    }
+
+    async function handleResponse(text, options = {}) {
+        const editorState = typeof window.getWorkshopEditorState === 'function'
+            ? await Promise.resolve(window.getWorkshopEditorState())
+            : null;
+        const fallbackFileName = normalizeText(editorState?.activeFileName || 'index.html');
+
+        const structuredEditBlocks = typeof window.extractWorkshopEditBlocks === 'function'
+            ? window.extractWorkshopEditBlocks(text)
+            : [];
+        const rawEditBlocks = parseRawSearchReplaceEdits(text, fallbackFileName);
+        const editBlocks = structuredEditBlocks.length > 0 ? structuredEditBlocks : rawEditBlocks;
+
+        if (editBlocks.length > 0) {
+            return await applySurgicalEditBlocks(editBlocks, text);
+        }
+
+        const actionResult = {
+            handled: false,
+            workshopFileRewriteAttempted: false,
+            workshopFileRewriteSucceeded: false
+        };
+
+        if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
+            if (window.showFeedback) {
+                window.showFeedback('No explicit [EDIT] tags found. Attempting automatic patch...', false);
+            }
+
+            const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(
+                text,
+                options.userPrompt || ''
+            );
+
+            if (fallbackResult?.attempted) {
+                actionResult.handled = true;
+                actionResult.workshopFileRewriteAttempted = true;
+                actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
+                if (fallbackResult.ok) removeDisplayedRawEditMessage(text);
+                return actionResult;
+            }
+        }
+
+        const fullFileResult = await applyFullFileCodeBlocks(text);
+        if (fullFileResult.attempted) {
+            actionResult.handled = true;
+            actionResult.workshopFileRewriteAttempted = true;
+            actionResult.workshopFileRewriteSucceeded = !!fullFileResult.ok;
+            if (fullFileResult.ok) removeDisplayedRawEditMessage(text);
+            return actionResult;
         }
 
         return actionResult;
