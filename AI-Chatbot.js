@@ -25,53 +25,64 @@ let isTyping = false;
 /**
  * Organize and prepare information for the AI to lift VRAM usage.
  * Searches for keywords in the raw context and extracts only relevant lines.
+ * Also uses ArcadeWorkshopManager's skeleton tool if available.
  */
-function prepareInformation(message, rawContext) {
+function prepareInformation(message, rawContext, fileName = '') {
   if (!rawContext) return "";
   
-  // Extract keywords from message (simple split and filter)
-  const keywords = message.toLowerCase().split(/\W+/).filter(word => word.length > 3);
+  let info = "";
   
-  if (keywords.length === 0) {
-    // If no keywords, just take the first part of the context to avoid massive prompts
-    return rawContext.slice(0, 2000) + "\n\n[Truncated to save VRAM]";
+  // 1. If it's code and large, try to generate a skeleton first
+  const isCode = typeof window.ArcadeWorkshopManager?.looksLikeExecutableCode === 'function' 
+    ? window.ArcadeWorkshopManager.looksLikeExecutableCode(rawContext)
+    : false;
+
+  if (isCode && rawContext.length > 5000 && typeof window.ArcadeWorkshopManager?.generateCodeSkeleton === 'function') {
+    info += `[File Skeleton View for ${fileName || 'active file'}]\n` + window.ArcadeWorkshopManager.generateCodeSkeleton(rawContext, fileName) + "\n\n";
   }
 
-  const lines = rawContext.split('\n');
-  const relevantLines = new Set();
+  // 2. Extract keywords from message (simple split and filter)
+  const keywords = message.toLowerCase().split(/\W+/).filter(word => word.length > 3);
+  
+  if (keywords.length > 0) {
+    const lines = rawContext.split('\n');
+    const relevantLines = new Set();
 
-  // Find lines containing keywords
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].toLowerCase();
-    for (const keyword of keywords) {
-      if (line.includes(keyword)) {
-        // Add current line and some context (before and after)
-        for (let j = Math.max(0, i - 2); j <= Math.min(lines.length - 1, i + 2); j++) {
-          relevantLines.add(j);
+    // Find lines containing keywords
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase();
+      for (const keyword of keywords) {
+        if (line.includes(keyword)) {
+          // Add current line and some context (before and after)
+          for (let j = Math.max(0, i - 2); j <= Math.min(lines.length - 1, i + 2); j++) {
+            relevantLines.add(j);
+          }
+          break; // Move to next line once a keyword matches
         }
-        break; // Move to next line once a keyword matches
+      }
+    }
+
+    if (relevantLines.size > 0) {
+      const sortedLineNumbers = Array.from(relevantLines).sort((a, b) => a - b);
+      info += `[Relevant Snippets based on keywords: ${keywords.join(', ')}]\n`;
+      
+      let lastLineNum = -1;
+      for (const lineNum of sortedLineNumbers) {
+        if (lastLineNum !== -1 && lineNum !== lastLineNum + 1) {
+          info += "\n... [Lines skipped] ...\n\n";
+        }
+        info += `${lineNum + 1}: ${lines[lineNum]}\n`;
+        lastLineNum = lineNum;
       }
     }
   }
 
-  if (relevantLines.size === 0) {
-    return rawContext.slice(0, 2000) + "\n\n[Truncated to save VRAM]";
+  // 3. Fallback or additional truncation if nothing specific found
+  if (!info) {
+    info = rawContext.slice(0, 3000) + "\n\n[Truncated to save VRAM]";
   }
 
-  // Sort and reconstruct the context
-  const sortedLineNumbers = Array.from(relevantLines).sort((a, b) => a - b);
-  let preparedContext = `[Prepared Information for AI - Showing only relevant snippets based on keywords: ${keywords.join(', ')}]\n\n`;
-  
-  let lastLineNum = -1;
-  for (const lineNum of sortedLineNumbers) {
-    if (lastLineNum !== -1 && lineNum !== lastLineNum + 1) {
-      preparedContext += "\n... [Lines skipped] ...\n\n";
-    }
-    preparedContext += `${lineNum + 1}: ${lines[lineNum]}\n`;
-    lastLineNum = lineNum;
-  }
-
-  return preparedContext;
+  return info;
 }
 
 /**
@@ -88,9 +99,23 @@ async function sendMessage(message) {
   // Show typing indicator
   showTyping();
 
+  // Try to get active file content from workshop manager
+  let rawContext = "";
+  let fileName = "";
+  
+  const editorContext = typeof window.ArcadeWorkshopManager?.getActiveWorkshopEditorContext === 'function'
+    ? window.ArcadeWorkshopManager.getActiveWorkshopEditorContext()
+    : null;
+
+  if (editorContext && editorContext.activeFileContent) {
+    rawContext = editorContext.activeFileContent;
+    fileName = editorContext.activeFileName || "index.html";
+  } else {
+    rawContext = document.body.innerText; // Fallback
+  }
+
   // Prepare information for the AI to lift VRAM usage
-  const rawContext = document.body.innerText; // Fallback to full page text
-  const preparedContext = prepareInformation(text, rawContext);
+  const preparedContext = prepareInformation(text, rawContext, fileName);
 
   try {
     const response = await fetch(CONFIG.aiEndpoint, {
