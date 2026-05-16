@@ -643,7 +643,8 @@ window.ArcadeWorkshopManager = {
     getPublishDirective: function() {
         return [
             '[WORKSHOP_PUBLISH]',
-            'To publish or update a game, you MUST include a [PUBLISH] block with a valid JSON payload at the end of your response.',
+            'CRITICAL: The user has requested an IMMEDIATE publish. You MUST NOT plan, you MUST NOT audit, and you MUST NOT provide a breakdown.',
+            'You MUST IMMEDIATELY write the full, complete, working game code and output a [PUBLISH] block with a valid JSON payload.',
             'The JSON must contain:',
             '  "title": The name of the game.',
             '  "category": "GAME" or "UTILITY".',
