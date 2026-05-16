@@ -110,13 +110,67 @@ window.ArcadeChatContext = (function() {
 })();
 
 /**
- * Quiet bridge probe and compact /edit POST guard.
+ * Local bridge request guard.
+ *
+ * The app must not probe localhost/127.0.0.1 LLM routes just because the page is
+ * running locally. Bridge traffic is allowed only when the user has actually
+ * configured a bridge URL/token/secret or selected a non-auto local model.
  */
-(function installQuietBridgeProbeGuard() {
-    if (window.__arcadeQuietBridgeProbeGuardInstalled || !window.fetch) return;
-    window.__arcadeQuietBridgeProbeGuardInstalled = true;
+(function installLocalBridgeRequestGuard() {
+    if (window.__arcadeLocalBridgeRequestGuardInstalled || !window.fetch) return;
+    window.__arcadeLocalBridgeRequestGuardInstalled = true;
 
     const originalFetch = window.fetch.bind(window);
+    const OFFLINE_UNTIL_KEY = 'ss_bridge_offline_until';
+    const OFFLINE_BACKOFF_MS = 60 * 1000;
+
+    function normalizeBoolean(value) {
+        const text = `${value ?? ''}`.trim().toLowerCase();
+        if (!text) return null;
+        if (['0', 'false', 'no', 'off', 'disabled'].includes(text)) return false;
+        if (['1', 'true', 'yes', 'on', 'enabled'].includes(text)) return true;
+        return null;
+    }
+
+    function getStoredValue(...keys) {
+        for (const key of keys) {
+            const value = `${localStorage.getItem(key) || ''}`.trim();
+            if (value) return value;
+        }
+        return '';
+    }
+
+    function hasExplicitBridgeConfig() {
+        const explicitEnabled = normalizeBoolean(
+            localStorage.getItem('signal-share-bridge-enabled')
+            ?? localStorage.getItem('ss_bridge_enabled')
+        );
+        if (explicitEnabled === false) return false;
+
+        const configuredUrl = `${window.SignalShareLocalLlm?.getBridgeBaseUrl?.() || ''}`.trim()
+            || getStoredValue('signal-share-bridge-url', 'ss_bridge_url');
+        if (configuredUrl) return true;
+
+        const bridgeSecret = getStoredValue(
+            'SIGNAL_SHARE_BRIDGE_SECRET',
+            'signal-share-bridge-secret',
+            'ss_bridge_secret'
+        );
+        if (bridgeSecret) return true;
+
+        const localToken = `${window.SignalShareLocalLlm?.getLocalLlmToken?.() || ''}`.trim()
+            || getStoredValue(
+                'SIGNAL_SHARE_LOCAL_LLM_TOKEN',
+                'signal-share-local-llm-token',
+                'ss_local_llm_token'
+            );
+        if (localToken) return true;
+
+        const selectedModel = getStoredValue('arcade-chat-model').toLowerCase();
+        if (selectedModel && selectedModel !== 'auto') return true;
+
+        return false;
+    }
 
     function isLoopbackHost(hostname = '') {
         const host = `${hostname || ''}`.trim().toLowerCase();
@@ -140,12 +194,11 @@ window.ArcadeChatContext = (function() {
         }
     }
 
-    function isBackgroundBridgeProbe(input, init = {}) {
-        if (getRequestMethod(input, init) !== 'GET') return false;
-        const url = parseUrl(input);
+    function isLocalBridgeRoute(url) {
         if (!url || !isLoopbackHost(url.hostname)) return false;
-        return /^\/api\/(?:local-llm|llm)\/models$/i.test(url.pathname)
-            || /^\/api\/local-llm\/health$/i.test(url.pathname);
+        return /^\/api\/(?:local-llm|llm)\/(?:chat|models|health)$/i.test(url.pathname)
+            || /^\/api\/system-media\/(?:current|action)$/i.test(url.pathname)
+            || /^\/api\/security\/audit$/i.test(url.pathname);
     }
 
     function isChatPost(input, init = {}) {
@@ -153,6 +206,41 @@ window.ArcadeChatContext = (function() {
         const url = parseUrl(input);
         if (!url) return false;
         return /^\/api\/(?:local-llm|llm)\/chat$/i.test(url.pathname);
+    }
+
+    function isOfflineBackoffActive() {
+        const until = Number(localStorage.getItem(OFFLINE_UNTIL_KEY) || 0);
+        return Number.isFinite(until) && until > Date.now();
+    }
+
+    function markBridgeOffline() {
+        localStorage.setItem(OFFLINE_UNTIL_KEY, String(Date.now() + OFFLINE_BACKOFF_MS));
+        window.__arcadeBridgeConfirmedOnline = false;
+    }
+
+    function markBridgeOnline() {
+        localStorage.removeItem(OFFLINE_UNTIL_KEY);
+        window.__arcadeBridgeConfirmedOnline = true;
+    }
+
+    function makeBridgeUnavailableResponse(url, reason = 'Local LLM bridge unavailable') {
+        return new Response(JSON.stringify({
+            ok: false,
+            error: reason,
+            message: reason,
+            route: url?.pathname || '',
+            bridgeUnavailable: true
+        }), {
+            status: 503,
+            statusText: 'Bridge unavailable',
+            headers: { 'Content-Type': 'application/json; charset=utf-8' }
+        });
+    }
+
+    function shouldShortCircuitBridgeRequest(url) {
+        if (!isLocalBridgeRoute(url)) return false;
+        if (!hasExplicitBridgeConfig()) return true;
+        return isOfflineBackoffActive();
     }
 
     function sanitizeChatPostBody(body) {
@@ -181,28 +269,33 @@ window.ArcadeChatContext = (function() {
         }
     }
 
-    window.fetch = function arcadeQuietBridgeProbeFetch(input, init = {}) {
-        if (isBackgroundBridgeProbe(input, init)) {
-            return Promise.resolve(new Response(JSON.stringify({
-                ok: false,
-                models: [],
-                quietBridgeProbeSkipped: true,
-                message: 'Background bridge probe skipped because no bridge is currently confirmed online.'
-            }), {
-                status: 503,
-                statusText: 'Bridge probe skipped',
-                headers: { 'Content-Type': 'application/json; charset=utf-8' }
-            }));
+    window.fetch = function arcadeLocalBridgeGuardedFetch(input, init = {}) {
+        const url = parseUrl(input);
+        const isBridgeRoute = isLocalBridgeRoute(url);
+
+        if (shouldShortCircuitBridgeRequest(url)) {
+            const reason = hasExplicitBridgeConfig()
+                ? 'Local LLM bridge is temporarily offline.'
+                : 'Local LLM bridge is not configured.';
+            return Promise.resolve(makeBridgeUnavailableResponse(url, reason));
         }
 
-        if (isChatPost(input, init) && typeof init?.body === 'string') {
-            return originalFetch(input, {
-                ...init,
-                body: sanitizeChatPostBody(init.body)
+        const nextInit = isChatPost(input, init) && typeof init?.body === 'string'
+            ? { ...init, body: sanitizeChatPostBody(init.body) }
+            : init;
+
+        return originalFetch(input, nextInit)
+            .then((response) => {
+                if (isBridgeRoute && response?.ok) markBridgeOnline();
+                return response;
+            })
+            .catch((error) => {
+                if (isBridgeRoute) {
+                    markBridgeOffline();
+                    return makeBridgeUnavailableResponse(url, error?.message || 'Local LLM bridge request failed.');
+                }
+                throw error;
             });
-        }
-
-        return originalFetch(input, init);
     };
 })();
 
@@ -225,8 +318,21 @@ window.ArcadeChatContext = (function() {
         window.checkBridgeConnectivity = async function patchedCheckBridgeConnectivity(options = {}) {
             const timeoutMs = Number(options?.timeoutMs || 0);
             const isSendTimePreflight = timeoutMs > 0 && timeoutMs <= 1500;
+            const bridgeConfigured = typeof window.fetch === 'function'
+                && (localStorage.getItem('signal-share-bridge-url')
+                    || localStorage.getItem('ss_bridge_url')
+                    || localStorage.getItem('SIGNAL_SHARE_BRIDGE_SECRET')
+                    || localStorage.getItem('signal-share-bridge-secret')
+                    || localStorage.getItem('ss_bridge_secret')
+                    || localStorage.getItem('SIGNAL_SHARE_LOCAL_LLM_TOKEN')
+                    || localStorage.getItem('signal-share-local-llm-token')
+                    || localStorage.getItem('ss_local_llm_token'));
+
+            if (isSendTimePreflight && !bridgeConfigured) {
+                return false;
+            }
+
             if (isSendTimePreflight) {
-                console.log('[Arcade Chat] Skipping blocking send-time bridge preflight; allowing chat request to proceed.');
                 return true;
             }
             return originalCheckBridgeConnectivity.apply(this, arguments);
