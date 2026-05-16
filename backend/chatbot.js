@@ -516,28 +516,9 @@ async function ensureLmStudioExclusiveModel(targetModel) {
 }
 
 function resetIdleUnloadTimer() {
+    // Idle VRAM unloading disabled per user request
     if (idleUnloadTimer) clearTimeout(idleUnloadTimer);
-    idleUnloadTimer = setTimeout(async () => {
-        const now = Date.now();
-        if (now - lastActivityAt >= IDLE_UNLOAD_TIMEOUT_MS) {
-            console.log("[Chatbot] Idle timeout reached. Flushing VRAM...");
-            try {
-                const payload = await fetchLmStudioJson("/models", { timeoutMs: 3000 });
-                const rows = parseLmStudioModelRows(payload);
-                const loaded = getLoadedLmStudioInstances(rows);
-                for (const instance of loaded) {
-                    await fetchLmStudioJson("/models/unload", {
-                        method: "POST",
-                        body: { instance_id: instance.id },
-                        timeoutMs: 10000
-                    });
-                    console.log(`[Chatbot] Idle Unload: ${instance.id}`);
-                }
-            } catch (err) {
-                console.warn("[Chatbot] Failed to perform idle VRAM flush:", err.message);
-            }
-        }
-    }, IDLE_UNLOAD_TIMEOUT_MS);
+    return;
 }
 
 async function getAutoSelectedLmStudioModel({ fallbackModels = [] } = {}) {
