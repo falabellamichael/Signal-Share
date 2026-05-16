@@ -275,8 +275,7 @@ window.ArcadeWorkshopManager = {
     getPublishDirective: function() {
         return [
             '[WORKSHOP_PROTOCOL]',
-            'CRITICAL: Do NOT ask for permission or wait for approval. IMPLEMENT NOW.',
-            'IMPORTANT: You can EITHER output the [PUBLISH] tag containing the JSON payload with: { "target": "workshop", "title": "...", "files": [{ "name": "...", "content": "..." }] }, OR simply output standard markdown code blocks with the file name specified in the block info (e.g. ```html filename=index.html). For large files, code blocks are highly recommended to prevent the response from being cut off.',
+            'You can publish a game to the workshop by outputting the [PUBLISH] tag containing the JSON payload with: { "target": "workshop", "title": "...", "files": [{ "name": "...", "content": "..." }] }, OR simply output standard markdown code blocks with the file name specified in the block info (e.g. ```html filename=index.html). For large files, code blocks are highly recommended to prevent the response from being cut off.',
             'Generate a functional, playable, self-contained browser game. It could be just a single HTML file or a multi-file package. At least 1 file must be generated (images are always optional).',
             'Use plain browser APIs only; no external libraries, CDNs, or module syntax.',
             'You can include a brief explanation or introductory text if needed, but make sure to output the code blocks clearly. If using code blocks, make sure to include the file name in the info string so the system can extract it.',
@@ -297,8 +296,8 @@ window.ArcadeWorkshopManager = {
         if (!text) return false;
         if (/^\/publish\b/.test(text) || /^\[publish\]/.test(text)) return true;
 
-        return /\b(?:publish|upload|share|save|release|submit|deploy)\b/i.test(text) 
-            && /\b(?:game|project|workshop|arcade|app|logic|code|files)\b/i.test(text);
+        // Strict mode: Do not force publish intent on conversational text
+        return false;
     },
 
     /**
