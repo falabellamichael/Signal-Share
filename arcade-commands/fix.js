@@ -1,172 +1,123 @@
 /**
  * /fix Command
- * Specialized protocol for rapid bug fixing.
+ * Fast bug-fix wrapper around the editor edit pipeline.
  */
 (function() {
-    const ACTION_WORDS = new Set([
-        'add', 'insert', 'create', 'make', 'build', 'change', 'update', 'modify', 'replace',
-        'remove', 'delete', 'fix', 'repair', 'debug', 'style', 'styles', 'css', 'javascript',
-        'js', 'stopwatch', 'timer', 'score', 'button', 'layout', 'color', 'colour', 'work',
-        'working', 'better', 'new', 'feature'
-    ]);
-    const FILLER_WORDS = new Set([
-        'a', 'an', 'and', 'the', 'to', 'for', 'in', 'on', 'of', 'my', 'game', 'workshop',
-        'editor', 'file', 'index', 'html', 'please'
-    ]);
-
-    function tokenize(value = '') {
-        return `${value || ''}`.toLowerCase().match(/[a-z0-9]+/g) || [];
+    function normalize(value = '') {
+        return `${value || ''}`.trim();
     }
 
-    function isTargetOnlyEditRequest(args = '', selected = null) {
-        const argTokens = tokenize(args);
-        if (argTokens.length === 0) return true;
-
-        const titleTokens = new Set(tokenize(selected?.title || ''));
-        const fileTokens = new Set(tokenize(selected?.fileName || ''));
-        const remaining = argTokens.filter((token) => {
-            return !titleTokens.has(token)
-                && !fileTokens.has(token)
-                && !FILLER_WORDS.has(token);
-        });
-
-        if (remaining.length === 0) return true;
-        return !remaining.some((token) => ACTION_WORDS.has(token));
-    }
-
-    function replyLocally(inputElement, message) {
+    function replyLocally(inputElement, message, isError = false) {
         if (typeof window.addChatMessage === 'function') {
-            window.addChatMessage('ai', message);
+            window.addChatMessage('ai', isError ? `⚠️ ${message}` : message);
+        } else if (typeof window.showFeedback === 'function') {
+            window.showFeedback(message, isError);
         }
         if (inputElement) inputElement.value = '';
-        if (typeof window.updateChatStatus === 'function') window.updateChatStatus('active');
         return true;
     }
 
-    function resolveFallbackEditTarget(args = '') {
-        if (typeof window.getWorkshopManageableGames !== 'function') return null;
-        const games = window.getWorkshopManageableGames();
-        if (!Array.isArray(games) || games.length === 0) return null;
+    function getEditCommand() {
+        return window.ArcadeCommandManager?.getCommand?.('edit') || null;
+    }
 
-        const editorState = typeof window.getWorkshopEditorState === 'function'
-            ? window.getWorkshopEditorState()
-            : null;
-        const activeGameId = `${editorState?.activeGameId || ''}`.trim();
-        const activeGame = activeGameId ? games.find((game) => game.id === activeGameId) : null;
-        if (activeGame) return activeGame;
-
-        const prompt = `${args || ''}`.toLowerCase();
-        if (games.length === 1 || /\b(any|whatever|something|one of my|a game|my game)\b/.test(prompt)) {
-            return games[0];
+    function getActiveEditorState() {
+        if (typeof window.getWorkshopEditorState !== 'function') return null;
+        try {
+            return window.getWorkshopEditorState();
+        } catch (_error) {
+            return null;
         }
+    }
 
-        return null;
+    function hasActiveEditor() {
+        const state = getActiveEditorState();
+        return Boolean(`${state?.activeGameId || ''}`.trim() && `${state?.activeFileName || ''}`.trim());
+    }
+
+    function hasRealFixInstruction(args = '') {
+        const text = normalize(args).toLowerCase();
+        if (!text) return false;
+        return /\b(?:fix|repair|debug|broken|bug|error|issue|not working|doesn't work|doesnt work|fails?|crash|syntax|validation|line\s+\d+)\b/.test(text);
     }
 
     window.ArcadeCommandManager.register({
         id: 'fix',
-        description: 'Rapid bug fixing protocol.',
+        description: 'Fix a bug in the selected Workshop editor file.',
+
         execute: async (args, inputElement) => {
-            let selected = null;
-            if (typeof window.resolveWorkshopEditGameFromPrompt === 'function'
-                && typeof window.setWorkshopEditActiveGame === 'function') {
-                let targetGame = window.resolveWorkshopEditGameFromPrompt(args);
-                if (!targetGame) targetGame = resolveFallbackEditTarget(args);
-                if (targetGame) {
-                    selected = window.setWorkshopEditActiveGame(targetGame.id, { prompt: args });
-                    if (selected?.ok) {
-                        console.log(`[Command: Fix] Auto-switching context to: ${selected.title} / ${selected.fileName}`);
-                    }
-                }
+            const prompt = normalize(args);
+            const editCmd = getEditCommand();
+
+            if (!prompt && !hasActiveEditor()) {
+                return replyLocally(inputElement, 'Open a Workshop game/file first, or choose one after /fix.');
             }
 
-            if (selected?.ok && isTargetOnlyEditRequest(args, selected)) {
-                window.activeArcadeCommandMode = null;
-                return replyLocally(
-                    inputElement,
-                    `[Workshop Fix]: Opened "${selected.title}" in Fix Mode (${selected.fileName}). Tell me the exact bug to fix, for example: /fix ${selected.title} fix the scoring bug.`
-                );
+            // Let /edit handle game/file target resolution, suggestions, and editor opening.
+            if (editCmd && typeof editCmd.execute === 'function') {
+                const result = await editCmd.execute(prompt, inputElement);
+                if (result === true) return true;
             }
 
-            if (!selected?.ok && isTargetOnlyEditRequest(args, selected)) {
-                window.activeArcadeCommandMode = null;
+            if (!hasRealFixInstruction(prompt)) {
                 return replyLocally(
                     inputElement,
-                    '[Workshop Fix]: I need a matching Workshop game and a fix request. Try: /fix Random Number Guessing Game fix the scoring bug.'
+                    'Opened the target. Now describe the bug, for example: /fix score does not update after clicking.'
                 );
             }
 
             window.activeArcadeCommandMode = '/fix';
-            return false; // Let normal flow continue to AI
+            window.activeArcadeCommandModes = Array.isArray(window.activeArcadeCommandModes)
+                ? Array.from(new Set([...window.activeArcadeCommandModes, '/fix', '/edit']))
+                : ['/fix', '/edit'];
+
+            if (inputElement && !inputElement.value.trim()) {
+                inputElement.value = `/fix ${prompt}`;
+            }
+            return false;
         },
+
         handleResponse: async (text, options = {}) => {
             const actionResult = {
                 handled: false,
                 workshopFileRewriteAttempted: false,
-                workshopFileRewriteSucceeded: false
+                workshopFileRewriteSucceeded: false,
+                editorEditAttempted: false,
+                editorEditSucceeded: false,
+                errorReason: null
             };
 
-            const editBlocks = typeof window.extractWorkshopEditBlocks === 'function' ? window.extractWorkshopEditBlocks(text) : [];
-            
-            if (editBlocks.length === 0) {
-                if (typeof window.tryAutoWorkshopFileRewriteFromReply === 'function') {
-                    if (window.showFeedback) window.showFeedback('No explicit [EDIT] tags found. Attempting automatic patch...', false);
-                    const fallbackResult = await window.tryAutoWorkshopFileRewriteFromReply(text, options.userPrompt || '');
-                    if (fallbackResult.attempted) {
-                        actionResult.handled = true;
-                        actionResult.workshopFileRewriteAttempted = true;
-                        actionResult.workshopFileRewriteSucceeded = !!fallbackResult.ok;
-                        
-                        if (!fallbackResult.ok) {
-                            actionResult.errorReason = fallbackResult.reason || 'Auto-patch failed';
-                            if (window.showFeedback) window.showFeedback(`Auto-Patch Failed: ${actionResult.errorReason}`, true);
-                        }
-                        return actionResult;
-                    }
-                }
-                return actionResult;
-            }
+            const editCmd = getEditCommand();
+            if (!editCmd || typeof editCmd.handleResponse !== 'function') return actionResult;
 
-            if (window.showFeedback) window.showFeedback('Applying surgical fixes...', false);
-            actionResult.handled = true;
-            const editorState = typeof window.getWorkshopEditorState === 'function' ? window.getWorkshopEditorState() : null;
-            const gameId = editorState?.activeGameId || window.lastPlayedGameId || "";
-            const fileName = editorState?.activeFileName || "index.html";
+            const result = await editCmd.handleResponse(text, {
+                ...options,
+                userPrompt: options.userPrompt || '/fix'
+            });
 
-            if (!gameId || !fileName) {
-                console.warn('[Arcade: Fix] No active game/file for surgical fix.');
-                return actionResult;
-            }
-
-            for (const editBlock of editBlocks) {
-                try {
-                    if (editBlock?.search && typeof window.applyAiFilePatch === 'function') {
-                        actionResult.workshopFileRewriteAttempted = true;
-                        const targetFileName = editBlock.fileName || fileName;
-                        console.log(`[Arcade: Fix] Applying patch to ${targetFileName}`);
-                        const patchResult = await window.applyAiFilePatch(gameId, targetFileName, editBlock.search, editBlock.replace, { save: true });
-                        if (patchResult?.ok) {
-                            actionResult.workshopFileRewriteSucceeded = true;
-                        } else if (window.showFeedback) {
-                            window.showFeedback(patchResult?.message || `Fix failed for ${targetFileName}`, true);
-                        }
-                    }
-                } catch (e) {
-                    console.error("[Arcade: Fix] Action failed:", e);
-                }
-            }
-
-            return actionResult;
+            if (!result?.handled) return actionResult;
+            return {
+                ...actionResult,
+                ...result,
+                handled: true,
+                workshopFileRewriteAttempted: !!(result.workshopFileRewriteAttempted || result.editorEditAttempted),
+                workshopFileRewriteSucceeded: !!(result.workshopFileRewriteSucceeded || result.editorEditSucceeded)
+            };
         },
+
         getSuggestions: (args = '') => {
-            const editCmd = window.ArcadeCommandManager.getCommand('edit');
+            const editCmd = getEditCommand();
             if (editCmd && typeof editCmd.getSuggestions === 'function') {
-                return editCmd.getSuggestions(args).map(s => ({
-                    ...s,
-                    description: s.description.replace('Edit', 'Fix')
+                return editCmd.getSuggestions(args).map((suggestion) => ({
+                    ...suggestion,
+                    description: `${suggestion.description || ''}`.replace(/^Edit\b/i, 'Fix') || 'Fix this Workshop target.'
                 }));
             }
-            return [];
+            return [
+                { id: 'bug', name: 'bug', description: 'Fix a bug in the active editor file.' },
+                { id: 'syntax', name: 'syntax', description: 'Fix a syntax/runtime error.' },
+                { id: 'layout', name: 'layout', description: 'Fix a layout issue.' }
+            ];
         }
     });
 })();
