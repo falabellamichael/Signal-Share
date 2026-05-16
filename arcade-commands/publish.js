@@ -13,6 +13,76 @@
         'a quick clicker challenge with upgrades'
     ];
 
+    const PUBLISH_LOCK_TTL_MS = 2 * 60 * 1000;
+    const PUBLISH_LOCK_NAMESPACE = '__arcadePublishCommandLocks';
+    let lastPublishPrompt = '';
+    let lastPublishTurnId = '';
+
+    function getPublishLocks() {
+        if (!window[PUBLISH_LOCK_NAMESPACE]) {
+            window[PUBLISH_LOCK_NAMESPACE] = {
+                inFlight: new Map(),
+                completed: new Map()
+            };
+        }
+        return window[PUBLISH_LOCK_NAMESPACE];
+    }
+
+    function prunePublishLocks() {
+        const locks = getPublishLocks();
+        const now = Date.now();
+        for (const [key, value] of locks.inFlight.entries()) {
+            if (now - Number(value?.at || 0) > PUBLISH_LOCK_TTL_MS) locks.inFlight.delete(key);
+        }
+        for (const [key, value] of locks.completed.entries()) {
+            if (now - Number(value?.at || 0) > PUBLISH_LOCK_TTL_MS) locks.completed.delete(key);
+        }
+    }
+
+    function hashText(value = '') {
+        const text = `${value || ''}`;
+        let hash = 5381;
+        for (let i = 0; i < text.length; i += 1) {
+            hash = ((hash << 5) + hash) ^ text.charCodeAt(i);
+        }
+        return (hash >>> 0).toString(36);
+    }
+
+    function makePublishKey(userPrompt = '', responseText = '') {
+        const prompt = normalize(userPrompt || lastPublishPrompt || '').toLowerCase();
+        const responseHash = hashText(responseText || '');
+        return `${lastPublishTurnId || 'publish'}::${prompt}::${responseHash}`;
+    }
+
+    function tryAcquirePublishLock(key = '') {
+        prunePublishLocks();
+        const locks = getPublishLocks();
+        if (!key) return { ok: false, reason: 'missing-key' };
+        if (locks.inFlight.has(key)) return { ok: false, reason: 'in-flight' };
+        if (locks.completed.has(key)) return { ok: false, reason: 'completed' };
+        locks.inFlight.set(key, { at: Date.now() });
+        return { ok: true };
+    }
+
+    function completePublishLock(key = '', data = {}) {
+        if (!key) return;
+        const locks = getPublishLocks();
+        locks.inFlight.delete(key);
+        locks.completed.set(key, { at: Date.now(), ...data });
+    }
+
+    function releasePublishLock(key = '') {
+        if (!key) return;
+        getPublishLocks().inFlight.delete(key);
+    }
+
+    function clearPublishMode() {
+        window.activeArcadeCommandMode = null;
+        window.activeArcadeCommandModes = Array.isArray(window.activeArcadeCommandModes)
+            ? window.activeArcadeCommandModes.filter(mode => mode !== '/publish')
+            : [];
+    }
+
     function showPublishFeedback(message, isError = false) {
         if (!message) return;
         if (typeof window.showFeedback === 'function') {
@@ -40,7 +110,7 @@
     }
 
     function sanitizeFileName(name = '', fallback = 'index.html') {
-        const clean = normalize(name).replace(/[\\/]+/g, '_').replace(/^['"]|['"]$/g, '');
+        const clean = normalize(name).replace(/[\\/]+/g, '_').replace(/^[']|[']$/g, '').replace(/^["]|["]$/g, '');
         return clean || fallback;
     }
 
@@ -139,13 +209,17 @@
                 return true;
             }
 
+            lastPublishPrompt = `/publish ${prompt}`;
+            lastPublishTurnId = `publish-${Date.now()}-${hashText(lastPublishPrompt)}`;
+            window.__arcadeActivePublishTurnId = lastPublishTurnId;
+
             window.activeArcadeCommandMode = '/publish';
             window.activeArcadeCommandModes = Array.isArray(window.activeArcadeCommandModes)
                 ? Array.from(new Set([...window.activeArcadeCommandModes, '/publish']))
                 : ['/publish'];
 
             if (inputElement) {
-                inputElement.value = `/publish ${prompt}`;
+                inputElement.value = lastPublishPrompt;
             }
             return false;
         },
@@ -168,6 +242,7 @@
                 publishTagDetected: /\[PUBLISH/i.test(text),
                 workshopPublishAttempted: false,
                 workshopPublishSucceeded: false,
+                publishSkippedDuplicate: false,
                 requiresRetry: false,
                 retryPrompt: '',
                 errorReason: null
@@ -175,17 +250,29 @@
 
             const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
             if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
-            const userPrompt = options.userPrompt || '';
+            const userPrompt = options.userPrompt || lastPublishPrompt || '';
             const publishIntent = modes.has('/publish') || /^\s*\/publish\b/i.test(userPrompt) || actionResult.publishTagDetected;
             if (!publishIntent) return actionResult;
 
             actionResult.handled = true;
+            const publishKey = makePublishKey(userPrompt, text);
+            const lock = tryAcquirePublishLock(publishKey);
+            if (!lock.ok) {
+                actionResult.publishSkippedDuplicate = true;
+                actionResult.errorReason = `Duplicate publish ignored (${lock.reason}).`;
+                clearPublishMode();
+                return actionResult;
+            }
+
+            // Clear the mode before the async publish call so a second response/action pass cannot also publish.
+            clearPublishMode();
             actionResult.workshopPublishAttempted = true;
 
             if (typeof window.publishCustomGameFromAi !== 'function') {
                 const message = 'Workshop publishing is unavailable in this environment.';
                 showPublishFeedback(message, true);
                 actionResult.errorReason = message;
+                releasePublishLock(publishKey);
                 return actionResult;
             }
 
@@ -202,6 +289,7 @@
                     `Original request: ${userPrompt}`
                 ].join('\n');
                 actionResult.errorReason = 'AI did not return publishable game files.';
+                releasePublishLock(publishKey);
                 return actionResult;
             }
 
@@ -215,13 +303,15 @@
                 files: workshopFiles,
                 mode: 'create',
                 gameId: '',
-                updateTitle: ''
+                updateTitle: '',
+                publishTurnId: lastPublishTurnId || window.__arcadeActivePublishTurnId || ''
             };
 
             try {
                 const workshopResult = await window.publishCustomGameFromAi(publishPayload);
                 if (workshopResult?.ok) {
                     actionResult.workshopPublishSucceeded = true;
+                    completePublishLock(publishKey, { id: workshopResult.id || '', title: workshopResult.title || title });
                     showPublishFeedback(`Published "${workshopResult.title || title}" in Workshop!`);
                     if (typeof window.setWorkshopEditActiveGame === 'function' && workshopResult.id) {
                         setTimeout(() => window.setWorkshopEditActiveGame(workshopResult.id), 800);
@@ -230,17 +320,14 @@
                     const message = workshopResult?.message || 'Failed to publish game to Workshop.';
                     actionResult.errorReason = message;
                     showPublishFeedback(message, true);
+                    releasePublishLock(publishKey);
                 }
             } catch (error) {
                 console.error('[Arcade: Publish] Critical system failure:', error);
                 actionResult.errorReason = error?.message || 'Critical upload error.';
                 showPublishFeedback(actionResult.errorReason, true);
+                releasePublishLock(publishKey);
             }
-
-            window.activeArcadeCommandMode = null;
-            window.activeArcadeCommandModes = Array.isArray(window.activeArcadeCommandModes)
-                ? window.activeArcadeCommandModes.filter(mode => mode !== '/publish')
-                : [];
 
             return actionResult;
         }
