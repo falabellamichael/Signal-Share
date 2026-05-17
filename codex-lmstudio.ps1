@@ -1,0 +1,112 @@
+param(
+  [string]$BaseUrl = "http://127.0.0.1:1234/v1",
+  [string]$Model = "",
+  [switch]$WriteConfig,
+  [switch]$ListModels
+)
+
+$ErrorActionPreference = "Stop"
+
+function Test-CommandExists {
+  param([Parameter(Mandatory = $true)][string]$Name)
+  return [bool](Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function Get-LmStudioModels {
+  param([Parameter(Mandatory = $true)][string]$BaseUrl)
+
+  $normalizedBaseUrl = $BaseUrl.TrimEnd("/")
+  $modelsUrl = "$normalizedBaseUrl/models"
+
+  try {
+    $response = Invoke-RestMethod -Uri $modelsUrl -Method Get -TimeoutSec 8
+  } catch {
+    throw "LM Studio did not respond at $modelsUrl. Start LM Studio > Developer > Local Server on port 1234 and load a model. $($_.Exception.Message)"
+  }
+
+  $models = @($response.data | ForEach-Object {
+    $id = "$($_.id)".Trim()
+    if ($id) { $id }
+  })
+
+  if ($models.Count -eq 0) {
+    throw "LM Studio responded at $modelsUrl, but returned no model IDs. Load a model in LM Studio first."
+  }
+
+  return $models
+}
+
+function Select-LmStudioModel {
+  param(
+    [Parameter(Mandatory = $true)][string[]]$Models,
+    [string]$RequestedModel = ""
+  )
+
+  $requested = "$RequestedModel".Trim()
+  if ($requested) {
+    if ($Models -contains $requested) { return $requested }
+    throw "Requested model '$requested' was not returned by LM Studio. Available models: $($Models -join ', ')"
+  }
+
+  $preferred = $Models | Where-Object {
+    $_ -notmatch "(?i)embedding|embed|rerank|vision|mmproj"
+  } | Select-Object -First 1
+
+  if ($preferred) { return $preferred }
+  return $Models[0]
+}
+
+function Write-CodexConfig {
+  param([Parameter(Mandatory = $true)][string]$ModelId)
+
+  $codexDir = Join-Path $env:USERPROFILE ".codex"
+  $configPath = Join-Path $codexDir "config.toml"
+
+  if (!(Test-Path $codexDir)) {
+    New-Item -ItemType Directory -Path $codexDir | Out-Null
+  }
+
+  $existing = ""
+  if (Test-Path $configPath) {
+    $existing = Get-Content $configPath -Raw
+  }
+
+  if ($existing -match '(?m)^\s*model\s*=') {
+    $existing = [regex]::Replace($existing, '(?m)^\s*model\s*=.*$', "model = `"$ModelId`"")
+  } else {
+    $existing = "model = `"$ModelId`"`r`n$existing"
+  }
+
+  if ($existing -match '(?m)^\s*oss_provider\s*=') {
+    $existing = [regex]::Replace($existing, '(?m)^\s*oss_provider\s*=.*$', 'oss_provider = "lmstudio"')
+  } else {
+    $existing = "oss_provider = `"lmstudio`"`r`n$existing"
+  }
+
+  Set-Content -Path $configPath -Value $existing.Trim() -Encoding UTF8
+  Write-Host "Updated Codex config: $configPath"
+}
+
+if (!(Test-CommandExists -Name "codex")) {
+  throw "The 'codex' command was not found in PATH. Install or expose Codex CLI before running this launcher."
+}
+
+$models = Get-LmStudioModels -BaseUrl $BaseUrl
+
+if ($ListModels) {
+  Write-Host "LM Studio models:"
+  foreach ($item in $models) { Write-Host "- $item" }
+  exit 0
+}
+
+$selectedModel = Select-LmStudioModel -Models $models -RequestedModel $Model
+Write-Host "Using LM Studio model: $selectedModel"
+
+if ($WriteConfig) {
+  Write-CodexConfig -ModelId $selectedModel
+}
+
+$env:OPENAI_BASE_URL = $BaseUrl.TrimEnd("/")
+$env:OPENAI_API_KEY = "lm-studio"
+
+codex --oss -c oss_provider="lmstudio" -m "$selectedModel"
