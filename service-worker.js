@@ -1,4 +1,4 @@
-const CACHE_NAME = "signal-share-shell-v125";
+const CACHE_NAME = "signal-share-shell-v126";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -11,6 +11,10 @@ const APP_SHELL = [
   "./app-v3.js",
   "./app-v3-ai.js",
   "./app-v3-ui.js",
+  "./app-v3-ui-core.js",
+  "./app-v3-ui-settings.js",
+  "./app-v3-ui-elements.js",
+  "./bridge-fetch-hardening.js",
   "./terms.html",
   "./privacy.html",
   "./site.webmanifest",
@@ -19,6 +23,69 @@ const APP_SHELL = [
   "./icons/icon-maskable-512.png",
   "./icons/apple-touch-icon-180.png",
 ];
+
+const BRIDGE_FETCH_HARDENING_SOURCE = `
+(function installBridgeFetchHardening() {
+  if (window.__signalShareBridgeFetchHardeningInstalled || typeof window.fetch !== "function") return;
+  window.__signalShareBridgeFetchHardeningInstalled = true;
+
+  const nativeFetch = window.fetch.bind(window);
+  const BRIDGE_PATH_PATTERN = /^\\/api\\/(?:local-llm|llm|system-media|system|tools|assistant|security)(?:\\/|$)/i;
+
+  function parseRequestUrl(input) {
+    try {
+      const raw = typeof input === "string" ? input : String((input && input.url) || "");
+      if (!raw) return null;
+      return new URL(raw, window.location.href);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function isLoopbackHost(hostname) {
+    const host = String(hostname || "").trim().toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
+  }
+
+  function isBridgeRequest(input) {
+    const url = parseRequestUrl(input);
+    if (!url) return false;
+    return isLoopbackHost(url.hostname) && BRIDGE_PATH_PATTERN.test(url.pathname || "");
+  }
+
+  function makeBridgeOfflineResponse(input, reason) {
+    const url = parseRequestUrl(input);
+    const message = reason || "Local bridge is unreachable.";
+    return new Response(JSON.stringify({
+      ok: false,
+      error: message,
+      message,
+      bridgeUnavailable: true,
+      route: (url && url.pathname) || ""
+    }), {
+      status: 503,
+      statusText: "Bridge unavailable",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Signal-Share-Bridge-Fallback": "1"
+      }
+    });
+  }
+
+  window.fetch = async function signalShareBridgeSafeFetch(input, init) {
+    const bridgeRequest = isBridgeRequest(input);
+    try {
+      const response = await nativeFetch(input, init);
+      if (!response && bridgeRequest) return makeBridgeOfflineResponse(input, "Local bridge returned no response.");
+      if (!response) throw new TypeError("Fetch returned no response.");
+      return response;
+    } catch (error) {
+      if (bridgeRequest) return makeBridgeOfflineResponse(input, (error && error.message) || "Local bridge request failed.");
+      throw error;
+    }
+  };
+})();
+`;
 
 function isLegacyLocalModelErrorPayload(text = "") {
   const value = `${text || ""}`.toLowerCase();
@@ -57,7 +124,16 @@ function shouldUseNetworkFirst(url) {
 function shouldPatchAppUiScript(request) {
   try {
     const url = new URL(request.url);
-    return url.origin === self.location.origin && /\/app-v3-ui\.js$/i.test(url.pathname);
+    return url.origin === self.location.origin && /\/app-v3-ui(?:-core)?\.js$/i.test(url.pathname);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function shouldPatchArcadeChatScript(request) {
+  try {
+    const url = new URL(request.url);
+    return url.origin === self.location.origin && /\/arcade-chat\.js$/i.test(url.pathname);
   } catch (_error) {
     return false;
   }
@@ -70,14 +146,21 @@ function patchAppUiScript(text = "") {
   return text;
 }
 
+function patchArcadeChatScript(text = "") {
+  if (text.includes("__signalShareBridgeFetchHardeningInstalled")) return text;
+  return `${BRIDGE_FETCH_HARDENING_SOURCE}\n\n${text}`;
+}
+
 async function maybePatchAndCacheResponse(request, response) {
   if (!response || response.status !== 200 || response.type !== "basic") return response;
 
-  if (shouldPatchAppUiScript(request)) {
+  if (shouldPatchAppUiScript(request) || shouldPatchArcadeChatScript(request)) {
     const headers = new Headers(response.headers);
     headers.set("content-type", "application/javascript; charset=utf-8");
     const originalText = await response.clone().text();
-    const patchedText = patchAppUiScript(originalText);
+    const patchedText = shouldPatchArcadeChatScript(request)
+      ? patchArcadeChatScript(originalText)
+      : patchAppUiScript(originalText);
     const patchedResponse = new Response(patchedText, {
       status: response.status,
       statusText: response.statusText,
