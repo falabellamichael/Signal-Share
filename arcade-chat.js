@@ -1001,6 +1001,12 @@ async function bridgeFetch(path, options = {}) {
                 lastNetworkError = error;
                 continue;
             }
+            if (!response) {
+                const error = new Error(`No response from bridge endpoint: ${endpoint}`);
+                networkFailures.push({ baseUrl, error });
+                lastNetworkError = error;
+                continue;
+            }
 
             if (response.ok) {
                 const normalizedPath = `${path || ""}`.trim().toLowerCase();
@@ -4456,4 +4462,5 @@ function getArcadeProtocolOfflineResponse(message) {
 
     return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
+
 
