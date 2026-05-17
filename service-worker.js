@@ -1,4 +1,4 @@
-const CACHE_NAME = "signal-share-shell-v123";
+const CACHE_NAME = "signal-share-shell-v124";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -43,6 +43,41 @@ function scrubLegacyLocalModelErrorPayload(text = "") {
     // Fall through to plain-text scrub.
   }
   return "Local AI endpoint is unavailable. Check the configured bridge/provider and try again.";
+}
+
+function shouldUseNetworkFirst(url) {
+  const pathname = `${url.pathname || ""}`.toLowerCase();
+  return pathname.endsWith(".js")
+    || pathname.endsWith(".css")
+    || pathname.endsWith(".html")
+    || pathname.endsWith("/")
+    || pathname.endsWith("/index.html");
+}
+
+async function fetchAndCache(request) {
+  const response = await fetch(request, { cache: "no-store" });
+  if (response && response.status === 200 && response.type === "basic") {
+    const copy = response.clone();
+    caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+  }
+  return response;
+}
+
+async function networkFirst(request, fallbackUrl = "") {
+  try {
+    return await fetchAndCache(request);
+  } catch (_error) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    if (fallbackUrl) return caches.match(fallbackUrl);
+    throw _error;
+  }
+}
+
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  return fetchAndCache(request);
 }
 
 async function fetchAndScrubChatResponse(request) {
@@ -101,29 +136,16 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request).catch(() => caches.match("./index.html"))
-    );
+    event.respondWith(networkFirst(request, "./index.html"));
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
+  if (shouldUseNetworkFirst(url)) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
 
-      return fetch(request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== "basic") {
-          return response;
-        }
-
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
-        return response;
-      });
-    })
-  );
+  event.respondWith(cacheFirst(request));
 });
 
 self.addEventListener("push", (event) => {
@@ -154,7 +176,6 @@ self.addEventListener("push", (event) => {
     options.body = payload.body.trim();
   }
 
-  // Check if any client is already focused
   const showPush = self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
     const isAnyFocused = clients.some((client) => client.focused);
     if (isAnyFocused) {
