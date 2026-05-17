@@ -74,6 +74,63 @@ function Upsert-TomlScalar {
   return "$line`r`n$Text"
 }
 
+function Upsert-TomlBool {
+  param(
+    [Parameter(Mandatory = $true)][string]$Text,
+    [Parameter(Mandatory = $true)][string]$Key,
+    [Parameter(Mandatory = $true)][bool]$Value
+  )
+
+  $tomlValue = if ($Value) { "true" } else { "false" }
+  $line = "$Key = $tomlValue"
+  $pattern = "(?m)^\s*$([regex]::Escape($Key))\s*=.*$"
+
+  if ($Text -match $pattern) {
+    return [regex]::Replace($Text, $pattern, $line)
+  }
+
+  return "$line`r`n$Text"
+}
+
+function Upsert-TomlSectionBool {
+  param(
+    [Parameter(Mandatory = $true)][string]$Text,
+    [Parameter(Mandatory = $true)][string]$Section,
+    [Parameter(Mandatory = $true)][string]$Key,
+    [Parameter(Mandatory = $true)][bool]$Value
+  )
+
+  $tomlValue = if ($Value) { "true" } else { "false" }
+  $line = "$Key = $tomlValue"
+  $sectionPattern = "(?m)^\[$([regex]::Escape($Section))\]\s*$"
+
+  if ($Text -notmatch $sectionPattern) {
+    return "$Text`r`n`r`n[$Section]`r`n$line"
+  }
+
+  $sectionStart = [regex]::Match($Text, $sectionPattern).Index
+  $afterSection = $Text.Substring($sectionStart)
+  $nextSectionMatch = [regex]::Match($afterSection, "(?m)^\[[^\]]+\]\s*$", [System.Text.RegularExpressions.RegexOptions]::Multiline, [TimeSpan]::FromSeconds(1))
+
+  $sectionEnd = $Text.Length
+  if ($nextSectionMatch.Success -and $nextSectionMatch.Index -gt 0) {
+    $sectionEnd = $sectionStart + $nextSectionMatch.Index
+  }
+
+  $before = $Text.Substring(0, $sectionStart)
+  $sectionText = $Text.Substring($sectionStart, $sectionEnd - $sectionStart)
+  $after = $Text.Substring($sectionEnd)
+  $keyPattern = "(?m)^\s*$([regex]::Escape($Key))\s*=.*$"
+
+  if ($sectionText -match $keyPattern) {
+    $sectionText = [regex]::Replace($sectionText, $keyPattern, $line)
+  } else {
+    $sectionText = $sectionText.TrimEnd() + "`r`n$line`r`n"
+  }
+
+  return $before + $sectionText + $after
+}
+
 function Write-CodexConfig {
   param([Parameter(Mandatory = $true)][string]$ModelId)
 
@@ -92,6 +149,19 @@ function Write-CodexConfig {
   $existing = Upsert-TomlScalar -Text $existing -Key "model" -Value $ModelId
   $existing = Upsert-TomlScalar -Text $existing -Key "model_provider" -Value "lmstudio"
   $existing = Upsert-TomlScalar -Text $existing -Key "oss_provider" -Value "lmstudio"
+  $existing = Upsert-TomlScalar -Text $existing -Key "web_search" -Value "disabled"
+  $existing = Upsert-TomlScalar -Text $existing -Key "model_reasoning_effort" -Value "minimal"
+  $existing = Upsert-TomlScalar -Text $existing -Key "model_reasoning_summary" -Value "none"
+  $existing = Upsert-TomlBool -Text $existing -Key "model_supports_reasoning_summaries" -Value $false
+  $existing = Upsert-TomlBool -Text $existing -Key "hide_agent_reasoning" -Value $true
+
+  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "multi_agent" -Value $false
+  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "apps" -Value $false
+  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "web_search" -Value $false
+  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "web_search_cached" -Value $false
+  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "web_search_request" -Value $false
+  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "browser_use" -Value $false
+  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "computer_use" -Value $false
 
   Set-Content -Path $configPath -Value $existing.Trim() -Encoding UTF8
   Write-Host "Updated Codex config for LM Studio app/CLI use: $configPath"
