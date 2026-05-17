@@ -2,6 +2,7 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import { createStrictAiTools, STRICT_TOOL_POLICY } from "./strict-ai-tools.js";
 
 dotenv.config({ path: path.resolve(process.cwd(), "backend", ".env") });
 dotenv.config();
@@ -35,7 +36,9 @@ New code to insert
 [/EDIT]
 
 The SEARCH block must match the existing file content exactly, including whitespace.
-Do not output planning or audits. Output only code blocks or edit blocks.`;
+Do not output planning or audits. Output only code blocks or edit blocks.
+
+${STRICT_TOOL_POLICY}`;
 
 const CORS_WHITELIST = [
   "https://signal-share.pages.dev",
@@ -402,6 +405,9 @@ app.use((req, res, next) => {
   next();
 });
 
+const strictAiTools = createStrictAiTools({ isAuthorized, fetchWithTimeout });
+app.use(strictAiTools.router);
+
 async function handleChatRoute(req, res) {
   try {
     if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized bridge request." });
@@ -461,14 +467,6 @@ app.get("/api/system-media/current", (_req, res) => {
     smtcError: "",
     stale: false
   });
-});
-
-app.post("/api/system-media/action", (req, res) => {
-  res.json({ ok: true, action: req.body?.action || "", message: "Media control route is available." });
-});
-
-app.get("/api/system/apps", (_req, res) => {
-  res.json({ apps: [] });
 });
 
 app.get("/api/system/tabs", (_req, res) => {

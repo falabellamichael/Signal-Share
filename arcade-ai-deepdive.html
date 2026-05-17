@@ -202,7 +202,13 @@
       
       <div class="feature-box" style="border-left: 4px solid var(--accent-secondary);">
           <h3>Idle-Unload Protocol</h3>
-          <p>The companion monitors the "Last Interaction" timestamp. If no activity is detected for 15 minutes, a silent trigger is sent to the local LLM bridge to flush the model from memory.</p>
+          <p>Type <code>/vram</code> in the AI chat to clear GPU memory and free up resources for better performance. This command is triggered automatically when no activity is detected for 15 minutes, but you can also use it manually if needed.</p>
+
+          <div class="code-snippet">
+            // Manual /vram Command:
+            window.clearVramCache();
+            console.log('GPU memory cleared');
+          </div>
           
           <div class="performance-stat">
               <span class="stat-value">0 MB</span>
