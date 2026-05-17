@@ -28,12 +28,65 @@ function normalizeSupabaseFailure(error, fallback = "Supabase request failed.") 
   if (message.includes("Cannot read properties of null") || message.includes("reading 'status'") || message.includes('reading "status"')) {
     return makeSupabaseUnavailableError(fallback);
   }
+  if (error?.code === "SUPABASE_UNAVAILABLE") return error;
   if (error instanceof Error) return error;
   if (error && typeof error === "object") {
     const details = [error.message, error.details, error.hint, error.code ? `Code: ${error.code}` : ""].filter(Boolean).join(" ");
     return makeSupabaseUnavailableError(details || fallback);
   }
   return makeSupabaseUnavailableError(fallback);
+}
+
+function createOfflineSupabaseClient(reason = "Supabase unavailable") {
+  const chain = {};
+  const chainMethods = ["select", "order", "eq", "or", "not", "maybeSingle", "single", "insert", "upsert", "delete"];
+  for (const method of chainMethods) chain[method] = () => chain;
+  chain.then = undefined;
+
+  return {
+    __signalShareOfflineSupabase: true,
+    reason,
+    from: () => chain,
+    rpc: async () => ({ data: null, error: makeSupabaseUnavailableError(reason) }),
+    functions: {
+      invoke: async () => ({ data: null, error: makeSupabaseUnavailableError(reason) })
+    },
+    storage: {
+      from: () => ({
+        upload: async () => ({ data: null, error: makeSupabaseUnavailableError(reason) }),
+        remove: async () => ({ data: null, error: makeSupabaseUnavailableError(reason) }),
+        getPublicUrl: () => ({ data: { publicUrl: "" } })
+      })
+    },
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      setSession: async () => ({ data: { session: null }, error: makeSupabaseUnavailableError(reason) }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
+    },
+    channel: () => ({
+      on: () => ({ subscribe: () => ({ unsubscribe() {} }) }),
+      subscribe: () => ({ unsubscribe() {} }),
+      unsubscribe() {}
+    }),
+    removeChannel: () => {}
+  };
+}
+
+function activateSupabaseOfflineFallback(error) {
+  const reason = error?.message || "Supabase is unavailable.";
+  if (apiContext.state) {
+    apiContext.state.backendMode = "local";
+    apiContext.state.backendError = reason;
+    apiContext.state.authRestoring = false;
+    apiContext.state.currentUser = null;
+    apiContext.state.supabase = createOfflineSupabaseClient(reason);
+  }
+  window.__supabaseClient = createOfflineSupabaseClient(reason);
+  return window.__supabaseClient;
+}
+
+function isSupabaseUnavailable(error) {
+  return normalizeSupabaseFailure(error).code === "SUPABASE_UNAVAILABLE";
 }
 
 function ensureSupabaseSdkAvailable() {
@@ -48,7 +101,7 @@ function ensureSupabaseSdkAvailable() {
 
 function getSupabaseClientOrThrow() {
   const client = apiContext.state?.supabase;
-  if (!client || typeof client.from !== "function") {
+  if (!client || typeof client.from !== "function" || client.__signalShareOfflineSupabase) {
     throw makeSupabaseUnavailableError("Supabase client is not initialized.");
   }
   return client;
@@ -70,92 +123,140 @@ async function runSupabaseQuery(queryPromise, fallback = "Supabase request faile
 
 export function createSupabaseClient() {
   if (window.__supabaseClient) return window.__supabaseClient;
-  ensureSupabaseSdkAvailable();
-  const client = window.supabase.createClient(apiContext.APP_CONFIG.supabaseUrl, apiContext.APP_CONFIG.supabaseAnonKey, {
-    db: {
-      schema: 'public'
-    }
-  });
-  window.__supabaseClient = client;
-  return client;
+  try {
+    ensureSupabaseSdkAvailable();
+    const client = window.supabase.createClient(apiContext.APP_CONFIG.supabaseUrl, apiContext.APP_CONFIG.supabaseAnonKey, {
+      db: {
+        schema: 'public'
+      }
+    });
+    window.__supabaseClient = client;
+    return client;
+  } catch (error) {
+    return activateSupabaseOfflineFallback(normalizeSupabaseFailure(error, "Supabase setup failed."));
+  }
 }
 
 export async function loadPostsFromSupabase() {
-  const client = getSupabaseClientOrThrow();
-  const data = await runSupabaseQuery(
-    client.from(apiContext.APP_CONFIG.postsTable).select("*").order("created_at", { ascending: false }),
-    "Supabase posts request failed."
-  );
-  return (Array.isArray(data) ? data : []).map(normalizeSupabasePost);
+  try {
+    const client = getSupabaseClientOrThrow();
+    const data = await runSupabaseQuery(
+      client.from(apiContext.APP_CONFIG.postsTable).select("*").order("created_at", { ascending: false }),
+      "Supabase posts request failed."
+    );
+    return (Array.isArray(data) ? data : []).map(normalizeSupabasePost);
+  } catch (error) {
+    const normalized = normalizeSupabaseFailure(error, "Supabase posts request failed.");
+    if (isSupabaseUnavailable(normalized)) {
+      activateSupabaseOfflineFallback(normalized);
+      return [];
+    }
+    throw normalized;
+  }
 }
 
 export async function loadLikedPostsFromSupabase() {
-  const client = getSupabaseClientOrThrow();
-  const userId = apiContext.state?.currentUser?.id;
-  if (!userId) return [];
-  const data = await runSupabaseQuery(
-    client.from(apiContext.POST_LIKES_TABLE).select("post_id").eq("user_id", userId),
-    "Supabase likes request failed."
-  );
-  return (Array.isArray(data) ? data : []).map((row) => row.post_id).filter((id) => typeof id === "string" && id.trim());
+  try {
+    const client = getSupabaseClientOrThrow();
+    const userId = apiContext.state?.currentUser?.id;
+    if (!userId) return [];
+    const data = await runSupabaseQuery(
+      client.from(apiContext.POST_LIKES_TABLE).select("post_id").eq("user_id", userId),
+      "Supabase likes request failed."
+    );
+    return (Array.isArray(data) ? data : []).map((row) => row.post_id).filter((id) => typeof id === "string" && id.trim());
+  } catch (error) {
+    if (isSupabaseUnavailable(error)) return [];
+    throw error;
+  }
 }
 
 export async function loadProfilesFromSupabase() {
-  const client = getSupabaseClientOrThrow();
-  const data = await runSupabaseQuery(
-    client.from("profiles").select("*").order("display_name", { ascending: true }),
-    "Supabase profiles request failed."
-  );
-  return (Array.isArray(data) ? data : []).map(normalizeProfile);
+  try {
+    const client = getSupabaseClientOrThrow();
+    const data = await runSupabaseQuery(
+      client.from("profiles").select("*").order("display_name", { ascending: true }),
+      "Supabase profiles request failed."
+    );
+    return (Array.isArray(data) ? data : []).map(normalizeProfile);
+  } catch (error) {
+    if (isSupabaseUnavailable(error)) return [];
+    throw error;
+  }
 }
 
 export async function loadOwnProfileFromSupabase() {
-  if (!apiContext.state.currentUser) return null;
-  const client = getSupabaseClientOrThrow();
-  const data = await runSupabaseQuery(
-    client.from("profiles").select("*").eq("id", apiContext.state.currentUser.id).maybeSingle(),
-    "Supabase profile request failed."
-  );
-  return data ? normalizeProfile(data) : null;
+  try {
+    if (!apiContext.state.currentUser) return null;
+    const client = getSupabaseClientOrThrow();
+    const data = await runSupabaseQuery(
+      client.from("profiles").select("*").eq("id", apiContext.state.currentUser.id).maybeSingle(),
+      "Supabase profile request failed."
+    );
+    return data ? normalizeProfile(data) : null;
+  } catch (error) {
+    if (isSupabaseUnavailable(error)) return null;
+    throw error;
+  }
 }
 
 export async function loadUserBansFromSupabase() {
-  const client = getSupabaseClientOrThrow();
-  const data = await runSupabaseQuery(
-    client.from("user_bans").select("*").order("created_at", { ascending: false }),
-    "Supabase user bans request failed."
-  );
-  return (Array.isArray(data) ? data : []).map(normalizeUserBan);
+  try {
+    const client = getSupabaseClientOrThrow();
+    const data = await runSupabaseQuery(
+      client.from("user_bans").select("*").order("created_at", { ascending: false }),
+      "Supabase user bans request failed."
+    );
+    return (Array.isArray(data) ? data : []).map(normalizeUserBan);
+  } catch (error) {
+    if (isSupabaseUnavailable(error)) return [];
+    throw error;
+  }
 }
 
 export async function loadCurrentUserBanFromSupabase() {
-  if (!apiContext.state.supabase || !apiContext.state.currentUser) return null;
-  const client = getSupabaseClientOrThrow();
-  const data = await runSupabaseQuery(
-    client.from("user_bans").select("*").eq("banned_id", apiContext.state.currentUser.id).maybeSingle(),
-    "Supabase current user ban request failed."
-  );
-  return data ? normalizeUserBan(data) : null;
+  try {
+    if (!apiContext.state.supabase || !apiContext.state.currentUser) return null;
+    const client = getSupabaseClientOrThrow();
+    const data = await runSupabaseQuery(
+      client.from("user_bans").select("*").eq("banned_id", apiContext.state.currentUser.id).maybeSingle(),
+      "Supabase current user ban request failed."
+    );
+    return data ? normalizeUserBan(data) : null;
+  } catch (error) {
+    if (isSupabaseUnavailable(error)) return null;
+    throw error;
+  }
 }
 
 export async function loadBlockedUsersFromSupabase() {
-  const client = getSupabaseClientOrThrow();
-  const userId = apiContext.state?.currentUser?.id;
-  if (!userId) return [];
-  const data = await runSupabaseQuery(
-    client.from("user_blocks").select("*").eq("blocker_id", userId),
-    "Supabase blocked users request failed."
-  );
-  return (Array.isArray(data) ? data : []).map(normalizeUserBlock);
+  try {
+    const client = getSupabaseClientOrThrow();
+    const userId = apiContext.state?.currentUser?.id;
+    if (!userId) return [];
+    const data = await runSupabaseQuery(
+      client.from("user_blocks").select("*").eq("blocker_id", userId),
+      "Supabase blocked users request failed."
+    );
+    return (Array.isArray(data) ? data : []).map(normalizeUserBlock);
+  } catch (error) {
+    if (isSupabaseUnavailable(error)) return [];
+    throw error;
+  }
 }
 
 export async function loadSiteSettingsFromSupabase() {
-  const client = getSupabaseClientOrThrow();
-  const data = await runSupabaseQuery(
-    client.from("site_settings").select("*").eq("id", "global").maybeSingle(),
-    "Supabase site settings request failed."
-  );
-  return data ? normalizeSiteSettings(data) : null;
+  try {
+    const client = getSupabaseClientOrThrow();
+    const data = await runSupabaseQuery(
+      client.from("site_settings").select("*").eq("id", "global").maybeSingle(),
+      "Supabase site settings request failed."
+    );
+    return data ? normalizeSiteSettings(data) : null;
+  } catch (error) {
+    if (isSupabaseUnavailable(error)) return null;
+    throw error;
+  }
 }
 
 export async function syncCurrentProfileToSupabase(displayNameOverride = "") {
@@ -196,41 +297,56 @@ export async function syncCurrentProfileToSupabase(displayNameOverride = "") {
 }
 
 export async function loadDirectThreadsFromSupabase() {
-  if (!apiContext.state.currentUser) return [];
-  const userId = apiContext.state.currentUser.id;
-  const data = await runSupabaseQuery(
-    getSupabaseClientOrThrow()
-      .from("direct_threads")
-      .select("*")
-      .or(`user_one_id.eq.${userId},user_two_id.eq.${userId}`)
-      .order("updated_at", { ascending: false }),
-    "Supabase direct threads request failed."
-  );
-  return (Array.isArray(data) ? data : []).map(normalizeDirectThread);
+  try {
+    if (!apiContext.state.currentUser) return [];
+    const userId = apiContext.state.currentUser.id;
+    const data = await runSupabaseQuery(
+      getSupabaseClientOrThrow()
+        .from("direct_threads")
+        .select("*")
+        .or(`user_one_id.eq.${userId},user_two_id.eq.${userId}`)
+        .order("updated_at", { ascending: false }),
+      "Supabase direct threads request failed."
+    );
+    return (Array.isArray(data) ? data : []).map(normalizeDirectThread);
+  } catch (error) {
+    if (isSupabaseUnavailable(error)) return [];
+    throw error;
+  }
 }
 
 export async function loadMessagesFromSupabase(threadId) {
-  const data = await runSupabaseQuery(
-    getSupabaseClientOrThrow()
-      .from("messages")
-      .select("*")
-      .eq("thread_id", threadId)
-      .order("created_at", { ascending: true }),
-    "Supabase messages request failed."
-  );
-  return (Array.isArray(data) ? data : []).map(normalizeMessage);
+  try {
+    const data = await runSupabaseQuery(
+      getSupabaseClientOrThrow()
+        .from("messages")
+        .select("*")
+        .eq("thread_id", threadId)
+        .order("created_at", { ascending: true }),
+      "Supabase messages request failed."
+    );
+    return (Array.isArray(data) ? data : []).map(normalizeMessage);
+  } catch (error) {
+    if (isSupabaseUnavailable(error)) return [];
+    throw error;
+  }
 }
 
 export async function loadThreadAttachmentPaths(threadId) {
-  const data = await runSupabaseQuery(
-    getSupabaseClientOrThrow()
-      .from("messages")
-      .select("attachment_file_path")
-      .eq("thread_id", threadId)
-      .not("attachment_file_path", "is", null),
-    "Supabase thread attachment request failed."
-  );
-  return (Array.isArray(data) ? data : []).map((row) => row.attachment_file_path).filter((path) => typeof path === "string" && path.trim());
+  try {
+    const data = await runSupabaseQuery(
+      getSupabaseClientOrThrow()
+        .from("messages")
+        .select("attachment_file_path")
+        .eq("thread_id", threadId)
+        .not("attachment_file_path", "is", null),
+      "Supabase thread attachment request failed."
+    );
+    return (Array.isArray(data) ? data : []).map((row) => row.attachment_file_path).filter((path) => typeof path === "string" && path.trim());
+  } catch (error) {
+    if (isSupabaseUnavailable(error)) return [];
+    throw error;
+  }
 }
 
 export async function getOrCreateDirectThread(partnerId) {
