@@ -202,7 +202,14 @@
       
       <div class="feature-box" style="border-left: 4px solid var(--accent-secondary);">
           <h3>Idle-Unload Protocol</h3>
-          <p>Type <code>/vram</code> in the AI chat to clear GPU memory and free up resources for better performance. This command is triggered automatically when no activity is detected for 15 minutes, but you can also use it manually if needed.</p>
+          <h3>How the /vram Command Works</h3>
+          <p>The <code>/vram</code> command triggers a complete GPU memory cleanup process:</p>
+
+          <ul>
+            <li><strong>Model Deletion:</strong> The local LLM bridge removes all cached models from VRAM, freeing up the entire model footprint.</li>
+            <li><strong>Cache Flush:</strong> All pending requests and in-memory data structures are cleared to prevent memory leaks.</li>
+            <li><strong>Idle-Ready State:</strong> The system returns to a clean state ready for new models to be loaded when needed.</li>
+          </ul>
 
           <div class="code-snippet">
             // Manual /vram Command:
