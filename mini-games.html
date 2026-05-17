@@ -23,6 +23,28 @@
                 document.documentElement.classList.add('platform-android');
                 document.documentElement.classList.add('is-steam-shell');
             }
+
+            const themeValues = new Set(['sunset', 'midnight', 'gallery', 'aurora', 'contrast', 'ember']);
+            function getStoredSignalShareTheme() {
+                try {
+                    const preferences = JSON.parse(localStorage.getItem('signal-share-prefs') || '{}');
+                    return themeValues.has(preferences.theme) ? preferences.theme : '';
+                } catch (_error) {
+                    return '';
+                }
+            }
+
+            function applyStoredSignalShareTheme() {
+                const theme = getStoredSignalShareTheme();
+                if (!theme) return;
+                document.documentElement.dataset.theme = theme;
+                if (document.body) document.body.dataset.theme = theme;
+            }
+
+            applyStoredSignalShareTheme();
+            if (!document.body) {
+                document.addEventListener('DOMContentLoaded', applyStoredSignalShareTheme, { once: true });
+            }
         })();
     </script>
     <style>

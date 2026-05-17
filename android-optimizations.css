@@ -83,39 +83,69 @@ html.platform-android.is-steam-shell body {
 }
 
 /* Mirror PC theme backgrounds on Android. Sunset is intentionally left unchanged. */
+html.platform-android[data-theme="midnight"],
 html.platform-android body[data-theme="midnight"] {
     --bg-android: #081017;
+    --steam-blue: #0c151d;
+    --steam-dark: #081017;
+    --steam-light: #7dd3fc;
+    --glass: rgba(11, 18, 26, 0.78);
+    --border: rgba(164, 184, 201, 0.16);
     background:
         radial-gradient(circle at top left, rgba(125, 211, 252, 0.18), transparent 26%),
         radial-gradient(circle at top right, rgba(52, 211, 153, 0.14), transparent 24%),
         linear-gradient(180deg, #081017 0%, #0c151d 50%, #111b23 100%) !important;
 }
 
+html.platform-android[data-theme="gallery"],
 html.platform-android body[data-theme="gallery"] {
     --bg-android: #fffdf7;
+    --steam-blue: #f4f0e6;
+    --steam-dark: #fffdf7;
+    --steam-light: #0f6fa7;
+    --glass: rgba(252, 250, 245, 0.82);
+    --border: rgba(26, 33, 40, 0.1);
     background:
         radial-gradient(circle at top left, rgba(15, 111, 167, 0.14), transparent 24%),
         radial-gradient(circle at bottom right, rgba(215, 141, 63, 0.12), transparent 28%),
         linear-gradient(180deg, #fffdf7 0%, #f4f0e6 48%, #ece6da 100%) !important;
 }
 
+html.platform-android[data-theme="aurora"],
 html.platform-android body[data-theme="aurora"] {
     --bg-android: #f5fcfb;
+    --steam-blue: #ecf5f3;
+    --steam-dark: #f5fcfb;
+    --steam-light: #007c91;
+    --glass: rgba(239, 248, 248, 0.8);
+    --border: rgba(16, 36, 43, 0.1);
     background:
         radial-gradient(circle at top left, rgba(89, 195, 173, 0.2), transparent 26%),
         radial-gradient(circle at top right, rgba(0, 124, 145, 0.14), transparent 28%),
         linear-gradient(180deg, #f5fcfb 0%, #ecf5f3 46%, #ddeae7 100%) !important;
 }
 
+html.platform-android[data-theme="contrast"],
 html.platform-android body[data-theme="contrast"] {
     --bg-android: #000000;
+    --steam-blue: #000000;
+    --steam-dark: #000000;
+    --steam-light: #fff200;
+    --glass: rgba(0, 0, 0, 0.9);
+    --border: rgba(255, 255, 255, 0.54);
     background:
         linear-gradient(90deg, rgba(255, 242, 0, 0.12), transparent 20%, rgba(0, 229, 255, 0.1)),
         linear-gradient(180deg, #000000 0%, #050505 48%, #000000 100%) !important;
 }
 
+html.platform-android[data-theme="ember"],
 html.platform-android body[data-theme="ember"] {
     --bg-android: #140302;
+    --steam-blue: #260705;
+    --steam-dark: #140302;
+    --steam-light: #ff4438;
+    --glass: rgba(32, 7, 6, 0.82);
+    --border: rgba(255, 120, 82, 0.24);
     background:
         radial-gradient(circle at top left, rgba(255, 68, 56, 0.3), transparent 28%),
         radial-gradient(circle at top right, rgba(255, 138, 61, 0.22), transparent 25%),
