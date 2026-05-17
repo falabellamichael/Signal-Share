@@ -625,6 +625,13 @@ function normalizeSourceLabel(sourceAppId = "") {
   return label.replace(/\.exe$/i, "");
 }
 
+function classifySourceProvider(sourceAppId = "") {
+  const id = `${sourceAppId || ""}`.toLowerCase();
+  if (id.includes("spotify")) return "spotify";
+  if (id.includes("youtube") || id.includes("ytmusic") || id.includes("youtube.music")) return "youtube";
+  return "";
+}
+
 app.get("/api/system-media/current", (req, res) => {
   const isWindows = process.platform === "win32";
   const base = {
@@ -638,6 +645,7 @@ app.get("/api/system-media/current", (req, res) => {
     appPackage: "",
     openUri: "",
     artworkUri: "",
+    sourceProvider: "",
     smtcHealthy: isWindows,
     smtcFailureCount: 0,
     smtcError: "",
@@ -649,10 +657,16 @@ app.get("/api/system-media/current", (req, res) => {
   }
 
   try {
-    const preferredSource = typeof req.query.preferredSource === "string" ? req.query.preferredSource.toLowerCase().trim() : "";
+    // Accept both "preferredSource" and "source" query params — the frontend
+    // sends one or both depending on the code path that built the URL.
+    const rawPreferred = typeof req.query.preferredSource === "string" ? req.query.preferredSource : "";
+    const rawSource = typeof req.query.source === "string" ? req.query.source : "";
+    const preferredSource = (rawPreferred || rawSource).toLowerCase().trim();
+    const isFiltered = Boolean(preferredSource && preferredSource !== "all");
+
     let session = null;
 
-    if (preferredSource && preferredSource !== "all") {
+    if (isFiltered) {
       const sessions = SMTCMonitor.getMediaSessions();
       if (Array.isArray(sessions) && sessions.length > 0) {
         for (const s of sessions) {
@@ -664,6 +678,13 @@ app.get("/api/system-media/current", (req, res) => {
             break;
           }
         }
+      }
+
+      // When a source filter is active and no matching session was found,
+      // return an idle response — do NOT fall back to the unfiltered current
+      // session, otherwise the filter is silently defeated.
+      if (!session) {
+        return res.json({ ...base, available: true });
       }
     }
 
@@ -698,6 +719,7 @@ app.get("/api/system-media/current", (req, res) => {
       meta,
       appPackage: `${session.sourceAppId || ""}`.trim(),
       artworkUri,
+      sourceProvider: classifySourceProvider(session.sourceAppId),
     });
   } catch (error) {
     console.error("SMTC error:", error);
@@ -742,7 +764,10 @@ app.use((req, res) => {
   return res.sendFile(path.join(projectRoot, "index.html"));
 });
 
-app.listen(port, "0.0.0.0", () => {
+// Express 5 requires the server handle to be stored at module scope to
+// prevent garbage collection from draining the event loop and exiting.
+// eslint-disable-next-line no-unused-vars
+const globalServer = app.listen(port, "0.0.0.0", () => {
   console.log(`[Bridge] Signal Share backend listening on http://0.0.0.0:${port}`);
   console.log(`[Bridge] AI endpoint configured: ${getConfiguredChatUrl() ? "YES" : "NO"}`);
   console.log(`[Bridge] LM Studio auto-detect enabled at ${normalizeBaseUrl(LM_STUDIO_BASE_URL) || "unavailable"}`);
