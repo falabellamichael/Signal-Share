@@ -2620,7 +2620,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                 // User explicitly asked the companion for an AI reply, so enable bridge attempts.
                 localStorage.setItem('ss_bridge_enabled', '1');
             }
-            const shouldBridgeSendPreflight = isEngineStatusOffline();
+            const shouldBridgeSendPreflight = false;
             if (shouldBridgeSendPreflight) {
                 const bridgeOnlineOnSend = await checkBridgeConnectivity({ signal, timeoutMs: 1500 });
                 updateEngineStatus(bridgeOnlineOnSend);
