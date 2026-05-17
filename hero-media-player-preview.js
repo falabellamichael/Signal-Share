@@ -585,8 +585,8 @@ export function renderHeroStagePreview(options = {}) {
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "ON-DEVICE MEDIA",
-      title: "",
-      meta: "",
+      title: idleTitle,
+      meta: idleMeta,
       showMetadata: true
     });
     return;
@@ -626,8 +626,8 @@ export function renderHeroStagePreview(options = {}) {
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "PC SYSTEM MEDIA",
-      title: "",
-      meta: "",
+      title: idleTitle,
+      meta: idleMeta,
       showMetadata: true
     });
     return;

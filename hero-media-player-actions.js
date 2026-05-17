@@ -137,8 +137,14 @@ export function handleOpenMediaAction(context) {
     // Source Isolation Logic: 
     // 1. If locked to a source, only act if system matches or isn't the 'other' major source.
     // 2. If in 'All' mode, follow whatever the system reports.
-    const actAsYouTube = (prefersYouTube && (systemIsYouTube || !systemIsSpotify)) || (systemIsYouTube && !prefersSpotify);
-    const actAsSpotify = (prefersSpotify && (systemIsSpotify || !systemIsYouTube)) || (systemIsSpotify && !prefersYouTube);
+    let actAsYouTube = (prefersYouTube && (systemIsYouTube || !systemIsSpotify)) || (systemIsYouTube && !prefersSpotify);
+    let actAsSpotify = (prefersSpotify && (systemIsSpotify || !systemIsYouTube)) || (systemIsSpotify && !prefersYouTube);
+    
+    // If not locked and idle, we want the button to default to opening media. Let's not fail silently.
+    if (!actAsYouTube && !actAsSpotify && !title && !meta) {
+       // fallback generic behavior if idle and no preference
+       actAsSpotify = true; // or do something else, but opening Spotify is better than nothing
+    }
 
     if (actAsYouTube) {
       // Prioritize direct link from bridge
@@ -161,6 +167,8 @@ export function handleOpenMediaAction(context) {
       if (title || meta) {
         const query = [title, meta].filter(Boolean).join(" ");
         targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+      } else {
+        targetUrl = "https://www.youtube.com";
       }
     } else if (prefersSpotify && (systemIsSpotify || (!systemIsYouTube && !post))) {
       // Pop up Spotify app on PC
@@ -512,8 +520,8 @@ export function handlePreviousAction(context) {
     );
 
     // If source is locked, we ALWAYS want to send the command to the bridge so it can target the correct app independently.
-    // If source is not locked ("All"), and system is idle, we fall back to local stepping.
-    const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube;
+    // If source is not locked ("All"), and system is idle, we fall back to local stepping (unless explicitly in a bridge mode).
+    const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube || mode === "desktop" || mode === "device";
 
     if (!shouldSendToBridge) {
       // Fallback to local feed stepping
@@ -596,8 +604,8 @@ export function handleNextAction(context) {
     );
 
     // If source is locked, we ALWAYS want to send the command to the bridge so it can target the correct app independently.
-    // If source is not locked ("All"), and system is idle, we fall back to local stepping.
-    const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube;
+    // If source is not locked ("All"), and system is idle, we fall back to local stepping (unless explicitly in a bridge mode).
+    const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube || mode === "desktop" || mode === "device";
 
     if (!shouldSendToBridge) {
       // Fallback to local feed stepping
