@@ -256,19 +256,23 @@ async function sendFixedMediaKey(actionName = "") {
   if (!keyCode) throw new Error("Unsupported media action.");
 
   const hexKey = `0x${keyCode.toString(16).toUpperCase()}`;
-  const command = [
-    "Add-Type -Namespace SignalShare -Name NativeMethods -MemberDefinition '[DllImport(\"user32.dll\")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);'",
-    `[SignalShare.NativeMethods]::keybd_event(${hexKey},0,0,[UIntPtr]::Zero)`,
-    `[SignalShare.NativeMethods]::keybd_event(${hexKey},0,2,[UIntPtr]::Zero)`
-  ].join("; ");
+  const className = `NativeMethods_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+  const script = `
+$code = '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);'
+Add-Type -Namespace SignalShare -Name ${className} -MemberDefinition $code
+[SignalShare.${className}]::keybd_event(${hexKey},0,0,[UIntPtr]::Zero)
+[SignalShare.${className}]::keybd_event(${hexKey},0,2,[UIntPtr]::Zero)
+`;
+  
+  const encodedCommand = Buffer.from(script, 'utf16le').toString('base64');
 
   return launchProcess("powershell.exe", [
     "-NoProfile",
     "-NonInteractive",
     "-ExecutionPolicy",
     "Bypass",
-    "-Command",
-    command
+    "-EncodedCommand",
+    encodedCommand
   ]);
 }
 

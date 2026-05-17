@@ -601,8 +601,8 @@ export function renderHeroStagePreview(options = {}) {
 
       commitCard(stage, {
         badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
-        title: "",
-        meta: "",
+        title: desktopSnapshot.title || "",
+        meta: desktopSnapshot.meta || "",
         note: (desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
         artworkUrl: artworkUrl,
         showMetadata: true
