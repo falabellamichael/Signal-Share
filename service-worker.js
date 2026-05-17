@@ -1,4 +1,4 @@
-const CACHE_NAME = "signal-share-shell-v126";
+const CACHE_NAME = "signal-share-shell-v127";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -147,8 +147,13 @@ function patchAppUiScript(text = "") {
 }
 
 function patchArcadeChatScript(text = "") {
-  if (text.includes("__signalShareBridgeFetchHardeningInstalled")) return text;
-  return `${BRIDGE_FETCH_HARDENING_SOURCE}\n\n${text}`;
+  const source = `${text || ""}`;
+  const patched = source.replace(
+    "const shouldBridgeSendPreflight = isEngineStatusOffline();",
+    "const shouldBridgeSendPreflight = false;"
+  );
+  if (patched.includes("__signalShareBridgeFetchHardeningInstalled")) return patched;
+  return `${BRIDGE_FETCH_HARDENING_SOURCE}\n\n${patched}`;
 }
 
 async function maybePatchAndCacheResponse(request, response) {
@@ -199,7 +204,7 @@ async function cacheFirst(request) {
 }
 
 async function fetchAndScrubChatResponse(request) {
-  const response = await fetch(request);
+  const response = await fetch(request, { cache: "no-store" });
   const contentType = response.headers.get("content-type") || "";
   const text = await response.clone().text().catch(() => "");
   if (!text || !isLegacyLocalModelErrorPayload(text)) return response;
@@ -244,8 +249,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (request.method === "POST" && /^\/api\/(?:local-llm|llm)\/chat$/i.test(url.pathname)) {
-    event.respondWith(fetchAndScrubChatResponse(request));
+  if (/^\/api\//i.test(url.pathname)) {
+    if (request.method === "POST" && /^\/api\/(?:local-llm|llm)\/chat$/i.test(url.pathname)) {
+      event.respondWith(fetchAndScrubChatResponse(request));
+      return;
+    }
+    event.respondWith(fetch(request, { cache: "no-store" }));
     return;
   }
 
