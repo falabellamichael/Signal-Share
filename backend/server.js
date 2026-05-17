@@ -386,6 +386,118 @@ function isAuthorized(req) {
   return Boolean((BRIDGE_SECRET && bridgeSecret === BRIDGE_SECRET) || (LOCAL_LLM_TOKEN && localToken === LOCAL_LLM_TOKEN));
 }
 
+function normalizeIntentText(value = "") {
+  return `${value || ""}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function classifyServerStrictIntent(message = "") {
+  const raw = `${message || ""}`.trim();
+  const text = normalizeIntentText(raw);
+  if (!text) return { tool: "chat.only", allowed: true };
+
+  const baseIntent = strictAiTools?.classifyStrictToolIntent?.(raw);
+  if (baseIntent && baseIntent.tool !== "chat.only" && baseIntent.allowed) return baseIntent;
+
+  const searchMatch = raw.match(/^(?:search|look up|lookup|duckduckgo)\s+(?:for\s+)?(.+)$/i);
+  if (searchMatch?.[1]?.trim()) {
+    return { tool: "duckduckgo.search", allowed: true, query: searchMatch[1].trim() };
+  }
+
+  const appMap = [
+    { id: "spotify", words: ["spotify"] },
+    { id: "notepad", words: ["notepad", "note pad", "notes"] },
+    { id: "calculator", words: ["calculator", "calc"] },
+    { id: "file-explorer", words: ["file explorer", "explorer", "files"] },
+    { id: "chrome", words: ["chrome", "google chrome"] },
+    { id: "edge", words: ["edge", "microsoft edge", "ms edge"] },
+    { id: "vscode", words: ["vscode", "vs code", "visual studio code"] },
+    { id: "discord", words: ["discord"] },
+    { id: "steam", words: ["steam"] }
+  ];
+
+  if (/^(open|launch|start)\b/.test(text)) {
+    const app = appMap.find((row) => row.words.some((word) => text.includes(normalizeIntentText(word))));
+    if (app) return { tool: "pc.open_app", allowed: true, appId: app.id };
+    return { tool: "pc.open_app", allowed: false, reason: "Requested app is not allowlisted." };
+  }
+
+  const mediaActionMap = [
+    { action: "play_pause", words: ["play pause", "play/pause", "pause", "play"] },
+    { action: "next", words: ["next", "skip"] },
+    { action: "previous", words: ["previous", "back"] }
+  ];
+
+  const mediaAction = mediaActionMap.find((row) => row.words.some((word) => text === normalizeIntentText(word) || text.startsWith(`${normalizeIntentText(word)} `)));
+  if (mediaAction && text.includes("spotify")) {
+    return { tool: "pc.app_action", allowed: true, appId: "spotify", action: mediaAction.action };
+  }
+
+  if (baseIntent && baseIntent.tool !== "chat.only") return baseIntent;
+  return { tool: "chat.only", allowed: true };
+}
+
+function formatDuckDuckGoReply(results = []) {
+  const rows = Array.isArray(results) ? results : [];
+  if (rows.length === 0) return "No DuckDuckGo results found.";
+  return rows.map((result, index) => {
+    const title = `${result?.title || "Untitled result"}`.trim();
+    const url = `${result?.url || ""}`.trim();
+    const snippet = `${result?.snippet || ""}`.trim();
+    return `${index + 1}. ${title}\n${url}${snippet ? ` — ${snippet}` : ""}`;
+  }).join("\n\n");
+}
+
+async function postLocalStrictTool(pathname, body = {}) {
+  const response = await fetchWithTimeout(`http://127.0.0.1:${port}${pathname}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  }, 30000);
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok) {
+    throw new Error(data?.error || data?.message || `Strict tool route failed: ${pathname}`);
+  }
+  return data;
+}
+
+async function handleStrictChatToolTurn(req, res, message = "") {
+  const intent = classifyServerStrictIntent(message);
+  if (!intent || intent.tool === "chat.only") return false;
+
+  if (!intent.allowed) {
+    res.json({ ok: true, reply: intent.reason || "Requested action is not available.", strictTool: true, intent });
+    return true;
+  }
+
+  try {
+    if (intent.tool === "duckduckgo.search") {
+      const data = await postLocalStrictTool("/api/tools/duckduckgo/search", { query: intent.query, maxResults: 5 });
+      return res.json({ ok: true, reply: formatDuckDuckGoReply(data.results), strictTool: true, tool: intent.tool, results: data.results });
+    }
+
+    if (intent.tool === "pc.open_app") {
+      const data = await postLocalStrictTool("/api/system/apps/open", { appId: intent.appId });
+      return res.json({ ok: true, reply: `Opened ${data.label || intent.appId}.`, strictTool: true, tool: intent.tool, appId: intent.appId });
+    }
+
+    if (intent.tool === "pc.app_action") {
+      const data = await postLocalStrictTool("/api/system/apps/action", { appId: intent.appId, action: intent.action });
+      return res.json({ ok: true, reply: `Ran ${intent.action} for ${data.appId || intent.appId}.`, strictTool: true, tool: intent.tool, appId: intent.appId, action: intent.action });
+    }
+
+    return res.json({ ok: true, reply: "Requested action is not available.", strictTool: true, intent });
+  } catch (error) {
+    console.error("[Bridge] Strict chat tool enforcement error:", error);
+    res.status(500).json({ ok: false, error: error?.message || "Strict tool request failed.", strictTool: true, intent });
+    return true;
+  }
+}
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -416,6 +528,9 @@ async function handleChatRoute(req, res) {
     if (!message && (!Array.isArray(history) || history.length === 0)) {
       return res.status(400).json({ ok: false, error: "No message provided." });
     }
+
+    const strictToolHandled = await handleStrictChatToolTurn(req, res, message || "");
+    if (strictToolHandled) return;
 
     const reply = await getChatResponse(message || "", history || [], pageContext || "", 0, attachment || null, model || "auto", customInstructions || "");
     return res.json({ ok: true, reply });
