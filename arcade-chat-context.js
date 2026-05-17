@@ -379,6 +379,10 @@ window.ArcadeChatContext = (function() {
                 })
             });
 
+            if (!response) {
+                return makeJsonChatResponse({ ok: true, reply: 'DuckDuckGo search failed.' });
+            }
+
             const data = await response.json().catch(() => null);
             if (!response.ok || !data?.ok) {
                 return makeJsonChatResponse({
@@ -418,6 +422,10 @@ window.ArcadeChatContext = (function() {
                 })
             });
 
+            if (!response) {
+                return makeJsonChatResponse({ ok: true, reply: 'App open request failed.' });
+            }
+
             const data = await response.json().catch(() => null);
             const reply = response.ok && data?.ok
                 ? `Opened ${data.label || intent.appId}.`
@@ -444,6 +452,10 @@ window.ArcadeChatContext = (function() {
                     action: intent.action
                 })
             });
+
+            if (!response) {
+                return makeJsonChatResponse({ ok: true, reply: 'App action failed.' });
+            }
 
             const data = await response.json().catch(() => null);
             const reply = response.ok && data?.ok
@@ -519,7 +531,14 @@ window.ArcadeChatContext = (function() {
 
         return originalFetch(input, nextInit)
             .then((response) => {
-                if (isBridgeRoute && response?.ok) markBridgeOnline();
+                if (!response) {
+                    if (isBridgeRoute) {
+                        markBridgeOffline();
+                        return makeBridgeUnavailableResponse(url, 'Local LLM bridge returned no response.');
+                    }
+                    throw new TypeError('Fetch returned no response.');
+                }
+                if (isBridgeRoute && response.ok) markBridgeOnline();
                 return response;
             })
             .catch((error) => {
