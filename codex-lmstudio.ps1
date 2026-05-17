@@ -57,7 +57,7 @@ function Select-LmStudioModel {
   return $Models[0]
 }
 
-function Upsert-TomlScalar {
+function Set-TomlRootString {
   param(
     [Parameter(Mandatory = $true)][string]$Text,
     [Parameter(Mandatory = $true)][string]$Key,
@@ -66,15 +66,11 @@ function Upsert-TomlScalar {
 
   $line = "$Key = `"$Value`""
   $pattern = "(?m)^\s*$([regex]::Escape($Key))\s*=.*$"
-
-  if ($Text -match $pattern) {
-    return [regex]::Replace($Text, $pattern, $line)
-  }
-
+  if ($Text -match $pattern) { return [regex]::Replace($Text, $pattern, $line) }
   return "$line`r`n$Text"
 }
 
-function Upsert-TomlBool {
+function Set-TomlRootBool {
   param(
     [Parameter(Mandatory = $true)][string]$Text,
     [Parameter(Mandatory = $true)][string]$Key,
@@ -84,38 +80,31 @@ function Upsert-TomlBool {
   $tomlValue = if ($Value) { "true" } else { "false" }
   $line = "$Key = $tomlValue"
   $pattern = "(?m)^\s*$([regex]::Escape($Key))\s*=.*$"
-
-  if ($Text -match $pattern) {
-    return [regex]::Replace($Text, $pattern, $line)
-  }
-
+  if ($Text -match $pattern) { return [regex]::Replace($Text, $pattern, $line) }
   return "$line`r`n$Text"
 }
 
-function Upsert-TomlSectionBool {
+function Set-TomlSectionValue {
   param(
     [Parameter(Mandatory = $true)][string]$Text,
     [Parameter(Mandatory = $true)][string]$Section,
     [Parameter(Mandatory = $true)][string]$Key,
-    [Parameter(Mandatory = $true)][bool]$Value
+    [Parameter(Mandatory = $true)][string]$RenderedValue
   )
 
-  $tomlValue = if ($Value) { "true" } else { "false" }
-  $line = "$Key = $tomlValue"
-  $sectionPattern = "(?m)^\[$([regex]::Escape($Section))\]\s*$"
+  $sectionHeader = "[$Section]"
+  $sectionPattern = "(?m)^\s*\[$([regex]::Escape($Section))\]\s*$"
+  $line = "$Key = $RenderedValue"
 
   if ($Text -notmatch $sectionPattern) {
-    return "$Text`r`n`r`n[$Section]`r`n$line"
+    return "$Text`r`n`r`n$sectionHeader`r`n$line`r`n"
   }
 
-  $sectionStart = [regex]::Match($Text, $sectionPattern).Index
-  $afterSection = $Text.Substring($sectionStart)
-  $nextSectionMatch = [regex]::Match($afterSection, "(?m)^\[[^\]]+\]\s*$", [System.Text.RegularExpressions.RegexOptions]::Multiline, [TimeSpan]::FromSeconds(1))
-
-  $sectionEnd = $Text.Length
-  if ($nextSectionMatch.Success -and $nextSectionMatch.Index -gt 0) {
-    $sectionEnd = $sectionStart + $nextSectionMatch.Index
-  }
+  $match = [regex]::Match($Text, $sectionPattern)
+  $sectionStart = $match.Index
+  $sectionBodyStart = $match.Index + $match.Length
+  $nextMatch = [regex]::Match($Text.Substring($sectionBodyStart), "(?m)^\s*\[[^\]]+\]\s*$")
+  $sectionEnd = if ($nextMatch.Success) { $sectionBodyStart + $nextMatch.Index } else { $Text.Length }
 
   $before = $Text.Substring(0, $sectionStart)
   $sectionText = $Text.Substring($sectionStart, $sectionEnd - $sectionStart)
@@ -129,6 +118,18 @@ function Upsert-TomlSectionBool {
   }
 
   return $before + $sectionText + $after
+}
+
+function Set-TomlSectionBool {
+  param(
+    [Parameter(Mandatory = $true)][string]$Text,
+    [Parameter(Mandatory = $true)][string]$Section,
+    [Parameter(Mandatory = $true)][string]$Key,
+    [Parameter(Mandatory = $true)][bool]$Value
+  )
+
+  $tomlValue = if ($Value) { "true" } else { "false" }
+  return Set-TomlSectionValue -Text $Text -Section $Section -Key $Key -RenderedValue $tomlValue
 }
 
 function Write-CodexConfig {
@@ -146,25 +147,33 @@ function Write-CodexConfig {
     $existing = Get-Content $configPath -Raw
   }
 
-  $existing = Upsert-TomlScalar -Text $existing -Key "model" -Value $ModelId
-  $existing = Upsert-TomlScalar -Text $existing -Key "model_provider" -Value "lmstudio"
-  $existing = Upsert-TomlScalar -Text $existing -Key "oss_provider" -Value "lmstudio"
-  $existing = Upsert-TomlScalar -Text $existing -Key "web_search" -Value "disabled"
-  $existing = Upsert-TomlScalar -Text $existing -Key "model_reasoning_effort" -Value "minimal"
-  $existing = Upsert-TomlScalar -Text $existing -Key "model_reasoning_summary" -Value "none"
-  $existing = Upsert-TomlBool -Text $existing -Key "model_supports_reasoning_summaries" -Value $false
-  $existing = Upsert-TomlBool -Text $existing -Key "hide_agent_reasoning" -Value $true
+  $existing = Set-TomlRootString -Text $existing -Key "model" -Value $ModelId
+  $existing = Set-TomlRootString -Text $existing -Key "model_provider" -Value "lmstudio"
+  $existing = Set-TomlRootString -Text $existing -Key "oss_provider" -Value "lmstudio"
+  $existing = Set-TomlRootString -Text $existing -Key "web_search" -Value "disabled"
+  $existing = Set-TomlRootString -Text $existing -Key "model_reasoning_effort" -Value "minimal"
+  $existing = Set-TomlRootString -Text $existing -Key "model_reasoning_summary" -Value "none"
+  $existing = Set-TomlRootBool -Text $existing -Key "model_supports_reasoning_summaries" -Value $false
+  $existing = Set-TomlRootBool -Text $existing -Key "hide_agent_reasoning" -Value $true
 
-  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "multi_agent" -Value $false
-  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "apps" -Value $false
-  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "web_search" -Value $false
-  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "web_search_cached" -Value $false
-  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "web_search_request" -Value $false
-  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "browser_use" -Value $false
-  $existing = Upsert-TomlSectionBool -Text $existing -Section "features" -Key "computer_use" -Value $false
+  $existing = Set-TomlSectionBool -Text $existing -Section "apps._default" -Key "enabled" -Value $false
+  $existing = Set-TomlSectionBool -Text $existing -Section "apps._default" -Key "default_tools_enabled" -Value $false
+  $existing = Set-TomlSectionBool -Text $existing -Section "apps._default" -Key "open_world_enabled" -Value $false
+  $existing = Set-TomlSectionBool -Text $existing -Section "apps._default" -Key "destructive_enabled" -Value $false
+
+  $existing = Set-TomlSectionBool -Text $existing -Section "tools" -Key "web_search" -Value $false
+  $existing = Set-TomlSectionBool -Text $existing -Section "tools" -Key "view_image" -Value $false
+
+  $existing = Set-TomlSectionBool -Text $existing -Section "features" -Key "multi_agent" -Value $false
+  $existing = Set-TomlSectionBool -Text $existing -Section "features" -Key "web_search" -Value $false
+  $existing = Set-TomlSectionBool -Text $existing -Section "features" -Key "web_search_cached" -Value $false
+  $existing = Set-TomlSectionBool -Text $existing -Section "features" -Key "web_search_request" -Value $false
+  $existing = Set-TomlSectionBool -Text $existing -Section "features" -Key "browser_use" -Value $false
+  $existing = Set-TomlSectionBool -Text $existing -Section "features" -Key "computer_use" -Value $false
 
   Set-Content -Path $configPath -Value $existing.Trim() -Encoding UTF8
   Write-Host "Updated Codex config for LM Studio app/CLI use: $configPath"
+  Write-Host "Disabled Codex app connector tools for LM Studio compatibility."
 }
 
 if (!(Test-CommandExists -Name "codex")) {
