@@ -57,6 +57,23 @@ function Select-LmStudioModel {
   return $Models[0]
 }
 
+function Upsert-TomlScalar {
+  param(
+    [Parameter(Mandatory = $true)][string]$Text,
+    [Parameter(Mandatory = $true)][string]$Key,
+    [Parameter(Mandatory = $true)][string]$Value
+  )
+
+  $line = "$Key = `"$Value`""
+  $pattern = "(?m)^\s*$([regex]::Escape($Key))\s*=.*$"
+
+  if ($Text -match $pattern) {
+    return [regex]::Replace($Text, $pattern, $line)
+  }
+
+  return "$line`r`n$Text"
+}
+
 function Write-CodexConfig {
   param([Parameter(Mandatory = $true)][string]$ModelId)
 
@@ -72,20 +89,12 @@ function Write-CodexConfig {
     $existing = Get-Content $configPath -Raw
   }
 
-  if ($existing -match '(?m)^\s*model\s*=') {
-    $existing = [regex]::Replace($existing, '(?m)^\s*model\s*=.*$', "model = `"$ModelId`"")
-  } else {
-    $existing = "model = `"$ModelId`"`r`n$existing"
-  }
-
-  if ($existing -match '(?m)^\s*oss_provider\s*=') {
-    $existing = [regex]::Replace($existing, '(?m)^\s*oss_provider\s*=.*$', 'oss_provider = "lmstudio"')
-  } else {
-    $existing = "oss_provider = `"lmstudio`"`r`n$existing"
-  }
+  $existing = Upsert-TomlScalar -Text $existing -Key "model" -Value $ModelId
+  $existing = Upsert-TomlScalar -Text $existing -Key "model_provider" -Value "oss"
+  $existing = Upsert-TomlScalar -Text $existing -Key "oss_provider" -Value "lmstudio"
 
   Set-Content -Path $configPath -Value $existing.Trim() -Encoding UTF8
-  Write-Host "Updated Codex config: $configPath"
+  Write-Host "Updated Codex config for app/CLI LM Studio use: $configPath"
 }
 
 if (!(Test-CommandExists -Name "codex")) {
