@@ -122,57 +122,6 @@ async function runSupabaseQuery(queryPromise, fallback = "Supabase request faile
   }
 }
 
-function buildSupabaseRestUrl(table, params = "") {
-  const baseUrl = `${apiContext.APP_CONFIG?.supabaseUrl || ""}`.replace(/\/+$/, "");
-  const tableName = `${table || ""}`.trim();
-  if (!baseUrl || !tableName) return "";
-  return `${baseUrl}/rest/v1/${encodeURIComponent(tableName)}${params ? `?${params}` : ""}`;
-}
-
-async function runSupabaseRestQuery(url, fallback = "Supabase request failed.") {
-  const apiKey = apiContext.APP_CONFIG?.supabaseAnonKey || "";
-  if (!url || !apiKey || typeof fetch !== "function") {
-    throw makeSupabaseUnavailableError(fallback);
-  }
-
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      mode: "cors",
-      cache: "no-store",
-      headers: {
-        apikey: apiKey,
-        Authorization: `Bearer ${apiKey}`,
-        Accept: "application/json"
-      }
-    });
-
-    const text = await response.text();
-    let data = null;
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch (_error) {
-        throw makeSupabaseUnavailableError(fallback);
-      }
-    }
-
-    if (!response.ok) {
-      throw normalizeSupabaseFailure(data || { message: response.statusText, code: response.status }, fallback);
-    }
-
-    return data;
-  } catch (error) {
-    throw normalizeSupabaseFailure(error, fallback);
-  }
-}
-
-async function loadPostsFromSupabaseRestFallback() {
-  const url = buildSupabaseRestUrl(apiContext.APP_CONFIG?.postsTable, "select=*&order=created_at.desc");
-  const data = await runSupabaseRestQuery(url, "Supabase posts request failed.");
-  return (Array.isArray(data) ? data : []).map(normalizeSupabasePost);
-}
-
 export function createSupabaseClient() {
   if (window.__supabaseClient && !window.__supabaseClient.__signalShareOfflineSupabase) {
     return window.__supabaseClient;
@@ -200,17 +149,7 @@ export async function loadPostsFromSupabase() {
     );
     return (Array.isArray(data) ? data : []).map(normalizeSupabasePost);
   } catch (error) {
-    const normalized = normalizeSupabaseFailure(error, "Supabase posts request failed.");
-    try {
-      return await loadPostsFromSupabaseRestFallback();
-    } catch (fallbackError) {
-      console.warn("Supabase REST posts fallback failed", fallbackError);
-    }
-    if (isSupabaseUnavailable(normalized)) {
-      activateSupabaseOfflineFallback(normalized);
-      return [];
-    }
-    throw normalized;
+    throw normalizeSupabaseFailure(error, "Supabase posts request failed.");
   }
 }
 

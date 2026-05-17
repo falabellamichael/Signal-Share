@@ -511,12 +511,14 @@ window.ArcadeChatContext = (function() {
         }
     }
 
-    window.fetch = function arcadeLocalBridgeGuardedFetch(input, init = {}) {
+    window.fetch = async function arcadeLocalBridgeGuardedFetch(input, init = {}) {
         const url = parseUrl(input);
         const isBridgeRoute = isLocalBridgeRoute(url);
 
-        const strictToolRequest = handleStrictToolChatRequest(input, init);
-        if (strictToolRequest) return strictToolRequest;
+        if (isChatPost(input, init) && typeof init?.body === 'string') {
+            const strictToolResponse = await handleStrictToolChatRequest(input, init);
+            if (strictToolResponse) return strictToolResponse;
+        }
 
         if (shouldShortCircuitBridgeRequest(url)) {
             const reason = bridgeTrafficAllowed()
@@ -529,25 +531,24 @@ window.ArcadeChatContext = (function() {
             ? { ...init, body: sanitizeChatPostBody(init.body) }
             : init;
 
-        return originalFetch(input, nextInit)
-            .then((response) => {
-                if (!response) {
-                    if (isBridgeRoute) {
-                        markBridgeOffline();
-                        return makeBridgeUnavailableResponse(url, 'Local LLM bridge returned no response.');
-                    }
-                    throw new TypeError('Fetch returned no response.');
-                }
-                if (isBridgeRoute && response.ok) markBridgeOnline();
-                return response;
-            })
-            .catch((error) => {
+        try {
+            const response = await originalFetch(input, nextInit);
+            if (!response) {
                 if (isBridgeRoute) {
                     markBridgeOffline();
-                    return makeBridgeUnavailableResponse(url, error?.message || 'Local LLM bridge request failed.');
+                    return makeBridgeUnavailableResponse(url, 'Local LLM bridge returned no response.');
                 }
-                throw error;
-            });
+                throw new TypeError('Fetch returned no response.');
+            }
+            if (isBridgeRoute && response.ok) markBridgeOnline();
+            return response;
+        } catch (error) {
+            if (isBridgeRoute) {
+                markBridgeOffline();
+                return makeBridgeUnavailableResponse(url, error?.message || 'Local LLM bridge request failed.');
+            }
+            throw error;
+        }
     };
 })();
 
