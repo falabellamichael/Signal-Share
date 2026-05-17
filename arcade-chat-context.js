@@ -233,7 +233,10 @@ window.ArcadeChatContext = (function() {
     function isLocalBridgeRoute(url) {
         if (!url || !isLoopbackHost(url.hostname)) return false;
         return /^\/api\/(?:local-llm|llm)\/(?:chat|models|health)$/i.test(url.pathname)
+            || /^\/api\/tools\/duckduckgo\/search$/i.test(url.pathname)
+            || /^\/api\/assistant\/intent$/i.test(url.pathname)
             || /^\/api\/system-media\/(?:current|action)$/i.test(url.pathname)
+            || /^\/api\/system\/apps(?:\/(?:open|action))?$/i.test(url.pathname)
             || /^\/api\/security\/audit$/i.test(url.pathname);
     }
 
@@ -271,6 +274,192 @@ window.ArcadeChatContext = (function() {
             statusText: 'Bridge unavailable',
             headers: { 'Content-Type': 'application/json; charset=utf-8' }
         });
+    }
+
+    function makeJsonChatResponse(payload, status = 200) {
+        return new Response(JSON.stringify(payload), {
+            status,
+            headers: { 'Content-Type': 'application/json; charset=utf-8' }
+        });
+    }
+
+    function classifyMainPageToolIntent(message = '') {
+        const raw = `${message || ''}`.trim();
+        const text = raw.toLowerCase().replace(/\s+/g, ' ');
+        if (!text) return null;
+
+        const searchMatch = raw.match(/^(?:search|look up|lookup|duckduckgo)\s+(?:for\s+)?(.+)$/i);
+        if (searchMatch?.[1]?.trim()) {
+            return {
+                type: 'duckduckgo.search',
+                query: searchMatch[1].trim()
+            };
+        }
+
+        const appMap = [
+            { id: 'spotify', words: ['spotify'] },
+            { id: 'notepad', words: ['notepad', 'note pad', 'notes'] },
+            { id: 'calculator', words: ['calculator', 'calc'] },
+            { id: 'file-explorer', words: ['file explorer', 'explorer', 'files'] },
+            { id: 'chrome', words: ['chrome', 'google chrome'] },
+            { id: 'edge', words: ['edge', 'microsoft edge', 'ms edge'] },
+            { id: 'vscode', words: ['vscode', 'vs code', 'visual studio code'] },
+            { id: 'discord', words: ['discord'] },
+            { id: 'steam', words: ['steam'] }
+        ];
+
+        const openRequested = /^(?:open|launch|start)\b/i.test(text);
+        if (openRequested) {
+            const app = appMap.find((row) => row.words.some((word) => text.includes(word)));
+            if (app) {
+                return {
+                    type: 'pc.open_app',
+                    appId: app.id
+                };
+            }
+
+            return {
+                type: 'unsupported',
+                reply: 'That app is not available in the allowed desktop app list.'
+            };
+        }
+
+        const mediaActionMap = [
+            { action: 'play_pause', words: ['play pause', 'play/pause', 'pause', 'play'] },
+            { action: 'next', words: ['next', 'skip'] },
+            { action: 'previous', words: ['previous', 'back'] }
+        ];
+
+        const mediaAction = mediaActionMap.find((row) => row.words.some((word) => text === word || text.startsWith(`${word} `)));
+        if (mediaAction && text.includes('spotify')) {
+            return {
+                type: 'pc.app_action',
+                appId: 'spotify',
+                action: mediaAction.action
+            };
+        }
+
+        return null;
+    }
+
+    async function handleStrictToolChatRequest(input, init = {}) {
+        if (!isChatPost(input, init) || typeof init?.body !== 'string') return null;
+
+        let payload = null;
+        try {
+            payload = JSON.parse(init.body);
+        } catch (_error) {
+            return null;
+        }
+
+        const intent = classifyMainPageToolIntent(payload?.message || '');
+        if (!intent) return null;
+
+        const sourceUrl = parseUrl(input);
+        if (!sourceUrl) return null;
+
+        if (intent.type === 'unsupported') {
+            return makeJsonChatResponse({
+                ok: true,
+                reply: intent.reply
+            });
+        }
+
+        if (intent.type === 'duckduckgo.search') {
+            const searchUrl = new URL('/api/tools/duckduckgo/search', sourceUrl.origin);
+            const response = await originalFetch(searchUrl.href, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(init.headers || {})
+                },
+                body: JSON.stringify({
+                    query: intent.query,
+                    maxResults: 5
+                })
+            });
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.ok) {
+                return makeJsonChatResponse({
+                    ok: true,
+                    reply: 'DuckDuckGo search failed.'
+                });
+            }
+
+            const results = Array.isArray(data.results) ? data.results : [];
+            const reply = results.length
+                ? results.map((result, index) => {
+                    const title = result.title || 'Untitled result';
+                    const url = result.url || '';
+                    const snippet = result.snippet ? ` — ${result.snippet}` : '';
+                    return `${index + 1}. ${title}\n${url}${snippet}`;
+                }).join('\n\n')
+                : 'No DuckDuckGo results found.';
+
+            return makeJsonChatResponse({
+                ok: true,
+                reply,
+                tool: intent.type,
+                results
+            });
+        }
+
+        if (intent.type === 'pc.open_app') {
+            const appUrl = new URL('/api/system/apps/open', sourceUrl.origin);
+            const response = await originalFetch(appUrl.href, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(init.headers || {})
+                },
+                body: JSON.stringify({
+                    appId: intent.appId
+                })
+            });
+
+            const data = await response.json().catch(() => null);
+            const reply = response.ok && data?.ok
+                ? `Opened ${data.label || intent.appId}.`
+                : (data?.error || 'App open request failed.');
+
+            return makeJsonChatResponse({
+                ok: true,
+                reply,
+                tool: intent.type,
+                appId: intent.appId
+            });
+        }
+
+        if (intent.type === 'pc.app_action') {
+            const actionUrl = new URL('/api/system/apps/action', sourceUrl.origin);
+            const response = await originalFetch(actionUrl.href, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(init.headers || {})
+                },
+                body: JSON.stringify({
+                    appId: intent.appId,
+                    action: intent.action
+                })
+            });
+
+            const data = await response.json().catch(() => null);
+            const reply = response.ok && data?.ok
+                ? `Ran ${intent.action} for ${intent.appId}.`
+                : (data?.error || 'App action failed.');
+
+            return makeJsonChatResponse({
+                ok: true,
+                reply,
+                tool: intent.type,
+                appId: intent.appId,
+                action: intent.action
+            });
+        }
+
+        return null;
     }
 
     function shouldShortCircuitBridgeRequest(url) {
@@ -313,6 +502,9 @@ window.ArcadeChatContext = (function() {
     window.fetch = function arcadeLocalBridgeGuardedFetch(input, init = {}) {
         const url = parseUrl(input);
         const isBridgeRoute = isLocalBridgeRoute(url);
+
+        const strictToolRequest = handleStrictToolChatRequest(input, init);
+        if (strictToolRequest) return strictToolRequest;
 
         if (shouldShortCircuitBridgeRequest(url)) {
             const reason = bridgeTrafficAllowed()
