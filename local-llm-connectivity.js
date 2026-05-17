@@ -104,6 +104,69 @@
     return { "X-Local-LLM-Token": token };
   }
 
+  function parseRequestUrl(input) {
+    try {
+      const raw = typeof input === "string" ? input : `${input?.url || ""}`;
+      if (!raw) return null;
+      return new URL(raw, global.location?.href || "http://localhost");
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function isLoopbackHost(hostname = "") {
+    const host = `${hostname || ""}`.trim().toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
+  }
+
+  function isBridgeApiRequest(input) {
+    const url = parseRequestUrl(input);
+    if (!url) return false;
+    return isLoopbackHost(url.hostname)
+      && /^\/api\/(?:local-llm|llm|system-media|system|tools|assistant|security)(?:\/|$)/i.test(url.pathname || "");
+  }
+
+  function makeBridgeUnavailableResponse(input, reason = "Local bridge request failed.") {
+    const url = parseRequestUrl(input);
+    return new Response(JSON.stringify({
+      ok: false,
+      error: reason,
+      message: reason,
+      bridgeUnavailable: true,
+      route: url?.pathname || ""
+    }), {
+      status: 503,
+      statusText: "Bridge unavailable",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Signal-Share-Bridge-Fallback": "1"
+      }
+    });
+  }
+
+  function installBridgeFetchGuard() {
+    if (global.__signalShareBridgeFetchGuardInstalled || typeof global.fetch !== "function") return;
+    global.__signalShareBridgeFetchGuardInstalled = true;
+
+    const nativeFetch = global.fetch.bind(global);
+    global.fetch = async function signalShareBridgeGuardedFetch(input, init) {
+      const bridgeRequest = isBridgeApiRequest(input);
+      try {
+        const response = await nativeFetch(input, init);
+        if (response) return response;
+        if (bridgeRequest) return makeBridgeUnavailableResponse(input, "Local bridge returned no response.");
+        throw new TypeError("Fetch returned no response.");
+      } catch (error) {
+        if (bridgeRequest) {
+          return makeBridgeUnavailableResponse(input, error?.message || "Local bridge request failed.");
+        }
+        throw error;
+      }
+    };
+  }
+
+  installBridgeFetchGuard();
+
   global.SignalShareLocalLlm = Object.freeze({
     BRIDGE_URL_KEY,
     BRIDGE_URL_LEGACY_KEYS,
