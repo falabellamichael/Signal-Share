@@ -2,7 +2,8 @@ param(
   [string]$BaseUrl = "http://127.0.0.1:1234/v1",
   [string]$Model = "",
   [switch]$WriteConfig,
-  [switch]$ListModels
+  [switch]$ListModels,
+  [switch]$DryRun
 )
 
 $ErrorActionPreference = "Stop"
@@ -91,6 +92,7 @@ if (!(Test-CommandExists -Name "codex")) {
   throw "The 'codex' command was not found in PATH. Install or expose Codex CLI before running this launcher."
 }
 
+$BaseUrl = $BaseUrl.TrimEnd("/")
 $models = Get-LmStudioModels -BaseUrl $BaseUrl
 
 if ($ListModels) {
@@ -106,7 +108,22 @@ if ($WriteConfig) {
   Write-CodexConfig -ModelId $selectedModel
 }
 
-$env:OPENAI_BASE_URL = $BaseUrl.TrimEnd("/")
+$env:OPENAI_BASE_URL = $BaseUrl
 $env:OPENAI_API_KEY = "lm-studio"
 
-codex --oss -c oss_provider="lmstudio" -m "$selectedModel"
+$codexArgs = @(
+  "--oss",
+  "-c",
+  'oss_provider="lmstudio"',
+  "-m",
+  $selectedModel
+)
+
+Write-Host "Starting Codex with LM Studio at $BaseUrl"
+Write-Host "codex $($codexArgs -join ' ')"
+
+if ($DryRun) {
+  exit 0
+}
+
+& codex @codexArgs
