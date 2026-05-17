@@ -37,6 +37,7 @@ New code to insert
 
 The SEARCH block must match the existing file content exactly, including whitespace.
 Do not output planning or audits. Output only code blocks or edit blocks.
+Only use information included in the current active conversation, current page context, and attached content. Do not reference, infer, or rely on messages from other saved conversations.
 
 ${STRICT_TOOL_POLICY}`;
 
@@ -117,7 +118,35 @@ function sanitizeModelReply(value = "") {
   return `${value || ""}`.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }
 
-function buildMessages({ message = "", history = [], pageContext = "", customInstructions = "" } = {}) {
+function normalizeConversationId(value = "") {
+  return `${value || ""}`.trim();
+}
+
+function sanitizeHistoryForConversation(history, conversationId = "") {
+  if (!Array.isArray(history)) return [];
+
+  const activeConversationId = normalizeConversationId(conversationId);
+  if (!activeConversationId) return [];
+
+  return history
+    .map((entry) => {
+      const entryConversationId = normalizeConversationId(entry?.conversationId || entry?.chatId || "");
+      return {
+        role: entry?.role === "assistant" ? "assistant" : "user",
+        content: `${entry?.content || entry?.text || ""}`.trim(),
+        conversationId: entryConversationId
+      };
+    })
+    .filter((entry) => {
+      if (!entry.content) return false;
+      if (entry.conversationId && entry.conversationId !== activeConversationId) return false;
+      return true;
+    })
+    .map(({ role, content }) => ({ role, content }))
+    .slice(-12);
+}
+
+function buildMessages({ message = "", history = [], pageContext = "", customInstructions = "", conversationId = "" } = {}) {
   const messages = [];
   messages.push({ role: "system", content: [SYSTEM_PROMPT, customInstructions].filter(Boolean).join("\n\n") });
 
@@ -125,10 +154,8 @@ function buildMessages({ message = "", history = [], pageContext = "", customIns
     messages.push({ role: "system", content: `Current page context:\n${pageContext}` });
   }
 
-  for (const entry of Array.isArray(history) ? history : []) {
-    const role = entry?.role === "assistant" ? "assistant" : "user";
-    const content = `${entry?.content || entry?.text || ""}`.trim();
-    if (content) messages.push({ role, content });
+  for (const entry of sanitizeHistoryForConversation(history, conversationId)) {
+    messages.push(entry);
   }
 
   const userMessage = `${message || ""}`.trim();
@@ -313,10 +340,10 @@ async function getProviderCandidates(model = "auto") {
   return candidates;
 }
 
-async function getChatResponse(message, history = [], pageContext = "", _depth = 0, attachment = null, model = "auto", customInstructions = "") {
+async function getChatResponse(message, history = [], pageContext = "", _depth = 0, attachment = null, model = "auto", customInstructions = "", conversationId = "") {
   if (!message && (!Array.isArray(history) || history.length === 0)) return "No message provided.";
 
-  const messages = buildMessages({ message, history, pageContext, customInstructions });
+  const messages = buildMessages({ message, history, pageContext, customInstructions, conversationId });
   if (attachment?.text) {
     messages.push({ role: "user", content: `Attached content:\n${attachment.text}` });
   }
@@ -525,6 +552,7 @@ async function handleChatRoute(req, res) {
     if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized bridge request." });
 
     const { message, history, pageContext, attachment, model, customInstructions } = req.body || {};
+    const conversationId = normalizeConversationId(req.body?.conversationId || req.body?.chatId || "");
     if (!message && (!Array.isArray(history) || history.length === 0)) {
       return res.status(400).json({ ok: false, error: "No message provided." });
     }
@@ -532,7 +560,7 @@ async function handleChatRoute(req, res) {
     const strictToolHandled = await handleStrictChatToolTurn(req, res, message || "");
     if (strictToolHandled) return;
 
-    const reply = await getChatResponse(message || "", history || [], pageContext || "", 0, attachment || null, model || "auto", customInstructions || "");
+    const reply = await getChatResponse(message || "", history || [], pageContext || "", 0, attachment || null, model || "auto", customInstructions || "", conversationId);
     return res.json({ ok: true, reply });
   } catch (error) {
     if (error?.code === "AI_PROVIDER_UNAVAILABLE") {

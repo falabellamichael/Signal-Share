@@ -480,18 +480,79 @@ window.ArcadeChatContext = (function() {
         return isOfflineBackoffActive() && window.__arcadeBridgeConfirmedOnline === false;
     }
 
+    function getHistoryEntrySignature(entry) {
+        if (!entry || typeof entry !== 'object') return '';
+        const role = entry.role === 'assistant' ? 'assistant' : 'user';
+        const content = `${entry.content || entry.text || ''}`.trim();
+        return content ? `${role}\u0000${content}` : '';
+    }
+
+    function getActiveStoredChat(activeChatId) {
+        if (!activeChatId) return null;
+        try {
+            const chats = JSON.parse(localStorage.getItem('arcade-chats') || '[]');
+            if (!Array.isArray(chats)) return null;
+            return chats.find(chat => chat?.id === activeChatId) || null;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    function scopeChatPayloadToActiveConversation(payload) {
+        const nextPayload = { ...payload };
+        let activeChatId = '';
+        try {
+            activeChatId = `${localStorage.getItem('arcade-last-chat-id') || ''}`.trim();
+        } catch (_error) {
+            activeChatId = '';
+        }
+
+        if (activeChatId) {
+            nextPayload.conversationId = activeChatId;
+        }
+
+        const activeChat = getActiveStoredChat(activeChatId);
+        const activeMessages = Array.isArray(activeChat?.messages) ? activeChat.messages : null;
+        if (!activeChatId || !activeMessages) {
+            nextPayload.history = [];
+            return nextPayload;
+        }
+
+        const allowedSignatures = new Set(
+            activeMessages
+                .map(getHistoryEntrySignature)
+                .filter(Boolean)
+        );
+
+        nextPayload.history = (Array.isArray(nextPayload.history) ? nextPayload.history : [])
+            .filter(entry => {
+                const entryChatId = `${entry?.conversationId || entry?.chatId || ''}`.trim();
+                if (entryChatId && entryChatId !== activeChatId) return false;
+                const signature = getHistoryEntrySignature(entry);
+                return Boolean(signature && allowedSignatures.has(signature));
+            })
+            .map(entry => ({
+                role: entry.role === 'assistant' ? 'assistant' : 'user',
+                content: `${entry.content || entry.text || ''}`.trim(),
+                conversationId: activeChatId
+            }));
+
+        return nextPayload;
+    }
+
     function sanitizeChatPostBody(body) {
         if (typeof body !== 'string' || !body.trim()) return body;
         try {
-            const payload = JSON.parse(body);
+            const payload = scopeChatPayloadToActiveConversation(JSON.parse(body));
             const message = `${payload.message || ''}`;
             const context = `${payload.pageContext || ''}`;
             const isEditPayload = window.ArcadeChatContext?.isEditLikeMessage?.(message)
                 || /direct_editor_write|active_workshop_editor|workshop edit|\[edit\]|AI_CHATBOT_SUPPORT/i.test(context);
-            if (!isEditPayload) return body;
+            if (!isEditPayload) return JSON.stringify(payload);
 
             const optimizedPayload = window.AIChatbotSupport?.optimizeChatPayload?.(payload) || payload;
             optimizedPayload.history = [];
+            if (payload.conversationId) optimizedPayload.conversationId = payload.conversationId;
             optimizedPayload.attachment = null;
             optimizedPayload.customInstructions = [
                 optimizedPayload.customInstructions || '',

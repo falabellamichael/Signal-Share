@@ -701,12 +701,14 @@ async function retryPublishWithAI(userPrompt = '', customRetryPrompt = '', signa
     const customInstructions = typeof getAiCore()?.getStoredCustomInstructions === 'function'
         ? getAiCore().getStoredCustomInstructions()
         : `${localStorage.getItem('ss_ai_custom_instructions') || ''}`.trim().slice(0, 2000);
+    const activeConversationId = ensureCurrentChatId();
     const payload = JSON.stringify({
         message: buildProtocolAwareUserMessage(userPrompt),
         model: requestModel,
         customInstructions,
         attachment: null,
         history: [],
+        conversationId: activeConversationId,
         pageContext: retryContext
     });
 
@@ -746,12 +748,14 @@ async function retryWorkshopEditWithEditorContext(userPrompt = '', richContext =
     const customInstructions = typeof getAiCore()?.getStoredCustomInstructions === 'function'
         ? getAiCore().getStoredCustomInstructions()
         : `${localStorage.getItem('ss_ai_custom_instructions') || ''}`.trim().slice(0, 2000);
+    const activeConversationId = ensureCurrentChatId();
     const payload = JSON.stringify({
         message: buildProtocolAwareUserMessage(userPrompt),
         model: requestModel,
         customInstructions,
         attachment: null,
         history: [],
+        conversationId: activeConversationId,
         pageContext: retryContext.slice(0, 10000)
     });
 
@@ -901,6 +905,7 @@ async function retryWorkshopRewriteWithEditorContext(userPrompt = '', richContex
     const customInstructions = typeof getAiCore()?.getStoredCustomInstructions === 'function'
         ? getAiCore().getStoredCustomInstructions()
         : `${localStorage.getItem('ss_ai_custom_instructions') || ''}`.trim().slice(0, 2000);
+    const activeConversationId = ensureCurrentChatId();
 
     try {
         const response = await bridgeFetch('/api/local-llm/chat', {
@@ -913,6 +918,7 @@ async function retryWorkshopRewriteWithEditorContext(userPrompt = '', richContex
                 customInstructions,
                 attachment: null,
                 history: [],
+                conversationId: activeConversationId,
                 pageContext: retryContext.slice(0, 24000)
             })
         });
@@ -1527,6 +1533,52 @@ function readArcadeChats() {
     }
 }
 
+function ensureCurrentChatId() {
+    if (currentChatId) return currentChatId;
+    let storedChatId = '';
+    try {
+        storedChatId = `${localStorage.getItem('arcade-last-chat-id') || ''}`.trim();
+    } catch (_error) {
+        storedChatId = '';
+    }
+    currentChatId = storedChatId || `chat_${Date.now()}`;
+    try {
+        localStorage.setItem('arcade-last-chat-id', currentChatId);
+    } catch (_error) {
+        // Ignore localStorage failures; in-memory conversation scoping still applies.
+    }
+    return currentChatId;
+}
+
+function normalizeArcadeChatMessage(message, conversationId = ensureCurrentChatId()) {
+    if (!message || typeof message !== 'object') return null;
+    return {
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: `${message.content || message.text || ''}`,
+        attachment: message.attachment || null,
+        conversationId
+    };
+}
+
+function appendArcadeChatHistoryMessage(role, content, attachment = null) {
+    const conversationId = ensureCurrentChatId();
+    const message = {
+        role: role === 'assistant' ? 'assistant' : 'user',
+        content: `${content || ''}`,
+        attachment,
+        conversationId
+    };
+    arcadeChatHistory.push(message);
+    return message;
+}
+
+function getScopedArcadeChatHistory(conversationId = ensureCurrentChatId()) {
+    return (Array.isArray(arcadeChatHistory) ? arcadeChatHistory : [])
+        .filter(message => !message?.conversationId || message.conversationId === conversationId)
+        .map(message => normalizeArcadeChatMessage(message, conversationId))
+        .filter(Boolean);
+}
+
 /**
  * Compress and downscale images to save VRAM on the bridge.
  */
@@ -1776,7 +1828,8 @@ window.syncArcadeSidebarOffsets = function () {
     }
 };
 
-function startNewChat() {
+function startNewChat(options = {}) {
+    const shouldPersist = options.persist !== false;
     currentChatId = 'chat_' + Date.now();
     arcadeChatHistory = [];
     const container = document.getElementById('chat-messages');
@@ -1790,19 +1843,23 @@ function startNewChat() {
     updateChatStatus('idle');
     showChatView();
     updateChatPlaceholder();
-    saveCurrentChat();
+    if (shouldPersist) saveCurrentChat();
 }
 
 function saveCurrentChat() {
-    if (!currentChatId) return;
+    const activeConversationId = ensureCurrentChatId();
+    const scopedMessages = getScopedArcadeChatHistory(activeConversationId);
+    arcadeChatHistory = scopedMessages;
 
     const chats = readArcadeChats();
-    const existingIdx = chats.findIndex(c => c.id === currentChatId);
+    const existingIdx = chats.findIndex(c => c.id === activeConversationId);
+    const firstMessage = scopedMessages[0];
+    const firstContent = `${firstMessage?.content || ''}`;
 
     const chatObj = {
-        id: currentChatId,
-        name: arcadeChatHistory.length > 0 ? arcadeChatHistory[0].content.substring(0, 30) + (arcadeChatHistory[0].content.length > 30 ? '...' : '') : 'New Session',
-        messages: arcadeChatHistory,
+        id: activeConversationId,
+        name: firstContent ? firstContent.substring(0, 30) + (firstContent.length > 30 ? '...' : '') : 'New Session',
+        messages: scopedMessages,
         lastUsed: Date.now()
     };
 
@@ -1813,7 +1870,7 @@ function saveCurrentChat() {
     }
 
     localStorage.setItem('arcade-chats', JSON.stringify(chats));
-    localStorage.setItem('arcade-last-chat-id', currentChatId);
+    localStorage.setItem('arcade-last-chat-id', activeConversationId);
 }
 
 function loadChat(id) {
@@ -1821,7 +1878,10 @@ function loadChat(id) {
     const chat = chats.find(c => c.id === id);
     if (chat) {
         currentChatId = chat.id;
-        arcadeChatHistory = chat.messages || [];
+        arcadeChatHistory = Array.isArray(chat.messages)
+            ? chat.messages.map(msg => normalizeArcadeChatMessage(msg, id)).filter(Boolean)
+            : [];
+        chat.messages = arcadeChatHistory;
         const container = document.getElementById('chat-messages');
         if (container) {
             container.innerHTML = `
@@ -1841,6 +1901,7 @@ function loadChat(id) {
 
         chat.lastUsed = Date.now();
         localStorage.setItem('arcade-chats', JSON.stringify(chats));
+        localStorage.setItem('arcade-last-chat-id', currentChatId);
     }
 }
 window.loadChat = loadChat;
@@ -1882,6 +1943,50 @@ function showChatView() {
     updateChatStatus('idle');
 }
 
+function deleteChatFromHistory(chatId, event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const chats = readArcadeChats();
+    const chatToDelete = chats.find(chat => chat?.id === chatId);
+    if (!chatToDelete) {
+        renderHistoryList();
+        return;
+    }
+
+    const chatName = `${chatToDelete.name || 'this conversation'}`.trim();
+    const confirmed = window.confirm(`Delete "${chatName}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    const remainingChats = chats.filter(chat => chat?.id !== chatId);
+    localStorage.setItem('arcade-chats', JSON.stringify(remainingChats));
+
+    if (currentChatId === chatId) {
+        const nextChat = remainingChats[0];
+        if (nextChat?.id) {
+            localStorage.setItem('arcade-last-chat-id', nextChat.id);
+            loadChat(nextChat.id);
+        } else {
+            localStorage.removeItem('arcade-last-chat-id');
+            currentChatId = null;
+            arcadeChatHistory = [];
+            startNewChat({ persist: false });
+        }
+    } else {
+        const lastChatId = localStorage.getItem('arcade-last-chat-id');
+        if (lastChatId === chatId) {
+            if (remainingChats[0]?.id) {
+                localStorage.setItem('arcade-last-chat-id', remainingChats[0].id);
+            } else {
+                localStorage.removeItem('arcade-last-chat-id');
+            }
+        }
+        renderHistoryList();
+    }
+}
+
 function renderHistoryList() {
     const container = document.getElementById('chat-history');
     const chats = readArcadeChats();
@@ -1901,22 +2006,36 @@ function renderHistoryList() {
         item.className = 'chat-history-item';
         item.onclick = () => loadChat(chat.id);
 
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'history-item-header';
+
         const nameDiv = document.createElement('div');
         nameDiv.className = 'history-name';
         nameDiv.textContent = chat.name;
+
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'history-delete-btn';
+        deleteButton.setAttribute('aria-label', `Delete conversation ${chat.name || 'Untitled conversation'}`);
+        deleteButton.title = 'Delete conversation';
+        deleteButton.textContent = '×';
+        deleteButton.addEventListener('click', (event) => deleteChatFromHistory(chat.id, event));
 
         const metaDiv = document.createElement('div');
         metaDiv.className = 'history-meta';
 
         const countSpan = document.createElement('span');
-        countSpan.textContent = `${chat.messages.length} messages`;
+        const messageCount = Array.isArray(chat.messages) ? chat.messages.length : 0;
+        countSpan.textContent = `${messageCount} messages`;
 
         const dateSpan = document.createElement('span');
         dateSpan.textContent = `${date} ${time}`;
 
+        headerDiv.appendChild(nameDiv);
+        headerDiv.appendChild(deleteButton);
         metaDiv.appendChild(countSpan);
         metaDiv.appendChild(dateSpan);
-        item.appendChild(nameDiv);
+        item.appendChild(headerDiv);
         item.appendChild(metaDiv);
         container.appendChild(item);
     });
@@ -2396,7 +2515,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                     // Ensure the user sees their command even if it was handled locally (except /clear which is silent)
                     if (!text.toLowerCase().startsWith('/clear')) {
                         addChatMessage('user', originalText);
-                        arcadeChatHistory.push({ role: 'user', content: originalText, attachment: null });
+                        appendArcadeChatHistoryMessage('user', originalText, null);
                         saveCurrentChat();
                     }
                     isSendingChatMessage = false;
@@ -2419,15 +2538,15 @@ window.sendChatMessage = async function (promptOverride = '') {
 
         // --- ALWAYS add the user message to UI and history now (if not handled by /clear) ---
         addChatMessage('user', originalText);
-        arcadeChatHistory.push({
-            role: 'user',
-            content: originalText,
-            attachment: currentChatAttachment ? {
+        appendArcadeChatHistoryMessage(
+            'user',
+            originalText,
+            currentChatAttachment ? {
                 data: currentChatAttachment,
                 type: currentChatAttachmentType,
                 name: currentChatAttachmentName
             } : null
-        });
+        );
         saveCurrentChat();
 
         // Clear input early to feel responsive
@@ -2443,7 +2562,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             const revertResult = await tryRevertLocalWorkshopStyleEnhancement();
             const revertReply = revertResult.message || 'No AI style enhancement block was found to revert.';
             addChatMessage('ai', `[Workshop Edit]: ${revertReply}`);
-            arcadeChatHistory.push({ role: 'assistant', content: `[Workshop Edit]: ${revertReply}` });
+            appendArcadeChatHistoryMessage('assistant', `[Workshop Edit]: ${revertReply}`);
             saveCurrentChat();
             updateChatStatus(revertResult.ok ? 'active' : 'idle');
             isSendingChatMessage = false;
@@ -2454,7 +2573,7 @@ window.sendChatMessage = async function (promptOverride = '') {
         if (directSteamTarget) {
             const response = openSteamGame(directSteamTarget);
             addChatMessage('ai', response);
-            arcadeChatHistory.push({ role: 'assistant', content: response });
+            appendArcadeChatHistoryMessage('assistant', response);
             saveCurrentChat();
             updateChatStatus('active');
             isSendingChatMessage = false;
@@ -2468,7 +2587,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                 ? `🔎 [Search Protocol]: Searching DuckDuckGo for "${duckQuery}".`
                 : "🔎 [Search Protocol]: Tell me what you want to search on DuckDuckGo.";
             addChatMessage('ai', response);
-            arcadeChatHistory.push({ role: 'assistant', content: response });
+            appendArcadeChatHistoryMessage('assistant', response);
             saveCurrentChat();
             updateChatStatus('active');
             isSendingChatMessage = false;
@@ -2484,7 +2603,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                 ? localStyleFallback.message
                 : (localStyleFallback.message || 'No active Workshop file content is available.')}`;
             addChatMessage('ai', fallbackReply);
-            arcadeChatHistory.push({ role: 'assistant', content: fallbackReply });
+            appendArcadeChatHistoryMessage('assistant', fallbackReply);
             saveCurrentChat();
             updateChatStatus(localStyleFallback.ok ? 'active' : 'idle');
             isSendingChatMessage = false;
@@ -2555,7 +2674,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             const editorName = `${activeEditorForRequest?.activeFileName || 'selected file'}`.trim();
             const replyText = `[Workshop Edit]: I can see ${editorName} selected in the editor, but its source content is not readable yet. Re-select the file in Workshop Edit Mode, then send the edit request again.`;
             addChatMessage('ai', replyText);
-            arcadeChatHistory.push({ role: 'assistant', content: replyText });
+            appendArcadeChatHistoryMessage('assistant', replyText);
             saveCurrentChat();
             updateChatStatus('idle');
             return;
@@ -2563,18 +2682,26 @@ window.sendChatMessage = async function (promptOverride = '') {
         if (editorReferenceActive && !hasActiveWorkshopEditor(richContext)) {
             const replyText = '[Workshop Edit]: I cannot read an active Workshop editor file yet. Open Workshop Edit Mode, select the game and file, then send the edit request again.';
             addChatMessage('ai', replyText);
-            arcadeChatHistory.push({ role: 'assistant', content: replyText });
+            appendArcadeChatHistoryMessage('assistant', replyText);
             saveCurrentChat();
             updateChatStatus('idle');
             return;
         }
         // Keep only the most recent messages to prevent context window overflow on small local models
         const maxHistory = editRequestActive ? (editorReferenceActive ? 6 : 2) : 6;
-        const recentHistory = arcadeChatHistory.slice(-maxHistory);
+        const activeConversationId = ensureCurrentChatId();
+        const scopedChatHistory = getScopedArcadeChatHistory(activeConversationId);
+        const recentHistory = scopedChatHistory.slice(-maxHistory);
 
-        const normalizedHistory = window.SignalShareAiCore
+        let normalizedHistory = window.SignalShareAiCore
             ? window.SignalShareAiCore.normalizeHistory(recentHistory, { aiSenderId: 'assistant' })
-            : recentHistory.map(m => ({ role: m.role, content: m.content }));
+            : recentHistory.map(m => ({ role: m.role, content: m.content, conversationId: activeConversationId }));
+        normalizedHistory = Array.isArray(normalizedHistory)
+            ? normalizedHistory.map((message, index) => ({
+                ...message,
+                conversationId: recentHistory[index]?.conversationId || activeConversationId
+            }))
+            : [];
 
         const pageText = richContext.workshopEditor ? "" : document.body.innerText.substring(0, 300);
         const sharedAiContext = window.SignalShareAiCore
@@ -2584,7 +2711,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                 pageUrl: window.location.href,
                 currentCategory: typeof currentCategory !== 'undefined' ? currentCategory : 'unknown',
                 visibleText: pageText,
-                attachment: arcadeChatHistory[arcadeChatHistory.length - 1]?.attachment || null
+                attachment: scopedChatHistory[scopedChatHistory.length - 1]?.attachment || null
             })
             : '';
 
@@ -2640,7 +2767,15 @@ window.sendChatMessage = async function (promptOverride = '') {
             }
 
             const protocolAwareMessage = buildProtocolAwareUserMessage(text);
-            const compactHistory = Array.isArray(normalizedHistory) ? normalizedHistory.slice(editRequestActive ? -4 : -10) : [];
+            const compactHistory = normalizedHistory
+                .filter(message => message?.conversationId === activeConversationId)
+                .map(message => ({
+                    role: message.role === 'assistant' ? 'assistant' : 'user',
+                    content: `${message.content || message.text || ''}`,
+                    conversationId: activeConversationId
+                }))
+                .filter(message => message.content.trim())
+                .slice(editRequestActive ? -4 : -10);
             const maxContextChars = editRequestActive ? 9000 : 12000;
             const compactPageContext = `${fullPageContext || ''}`.slice(0, maxContextChars); // Keep small local models responsive
 
@@ -2653,6 +2788,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                         customInstructions,
                         attachment,
                         history: compactHistory,
+                        conversationId: activeConversationId,
                         pageContext: compactPageContext
                     })
                 }
@@ -2801,7 +2937,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                 if (localStyleFallback?.ok) {
                     const fallbackReply = `[Workshop Edit]: ${localStyleFallback.message}`;
                     addChatMessage('ai', fallbackReply);
-                    arcadeChatHistory.push({ role: 'assistant', content: fallbackReply });
+                    appendArcadeChatHistoryMessage('assistant', fallbackReply);
                     saveCurrentChat();
                     updateChatStatus('active');
                     return;
@@ -2809,7 +2945,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             }
 
             addChatMessage('ai', reply || "...");
-            arcadeChatHistory.push({ role: 'assistant', content: reply });
+            appendArcadeChatHistoryMessage('assistant', reply);
             saveCurrentChat();
             updateChatStatus('active');
 
@@ -2825,7 +2961,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                 console.log('[Arcade Chat] Auto-refining search result for AI...');
 
                 // Add the retrieval to history so the AI sees it in context
-                arcadeChatHistory.push({ role: 'user', content: autoFollowUp });
+                appendArcadeChatHistoryMessage('user', autoFollowUp);
 
                 // Trigger a recursive call to sendChatMessage with the new context
                 setTimeout(() => {
@@ -2848,7 +2984,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             if (workshopPublishIntent && !isWorkshopEditIntentPrompt(text, richContext)) {
                 const publishReply = '🕹️ [Arcade Protocol]: I did not publish anything because the local model did not return a valid game. Please retry with a stronger code model or ask me to generate the files again.';
                 addChatMessage('ai', publishReply);
-                arcadeChatHistory.push({ role: 'assistant', content: publishReply });
+                appendArcadeChatHistoryMessage('assistant', publishReply);
                 saveCurrentChat();
                 updateChatStatus('idle');
                 return;
@@ -2884,7 +3020,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             }
             addChatMessage('ai', offlineReply);
 
-            arcadeChatHistory.push({ role: 'assistant', content: offlineReply });
+            appendArcadeChatHistoryMessage('assistant', offlineReply);
             saveCurrentChat();
             updateChatStatus('offline');
         }
