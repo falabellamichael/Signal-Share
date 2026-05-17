@@ -90,11 +90,11 @@ function Write-CodexConfig {
   }
 
   $existing = Upsert-TomlScalar -Text $existing -Key "model" -Value $ModelId
-  $existing = Upsert-TomlScalar -Text $existing -Key "model_provider" -Value "oss"
+  $existing = Upsert-TomlScalar -Text $existing -Key "model_provider" -Value "lmstudio"
   $existing = Upsert-TomlScalar -Text $existing -Key "oss_provider" -Value "lmstudio"
 
   Set-Content -Path $configPath -Value $existing.Trim() -Encoding UTF8
-  Write-Host "Updated Codex config for app/CLI LM Studio use: $configPath"
+  Write-Host "Updated Codex config for LM Studio app/CLI use: $configPath"
 }
 
 if (!(Test-CommandExists -Name "codex")) {
