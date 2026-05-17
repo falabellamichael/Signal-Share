@@ -435,17 +435,6 @@ body[data-theme="aurora"] #chat-model-select {
     }
 }
 
-/* Main page Android should inherit the same tab colors as desktop. */
-html.platform-android body.main-page .chat-toggle-btn.chat-tab-mode {
-    background: #0d121a !important;
-    border-color: rgba(255, 255, 255, 0.05) !important;
-    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5) !important;
-}
-
-html.platform-android body.main-page .chat-toggle-btn.chat-tab-mode:hover {
-    background: var(--arc-msg-ai-bg) !important;
-}
-
 .close-chat-btn {
     background: var(--arc-line);
     border: 1px solid var(--arc-border);

@@ -8,7 +8,6 @@
     --safe-area-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-left: env(safe-area-inset-left, 0px);
     --safe-area-right: env(safe-area-inset-right, 0px);
-    --bg-android: #f6efe3;
 }
 
 /* 1. Global Reset & Performance */
@@ -48,7 +47,6 @@ html.platform-android {
     min-height: 100% !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    background-color: transparent !important;
     overscroll-behavior-y: auto !important;
 }
 
@@ -62,7 +60,7 @@ html.platform-android body:not(.questions-page) {
     -webkit-overflow-scrolling: touch !important;
     touch-action: auto !important;
 
-    /* Keep PC theme colors on Android; layout fixes stay Android-specific. */
+    /* Theme colors stay owned by the desktop CSS. */
 }
 
 /* Revert scroll resets for Steam Shell and Apps */
@@ -74,47 +72,6 @@ html.platform-android.is-signal-app body {
     height: 100dvh !important;
     overflow: hidden !important;
     overscroll-behavior-y: none !important;
-}
-
-/* Explicit background fix for Steam Shell */
-html.platform-android.is-steam-shell,
-html.platform-android.is-steam-shell body {
-    background: #1b2838 !important;
-}
-
-/* Main page theme parity: keep Android colors identical to desktop themes. */
-html.platform-android body.main-page[data-theme="midnight"] {
-    background:
-        radial-gradient(circle at top left, rgba(125, 211, 252, 0.18), transparent 26%),
-        radial-gradient(circle at top right, rgba(52, 211, 153, 0.14), transparent 24%),
-        linear-gradient(180deg, #081017 0%, #0c151d 50%, #111b23 100%) !important;
-}
-
-html.platform-android body.main-page[data-theme="gallery"] {
-    background:
-        radial-gradient(circle at top left, rgba(15, 111, 167, 0.14), transparent 24%),
-        radial-gradient(circle at bottom right, rgba(215, 141, 63, 0.12), transparent 28%),
-        linear-gradient(180deg, #fffdf7 0%, #f4f0e6 48%, #ece6da 100%) !important;
-}
-
-html.platform-android body.main-page[data-theme="aurora"] {
-    background:
-        radial-gradient(circle at top left, rgba(89, 195, 173, 0.2), transparent 26%),
-        radial-gradient(circle at top right, rgba(0, 124, 145, 0.14), transparent 28%),
-        linear-gradient(180deg, #f5fcfb 0%, #ecf5f3 46%, #ddeae7 100%) !important;
-}
-
-html.platform-android body.main-page[data-theme="contrast"] {
-    background:
-        linear-gradient(90deg, rgba(255, 242, 0, 0.12), transparent 20%, rgba(0, 229, 255, 0.1)),
-        linear-gradient(180deg, #000000 0%, #050505 48%, #000000 100%) !important;
-}
-
-html.platform-android body.main-page[data-theme="ember"] {
-    background:
-        radial-gradient(circle at top left, rgba(255, 68, 56, 0.3), transparent 28%),
-        radial-gradient(circle at top right, rgba(255, 138, 61, 0.22), transparent 25%),
-        linear-gradient(180deg, #140302 0%, #260705 48%, #100101 100%) !important;
 }
 
 /* Kill fixed-position blobs that cause "messed up background" (Shader failures) */
@@ -275,7 +232,6 @@ html.platform-android .messenger-section {
     flex-direction: column !important;
     justify-content: flex-start !important;
     align-items: center !important;
-    background-color: #000 !important;
     padding: 0 !important;
     margin: 0 !important;
     height: 100vh !important;
@@ -395,12 +351,19 @@ html.platform-android .theme-picker-menu {
     top: calc(100% + 8px) !important;
     right: 0 !important;
     left: 0 !important;
-    display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 10px !important;
     max-height: min(540px, calc(var(--viewport-visible-height) - 180px)) !important;
     overflow-y: auto !important;
     padding: 10px !important;
+}
+
+html.platform-android .theme-picker.is-open .theme-picker-menu:not([hidden]) {
+    display: grid !important;
+}
+
+html.platform-android .theme-picker-menu[hidden] {
+    display: none !important;
 }
 
 html.platform-android .theme-option-tile {
