@@ -1,4 +1,4 @@
-const CACHE_NAME = "signal-share-shell-v128";
+const CACHE_NAME = "signal-share-shell-v129";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -148,9 +148,17 @@ function patchAppUiScript(text = "") {
 
 function patchArcadeChatScript(text = "") {
   const source = `${text || ""}`;
-  const patched = source.replace(
+  let patched = source.replace(
     "const shouldBridgeSendPreflight = isEngineStatusOffline();",
     "const shouldBridgeSendPreflight = false;"
+  );
+  patched = patched.replace(
+    "method: 'GET',\n                timeoutMs: 2200",
+    "method: 'GET',\n                timeoutMs: 2200,\n                suppressNetworkErrors: true"
+  );
+  patched = patched.replace(
+    "        } catch (error) {\n            console.error(`[Bridge Fetch] Failed to reach ${endpoint}:`, error.message || error);",
+    "        } catch (error) {\n            if (!suppressNetworkErrors) {\n                console.error(`[Bridge Fetch] Failed to reach ${endpoint}:`, error.message || error);\n            }"
   );
   if (patched.includes("__signalShareBridgeFetchHardeningInstalled")) return patched;
   return `${BRIDGE_FETCH_HARDENING_SOURCE}\n\n${patched}`;

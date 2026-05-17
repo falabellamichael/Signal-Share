@@ -444,7 +444,8 @@ async function hydrateChatModelSelect({ forceRefresh = false } = {}) {
         for (const path of modelCatalogPaths) {
             const next = await bridgeFetch(path, {
                 method: 'GET',
-                timeoutMs: 2200
+                timeoutMs: 2200,
+                suppressNetworkErrors: true
             });
             if (next.ok || next.status !== 404 || path === modelCatalogPaths[modelCatalogPaths.length - 1]) {
                 response = next;
@@ -1033,7 +1034,9 @@ async function bridgeFetch(path, options = {}) {
 
             lastHttpResponse = response;
         } catch (error) {
-            console.error(`[Bridge Fetch] Failed to reach ${endpoint}:`, error.message || error);
+            if (!suppressNetworkErrors) {
+                console.error(`[Bridge Fetch] Failed to reach ${endpoint}:`, error.message || error);
+            }
             networkFailures.push({ baseUrl, error });
             lastNetworkError = error;
             if (externalSignal?.aborted) break;
