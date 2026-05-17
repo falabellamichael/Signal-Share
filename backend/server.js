@@ -597,6 +597,7 @@ app.get("/api/local-llm/models", async (_req, res) => {
 
 app.get("/api/system-media/current", (_req, res) => {
   res.json({
+    available: true,
     active: false,
     playbackState: "none",
     title: "No media detected",
