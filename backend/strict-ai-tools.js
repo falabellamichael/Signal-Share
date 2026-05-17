@@ -144,6 +144,15 @@ function normalizeActionName(value = "") {
     .trim();
 }
 
+function isAllowedSystemUri(value = "") {
+  const uri = `${value || ""}`.trim().toLowerCase();
+  return ["http:", "https:", "spotify:", "ms-phone:", "yourphone:", "mobilephonelink:"].some((protocol) => uri.startsWith(protocol));
+}
+
+function toPowerShellSingleQuoted(value = "") {
+  return `${value || ""}`.replace(/'/g, "''");
+}
+
 function getPublicAppCatalog() {
   return Object.values(PC_APP_ALLOWLIST).map((app) => ({
     id: app.id,
@@ -263,6 +272,37 @@ async function sendFixedMediaKey(actionName = "") {
   ]);
 }
 
+async function openAllowedSystemUri(uri = "") {
+  const targetUri = `${uri || ""}`.trim();
+  if (!targetUri) throw new Error("URI is required.");
+  if (!isAllowedSystemUri(targetUri)) throw new Error("URI protocol is not allowlisted.");
+
+  const safeUri = toPowerShellSingleQuoted(targetUri);
+  const command = `
+$uri = '${safeUri}'
+if ($uri -eq 'mobilephonelink:' -or $uri -eq 'ms-phone:') {
+  try { Start-Process 'ms-phone:' -ErrorAction Stop } catch {
+    try { Start-Process 'yourphone:' -ErrorAction Stop } catch {
+      try { explorer.exe 'shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App' } catch {
+        Start-Process 'https://www.microsoft.com/store/productId/9NMP3S0RLH54'
+      }
+    }
+  }
+} else {
+  Start-Process -FilePath $uri
+}
+`.trim();
+
+  return launchProcess("powershell.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-Command",
+    command
+  ]);
+}
+
 async function openAllowedApp(app) {
   if (!app?.launch?.command) throw new Error("App launch definition is missing.");
   return launchProcess(app.launch.command, app.launch.args || []);
@@ -349,18 +389,24 @@ export function createStrictAiTools({ isAuthorized, fetchWithTimeout }) {
 
   router.post("/api/system-media/action", async (req, res) => {
     try {
-      if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized bridge request." });
+      if (!isAuthorized(req)) return res.json({ ok: false, error: "Unauthorized bridge request." });
 
       const action = normalizeActionName(req.body?.action || "");
+      if (action === "open_uri") {
+        const uri = `${req.body?.uri || req.body?.openUri || ""}`.trim();
+        const result = await openAllowedSystemUri(uri);
+        return res.json({ ok: true, action, ...result });
+      }
+
       if (!MEDIA_ACTION_KEYS[action]) {
-        return res.status(400).json({ ok: false, error: "Unsupported media action." });
+        return res.json({ ok: false, error: "Unsupported media action." });
       }
 
       const result = await sendFixedMediaKey(action);
       return res.json({ ok: true, action, ...result });
     } catch (error) {
       console.error("[Bridge] Media action error:", error);
-      return res.status(500).json({ ok: false, error: error?.message || "Media action failed." });
+      return res.json({ ok: false, error: error?.message || "Media action failed." });
     }
   });
 
