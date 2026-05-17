@@ -1321,7 +1321,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     for (const endpoint of endpoints) {
       try {
         const url = new URL(endpoint, window.location.href);
-        if (state.heroControlSource && state.heroControlSource !== ll) {
+        if (state.heroControlSource && state.heroControlSource !== "all") {
           url.searchParams.set("preferredSource", state.heroControlSource);
         }
         const fetchUrl = url.toString();
