@@ -1,4 +1,4 @@
-const CACHE_NAME = "signal-share-shell-v124";
+const CACHE_NAME = "signal-share-shell-v125";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -54,13 +54,48 @@ function shouldUseNetworkFirst(url) {
     || pathname.endsWith("/index.html");
 }
 
+function shouldPatchAppUiScript(request) {
+  try {
+    const url = new URL(request.url);
+    return url.origin === self.location.origin && /\/app-v3-ui\.js$/i.test(url.pathname);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function patchAppUiScript(text = "") {
+  const original = 'function applySiteSettings(settings) { const root = document.documentElement; root.style.setProperty("--shell-max-width", `${settings.shellWidth}px`); root.style.setProperty("--section-gap", `${settings.sectionGap}px`); root.style.setProperty("--radius-xl", `${settings.surfaceRadius}px`); root.style.setProperty("--radius-lg", `${Math.max(18, settings.surfaceRadius - 8)}px`); root.style.setProperty("--radius-md", `${Math.max(14, settings.surfaceRadius - 14)}px`); root.style.setProperty("--feed-media-fit", settings.mediaFit); }';
+  const replacement = 'function applySiteSettings(settings = {}) { const safeSettings = { ...DEFAULT_SITE_SETTINGS, ...(settings && typeof settings === "object" ? settings : {}) }; state.siteSettings = safeSettings; const root = document.documentElement; root.style.setProperty("--shell-max-width", `${safeSettings.shellWidth}px`); root.style.setProperty("--section-gap", `${safeSettings.sectionGap}px`); root.style.setProperty("--radius-xl", `${safeSettings.surfaceRadius}px`); root.style.setProperty("--radius-lg", `${Math.max(18, safeSettings.surfaceRadius - 8)}px`); root.style.setProperty("--radius-md", `${Math.max(14, safeSettings.surfaceRadius - 14)}px`); root.style.setProperty("--feed-media-fit", safeSettings.mediaFit); }';
+  if (text.includes(original)) return text.replace(original, replacement);
+  return text;
+}
+
+async function maybePatchAndCacheResponse(request, response) {
+  if (!response || response.status !== 200 || response.type !== "basic") return response;
+
+  if (shouldPatchAppUiScript(request)) {
+    const headers = new Headers(response.headers);
+    headers.set("content-type", "application/javascript; charset=utf-8");
+    const originalText = await response.clone().text();
+    const patchedText = patchAppUiScript(originalText);
+    const patchedResponse = new Response(patchedText, {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
+    const copy = patchedResponse.clone();
+    caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+    return patchedResponse;
+  }
+
+  const copy = response.clone();
+  caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+  return response;
+}
+
 async function fetchAndCache(request) {
   const response = await fetch(request, { cache: "no-store" });
-  if (response && response.status === 200 && response.type === "basic") {
-    const copy = response.clone();
-    caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
-  }
-  return response;
+  return maybePatchAndCacheResponse(request, response);
 }
 
 async function networkFirst(request, fallbackUrl = "") {
