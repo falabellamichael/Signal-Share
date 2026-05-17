@@ -781,9 +781,9 @@ export function createAppUi(context) {
       state.lastHeroControlSource = source;
     }
 
-    // In Feed mode, clicking an already active source toggle turns it off (sets back to "all")
+    // Clicking an already active source toggle turns it off (sets back to "all")
     let targetSource = source;
-    if (isFeedMode && currentSource === source) {
+    if (currentSource === source) {
       targetSource = "all";
     }
 

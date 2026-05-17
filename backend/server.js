@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { createStrictAiTools, STRICT_TOOL_POLICY } from "./strict-ai-tools.js";
+import { SMTCMonitor, PlaybackStatus } from "@coooookies/windows-smtc-monitor";
 
 dotenv.config({ path: path.resolve(process.cwd(), "backend", ".env") });
 dotenv.config();
@@ -595,22 +596,117 @@ app.get("/api/local-llm/models", async (_req, res) => {
   res.json({ ok: true, models: catalog.rows, ...catalog });
 });
 
-app.get("/api/system-media/current", (_req, res) => {
-  res.json({
-    available: true,
+function mapPlaybackState(playbackStatus) {
+  switch (playbackStatus) {
+    case PlaybackStatus.PLAYING:
+      return "playing";
+    case PlaybackStatus.PAUSED:
+      return "paused";
+    case PlaybackStatus.CLOSED:
+    case PlaybackStatus.STOPPED:
+      return "none";
+    default:
+      return "active";
+  }
+}
+
+function inferArtworkMimeType(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 4) return "";
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return "image/png";
+  if (buffer[0] === 0xff && buffer[1] === 0xd8) return "image/jpeg";
+  if (buffer[0] === 0x42 && buffer[1] === 0x4d) return "image/bmp";
+  return "";
+}
+
+function normalizeSourceLabel(sourceAppId = "") {
+  if (!sourceAppId) return "";
+  const label = `${sourceAppId}`.trim();
+  if (!label) return "";
+  return label.replace(/\.exe$/i, "");
+}
+
+app.get("/api/system-media/current", (req, res) => {
+  const isWindows = process.platform === "win32";
+  const base = {
+    source: "windows-smtc",
+    available: isWindows,
     active: false,
+    permissionRequired: false,
     playbackState: "none",
-    title: "No media detected",
+    title: "",
     meta: "",
-    artworkUri: "",
+    appPackage: "",
     openUri: "",
-    preferredSource: "",
-    sourceProvider: "",
-    smtcHealthy: true,
+    artworkUri: "",
+    smtcHealthy: isWindows,
     smtcFailureCount: 0,
     smtcError: "",
     stale: false
-  });
+  };
+
+  if (!isWindows) {
+    return res.json(base);
+  }
+
+  try {
+    const preferredSource = typeof req.query.preferredSource === "string" ? req.query.preferredSource.toLowerCase().trim() : "";
+    let session = null;
+
+    if (preferredSource && preferredSource !== "all") {
+      const sessions = SMTCMonitor.getMediaSessions();
+      if (Array.isArray(sessions) && sessions.length > 0) {
+        for (const s of sessions) {
+          const appId = `${s.sourceAppId || ""}`.toLowerCase();
+          const title = `${s.media?.title || ""}`.toLowerCase();
+          const artist = `${s.media?.artist || ""}`.toLowerCase();
+          if (appId.includes(preferredSource) || title.includes(preferredSource) || artist.includes(preferredSource)) {
+            session = s;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!session) {
+      session = SMTCMonitor.getCurrentMediaSession();
+    }
+
+    if (!session) {
+      return res.json(base);
+    }
+
+    const playbackState = mapPlaybackState(session.playback?.playbackStatus);
+    const sourceLabel = normalizeSourceLabel(session.sourceAppId);
+    const title = `${session.media?.title || ""}`.trim();
+    const artist = `${session.media?.artist || session.media?.albumArtist || ""}`.trim();
+    const meta = [sourceLabel, artist].filter(Boolean).join(" - ");
+
+    let artworkUri = "";
+    const thumbnail = session.media?.thumbnail;
+    if (Buffer.isBuffer(thumbnail) && thumbnail.length > 0 && thumbnail.length <= 140000) {
+      const mimeType = inferArtworkMimeType(thumbnail);
+      if (mimeType) {
+        artworkUri = `data:${mimeType};base64,${thumbnail.toString("base64")}`;
+      }
+    }
+
+    res.json({
+      ...base,
+      active: playbackState !== "none",
+      playbackState,
+      title: title || "Now playing",
+      meta,
+      appPackage: `${session.sourceAppId || ""}`.trim(),
+      artworkUri,
+    });
+  } catch (error) {
+    console.error("SMTC error:", error);
+    res.json({
+      ...base,
+      smtcHealthy: false,
+      smtcError: error?.message || "Unknown error"
+    });
+  }
 });
 
 app.get("/api/system/tabs", (_req, res) => {

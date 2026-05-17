@@ -1320,8 +1320,13 @@ The companion bridge is designed with several security layers to keep your PC sa
     const endpoints = resolveDesktopSnapshotEndpoints({ force });
     for (const endpoint of endpoints) {
       try {
-        const response = await window.fetch(endpoint, {
-          ...withLocalNetworkFetchOptions(endpoint, {
+        const url = new URL(endpoint, window.location.href);
+        if (state.heroControlSource && state.heroControlSource !== ll) {
+          url.searchParams.set("preferredSource", state.heroControlSource);
+        }
+        const fetchUrl = url.toString();
+        const response = await window.fetch(fetchUrl, {
+          ...withLocalNetworkFetchOptions(fetchUrl, {
             method: "GET",
             cache: "no-store",
             credentials: "omit",
