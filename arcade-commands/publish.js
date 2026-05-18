@@ -251,8 +251,11 @@
             const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
             if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
             const userPrompt = options.userPrompt || lastPublishPrompt || '';
-            const publishIntent = modes.has('/publish') || /^\s*\/publish\b/i.test(userPrompt) || actionResult.publishTagDetected;
-            if (!publishIntent) return actionResult;
+            // STRICT GUARDRAIL: Only treat as publish intent if the USER explicitly
+            // issued the /publish command. An AI-hallucinated [PUBLISH] tag in its
+            // reply is NOT sufficient — that is a model error, not a user command.
+            const userExplicitlyRequestedPublish = modes.has('/publish') || /^\s*\/publish\b/i.test(userPrompt);
+            if (!userExplicitlyRequestedPublish) return actionResult;
 
             actionResult.handled = true;
             const publishKey = makePublishKey(userPrompt, text);

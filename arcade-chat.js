@@ -2950,7 +2950,7 @@ window.sendChatMessage = async function (promptOverride = '') {
             updateChatStatus('active');
 
             // Execute any tags in the reply
-            if (window.showFeedback && (reply.includes('[PUBLISH]') || isWorkshopPublishIntentPrompt(text))) {
+            if (window.showFeedback && isWorkshopPublishIntentPrompt(text)) {
                 window.showFeedback("🕹️ Processing Workshop Assets...", false, 4000);
             }
             const actionResult = await executeArcadeChatActions(reply, { userPrompt: text });
@@ -3893,11 +3893,18 @@ function isUnhelpfulWorkshopEditReply(replyText = '') {
 function isWorkshopPublishIntentPrompt(message = "") {
     const text = `${message || ''}`.trim().toLowerCase();
     if (!text) return false;
-    const publishVerb = /\b(publish|upload|save|add|ship|submit|post|share)\b/.test(text);
-    const buildVerb = /\b(write|create|build|make|generate|code|new)\b/.test(text);
-    const target = /\b(library|workshop|arcade|store)\b/.test(text);
-    const gameMention = /\b(game|mini[-\s]?game|arcade game|app|utility)\b/.test(text);
-    return (target && publishVerb) || (buildVerb && gameMention) || (publishVerb && gameMention);
+
+    // Check active command modes — only the /publish mode counts
+    const modes = new Set(Array.isArray(window.activeArcadeCommandModes) ? window.activeArcadeCommandModes : []);
+    if (window.activeArcadeCommandMode) modes.add(window.activeArcadeCommandMode);
+    if (modes.has('/publish')) return true;
+
+    // Only explicit /publish command or [publish] tag should trigger publishing
+    if (/^\/publish\b/.test(text) || /^\[publish\]/.test(text)) return true;
+
+    // Strict mode: Do not infer publish intent from conversational text.
+    // The AI must not publish unless the user explicitly requests it via /publish.
+    return false;
 }
 
 function isWorkshopEditorReferencePrompt(message = "") {

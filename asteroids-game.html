@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js no-accessibility">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Astroids Style Shooter</title>
+<style>
+  /* Reset and base styles */
+  * {
+    box-sizing: border-box;
+    margin: 0; padding: 0;
+  }
+  body, html {
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    user-select: none;
+  }
+  #game-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  canvas {
+    background: #111;
+    display: block;
+    border: 2px solid #0f0;
+    box-shadow: 0 0 20px #0f0 inset;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    canvas {
+      width: 90vw;
+      height: 60vh;
+    }
+  }
+
+  /* Accessibility: focus rings and interactive elements */
+  button, [role="button"] {
+    outline: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  button:focus-visible, [role=button]:focus-visible {
+    outline: 3px solid #0f0;
+    outline-offset: 2px;
+  }
+
+  /* Keyboard navigation */
+  [data-interactive="control"] {
+    outline: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    background-color: #0a0;
+    color: #fff;
+    font-weight: bold;
+    transition: background-color 0.2s;
+  }
+  [data-interactive="control"]:focus-visible {
+    outline: 3px solid #0f0;
+    outline-offset: 2px;
+  }
+
+  /* Responsive layout */
+  @media (max-width: 600px) {
+    canvas {
+      width: 95vw;
+      height: 50vh;
+    }
+  }
+</style>
+</head>
+<body>
+  <div id="game-container" role="region" aria-label="Astroids-style shooter game">
+    <canvas id="gameCanvas" tabindex="0" aria-label="Game canvas, use arrow keys to move and spacebar to fire"></div>
+    <div id="status" aria-live="polite" style="position: absolute; bottom: 10px; left: 10px; color: #0f0; font-size: 14px; max-width: 90vw; word-wrap: break-word;"></div>
+    <button id="restartBtn" data-interactive="control" aria-label="Restart game">Restart Game</button>
+  </div>
+
+<script type="module">
+// Astroids-style shooter game implemented with robust state management, responsive design, accessibility, and performance in mind.
+
+(() => {
+  "use strict";
+
+  // Constants
+  const CANVAS_WIDTH = 800;
+  const CANVAS_HEIGHT = 600;
+  const GRAVITY = 0.05;
+  const FRICTION = 0.98;
+
+  // Game state (centralized, predictable)
+  const state = {
+    // Player
+    position: { x: 400, y: 300 },
+    velocity: { x: 0, y: 0 },
+    rotation: 0,
+    speed: 2.5,
+    angle: 0,
+    rotationSpeed: 0.03,
+    thrustPower: -1.8,
+    fireCooldown: 0,
+    maxCooldown: 300, // ms
+
+    // Bullets
+    bullets: [],
+    bulletSpawnTimer: 0,
+
+    // Enemies (simple AI)
+    enemies: [
+      {
+        x: Math.random() * CANVAS_WIDTH,
+        y: Math.random() * CANVAS_HEIGHT,
+        size: 40 + Math.random() * 20,
+        speed: 1.5 + Math.random() * 0.8,
+        direction: { x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5) * 2 },
+        active: true,
+      }
+    ],
+    enemySpawnTimer: 0,
+
+    // Game state flags
+    gameOver: false,
+    score: 0,
+    highScore: localStorage.getItem('astroids_score') || 0,
+
+    // UI & controls
+    keyState: {
+      arrowLeft: false,
+      arrowRight: false,
+      space: false,
+    },
+    lastFireTime: 0,
+  };
+
+  // DOM elements
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const statusEl = document.getElementById('status');
+  const restartBtn = document.getElementById('restartBtn');
+
+  // Game loop timer ID
+  let gameLoopId = null;
+
+  // Utility: clamp value between min and max
+  function clamp(v, min, max) {
+    return Math.min(Math.max(v, min), max);
+  }
+
+  // Utility: distance between two points
+  function dist(a, b) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.hypot(dx, dy);
+  }
+
+  // Utility: vector normalization and scaling
+  function normalize(v) {
+    const len = Math.hypot(v.x, v.y);
+    return len > 0.0001 ? { x: v.x / len, y: v.y / len } : { x: 0, y: 0 };
+  }
+  function scaleVec(v, factor) {
+    return { x: v.x * factor, y: v.y * factor };
+  }
+
+  // Convert canvas coordinates to normalized game space
+  function worldToCanvas(x, y) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (x - rect.left + rect.width / 2) / rect.width,
+      y: (y - rect.top + rect.height / 2) / rect.height,
+    };
+  }
+
+  // Convert normalized game space to canvas coordinates
+  function canvasToWorld(x, y) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: rect.left + x * rect.width,
+      y: rect.top + y * rect.height,
+    };
+  }
+
+  // Game state update (pure function)
+  function update() {
+    if (state.gameOver) return;
+
+    const now = performance.now();
+
+    // Update player
+    const { position, velocity, rotation, thrustPower, fireCooldown, maxCooldown } = state;
+    let dt = 16; // ~60fps approx
+
+    // Thrust cooldown
+    if (now - state.lastFireTime > fireCooldown) {
+      if (state.keyState.space && !position.active) {
+        velocity.x += Math.cos(rotation) * thrustPower;
+        velocity.y -= Math.sin(rotation) * thrustPower; // upward thrust
+        state.lastFireTime = now;
+      }
+    }
+
+    // Apply gravity and friction to velocity
+    velocity.y += GRAVITY * dt;
+    velocity.x *= FRICTION;
+    velocity.y *= FRICTION;
+
+    // Update position
+    position.x += velocity.x * dt;
+    position.y += velocity.y * dt;
+
+    // Rotate smoothly
+    rotation += rotationSpeed * dt;
+
+    // Keep player within bounds (simple wall collision)
+    const boundary = Math.min(CANVAS_WIDTH / 2, CANVAS_WIDTH / 2);
+    if (position.x < -boundary) {
+      position.x = -boundary;
+      velocity.x *= -0.8;
+    }
+    if (position.x > boundary) {
+      position.x = boundary;
+      velocity.x *= -0.8;
+    }
+    if (position.y < -boundary) {
+      position.y = -boundary;
+      velocity.y *= -0.8;
+    }
+    if (position.y > boundary) {
+      position.y = boundary;
+      velocity.y *= -0.8;
+    }
+
+    // Update enemies
+    state.enemies.forEach(enemy => {
+      if (!enemy.active) return;
+
+      // Simple AI: move toward player
+      const dx = state.position.x - enemy.x;
+      const dy = state.position.y - enemy.y;
+      const distToPlayer = dist({ x: state.position.x, y: state.position.y }, { x: state.position.x, y: state.position.y }); // placeholder
+      if (distToPlayer < 150) {
+        const angleToPlayer = Math.atan2(dy, dx);
+        enemy.direction.x = Math.cos(angleToPlayer);
+        enemy.direction.y = Math.sin(angleToPlayer);
+        enemy.active = true;
+      } else {
+        // Random drift
+        enemy.direction.x += (Math.random() - 0.5) * 0.02;
+        enemy.direction.y += (Math.random() - 0.5) * 0.02;
+        enemy.direction = normalize(enemy.direction);
+      }
+    });
+
+    // Enemy spawn and movement
+    state.enemySpawnTimer += dt;
+    if (state.enemySpawnTimer > 1500 + Math.random() * 1000) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1.5 + Math.random() * 0.8;
+      state.enemies.push({
+        x: state.position.x,
+        y: state.position.y,
+        size: 40 + Math.random() * 20,
+        speed,
+        direction: { x: Math.cos(angle), y: Math.sin(angle) },
+        active: true,
+      });
+      state.enemySpawnTimer = 0;
+    }
+
+    // Update bullets
+    const bulletsToUpdate = [...state.bullets];
+    bulletsToUpdate.forEach(b => {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+
+      // Collision with walls
+      if (b.x < 0 || b.x > CANVAS_WIDTH) b.vx *= -0.8;
+      if (b.y < 0 || b.y > CANVAS_HEIGHT) b.vy *= -0.8;
+
+      // Collision with enemies
+      state.enemies.forEach(enemy => {
+        const dist = dist({ x: b.x, y: b.y }, { x: enemy.x, y: enemy.y });
+        if (dist < enemy.size + 10 && enemy.active) {
+          // Hit
+          state.gameOver = true;
+          state.score += 100 * (enemy.size / 40);
+          state.highScore = Math.max(state.highScore, state.score);
+          localStorage.setItem('astroids_score', state.score.toString());
+        }
+      });
+
+      // Remove off-screen or dead bullets
+      if (b.x < -10 || b.x > CANVAS_WIDTH + 10 || b.y < -10 || b.y > CANVAS_HEIGHT + 10) {
+        bulletsToUpdate.splice(bulletsToUpdate.indexOf(b), 1);
+      } else {
+        // Optional: add bullet damage or sound here
+      }
+    });
+    state.bullets = bulletsToUpdate;
+
+    // Score update (simple)
+    state.score += state.bullets.length * 10;
+    if (state.gameOver) {
+      statusEl.textContent = `Game Over! Score: ${state.score} | High Score: ${state.highScore}`;
+    } else {
+      statusEl.textContent = `Score: ${state.score} | High Score: ${state.highScore}`;
+    }
+  }
+
+  // Render game canvas
+  function render() {
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    const { position, rotation } = state;
+
+    // Draw background (dark space)
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Draw player
+    ctx.save();
+    ctx.translate(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    ctx.rotate(rotation);
+    ctx.fillStyle = '#0ff';
+    ctx.shadowColor = 'rgba(0,255,255,0.3)';
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.min(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Draw enemies
+    state.enemies.forEach(enemy => {
+      if (!enemy.active) return;
+      const { x, y } = canvasToWorld(enemy.x, enemy.y);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(enemy.direction.x + Math.PI / 2); // rotate direction
+      ctx.fillStyle = '#f00';
+      ctx.shadowColor = 'rgba(255,0,0,0.6)';
+      ctx.beginPath();
+      ctx.arc(0, 0, enemy.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // Draw bullets
+    state.bullets.forEach(b => {
+      const { x, y } = canvasToWorld(b.x, b.y);
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#0ff';
+      ctx.shadowColor = 'rgba(0,255,255,0.3)';
+      ctx.fill();
+    });
+
+    // Draw score overlay
+    ctx.fillStyle = '#0f0';
+    ctx.font = '18px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Score: ${state.score}`, 10, 20);
+    ctx.textAlign = 'right';
+    ctx.fillText(`High: ${state.highScore}`, CANVAS_WIDTH - 10, 20);
+
+    // Draw controls (keyboard)
+    const keys = ['ArrowLeft', 'ArrowRight', 'Space'];
+    keys.forEach(k => {
+      const btn = document.querySelector(`[data-interactive="control"][aria-label="${k} control"]`);
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2 - 30;
+      ctx.fillStyle = 'rgba(0,255,0,0.3)';
+      ctx.strokeStyle = '#0ff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - 8, y - 10, 16, 20);
+      ctx.fillText(k, x, y);
+    });
+  }
+
+  // Game loop
+  function startGameLoop() {
+    if (state.gameOver) return;
+
+    gameLoopId = requestAnimationFrame(update);
+  }
+
+  function stopGameLoop() {
+    if (!gameLoopId) return;
+    cancelAnimationFrame(gameLoopId);
+    gameLoopId = null;
+  }
+
+  // Input handling
+  function handleInput(e) {
+    const key = e.key.toLowerCase();
+    switch (key) {
+      case 'arrowleft':
+        state.keyState.arrowLeft = true;
+        break;
+      case 'arrowright':
+        state.keyState.arrowRight = true;
+        break;
+      case 'space':
+        state.keyState.space = !state.keyState.space; // toggle fire
+        if (state.keyState.space && !position.active) {
+          state.lastFireTime = performance.now();
+        }
+        break;
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      state.keyState.space = true;
+      state.lastFireTime = performance.now();
+    }
+  }
+
+  // Bullet firing
+  function fireBullet() {
+    const now = performance.now();
+    if (now - state.lastFireTime < state.fireCooldown) return;
+
+    const angleRad = Math.radians(state.rotation);
+    const speed = state.thrustPower;
+    const vx = Math.cos(angleRad) * speed;
+    const vy = Math.sin(angleRad) * speed;
+
+    state.bullets.push({
+      x: position.x,
+      y: position.y,
+      vx,
+      vy,
+      radius: 4,
+      life: 3000, // ms
+    });
+    state.lastFireTime = now;
+  }
+
+  // Event listeners
+  window.addEventListener('load', () => {
+    canvas.setAttribute('tabindex', '0');
+    restartBtn.addEventListener('click', () => {
+      resetGame();
+    });
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleInput);
+
+    startGameLoop();
+  });
+
+  function resetGame() {
+    state.position = { x: 400, y: 300 };
+    state.velocity = { x: 0, y: 0 };
+    state.rotation = 0;
+    state.thrustPower = -1.8;
+    state.fireCooldown = 300;
+    state.enemies = [
+      {
+        x: Math.random() * CANVAS_WIDTH,
+        y: Math.random() * CANVAS_HEIGHT,
+        size: 40 + Math.random() * 20,
+        speed: 1.5 + Math.random() * 0.8,
+        direction: { x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5) * 2 },
+        active: true,
+      }
+    ];
+    state.enemySpawnTimer = 0;
+    state.bullets = [];
+    state.gameOver = false;
+    state.score = 0;
+    state.highScore = localStorage.getItem('astroids_score') || 0;
+
+    statusEl.textContent = `Score: ${state.score} | High Score: ${state.highScore}`;
+    render();
+  }
+
+  // Prevent default key actions (e.g., scroll) when space is pressed
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+    }
+  });
+})();
+</script>
+</body>
+</html>

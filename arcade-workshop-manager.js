@@ -680,7 +680,9 @@ window.ArcadeWorkshopManager = {
 
     shouldRouteToWorkshop: function(data, text, userPrompt) {
         if (data?.target === 'workshop') return true;
-        return this.isWorkshopPublishIntentPrompt(userPrompt) || text.includes('[PUBLISH]');
+        // Only route to workshop if the USER explicitly used /publish.
+        // Do NOT route based on AI-hallucinated [PUBLISH] tags in the reply text.
+        return this.isWorkshopPublishIntentPrompt(userPrompt);
     },
 
     generateCodeSkeleton: function(content, fileName = '') {
