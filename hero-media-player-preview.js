@@ -484,6 +484,138 @@ function commitStandbyOrFallback(stage, standbyPost, previewOptions, fallbackCar
   commitCard(stage, fallbackCardOptions);
 }
 
+/**
+ * Handles Media-Toggle Mode (YouTube/Spotify toggle)
+ * Attempts to fetch preview from both sources and shows the active one
+ */
+function handleMediaToggleMode(options = {}) {
+  const {
+    post,
+    matchedPost,
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
+    isYouTubeMode,
+    isSpotifyActive,
+  } = options;
+
+  // Check for YouTube preview first (priority if both are active)
+  if (isYouTubeMode || (post && post.sourceKind === "youtube")) {
+    const resolvedMetadata = resolveAppPreviewArtwork(post, {
+      parseYouTubeUrl,
+      resolveActivePlayerSource,
+    });
+
+    if (resolvedMetadata) {
+      return createCardResult({
+        badge: isSpotifyActive ? "YOUTUBE ACTIVE" : "NOW PLAYING",
+        title: post?.title || matchedPost?.title || "",
+        meta: matchedPost?.creator || post?.creator || "Signal Share",
+        artworkUrl: resolvedMetadata,
+      });
+    }
+  }
+
+  // Check for Spotify preview
+  if (isSpotifyActive || (post && post.sourceKind === "spotify")) {
+    const resolvedMetadata = resolveAppPreviewArtwork(post, {
+      parseYouTubeUrl,
+      resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
+    });
+
+    if (resolvedMetadata) {
+      return createCardResult({
+        badge: isYouTubeMode ? "SPOTIFY ACTIVE" : "NOW PLAYING",
+        title: post?.title || matchedPost?.title || "",
+        meta: matchedPost?.creator || post?.creator || "Signal Share",
+        artworkUrl: resolvedMetadata,
+      });
+    }
+  }
+
+  // Return idle state if no active source found
+  const preferredSource = (isSpotifyActive && isYouTubeMode) ? "Both" : (isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "Ready"));
+  const idleTitle = preferredSource === "Both" 
+    ? "Ready for YouTube or Spotify" 
+    : `${preferredSource} Playback`;
+
+  return createCardResult({
+    badge: `TOGGLE MODE · ${preferredSource.toUpperCase()}`,
+    title: post?.title || matchedPost?.title || idleTitle,
+    meta: (post?.creator || matchedPost?.creator || "Signal Share") + (isSpotifyActive && isYouTubeMode ? " (YouTube)" : ""),
+  });
+}
+
+/**
+ * Main entry point for Media-Toggle Mode preview rendering
+ */
+export function renderMediaTogglePreview(options = {}) {
+  const {
+    stage,
+    mode,
+    post,
+    fallbackMedia,
+    nativeSnapshot,
+    desktopSnapshot,
+    getStandbyPreviewPost,
+    state,
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
+  } = options;
+
+  if (!stage) return;
+
+  // Determine active sources for toggle mode
+  const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube");
+  const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify");
+
+  // For toggle mode, try to render from both sources
+  if ((isYouTubeMode && isSpotifyActive) || window.SIGNAL_SHARE_HERO_PLAYER_CONFIG?.heroControlMode === "media") {
+    const result = handleMediaToggleMode({
+      post,
+      desktopSnapshot,
+      matchedPost: null,
+      parseYouTubeUrl,
+      resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
+      isYouTubeMode,
+      isSpotifyActive,
+    });
+
+    // Use the result if artwork/node is available
+    if (result && result.node.firstElementChild) {
+      setStageContent(stage, result.node, result.key);
+      return;
+    }
+
+    // Fallback to idle state
+    const preferredSource = (isSpotifyActive && isYouTubeMode) ? "Both" : (isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "Ready"));
+    commitCard(stage, {
+      badge: `TOGGLE MODE · ${preferredSource.toUpperCase()}`,
+      title: "Ready for playback",
+      meta: "Start YouTube or Spotify to begin",
+    });
+    return;
+  }
+
+  // Standard rendering for non-toggle modes
+  renderHeroStagePreview({
+    stage,
+    mode,
+    post,
+    fallbackMedia,
+    nativeSnapshot,
+    desktopSnapshot,
+    getStandbyPreviewPost,
+    state,
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
+  });
+}
+
 function canUseFallbackMedia(fallbackMedia) {
   return typeof HTMLMediaElement !== "undefined" && fallbackMedia instanceof HTMLMediaElement;
 }
@@ -515,8 +647,11 @@ export function renderHeroStagePreview(options = {}) {
 
   if (!stage) return;
 
-  const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube");
-  const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify");
+  // Detect YouTube or Spotify for Media-Toggle Mode
+  const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube")
+    || window.SIGNAL_SHARE_HERO_PLAYER_CONFIG?.heroMediaSource === "youtube";
+  const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify")
+    || window.SIGNAL_SHARE_HERO_PLAYER_CONFIG?.heroMediaSource === "spotify";
   const isFeedMode = state?.heroControlMode === "feed";
   const isHardenedEnvironment = (isFeedMode || state?.heroControlMode === "media");
 

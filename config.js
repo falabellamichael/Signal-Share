@@ -14,3 +14,12 @@ window.SIGNAL_SHARE_CONFIG = {
   adminEmails: ["falabellamichael@gmail.com", "falabellasocials@gmail.com"],
   masterAdminEmails: ["falabellamichael@gmail.com"],
 };
+
+// HERO MEDIA PLAYER - Enable Media-Youtube/Spotify Toggle Mode
+window.SIGNAL_SHARE_HERO_PLAYER_CONFIG = {
+  heroControlMode: "media", // Required for toggle mode preview
+  heroMediaSource: null, // Dynamically set based on YouTube or Spotify active
+  heroControlSource: null,
+  desktopSnapshotEndpoint: "",
+  bridgeSecret: null,
+};

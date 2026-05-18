@@ -1,0 +1,15 @@
+name: Website Files MCP
+version: 0.0.1
+schema: v1
+
+mcpServers:
+  Website Files:
+    command: "npx.cmd"
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - "C:/Users/Falab/OneDrive/Documents/Website Project"
+    env:
+      NODE_ENV: "production"
+      npm_config_yes: "true"
+      npm_config_cache: "C:/Users/Falab/.npm-cache"
