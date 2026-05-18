@@ -133,20 +133,47 @@ function setStageContent(stage, node, key, options = {}) {
 /**
  * Resolves the artwork URL for a post.
  * Supports synchronous string returns (YouTube, images) and asynchronous Promises (Spotify).
+ * Ensures correct song matching by using title/artist context when possible.
  */
 export function resolveAppPreviewArtwork(post, options = {}) {
   if (!post) return "";
   const { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl } = options;
 
+  // For YouTube, use video ID
   if (post.sourceKind === "youtube") {
     const videoId = resolveYouTubePreviewId(post, parseYouTubeUrl);
     return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "";
   }
 
+  // For Spotify, ensure we're using the correct external ID/label that matches the displayed song
   if (post.sourceKind === "spotify") {
-    return typeof getSpotifyPreviewImageUrl === "function" ? getSpotifyPreviewImageUrl(post) : "";
+    const cleanTitle = toCleanString(post.title || "");
+    const cleanCreator = toCleanString(post.creator || "");
+    const externalId = toCleanString(post.externalId || "");
+    const label = toCleanString(post.label || "");
+
+    // Only call getSpotifyPreviewImageUrl if we have a reliable Spotify ID/label that matches the song data
+    if (typeof getSpotifyPreviewImageUrl === "function" && externalId) {
+      return getSpotifyPreviewImageUrl({ ...post, title: cleanTitle, creator: cleanCreator });
+    }
+
+    // Fallback to label-based search if no explicit ID
+    if (label) {
+      const lowerLabel = label.toLowerCase();
+      if (lowerLabel.includes("spotify") || lowerLabel.match(/track|album|playlist/)) {
+        return getSpotifyPreviewImageUrl({ ...post, title: cleanTitle, creator: cleanCreator });
+      }
+    }
+
+    // If we can't match a reliable Spotify ID, return empty string to avoid wrong artwork
+    if (cleanTitle || cleanCreator) {
+      console.warn(`[Hero Preview] Cannot reliably resolve artwork for: "${cleanTitle}" by "${cleanCreator}". Check externalId/label.`);
+      return "";
+    }
+    return "";
   }
 
+  // For media uploads, try active player source first
   if (post.mediaKind === "image") {
     const resolved = safeCall(resolveActivePlayerSource, "", post);
     if (resolved) return resolved;
@@ -487,6 +514,7 @@ function commitStandbyOrFallback(stage, standbyPost, previewOptions, fallbackCar
 /**
  * Handles Media-Toggle Mode (YouTube/Spotify toggle)
  * Attempts to fetch preview from both sources and shows the active one
+ * Ensures correct song matching by passing title/creator context with post data
  */
 function handleMediaToggleMode(options = {}) {
   const {
@@ -499,26 +527,17 @@ function handleMediaToggleMode(options = {}) {
     isSpotifyActive,
   } = options;
 
-  // Check for YouTube preview first (priority if both are active)
-  if (isYouTubeMode || (post && post.sourceKind === "youtube")) {
-    const resolvedMetadata = resolveAppPreviewArtwork(post, {
-      parseYouTubeUrl,
-      resolveActivePlayerSource,
-    });
+  // Check for Spotify preview first (higher priority when in media toggle mode)
+  if (isSpotifyActive && post?.sourceKind === "spotify") {
+    const cleanTitle = toCleanString(post.title || "");
+    const cleanCreator = toCleanString(post.creator || "");
 
-    if (resolvedMetadata) {
-      return createCardResult({
-        badge: isSpotifyActive ? "YOUTUBE ACTIVE" : "NOW PLAYING",
-        title: post?.title || matchedPost?.title || "",
-        meta: matchedPost?.creator || post?.creator || "Signal Share",
-        artworkUrl: resolvedMetadata,
-      });
-    }
-  }
-
-  // Check for Spotify preview
-  if (isSpotifyActive || (post && post.sourceKind === "spotify")) {
-    const resolvedMetadata = resolveAppPreviewArtwork(post, {
+    // Pass enriched post data with context for correct artwork matching
+    const resolvedMetadata = resolveAppPreviewArtwork({
+      ...post,
+      title: cleanTitle,
+      creator: cleanCreator,
+    }, {
       parseYouTubeUrl,
       resolveActivePlayerSource,
       getSpotifyPreviewImageUrl,
@@ -527,6 +546,30 @@ function handleMediaToggleMode(options = {}) {
     if (resolvedMetadata) {
       return createCardResult({
         badge: isYouTubeMode ? "SPOTIFY ACTIVE" : "NOW PLAYING",
+        title: post?.title || matchedPost?.title || "",
+        meta: matchedPost?.creator || post?.creator || "Signal Share",
+        artworkUrl: resolvedMetadata,
+      });
+    }
+  }
+
+  // Check for YouTube preview (lower priority)
+  if (isYouTubeMode || (post && post.sourceKind === "youtube")) {
+    const cleanTitle = toCleanString(post.title || "");
+    const cleanCreator = toCleanString(post.creator || "");
+
+    const resolvedMetadata = resolveAppPreviewArtwork({
+      ...post,
+      title: cleanTitle,
+      creator: cleanCreator,
+    }, {
+      parseYouTubeUrl,
+      resolveActivePlayerSource,
+    });
+
+    if (resolvedMetadata) {
+      return createCardResult({
+        badge: isSpotifyActive ? "YOUTUBE ACTIVE" : "NOW PLAYING",
         title: post?.title || matchedPost?.title || "",
         meta: matchedPost?.creator || post?.creator || "Signal Share",
         artworkUrl: resolvedMetadata,
@@ -543,7 +586,7 @@ function handleMediaToggleMode(options = {}) {
   return createCardResult({
     badge: `TOGGLE MODE · ${preferredSource.toUpperCase()}`,
     title: post?.title || matchedPost?.title || idleTitle,
-    meta: (post?.creator || matchedPost?.creator || "Signal Share") + (isSpotifyActive && isYouTubeMode ? " (YouTube)" : ""),
+    meta: (post?.creator || matchedPost?.creator || "Signal Share"),
   });
 }
 
