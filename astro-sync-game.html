@@ -3,28 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Astro Sync</title>
+    <title>Astro Sync - Cosmic Color Match</title>
     <link rel="stylesheet" href="astro-sync-game.css">
+    <!-- Google Fonts for premium typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <div class="stars-bg"></div>
     <div class="game-container">
         <h1>Astro Sync</h1>
-        <p class="subtitle">Match the target color to win!</p>
-
+        <p class="subtitle">Match the cosmic target color to synchronize the frequencies.</p>
+        
         <div class="stats-bar">
-            <div id="scoreDisplay" class="stat-box">Score: 0</div>
-            <div id="timerDisplay" class="stat-box">Time Left: 30s</div>
+            <div class="stat-box" id="scoreDisplay">Score: 0</div>
+            <div class="stat-box" id="timerDisplay">Time: 30s</div>
+            <div class="stat-box" id="levelDisplay">Level: 1</div>
         </div>
 
         <div class="game-area">
-            <div id="targetColorBox" class="color-display target-box">Waiting...</div>
-            <button id="syncButton" class="action-button disabled" disabled>Sync</button>
+            <div class="color-box-container">
+                <span class="label">Target</span>
+                <div class="color-display target-box" id="targetColorBox"></div>
+            </div>
+            <div class="color-box-container">
+                <span class="label">Current</span>
+                <div class="color-display current-box" id="currentColorBox"></div>
+            </div>
         </div>
 
-        <div id="messageArea" class="message-area">Click 'Start Game' to begin.</div>
-        <button id="startButton" class="start-button">Start Game</button>
+        <div class="controls">
+            <button class="action-button disabled" id="syncButton" disabled>Wait for Start</button>
+            <button class="start-button" id="startButton">Start Game</button>
+        </div>
+        
+        <div class="message-area" id="messageArea">Press Start to Begin</div>
     </div>
+    
+    <!-- Audio elements for feedback (optional but good for premium feel) -->
+    <audio id="successSound" src="https://assets.mixkit.co/active_storage/sfx/2019/success-bell-935.wav" preload="auto"></audio>
+    <audio id="failSound" src="https://assets.mixkit.co/active_storage/sfx/2021/fail-tone-934.wav" preload="auto"></audio>
 
-    <script src="astro-sync-game.js"></script>
+    <script src="astro-sync-game.js" defer></script>
 </body>
 </html>
