@@ -1,10 +1,35 @@
 /**
- * Signal Share Arcade Chat Prompts
- * A collection of 100 clever and varied suggestions for the AI companion.
+ * Signal Share Chat Prompts
+ * A collection of suggestions for the AI companion covering the full platform:
+ * social feed, messaging, media player, arcade games, themes, and more.
  */
 
 window.arcadeChatSuggestions = [
-    // Media & Player Controls
+    // Social Feed & Posting
+    "Say 'How do I post in the feed?'...",
+    "Ask how to share a YouTube video...",
+    "Say 'Help me write a post'...",
+    "Ask how to share a Spotify track...",
+    "Say 'How do I like or comment?'...",
+    "Ask about sharing images in posts...",
+    "Say 'Show me the latest posts'...",
+    "Ask how to embed media in a post...",
+    "Say 'How do I delete a post?'...",
+    "Ask about the community feed...",
+
+    // Direct Messaging
+    "Say 'Open the messenger'...",
+    "Ask how to send a direct message...",
+    "Say 'How do I find friends?'...",
+    "Ask about message notifications...",
+    "Say 'Search for a user'...",
+    "Ask how to start a conversation...",
+    "Say 'How do I block someone?'...",
+    "Ask about managing conversations...",
+    "Say 'Who is online right now?'...",
+    "Ask how to share media in DMs...",
+
+    // Media Player Controls
     "Say 'Play some Lo-Fi beats'...",
     "Ask to pause the PC media...",
     "Say 'Next track on Spotify'...",
@@ -15,7 +40,7 @@ window.arcadeChatSuggestions = [
     "Ask to play some aggressive synthwave...",
     "Say 'Toggle the mini-player'...",
     "Ask to shuffle my playlist...",
-    
+
     // Game Controls & Discovery
     "Say 'Launch Neon Pinball'...",
     "Ask to open the game library...",
@@ -27,7 +52,7 @@ window.arcadeChatSuggestions = [
     "Ask for a pro-gamer tip for Pinball...",
     "Say 'Open the Arcade Shop'...",
     "Ask to see my high scores...",
-    
+
     // Theme & Visual Customization
     "Say 'Switch to Midnight theme'...",
     "Ask to change the accent color to gold...",
@@ -39,8 +64,8 @@ window.arcadeChatSuggestions = [
     "Ask to make the UI glassmorphic'...",
     "Say 'Open the Ember theme'...",
     "Ask to show the Ocean theme'...",
-    
-    // Navigation & Feed
+
+    // Navigation & Platform Features
     "Say 'Scroll to the top'...",
     "Ask to refresh the feed'...",
     "Say 'Jump to the bottom'...",
@@ -51,7 +76,7 @@ window.arcadeChatSuggestions = [
     "Ask to show my saved posts'...",
     "Say 'Open the help guide'...",
     "Ask to search for friends'...",
-    
+
     // System & AI Bridge
     "Say 'Check the bridge status'...",
     "Ask to refresh the Local LLM'...",
@@ -63,7 +88,7 @@ window.arcadeChatSuggestions = [
     "Ask to check for updates'...",
     "Say 'Show keyboard shortcuts'...",
     "Ask to view the privacy policy'...",
-    
+
     // Interactive & Easter Eggs
     "Say 'Do a barrel roll'...",
     "Ask for a gaming joke'...",
@@ -75,7 +100,7 @@ window.arcadeChatSuggestions = [
     "Ask for the weather in the arcade'...",
     "Say 'Tell me a story about a glitch'...",
     "Ask to find the hidden pixels'...",
-    
+
     // Strategy & Tips
     "Ask for Snake strategy'...",
     "Say 'How do I level up faster?'...",
@@ -87,8 +112,8 @@ window.arcadeChatSuggestions = [
     "Say 'Explain the multiplier mechanics'...",
     "Ask to analyze my recent match'...",
     "Say 'Give me a daily mission'...",
-    
-    // Social & Messaging
+
+    // Social & Messaging (extended)
     "Say 'Compose a new message'...",
     "Ask to see my recent chats'...",
     "Say 'Who is online right now?'...",
@@ -99,7 +124,7 @@ window.arcadeChatSuggestions = [
     "Ask to report a bug'...",
     "Say 'Invite a friend to play'...",
     "Ask to see the global chat'...",
-    
+
     // Productivity & Utilities
     "Say 'Calculate 56 * 12'...",
     "Ask to set a gaming timer'...",
@@ -111,7 +136,7 @@ window.arcadeChatSuggestions = [
     "Ask to view the terms of service'...",
     "Say 'Check my connection speed'...",
     "Ask to optimize memory usage'...",
-    
+
     // Dynamic & Fun
     "Say 'Surprise me!'...",
     "Ask to change my nickname'...",

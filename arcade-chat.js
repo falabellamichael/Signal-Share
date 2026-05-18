@@ -1275,7 +1275,7 @@ function updateChatPlaceholder() {
     const input = document.getElementById('arc-chat-input');
     if (!input) return;
 
-    const suggestions = window.arcadeChatSuggestions || ["Ask for gaming advice..."];
+    const suggestions = window.arcadeChatSuggestions || ["Ask me anything about Signal Share..."];
 
 
     const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)];
@@ -1836,7 +1836,7 @@ function startNewChat(options = {}) {
     if (container) {
         container.innerHTML = `
             <div class="chat-message message-ai">
-                Hello! I'm your local arcade assistant. How can I help you optimize your gameplay today?
+                Hello! I'm your Signal Share companion. I can help with the feed, messenger, media player, arcade games, and more — what's up?
             </div>
         `;
     }
@@ -1886,7 +1886,7 @@ function loadChat(id) {
         if (container) {
             container.innerHTML = `
                 <div class="chat-message message-ai">
-                    Hello! I'm your local arcade assistant. How can I help you optimize your gameplay today?
+                    Hello! I'm your Signal Share companion. I can help with the feed, messenger, media player, arcade games, and more — what's up?
                 </div>
             `;
 
@@ -2639,11 +2639,14 @@ window.sendChatMessage = async function (promptOverride = '') {
         let wasCancelledByUser = false;
 
         // Prepare rich context for the AI
+        const pageSection = classifyCurrentPage();
         let richContext = {
             page: {
                 title: document.title,
                 url: window.location.href,
-                category: typeof currentCategory !== 'undefined' ? currentCategory : 'unknown'
+                category: typeof currentCategory !== 'undefined' ? currentCategory : 'unknown',
+                section: pageSection.id,
+                sectionLabel: pageSection.label
             },
             user: (window.state && window.state.currentUser) ? {
                 id: window.state.currentUser.id,
@@ -2706,7 +2709,7 @@ window.sendChatMessage = async function (promptOverride = '') {
         const pageText = richContext.workshopEditor ? "" : document.body.innerText.substring(0, 300);
         const sharedAiContext = window.SignalShareAiCore
             ? window.SignalShareAiCore.buildCompanionContext({
-                surface: 'mini-games',
+                surface: pageSection.id || 'unknown',
                 pageTitle: document.title || '',
                 pageUrl: window.location.href,
                 currentCategory: typeof currentCategory !== 'undefined' ? currentCategory : 'unknown',
@@ -3890,6 +3893,59 @@ function isUnhelpfulWorkshopEditReply(replyText = '') {
         || text.includes('i do not have the current code');
 }
 
+/**
+ * Classifies the current page into a named section of Signal Share.
+ * This gives the AI explicit awareness of where the user is browsing.
+ */
+function classifyCurrentPage() {
+    const url = `${window.location.href || ''}`.toLowerCase();
+    const path = `${window.location.pathname || ''}`.toLowerCase();
+    const title = `${document.title || ''}`.toLowerCase();
+    const hash = `${window.location.hash || ''}`.toLowerCase();
+
+    // Specific game pages
+    if (path.includes('-game.html') || path.includes('-game/')) {
+        const gameName = path.match(/([a-z0-9-]+)-game/)?.[1] || 'unknown';
+        return { id: 'arcade-game', label: `Playing ${gameName} game` };
+    }
+
+    // Arcade / Mini-Games hub
+    if (path.includes('mini-games') || path.includes('arcade') || hash.includes('arcade')) {
+        return { id: 'arcade-games', label: 'Arcade & Mini-Games library' };
+    }
+
+    // Messenger
+    if (path.includes('messenger') || hash.includes('messenger') ||
+        document.querySelector('.steam-chat-sidebar.active') ||
+        (window.state && window.state.messengerOpen)) {
+        return { id: 'messenger', label: 'Direct Messenger' };
+    }
+
+    // Profile
+    if (path.includes('profile') || hash.includes('profile')) {
+        return { id: 'profile', label: 'User Profile' };
+    }
+
+    // Settings
+    if (path.includes('settings') || hash.includes('settings')) {
+        return { id: 'settings', label: 'Settings & Preferences' };
+    }
+
+    // Workshop editor
+    if (path.includes('workshop') || hash.includes('workshop')) {
+        return { id: 'workshop', label: 'Arcade Workshop Editor' };
+    }
+
+    // Main feed (default for index.html or root)
+    if (path === '/' || path.endsWith('index.html') || path === '' ||
+        title.includes('signal share') || title.includes('media in motion')) {
+        return { id: 'main-feed', label: 'Signal Share main feed — social posts, media sharing, and community content' };
+    }
+
+    // Fallback
+    return { id: 'unknown', label: `Browsing: ${document.title || 'Signal Share'}` };
+}
+
 function isWorkshopPublishIntentPrompt(message = "") {
     const text = `${message || ''}`.trim().toLowerCase();
     if (!text) return false;
@@ -4569,6 +4625,7 @@ function getArcadeProtocolOfflineResponse(message) {
     const input = message.toLowerCase();
 
     const responses = [
+        // Gaming tips (preserved)
         {
             keywords: ["pinball", "gravity"],
             answer: "🕹️ [Arcade Protocol]: In Neon Pinball, keep your eyes on the top bumpers. Hitting them in sequence triggers the 'Gravity Shift' multiplier, which can triple your score in seconds!"
@@ -4581,17 +4638,46 @@ function getArcadeProtocolOfflineResponse(message) {
             keywords: ["snake", "wrap", "trap"],
             answer: "🐍 [Arcade Protocol]: In Neon Snake, the board is edge-wrapped. If you're about to crash, move through the wall to appear on the other side. Use this to surprise high-value fruit!"
         },
+        // Social & Feed
+        {
+            keywords: ["post", "feed", "share a"],
+            answer: "📝 [Signal Share]: To post in the feed, tap the compose area at the top. You can share text, images, YouTube links, or Spotify tracks. Your post will appear in the community feed for everyone to see!"
+        },
+        {
+            keywords: ["youtube", "video", "embed"],
+            answer: "▶️ [Signal Share]: Paste a YouTube link into a new post and it will automatically embed as a playable preview. Your friends can watch it right in the feed!"
+        },
+        {
+            keywords: ["spotify", "music", "song", "track"],
+            answer: "🎵 [Signal Share]: Share Spotify tracks by pasting a Spotify link into a post. The Hero Media Player can also control your desktop Spotify playback if the PC bridge is connected!"
+        },
+        // Messaging
+        {
+            keywords: ["message", "dm", "messenger", "chat with"],
+            answer: "💬 [Signal Share]: Open the Messenger to send direct messages to other users. You can share text, images, and media links in private conversations!"
+        },
+        // Media Player
+        {
+            keywords: ["player", "media", "playback", "playing", "pause", "next", "previous"],
+            answer: "🎧 [Signal Share]: The Hero Media Player syncs with your PC's active media session. Use it to play, pause, skip, and control volume across YouTube, Spotify, and other desktop apps!"
+        },
+        // Theme & Settings
+        {
+            keywords: ["theme", "dark mode", "color", "accent"],
+            answer: "🎨 [Signal Share]: You can switch themes from the settings menu. Try Midnight, Sunset, Ocean, Forest, or Ember — each one transforms the entire interface!"
+        },
+        // Greetings & Help (broadened)
         {
             keywords: ["hello", "hi", "hey"],
-            answer: "👋 [Arcade Protocol]: Intelligence core is currently offline, but I am standing by for tactical support. Ask me about the games or how to improve your high score!"
+            answer: "👋 [Signal Share]: Hey! My intelligence core is offline right now, but I'm still here. I can help with the feed, messenger, media player, and arcade games — just ask!"
         },
         {
             keywords: ["help", "what can you do"],
-            answer: "🎮 [Arcade Protocol]: I am your tactical game assistant. Even in offline mode, I can provide tips for Pinball, Hoops, and Snake. Just ask about a specific game!"
+            answer: "🌐 [Signal Share]: I'm your Signal Share companion! I can help you post in the feed, manage messages, control media playback, navigate themes, play arcade games, and more. Even offline, I have tips ready!"
         },
         {
             keywords: ["thank", "thanks"],
-            answer: "🕹️ [Arcade Protocol]: You're welcome, player. Now get back in there and break that record!"
+            answer: "✨ [Signal Share]: You're welcome! Enjoy Signal Share — whether you're posting, chatting, listening, or gaming!"
         }
     ];
 
@@ -4600,10 +4686,10 @@ function getArcadeProtocolOfflineResponse(message) {
     }
 
     const fallbacks = [
-        "📶 [Arcade Protocol]: My advanced logic core is currently out of range. Check if your Arcade Companion bridge is running on your PC!",
-        "📡 [Arcade Protocol]: Communication with the main intelligence core is unstable. Ensure the bridge server is active and try again.",
-        "🕹️ [Arcade Protocol]: Sync failed. I'm relying on cached arcade data. If you're on a real device, check your bridge IP settings!",
-        "🎮 [Arcade Protocol]: My logic processors are running local-only. (Bridge unreachable). I can still help with game tips though!"
+        "📶 [Signal Share]: My advanced logic core is currently out of range. Check if your companion bridge is running on your PC!",
+        "📡 [Signal Share]: Communication with the intelligence core is unstable. Ensure the bridge server is active and try again.",
+        "🌐 [Signal Share]: Sync failed. I'm running on cached data only. If you're on a real device, check your bridge settings!",
+        "💬 [Signal Share]: My logic processors are running local-only (bridge unreachable). I can still help with tips about the feed, messaging, media, and arcade!"
     ];
 
     return fallbacks[Math.floor(Math.random() * fallbacks.length)];
