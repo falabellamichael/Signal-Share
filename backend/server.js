@@ -638,10 +638,17 @@ function normalizeSourceLabel(sourceAppId = "") {
   return label.replace(/\.exe$/i, "");
 }
 
-function classifySourceProvider(sourceAppId = "") {
+function classifySourceProvider(sourceAppId = "", { title = "", artist = "", inferredFrom = "" } = {}) {
   const id = `${sourceAppId || ""}`.toLowerCase();
   if (id.includes("spotify")) return "spotify";
   if (id.includes("youtube") || id.includes("ytmusic") || id.includes("youtube.music")) return "youtube";
+
+  // Browsers (Chrome, Edge, Firefox) hosting YouTube will NOT have "youtube" in their appId.
+  // If a caller already confirmed the session was matched for "youtube" (via preferredSource filter),
+  // trust that context and classify it as "youtube".
+  if (inferredFrom === "youtube") return "youtube";
+  if (inferredFrom === "spotify") return "spotify";
+
   return "";
 }
 
@@ -679,6 +686,10 @@ app.get("/api/system-media/current", (req, res) => {
 
     let session = null;
 
+    // inferredSourceProvider tracks the effective platform when filtering so the response
+    // can carry the correct sourceProvider even for browser-hosted sessions (e.g. Chrome playing YouTube).
+    let inferredSourceProvider = "";
+
     if (isFiltered) {
       const sessions = SMTCMonitor.getMediaSessions();
       if (Array.isArray(sessions) && sessions.length > 0) {
@@ -686,9 +697,26 @@ app.get("/api/system-media/current", (req, res) => {
           const appId = `${s.sourceAppId || ""}`.toLowerCase();
           const title = `${s.media?.title || ""}`.toLowerCase();
           const artist = `${s.media?.artist || ""}`.toLowerCase();
+
+          // Direct match: the appId or media text contains the preferred source name.
           if (appId.includes(preferredSource) || title.includes(preferredSource) || artist.includes(preferredSource)) {
             session = s;
+            inferredSourceProvider = preferredSource;
             break;
+          }
+
+          // Browser-hosted YouTube: Chrome/Edge/Firefox don't include "youtube" in their appId.
+          // When the user requests preferredSource=youtube, also match browser sessions that are
+          // actively playing something (they are almost certainly playing YouTube if no Spotify session exists).
+          if (preferredSource === "youtube") {
+            const isBrowser = appId.includes("chrome") || appId.includes("msedge") || appId.includes("edge") || appId.includes("firefox") || appId.includes("opera");
+            if (isBrowser && (title || artist)) {
+              session = s;
+              inferredSourceProvider = "youtube";
+              // Don't break — keep looking for a dedicated YouTube app first.
+              // We use this browser session as a fallback by NOT breaking here;
+              // if a better match follows, it will overwrite this.
+            }
           }
         }
       }
@@ -732,7 +760,13 @@ app.get("/api/system-media/current", (req, res) => {
       meta,
       appPackage: `${session.sourceAppId || ""}`.trim(),
       artworkUri,
-      sourceProvider: classifySourceProvider(session.sourceAppId),
+      // Pass inferredSourceProvider so the frontend knows the effective platform
+      // even when a browser (Chrome/Edge) is hosting YouTube.
+      sourceProvider: classifySourceProvider(session.sourceAppId, {
+        title,
+        artist,
+        inferredFrom: inferredSourceProvider,
+      }),
     });
   } catch (error) {
     console.error("SMTC error:", error);

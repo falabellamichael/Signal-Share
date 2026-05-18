@@ -647,10 +647,16 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     if (preferredSource === "youtube") {
       if (combined.includes("spotify") || uri.includes("open.spotify.com")) return false;
-      return combined.includes("youtube")
-        || combined.includes("ytmusic")
-        || uri.includes("youtu.be/")
-        || /[a-zA-Z0-9_-]{11}/.test(snapshot?.openUri || "");
+      // Direct YouTube or YT Music app match
+      if (combined.includes("youtube") || combined.includes("ytmusic") || uri.includes("youtu.be/")) return true;
+      // YouTube open URI match
+      if (/[a-zA-Z0-9_-]{11}/.test(snapshot?.openUri || "")) return true;
+      // Browser-hosted YouTube: Chrome/Edge/Firefox playing media via SMTC.
+      // The bridge now sets sourceProvider="youtube" for these, but we also accept them
+      // via appPackage heuristic as a fallback for older bridge versions.
+      const isBrowserApp = app.includes("chrome") || app.includes("msedge") || app.includes("edge") || app.includes("firefox") || app.includes("opera");
+      if (isBrowserApp && (normalizeText(snapshot.title) || normalizeText(snapshot.meta))) return true;
+      return false;
     }
 
     return false;

@@ -772,16 +772,26 @@ export function renderHeroStagePreview(options = {}) {
 
   if (mode === "desktop") {
     if (desktopSnapshot?.active || desktopSnapshot?.playbackState === "paused") {
-      const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
+      // Determine the platform label from the snapshot's sourceProvider or the active toggle.
+      const snapshotProvider = (desktopSnapshot.sourceProvider || "").toLowerCase();
+      let platformLabel = "PC SYSTEM MEDIA";
+      if (snapshotProvider === "youtube" || isYouTubeMode) {
+        platformLabel = "YOUTUBE";
+      } else if (snapshotProvider === "spotify" || isSpotifyActive) {
+        platformLabel = "SPOTIFY";
+      }
+
       // PRIORITIZE BRIDGE ARTWORK: The bridge has the live thumbnail for what's actually playing.
       // We fall back to the matched feed item's artwork if the bridge is missing it.
       let artworkUrl = desktopSnapshot.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
 
+      const playbackNote = desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing";
+
       commitCard(stage, {
-        badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA"),
+        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : platformLabel,
         title: desktopSnapshot.title || "",
         meta: desktopSnapshot.meta || "",
-        note: (desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
+        note: playbackNote,
         artworkUrl: artworkUrl,
         showMetadata: true
       });
@@ -797,13 +807,13 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     const preferredSource = isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "");
-    const idleTitle = (preferredSource === "Spotify" || preferredSource === "YouTube") ? "Idle" : "Waiting for playback";
-    const idleMeta = isSpotifyActive 
-      ? "Idle"
-      : (isYouTubeMode ? "Idle" : "Start YouTube, Spotify, or another desktop app.");
+    const idleTitle = preferredSource ? `${preferredSource} · Waiting` : "Waiting for playback";
+    const idleMeta = isSpotifyActive
+      ? "Open Spotify and start a track."
+      : (isYouTubeMode ? "Open YouTube in a browser or app." : "Start YouTube, Spotify, or another desktop app.");
 
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "PC SYSTEM MEDIA",
+      badge: preferredSource ? `${preferredSource.toUpperCase()} · IDLE` : "PC SYSTEM MEDIA",
       title: idleTitle,
       meta: idleMeta,
       showMetadata: true
