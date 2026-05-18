@@ -780,8 +780,8 @@ app.use((req, res) => {
 // Express 5 requires the server handle to be stored at module scope to
 // prevent garbage collection from draining the event loop and exiting.
 // eslint-disable-next-line no-unused-vars
-const globalServer = app.listen(port, "0.0.0.0", () => {
-  console.log(`[Bridge] Signal Share backend listening on http://0.0.0.0:${port}`);
+const globalServer = app.listen(port, () => {
+  console.log(`[Bridge] Signal Share backend listening on port ${port} (IPv4 and IPv6)`);
   console.log(`[Bridge] AI endpoint configured: ${getConfiguredChatUrl() ? "YES" : "NO"}`);
   console.log(`[Bridge] LM Studio auto-detect enabled at ${normalizeBaseUrl(LM_STUDIO_BASE_URL) || "unavailable"}`);
   console.log(`[Bridge] Ollama auto-detect enabled at ${normalizeBaseUrl(OLLAMA_BASE_URL) || "unavailable"}`);
