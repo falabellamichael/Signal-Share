@@ -779,3 +779,15 @@ const globalServer = app.listen(port, "0.0.0.0", () => {
   console.log(`[Bridge] LM Studio auto-detect enabled at ${normalizeBaseUrl(LM_STUDIO_BASE_URL) || "unavailable"}`);
   console.log(`[Bridge] Ollama auto-detect enabled at ${normalizeBaseUrl(OLLAMA_BASE_URL) || "unavailable"}`);
 });
+
+// Keepalive: Prevent Node.js from exiting by maintaining an active timer handle.
+// This is necessary because ES module top-level const references alone are not
+// enough to keep the event loop alive in all Node.js versions.
+const _keepalive = setInterval(() => {}, 1 << 30); // ~12 day interval, virtually no overhead
+globalServer.on("close", () => clearInterval(_keepalive));
+globalServer.on("error", (err) => {
+  console.error(`[Bridge] Server error: ${err.message}`);
+  if (err.code === "EADDRINUSE") {
+    console.error(`[Bridge] Port ${port} is already in use. Stop the other process or change PORT in .env.`);
+  }
+});
