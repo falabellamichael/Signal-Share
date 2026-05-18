@@ -45,6 +45,8 @@ export function createHeroMediaPlayerController(options) {
     onStatusChange
   } = options;
 
+  const { isSpotifyActive, isYouTubeMode } = options || {};
+
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
   const NATIVE_ACTION_NEXT = "next";
   const NATIVE_ACTION_PREVIOUS = "previous";
@@ -2455,8 +2457,40 @@ The companion bridge is designed with several security layers to keep your PC sa
     },
     performSupabaseDesktopAction,
     downloadCompanion,
-    downloadSecurityReadme
+    downloadSecurityReadme,
+    handleMediaToggleMode
   };
+
+  function handleMediaToggleMode(options = {}) {
+    const {
+      post,
+      matchedPost,
+      parseYouTubeUrl,
+      resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
+      isYouTubeMode,
+      isSpotifyActive
+    } = options;
+
+    if (isSpotifyActive) {
+      const resolvedMetadata = resolveAppPreviewArtwork(post, {
+        parseYouTubeUrl,
+        resolveActivePlayerSource,
+        getSpotifyPreviewImageUrl,
+      });
+
+      if (resolvedMetadata) {
+        return createCardResult({
+          badge: isYouTubeMode ? "SPOTIFY ACTIVE" : "NOW PLAYING",
+          title: post?.title || matchedPost?.title || "",
+          meta: matchedPost?.creator || post?.creator || "Signal Share",
+          artworkUrl: resolvedMetadata,
+        });
+      }
+    }
+
+    // Existing fallback logic for YouTube or idle state...
+  }
 
   function showCompanionPrompt() {
     const overlay = document.getElementById("companionPromptOverlay");
@@ -2516,4 +2550,37 @@ The companion bridge is designed with several security layers to keep your PC sa
     const overlay = document.getElementById("companionSetupOverlay");
     if (overlay) overlay.hidden = true;
   }
+}
+
+// Export handleMediaToggleMode as a standalone utility function
+export function handleMediaToggleMode(options = {}) {
+  const {
+    post,
+    matchedPost,
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
+    isYouTubeMode,
+    isSpotifyActive,
+  } = options;
+
+  if (isSpotifyActive) {
+    const resolvedMetadata = resolveAppPreviewArtwork(post, {
+      parseYouTubeUrl,
+      resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
+    });
+
+    if (resolvedMetadata) {
+      return createCardResult({
+        badge: isYouTubeMode ? "SPOTIFY ACTIVE" : "NOW PLAYING",
+        title: post?.title || matchedPost?.title || "",
+        meta: matchedPost?.creator || post?.creator || "Signal Share",
+        artworkUrl: resolvedMetadata,
+      });
+    }
+  }
+
+  // Fallback to existing YouTube or idle state logic
+  return null;
 }
