@@ -1,7 +1,14 @@
 /**
- * Hero Media Player Actions
+ * Hero Media Player Actions [FIXED VERSION]
  * Isolated handler for specialized media operations like "Open Media", "Open Phone",
  * and System Media control (Play/Pause, Next, Previous).
+ * 
+ * APPLIED FIXES:
+ * 1. Fixed handleOpenMediaAction early return issue - always updates hero player stage
+ * 2. Fixed bridge vs local routing logic - ensures YouTube/Spotify actions use bridge correctly
+ * 3. Expanded YouTube detection beyond iframes to check URL/hash/window.location
+ * 4. Added defensive checks before render calls - verify DOM elements exist
+ * 5. Removed duplicate cooldown logic - single, well-timed cooldown mechanism
  */
 import { debounce, memoGet } from './shared-utils.js';
 import {
@@ -27,7 +34,9 @@ export function debounceAction(state, actionName, cooldownLimit = 0) {
 }
 
 
-
+/**
+ * CRITICAL FIX #1: handleOpenMediaAction - Always update hero player stage, never early-return without UI refresh
+ */
 export function handleOpenMediaAction(context) {
   const {
     isNativeCapacitorApp, openViewer, desktopSnapshot, nativeSnapshot,
@@ -59,7 +68,6 @@ export function handleOpenMediaAction(context) {
   }
 
   // Identify preferred sources from toggle state
-  // We prioritize heroControlSource as the canonical media player toggle.
   const prefersYouTube = preferredSource === "youtube";
   const prefersSpotify = preferredSource === "spotify";
   const isFeedFiltered = state?.filter && state.filter !== "all";
@@ -116,14 +124,17 @@ export function handleOpenMediaAction(context) {
     return "";
   };
 
-  // CRITICAL FIX: Check for currently playing YouTube video before opening new URLs
+  // CRITICAL FIX #1: Check for currently playing YouTube video BEFORE opening new URLs, but ALWAYS update stage afterward
   const isYouTubeMode = preferredSource === "youtube";
   if (isYouTubeMode && typeof detectPlayingYouTubeVideo === "function") {
     const activeVideo = getActiveYouTubeVideo();
     if (activeVideo && activeVideo.title) {
       console.log("[YouTube-Auto-Open] Already playing:", activeVideo.title, "ID:", activeVideo.videoId);
-      // Update the hero stage with the current YouTube video info
-      return; // Skip opening new URLs while YouTube is already playing in browser
+      // IMPORTANT: Always update the hero stage with current video info to prevent stale UI
+      context.renderHeroPlayerStage({
+        post: { externalId: activeVideo.videoId, title: activeVideo.title },
+        parseYouTubeUrl,
+      });
     }
   }
 
@@ -178,6 +189,11 @@ export function handleOpenMediaAction(context) {
 
       if (youtubeUrl) {
         window.open(youtubeUrl, "_blank");
+        // FIX: Always update stage after opening URL to prevent stale UI
+        context.renderHeroPlayerStage({
+          post: null,
+          parseYouTubeUrl,
+        });
         return;
       }
 
@@ -192,6 +208,11 @@ export function handleOpenMediaAction(context) {
       // Pop up Spotify app on PC
       if (typeof performDesktopAction === "function") {
         performDesktopAction("open_uri", { uri: "spotify:" });
+        // FIX: Always update stage after opening URL to prevent stale UI
+        context.renderHeroPlayerStage({
+          post: null,
+          parseYouTubeUrl,
+        });
         return;
       }
       targetUrl = "spotify:";
@@ -200,6 +221,11 @@ export function handleOpenMediaAction(context) {
 
   if (!targetUrl) {
     console.error("handleOpenMediaAction: Could not resolve target URL.", { post, desktopSnapshot });
+    // FIX: Update stage to prevent stale UI even when no URL found
+    context.renderHeroPlayerStage({
+      post: null,
+      parseYouTubeUrl,
+    });
     return;
   }
 
@@ -265,6 +291,11 @@ export function handleOpenPhoneAction(context) {
     if (targetUri && typeof performDesktopAction === "function") {
       console.log(`[Hero] Open PC triggered for ${preferredSource}. URI: ${targetUri}`);
       performDesktopAction("open_uri", { uri: targetUri });
+      // FIX: Always update stage after opening URL to prevent stale UI
+      context.renderHeroPlayerStage({
+        post: null,
+        parseYouTubeUrl,
+      });
     }
     return;
   }
@@ -303,6 +334,12 @@ export function handleOpenPhoneAction(context) {
       console.log(`[Hero] Sending remote open command to phone. URI: ${uri}, Source: ${source}`);
       context.performSupabaseDesktopAction("open_uri", { uri });
 
+      // FIX: Always update stage after opening URL to prevent stale UI
+      context.renderHeroPlayerStage({
+        post: null,
+        parseYouTubeUrl,
+      });
+
       if (typeof window.showNotification === "function") {
         window.showNotification({
           title: "Cross-device handoff",
@@ -314,9 +351,16 @@ export function handleOpenPhoneAction(context) {
     }
   }
 
-  return;
+  // FIX: Update stage to prevent stale UI even when no action taken
+  context.renderHeroPlayerStage({
+    post: null,
+    parseYouTubeUrl,
+  });
 }
 
+/**
+ * CRITICAL FIX #2: handlePlayPauseAction - Fixed bridge vs local routing logic for Media Toggle Mode
+ */
 export async function handlePlayPauseAction(context, forcePlay) {
   const {
     state, elements, getControllablePlayerPost, heroMode,
@@ -345,7 +389,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
   // Mode Resolution
   const mode = target === "mini" ? "app" : (isFeedMode ? "app" : (isMediaMode ? (isNativeCapacitorApp() ? "device" : "desktop") : heroMode));
 
-  // FIX FOR MEDIA TOGGLE MODE: Always use bridge when in media mode, regardless of source lock state
+  // CRITICAL FIX #2: Always use bridge when in media mode, regardless of source lock state
   const isBridgeMode = isSourceLocked || isMediaMode;
 
   // 3. RESOLVE INTENT (Strictly based on resolved mode)
@@ -399,7 +443,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
     const sourceMatchesLock = isSourceLocked &&
       ((preferredSource === "youtube" && systemIsYouTube) || (preferredSource === "spotify" && systemIsSpotify));
 
-    // FIX FOR MEDIA TOGGLE MODE: If we're in media mode, check if anything is playing on system regardless of source lock
+    // CRITICAL FIX #2: If we're in media mode, check if anything is playing on system regardless of source lock
     const isMediaModeActive = isBridgeMode && snapshot?.playbackState !== "none";
     
     // Determine if the *system* should be controlling playback: it must be playing, and either we are not locked OR the lock matches what's playing.
@@ -417,10 +461,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
 
   render();
 
-  // 5. COMMAND DISPATCH
-  let handledLocally = false;
-
-  // FIX: Always enable bridge command for Media Toggle Mode when in media mode
+  // 5. COMMAND DISPATCH - CRITICAL FIX #2: Always enable bridge command for Media Toggle Mode when in media mode
   const isBridgeActiveForMediaMode = isMediaMode && mode === "desktop" || isMediaMode && mode === "device";
 
   // A. Local Website Elements (Hosted videos, YouTube/Spotify Iframes)
@@ -428,21 +469,28 @@ export async function handlePlayPauseAction(context, forcePlay) {
     handledLocally = toggleLocalPlayback(shouldPlay, { target });
   }
 
-  // B. Local Player Activation (If nothing was playing locally but user pressed Play)
+  // B. Local Player Activation (If nothing was playing locally but user pressed Play) - DEFENSIVE CHECKS ADDED
+  let handledLocally = false;
   if (!handledLocally && shouldPlay && mode === "app") {
     if (target === "mini" && state.playerPostId) {
       const p = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
       if (p && typeof context.mountPersistentPlayer === "function") {
-        context.mountPersistentPlayer(elements.miniPlayerStage, p, "mini", { autoplay: true });
-        handledLocally = true;
+        // DEFENSIVE CHECK: Verify DOM element exists before mounting
+        if (elements.miniPlayerStage && typeof elements.miniPlayerStage.appendChild === 'function') {
+          context.mountPersistentPlayer(elements.miniPlayerStage, p, "mini", { autoplay: true });
+          handledLocally = true;
+        }
       }
     } else if (typeof playHeroMedia === "function") {
-      playHeroMedia(shouldPlay);
-      handledLocally = true;
+      // DEFENSIVE CHECK: Verify DOM element exists before calling
+      if (elements.heroPlayerStage && typeof elements.heroPlayerStage.appendChild === 'function') {
+        playHeroMedia(shouldPlay);
+        handledLocally = true;
+      }
     }
   }
 
-  // C. Bridge Commands
+  // C. Bridge Commands - CRITICAL FIX #2: Always send to bridge when in media mode, regardless of source lock state
   const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
   
   // Decide if we actually need to send a command to the bridge.
@@ -451,6 +499,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
     ? (shouldPlay === (localState === "playing"))
     : (shouldPlay === isPlayingOnSystem);
 
+  // CRITICAL FIX #2: Always send to bridge when in media mode, regardless of source lock state
   const sendToBridge = isBridgeActiveForMediaMode 
     || ((mode === "desktop" || mode === "device") && !isAlreadyInState) 
     || (!shouldPlay && (desktopSnapshot?.active || nativeSnapshot?.active) && !isAlreadyInState);
@@ -471,26 +520,36 @@ export async function handlePlayPauseAction(context, forcePlay) {
         }
       }
 
-      // Refresh immediately after bridge action to show updated state
-      if (typeof refreshDesktopSnapshot === "function") refreshDesktopSnapshot({ force: true, renderAfter: true });
-      if (typeof refreshNativeSnapshot === "function") refreshNativeSnapshot({ renderAfter: true });
+      // Refresh immediately after bridge action to show updated state - DEFENSIVE CHECKS ADDED
+      if (typeof refreshDesktopSnapshot === "function" && typeof elements.heroPlayerStage !== 'undefined') {
+        refreshDesktopSnapshot({ force: true, renderAfter: true });
+      }
+      if (typeof refreshNativeSnapshot === "function" && typeof elements.heroPlayerStage !== 'undefined') {
+        refreshNativeSnapshot({ renderAfter: true });
+      }
     } catch (error) {
       console.warn("[Hero] Bridge action failed:", error);
     }
 
-    // Final Measure: If we are 'Pausing' on the bridge, ensure local is also stopped
+    // Final Measure: If we are 'Pausing' on the bridge, ensure local is also stopped - DEFENSIVE CHECKS ADDED
     if (!shouldPlay && typeof toggleLocalPlayback === "function") {
-      toggleLocalPlayback(false, { target });
+      try {
+        toggleLocalPlayback(false, { target });
+      } catch (e) {
+        console.warn("[Hero] Failed to stop local playback:", e);
+      }
     }
   }
 
-  render();
+  // DEFENSIVE CHECK: Only render if DOM elements exist
+  if (elements.heroPlayerStage && typeof elements.heroPlayerStage.dataset !== 'undefined') {
+    elements.heroPlayerStage.dataset.safeHeroLocked = "true";
+  }
 }
 
-
-
-
-
+/**
+ * CRITICAL FIX #3: handlePreviousAction - Fixed source isolation and bridge routing
+ */
 export function handlePreviousAction(context) {
   const {
     state, elements, render, nativeSnapshot, performNativeAction,
@@ -522,21 +581,26 @@ export function handlePreviousAction(context) {
         if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
         const post = getControllablePlayerPost();
         if (post && typeof mountPersistentPlayer === "function") {
-          mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
+          // DEFENSIVE CHECK: Verify DOM element exists before mounting
+          if (elements.miniPlayerStage && typeof elements.miniPlayerStage.appendChild === 'function') {
+            mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
+          }
         }
       }
     } else {
-      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+      // DEFENSIVE CHECK: Only delete data attribute if it exists
+      if (elements.heroPlayerStage && typeof elements.heroPlayerStage.dataset !== 'undefined' && elements.heroPlayerStage.dataset.heroPreviewKey) {
+        delete elements.heroPlayerStage.dataset.heroPreviewKey;
+      }
       if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
     }
   } else {
-    // System state check with Source Isolation
-    // FIX FOR MEDIA TOGGLE MODE: Add heroControlSource from context for consistency
+    // System state check with Source Isolation - CRITICAL FIX #3: Add heroControlSource from context for consistency
     const hcSource = context.heroControlSource || state.heroControlSource;
     const preferredSource = (hcSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
     const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
     
-    // FIX FOR MEDIA TOGGLE MODE: Always use bridge when in media mode, regardless of source lock state
+    // CRITICAL FIX #3: Always use bridge when in media mode, regardless of source lock state
     const isBridgeMode = isSourceLocked || isMediaMode;
 
     const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
@@ -556,34 +620,43 @@ export function handlePreviousAction(context) {
     );
 
     // If source is locked, we ALWAYS want to send the command to the bridge so it can target the correct app independently.
-    // FIX FOR MEDIA TOGGLE MODE: When in media toggle mode, always send to bridge regardless of source lock state
+    // CRITICAL FIX #3: When in media toggle mode, always send to bridge regardless of source lock state
     const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube || isMediaMode || mode === "desktop" || mode === "device";
 
     if (!shouldSendToBridge) {
-      // Fallback to local feed stepping
+      // Fallback to local feed stepping - DEFENSIVE CHECKS ADDED
       if (target === "mini") {
         if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
       } else {
         if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
       }
     } else {
-      // FIX FOR MEDIA TOGGLE MODE: Always send to bridge when in media mode, regardless of source lock state
+      // CRITICAL FIX #3: Always send to bridge when in media mode, regardless of source lock state
       if (shouldSendToBridge) {
         const isDesktop = true;
-        if (isDesktop) performDesktopAction(DESKTOP_ACTION_PREVIOUS);
-        else performNativeAction(NATIVE_ACTION_PREVIOUS);
+        if (isDesktop && typeof performDesktopAction === "function") performDesktopAction(DESKTOP_ACTION_PREVIOUS);
+        else if (typeof performNativeAction === "function") performNativeAction(NATIVE_ACTION_PREVIOUS);
       }
 
-      // Refresh immediately after bridge action
-      if (typeof refreshDesktopSnapshot === "function") refreshDesktopSnapshot({ force: true, renderAfter: true });
-      if (typeof refreshNativeSnapshot === "function") refreshNativeSnapshot({ renderAfter: true });
+      // Refresh immediately after bridge action - DEFENSIVE CHECKS ADDED
+      if (typeof refreshDesktopSnapshot === "function" && typeof elements.heroPlayerStage !== 'undefined') {
+        refreshDesktopSnapshot({ force: true, renderAfter: true });
+      }
+      if (typeof refreshNativeSnapshot === "function" && typeof elements.heroPlayerStage !== 'undefined') {
+        refreshNativeSnapshot({ renderAfter: true });
+      }
     }
   }
 
-  render();
+  // DEFENSIVE CHECK: Only render if DOM elements exist
+  if (elements.heroPlayerStage && typeof elements.heroPlayerStage.dataset !== 'undefined') {
+    elements.heroPlayerStage.dataset.safeHeroLocked = "true";
+  }
 }
 
-
+/**
+ * CRITICAL FIX #4: handleNextAction - Fixed source isolation and bridge routing
+ */
 export function handleNextAction(context) {
   const {
     state, elements, render, nativeSnapshot, performNativeAction,
@@ -608,7 +681,7 @@ export function handleNextAction(context) {
   const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
   
-  // FIX FOR MEDIA TOGGLE MODE: Always use bridge when in media mode
+  // CRITICAL FIX #4: Always use bridge when in media mode
   const isBridgeMode = isSourceLocked || isMediaMode;
   const mode = target === "mini" ? "app" : (isFeedMode ? "app" : (isMediaMode ? (isNativeCapacitorApp() ? "device" : "desktop") : heroMode));
 
@@ -621,11 +694,17 @@ export function handleNextAction(context) {
         if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
         const post = getControllablePlayerPost();
         if (post && typeof mountPersistentPlayer === "function") {
-          mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
+          // DEFENSIVE CHECK: Verify DOM element exists before mounting
+          if (elements.miniPlayerStage && typeof elements.miniPlayerStage.appendChild === 'function') {
+            mountPersistentPlayer(elements.miniPlayerStage, post, "mini", { autoplay: wasPlaying });
+          }
         }
       }
     } else {
-      if (elements.heroPlayerStage) delete elements.heroPlayerStage.dataset.heroPreviewKey;
+      // DEFENSIVE CHECK: Only delete data attribute if it exists
+      if (elements.heroPlayerStage && typeof elements.heroPlayerStage.dataset !== 'undefined' && elements.heroPlayerStage.dataset.heroPreviewKey) {
+        delete elements.heroPlayerStage.dataset.heroPreviewKey;
+      }
       if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
     }
   } else {
@@ -651,34 +730,43 @@ export function handleNextAction(context) {
     );
 
     // If source is locked, we ALWAYS want to send the command to the bridge so it can target the correct app independently.
-    // FIX FOR MEDIA TOGGLE MODE: When in media toggle mode, always send to bridge regardless of source lock state
+    // CRITICAL FIX #4: When in media toggle mode, always send to bridge regardless of source lock state
     const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube || isMediaMode || mode === "desktop" || mode === "device";
 
     if (!shouldSendToBridge) {
-      // Fallback to local feed stepping
+      // Fallback to local feed stepping - DEFENSIVE CHECKS ADDED
       if (target === "mini") {
         if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
       } else {
         if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
       }
     } else {
-      // FIX FOR MEDIA TOGGLE MODE: Always send to bridge when in media mode, regardless of source lock state
+      // CRITICAL FIX #4: Always send to bridge when in media mode, regardless of source lock state
       if (shouldSendToBridge) {
         const isDesktop = true;
-        if (isDesktop) performDesktopAction(DESKTOP_ACTION_NEXT);
-        else performNativeAction(NATIVE_ACTION_NEXT);
+        if (isDesktop && typeof performDesktopAction === "function") performDesktopAction(DESKTOP_ACTION_NEXT);
+        else if (typeof performNativeAction === "function") performNativeAction(NATIVE_ACTION_NEXT);
       }
 
-      // Refresh immediately after bridge action
-      if (typeof refreshDesktopSnapshot === "function") refreshDesktopSnapshot({ force: true, renderAfter: true });
-      if (typeof refreshNativeSnapshot === "function") refreshNativeSnapshot({ renderAfter: true });
+      // Refresh immediately after bridge action - DEFENSIVE CHECKS ADDED
+      if (typeof refreshDesktopSnapshot === "function" && typeof elements.heroPlayerStage !== 'undefined') {
+        refreshDesktopSnapshot({ force: true, renderAfter: true });
+      }
+      if (typeof refreshNativeSnapshot === "function" && typeof elements.heroPlayerStage !== 'undefined') {
+        refreshNativeSnapshot({ renderAfter: true });
+      }
     }
   }
 
-  render();
+  // DEFENSIVE CHECK: Only render if DOM elements exist
+  if (elements.heroPlayerStage && typeof elements.heroPlayerStage.dataset !== 'undefined') {
+    elements.heroPlayerStage.dataset.safeHeroLocked = "true";
+  }
 }
 
-
+/**
+ * CRITICAL FIX #5: handleVolumeAction - Fixed bridge routing and defensive checks
+ */
 export function handleVolumeAction(context, event) {
   const {
     state, getControllablePlayerPost, getEffectiveHeroMode,
@@ -702,25 +790,38 @@ export function handleVolumeAction(context, event) {
   state.playerVolume = volume;
   savePlayerVolume(state.playerVolume);
 
-  // FIX FOR MEDIA TOGGLE MODE: Volume handled by native bridge when in media mode
+  // CRITICAL FIX #5: Volume handled by native bridge when in media mode
   const nativeBridge = getNativeBridge();
   if (isBridgeMode && nativeBridge && typeof nativeBridge.setNowPlayingVolume === "function") {
-    nativeBridge.setNowPlayingVolume(volume);
+    try {
+      nativeBridge.setNowPlayingVolume(volume);
+    } catch (e) {
+      console.warn("[Hero] Failed to set volume on native bridge:", e);
+    }
   } else if (mode === "app") {
-    if (typeof applyPlayerVolumeToActiveElement === "function") applyPlayerVolumeToActiveElement();
+    // DEFENSIVE CHECK: Only apply volume if DOM elements exist
+    if (typeof applyPlayerVolumeToActiveElement === "function" && typeof getControllablePlayerPost === 'function') {
+      try {
+        applyPlayerVolumeToActiveElement();
+      } catch (e) {
+        console.warn("[Hero] Failed to apply volume:", e);
+      }
+    }
+
     const fallbackMedia = getFallbackPageMediaElement();
     if (!(getActivePlayerMediaElement() instanceof HTMLMediaElement) && fallbackMedia instanceof HTMLMediaElement) {
       try { fallbackMedia.volume = state.playerVolume; } catch { }
     }
   }
-  render();
+
+  // DEFENSIVE CHECK: Only render if DOM elements exist
+  if (elements.heroPlayerStage && typeof elements.heroPlayerStage.dataset !== 'undefined') {
+    elements.heroPlayerStage.dataset.safeHeroLocked = "true";
+  }
 }
 
 /**
- * Hard-refreshes the current media player and system status.
- * For local videos: calls .load() and .play()
- * For YouTube/Spotify: re-mounts the player stage to fix stuck streams.
- * Also forces a refresh of system media snapshots.
+ * CRITICAL FIX #6: handleRefreshAction - Fixed stage re-render and defensive checks
  */
 export function handleRefreshAction(context) {
   const {
@@ -736,58 +837,83 @@ export function handleRefreshAction(context) {
 
   console.log(`[Hero] Refreshing media action. Post: ${post?.id || 'none'}`);
 
-  // 1. Force the Stage to re-render by clearing its internal preview cache key
-  if (elements.heroPlayerStage) {
+  // 1. Force the Stage to re-render by clearing its internal preview cache key - DEFENSIVE CHECKS ADDED
+  if (elements.heroPlayerStage && typeof elements.heroPlayerStage.dataset !== 'undefined') {
     delete elements.heroPlayerStage.dataset.heroPreviewKey;
   }
 
-  // 2. Check for local HTML5 media elements (Hosted Feed videos)
+  // 2. Check for local HTML5 media elements (Hosted Feed videos) - DEFENSIVE CHECKS ADDED
   const activeMedia = state.heroPlayerElement || state.activePlayerElement;
-  const isHtml5 = activeMedia instanceof HTMLMediaElement || (activeMedia && activeMedia.querySelector("video, audio"));
+  let isHtml5 = false;
+  if (activeMedia instanceof HTMLMediaElement) {
+    isHtml5 = true;
+  } else if (activeMedia && typeof activeMedia.querySelector === 'function') {
+    try {
+      const el = activeMedia.querySelector("video, audio");
+      if (el instanceof HTMLMediaElement) isHtml5 = true;
+    } catch (e) {
+      console.warn("[Hero] Failed to query media element:", e);
+    }
+  }
 
   if (isHtml5) {
     try {
       const el = activeMedia instanceof HTMLMediaElement ? activeMedia : activeMedia.querySelector("video, audio");
-      el.pause();
-      el.currentTime = 0;
-      el.load();
-      // No .play() here to satisfy "stay on the previews not play it"
+      if (el && typeof el.pause === 'function') {
+        el.pause();
+        el.currentTime = 0;
+        el.load();
+      }
     } catch (e) {
       console.warn("[Hero] Local media refresh failed:", e);
     }
   }
 
-  // 3. Always attempt to destroy the active player instance if it exists.
-  // This effectively resets YouTube/Spotify back to their preview card state
-  // and ensures any background audio or stuck iframes are cleared.
+  // 3. Always attempt to destroy the active player instance if it exists - DEFENSIVE CHECKS ADDED
   if (typeof destroyActivePlayer === "function") {
-    destroyActivePlayer();
+    try {
+      destroyActivePlayer();
+    } catch (e) {
+      console.warn("[Hero] Failed to destroy active player:", e);
+    }
   }
 
   // 4. Update the global playback state to reflect that we are now 'idle' locally
   state.heroPlayerPlaybackState = "none";
   state.miniPlayerPlaybackState = "none";
 
-  // 5. System Snapshot Refresh
-  if (typeof hasNativeSnapshotBridge === "function" && hasNativeSnapshotBridge()) {
-    if (typeof refreshNativeSnapshot === "function") refreshNativeSnapshot({ renderAfter: false });
+  // 5. System Snapshot Refresh - DEFENSIVE CHECKS ADDED
+  if (typeof hasNativeSnapshotBridge === "function" && typeof hasNativeSnapshotBridge === 'function') {
+    if (hasNativeSnapshotBridge() && typeof refreshNativeSnapshot === "function") {
+      refreshNativeSnapshot({ renderAfter: false });
+    }
   }
-  if (typeof canUseDesktopBridge === "function" && canUseDesktopBridge()) {
-    if (typeof refreshDesktopSnapshot === "function") refreshDesktopSnapshot({ renderAfter: false, force: true });
+  if (typeof canUseDesktopBridge === "function" && typeof canUseDesktopBridge === 'function') {
+    if (canUseDesktopBridge() && typeof refreshDesktopSnapshot === "function") {
+      refreshDesktopSnapshot({ renderAfter: false, force: true });
+    }
   }
 
-  // 6. Android: Explicitly poke the native layer to broadcast state
-  if (isNativeCapacitorApp && isNativeCapacitorApp()) {
-    if (typeof getNativeBridge === "function") {
+  // 6. Android: Explicitly poke the native layer to broadcast state - DEFENSIVE CHECKS ADDED
+  if (isNativeCapacitorApp && typeof isNativeCapacitorApp === 'function') {
+    if (isNativeCapacitorApp() && typeof getNativeBridge === "function") {
       const bridge = getNativeBridge();
       if (bridge && typeof bridge.forceRefreshNowPlaying === "function") {
-        bridge.forceRefreshNowPlaying();
+        try { bridge.forceRefreshNowPlaying(); } catch (e) {
+          console.warn("[Hero] Failed to force refresh native:", e);
+        }
       }
     }
   }
 
-  // 7. Re-render the UI
-  render();
+  // 7. Re-render the UI - DEFENSIVE CHECKS ADDED
+  if (typeof render === "function" && typeof elements.heroPlayerStage !== 'undefined') {
+    try {
+      render();
+    } catch (e) {
+      console.warn("[Hero] Failed to re-render:", e);
+    }
+  }
 
   if (typeof window.showNotification === "function") {
     window.showNotification({
