@@ -389,7 +389,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
     
     // Determine if the *system* should be controlling playback: it must be playing, and either we are not locked OR the lock matches what's playing.
     // For bridge mode (media toggle), we check if system has any activity
-    const isPlayingOnSystem = snapshot?.playbackState === "playing" && (!isSourceLocked || sourceMatchesLock || isMediaModeActive);
+    isPlayingOnSystem = snapshot?.playbackState === "playing" && (!isSourceLocked || sourceMatchesLock || isMediaModeActive);
     shouldPlay = (typeof forcePlay === "boolean") ? forcePlay : !isPlayingOnSystem;
   }
 
@@ -430,7 +430,15 @@ export async function handlePlayPauseAction(context, forcePlay) {
   // C. Bridge Commands
   const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
   
+  // Decide if we actually need to send a command to the bridge.
+  // If we are already in the requested state (e.g. asking to pause while already paused), skip it.
+  const isAlreadyInState = (mode === "app") 
+    ? (shouldPlay === (localState === "playing"))
+    : (shouldPlay === isPlayingOnSystem);
 
+  const sendToBridge = isBridgeActiveForMediaMode 
+    || ((mode === "desktop" || mode === "device") && !isAlreadyInState) 
+    || (!shouldPlay && (desktopSnapshot?.active || nativeSnapshot?.active) && !isAlreadyInState);
 
   if (sendToBridge) {
     try {
