@@ -225,10 +225,10 @@ export function handleOpenMediaAction(context) {
 export function handleOpenPhoneAction(context) {
   const { isNativeCapacitorApp, state, performDesktopAction, getControllablePlayerPost } = context;
   const post = getControllablePlayerPost();
+  const heroControlSource = state.heroControlSource;
 
   // 1. Android Native App -> "Open PC" Action
   if (isNativeCapacitorApp()) {
-    const heroControlSource = state.heroControlSource;
     const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
 
     let targetUri = "";
@@ -323,6 +323,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
   // Identify modes and sources
   const isFeedMode = state.heroControlMode === "feed";
   const isMediaMode = state.heroControlMode === "media";
+  const heroControlSource = state.heroControlSource;
   const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
 
@@ -504,6 +505,7 @@ export function handlePreviousAction(context) {
     }
   } else {
     // System state check with Source Isolation
+    const heroControlSource = state.heroControlSource;
     const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
     const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
 
@@ -588,6 +590,7 @@ export function handleNextAction(context) {
     }
   } else {
     // System state check with Source Isolation
+    const heroControlSource = state.heroControlSource;
     const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
     const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
 
