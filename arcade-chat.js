@@ -436,6 +436,7 @@ async function hydrateChatModelSelect({ forceRefresh = false } = {}) {
     const select = document.getElementById('chat-model-select');
     if (!select) return;
     if (!isBridgeFeatureEnabled()) return;
+    if (!forceRefresh && bridgePollNextAllowedAt && Date.now() < bridgePollNextAllowedAt) return;
 
     try {
         const querySuffix = forceRefresh ? '?force=true' : '';
@@ -1162,6 +1163,8 @@ function startDesktopBridgePolling() {
     }
 
     bridgeEnabled = true;
+    bridgePollFailureCount = 0;
+    bridgePollNextAllowedAt = 0;
     pollDesktopBridge();
 
     // Lightweight live refresh for bridge status.
@@ -1185,6 +1188,7 @@ function stopDesktopBridgePolling() {
  */
 async function pollDesktopBridge() {
     if (!bridgeEnabled || bridgePollInFlight) return;
+    if (bridgePollNextAllowedAt && Date.now() < bridgePollNextAllowedAt) return;
 
     bridgePollInFlight = true;
     try {
@@ -1194,6 +1198,8 @@ async function pollDesktopBridge() {
 
         if (!online) {
             bridgePollFailureCount += 1;
+            const backoffMs = Math.min(120000, 15000 * Math.pow(2, Math.max(0, bridgePollFailureCount - 1)));
+            bridgePollNextAllowedAt = Date.now() + backoffMs;
             return;
         }
 
@@ -1210,6 +1216,8 @@ async function pollDesktopBridge() {
         }
     } catch (_error) {
         bridgePollFailureCount += 1;
+        const backoffMs = Math.min(120000, 15000 * Math.pow(2, Math.max(0, bridgePollFailureCount - 1)));
+        bridgePollNextAllowedAt = Date.now() + backoffMs;
         updateEngineStatus(false);
     } finally {
         bridgePollInFlight = false;

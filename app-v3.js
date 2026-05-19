@@ -566,8 +566,7 @@ function resolveBridgeBaseCandidates() {
 }
 
 function shouldAttemptBridgeRequests() {
-  if (isNativeCapacitorApp()) return isBridgeFeatureEnabled();
-  if (isLoopbackSiteOrigin() || isPrivateSiteOrigin()) return true;
+  // Only probe bridge/network permissions when bridge features are explicitly enabled.
   return isBridgeFeatureEnabled();
 }
 

@@ -1480,6 +1480,33 @@ The companion bridge is designed with several security layers to keep your PC sa
           return desktopSnapshot;
         }
 
+        if (!snapshot) {
+          const didChange = lastDesktopSnapshotSignature !== "none";
+          desktopSnapshot = null;
+          lastDesktopSnapshotSignature = "none";
+          desktopPollFailureCount += 1;
+
+          if (desktopPollFailureCount >= 3) {
+            state.desktopBridgeSuspended = true;
+          }
+
+          const shouldWarn = !state.desktopBridgeSuspended
+            && !isNativeCapacitorApp()
+            && (desktopPollFailureCount === 1);
+
+          if (shouldWarn) {
+            console.warn("[Hero] Desktop media bridge not detected. Run the Signal-Share desktop bridge on your PC with: node server.js");
+          }
+
+          if (renderAfter && didChange) {
+            render();
+            if (typeof onStatusChange === "function") {
+              onStatusChange();
+            }
+          }
+          return null;
+        }
+
         const nextSignature = getDesktopSnapshotSignature(snapshot);
         const didChange = nextSignature !== lastDesktopSnapshotSignature;
 
