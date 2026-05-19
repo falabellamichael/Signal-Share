@@ -2013,16 +2013,21 @@ The companion bridge is designed with several security layers to keep your PC sa
     const mode = getEffectiveHeroMode(controllablePost);
     const fallbackMedia = getFallbackPageMediaElement();
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
+    const stagePost = customOptions.post !== undefined
+      ? customOptions.post
+      : (mode === "app"
+        ? getHeroPost()
+        : (matchedPost || controllablePost || getStandbyPreviewPost() || null));
 
     renderHeroStagePreview(Object.assign({}, options, {
       stage: elements.heroPlayerStage,
       mode,
-      post: customOptions.post !== undefined ? customOptions.post : (mode === "app" ? getHeroPost() : null),
+      post: stagePost,
       fallbackMedia,
       desktopSnapshot,
       nativeSnapshot,
       matchedPost,
-      showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot,
+      showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot && !stagePost,
       active: mode !== "app",
       parseYouTubeUrl: customOptions.parseYouTubeUrl || parseYouTubeUrl,
       state
@@ -2334,6 +2339,21 @@ The companion bridge is designed with several security layers to keep your PC sa
         syncTitle = nextTitle;
         syncArtist = nextCaption;
         syncArtwork = nativeSnapshot.artworkUri || "";
+      } else if (post) {
+        const providerName = getExternalProviderName(post);
+        if (isExternalUrlPost(post)) {
+          const externalDisplay = getExternalHeaderDisplay(post);
+          nextTitle = externalDisplay.title || "Ready to play";
+          nextCaption = externalDisplay.caption || providerName;
+        } else {
+          const creatorSummary = getProfileSummaryForPost(post);
+          const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
+          nextTitle = post?.title || "Ready to play";
+          nextCaption = post ? `${post.caption} · ${creatorName}` : "";
+        }
+        nextStatus = `${providerName.toUpperCase()} PREVIEW`;
+        syncTitle = nextTitle;
+        syncArtist = nextCaption;
       } else {
         const preferredSource = getPreferredHeroControlSource();
         nextTitle = (preferredSource === "spotify" || preferredSource === "youtube") ? "Idle" : "Device media idle";
@@ -2355,6 +2375,21 @@ The companion bridge is designed with several security layers to keep your PC sa
         syncTitle = nextTitle;
         syncArtist = nextCaption;
         syncArtwork = desktopSnapshot.artworkUri || "";
+      } else if (post) {
+        const providerName = getExternalProviderName(post);
+        if (isExternalUrlPost(post)) {
+          const externalDisplay = getExternalHeaderDisplay(post);
+          nextTitle = externalDisplay.title || "Ready to play";
+          nextCaption = externalDisplay.caption || providerName;
+        } else {
+          const creatorSummary = getProfileSummaryForPost(post);
+          const creatorName = creatorSummary?.displayName ?? post?.creator ?? "Member";
+          nextTitle = post?.title || "Ready to play";
+          nextCaption = post ? `${post.caption} · ${creatorName}` : "";
+        }
+        nextStatus = `${providerName.toUpperCase()} PREVIEW`;
+        syncTitle = nextTitle;
+        syncArtist = nextCaption;
       } else {
         nextTitle = (preferredSource === "spotify" || preferredSource === "youtube") ? "Idle" : "PC media idle";
         nextCaption = preferredSource === "spotify"
@@ -2445,14 +2480,15 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     if (!isHeroActive) {
+      const stagePost = mode === "app" ? post : (matchedPost || post || null);
       renderHeroStagePreview(Object.assign({}, options, {
         stage: elements.heroPlayerStage,
         mode,
-        post: mode === "app" ? post : null, // ONLY pass the feed post if we are in app mode
+        post: stagePost,
         fallbackMedia,
         desktopSnapshot,
         matchedPost,
-        showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot,
+        showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot && !stagePost,
         active: mode !== "app" // Treat media modes as "active" to show info/matched player
       }));
     }
