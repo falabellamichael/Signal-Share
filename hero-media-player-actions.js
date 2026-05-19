@@ -465,12 +465,12 @@ export async function handlePlayPauseAction(context, forcePlay) {
   const isBridgeActiveForMediaMode = isMediaMode && mode === "desktop" || isMediaMode && mode === "device";
 
   // A. Local Website Elements (Hosted videos, YouTube/Spotify Iframes)
+  let handledLocally = false;
   if (typeof toggleLocalPlayback === "function") {
     handledLocally = toggleLocalPlayback(shouldPlay, { target });
   }
 
   // B. Local Player Activation (If nothing was playing locally but user pressed Play) - DEFENSIVE CHECKS ADDED
-  let handledLocally = false;
   if (!handledLocally && shouldPlay && mode === "app") {
     if (target === "mini" && state.playerPostId) {
       const p = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
