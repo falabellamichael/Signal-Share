@@ -701,7 +701,7 @@ export function renderHeroStagePreview(options = {}) {
       platformLabel = "SPOTIFY";
     }
 
-    let artworkUrl = desktopSnapshot.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
+    let artworkUrl = desktopSnapshot?.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
 
     const badge = matchedPost 
       ? platformLabel 
@@ -709,8 +709,8 @@ export function renderHeroStagePreview(options = {}) {
 
     commitCard(stage, {
       badge: badge,
-      title: desktopSnapshot.title || matchedPost?.title || "",
-      meta: desktopSnapshot.meta || matchedPost?.creator || "",  // Keep creator only for metadata mode
+      title: desktopSnapshot?.title || matchedPost?.title || "",
+      meta: desktopSnapshot?.meta || matchedPost?.creator || "",  // Keep creator only for metadata mode
       artworkUrl: artworkUrl
     });
 
