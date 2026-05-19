@@ -33,6 +33,10 @@ export function handleOpenMediaAction(context) {
 
   if (debounceAction(state, "open_media", 0)) return;
 
+  // Get current source from toggle state - prioritize controller's authoritative source
+  const heroControlSource = state.heroControlSource;
+  const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+
   const controllablePost = memoGet(`controllable_post`, () => getControllablePlayerPost(), 100);
   const mode = getEffectiveHeroMode(controllablePost);
   let post = null;
@@ -52,7 +56,6 @@ export function handleOpenMediaAction(context) {
 
   // Identify preferred sources from toggle state
   // We prioritize heroControlSource as the canonical media player toggle.
-  const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const prefersYouTube = preferredSource === "youtube";
   const prefersSpotify = preferredSource === "spotify";
   const isFeedFiltered = state?.filter && state.filter !== "all";
@@ -225,7 +228,8 @@ export function handleOpenPhoneAction(context) {
 
   // 1. Android Native App -> "Open PC" Action
   if (isNativeCapacitorApp()) {
-    const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+    const heroControlSource = state.heroControlSource;
+    const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
 
     let targetUri = "";
     if (preferredSource === "youtube") {
@@ -259,7 +263,7 @@ export function handleOpenPhoneAction(context) {
 
   // Cross-Device Handoff: PC -> Phone (via Supabase)
   if (state.supabase && state.currentUser?.id && typeof context.performSupabaseDesktopAction === "function") {
-    const source = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+    const source = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
 
     // 1. Resolve the most relevant post for the current mode
     let targetPost = post;
@@ -319,7 +323,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
   // Identify modes and sources
   const isFeedMode = state.heroControlMode === "feed";
   const isMediaMode = state.heroControlMode === "media";
-  const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+  const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
 
   // Mode Resolution
@@ -500,7 +504,7 @@ export function handlePreviousAction(context) {
     }
   } else {
     // System state check with Source Isolation
-    const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+    const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
     const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
 
     const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
@@ -584,7 +588,7 @@ export function handleNextAction(context) {
     }
   } else {
     // System state check with Source Isolation
-    const preferredSource = (state?.heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+    const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
     const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
 
     const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
