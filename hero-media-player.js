@@ -45,7 +45,16 @@ export function createHeroMediaPlayerController(options) {
     onStatusChange
   } = options;
 
+  // CRITICAL FIX: Synchronize optional parameters with actual state for toggle mode detection
   const { isSpotifyActive, isYouTubeMode } = options || {};
+  
+  // If not explicitly provided, derive from state (for Media Toggle Mode)
+  if (isSpotifyActive === undefined) {
+    isSpotifyActive = state?.heroMediaSource === "spotify" || state?.heroControlSource === "spotify";
+  }
+  if (isYouTubeMode === undefined) {
+    isYouTubeMode = state?.heroMediaSource === "youtube" || state?.heroControlSource === "youtube";
+  }
 
   const NATIVE_ACTION_PLAY_PAUSE = "play_pause";
   const NATIVE_ACTION_NEXT = "next";

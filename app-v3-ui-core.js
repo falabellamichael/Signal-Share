@@ -796,6 +796,8 @@ export function createAppUi(context) {
       heroMediaPlayerController.setHeroControlSource(targetSource);
     } else {
       state.heroControlSource = targetSource;
+      // CRITICAL FIX: Also update heroMediaSource for toggle mode detection in preview rendering
+      state.heroMediaSource = targetSource;
     }
 
     render();
