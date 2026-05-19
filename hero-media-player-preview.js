@@ -726,6 +726,7 @@ export function renderHeroStagePreview(options = {}) {
 
 
   if (!post) {
+    const metadata = safeCall(getBrowserMediaMetadata, null);
     // Minimal fallback - just artwork with status badge (if available)
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
       badge: "NOW PLAYING",  // Show status
