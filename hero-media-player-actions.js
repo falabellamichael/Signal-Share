@@ -330,6 +330,9 @@ export async function handlePlayPauseAction(context, forcePlay) {
   // Mode Resolution
   const mode = target === "mini" ? "app" : (isFeedMode ? "app" : (isMediaMode ? (isNativeCapacitorApp() ? "device" : "desktop") : heroMode));
 
+  // FIX FOR MEDIA TOGGLE MODE: Always use bridge when in media mode, regardless of source lock state
+  const isBridgeMode = isSourceLocked || isMediaMode;
+
   // 3. RESOLVE INTENT (Strictly based on resolved mode)
   let shouldPlay = true;
   let isPlayingOnSystem = false;
@@ -381,12 +384,16 @@ export async function handlePlayPauseAction(context, forcePlay) {
     const sourceMatchesLock = isSourceLocked &&
       ((preferredSource === "youtube" && systemIsYouTube) || (preferredSource === "spotify" && systemIsSpotify));
 
+    // FIX FOR MEDIA TOGGLE MODE: If we're in media mode, check if anything is playing on system regardless of source lock
+    const isMediaModeActive = isBridgeMode && snapshot?.playbackState !== "none";
+    
     // Determine if the *system* should be controlling playback: it must be playing, and either we are not locked OR the lock matches what's playing.
-    isPlayingOnSystem = snapshot?.playbackState === "playing" && (!isSourceLocked || sourceMatchesLock);
+    // For bridge mode (media toggle), we check if system has any activity
+    const isPlayingOnSystem = snapshot?.playbackState === "playing" && (!isSourceLocked || sourceMatchesLock || isMediaModeActive);
     shouldPlay = (typeof forcePlay === "boolean") ? forcePlay : !isPlayingOnSystem;
   }
 
-  console.log(`[Hero] Intent: ${shouldPlay ? "PLAY" : "PAUSE"} (Mode: ${mode}, Locked: ${preferredSource || 'none'})`);
+  console.log(`[Hero] Intent: ${shouldPlay ? "PLAY" : "PAUSE"} (Mode: ${mode}, Locked: ${preferredSource || 'none'}, Bridge Mode: ${isBridgeMode})`);
 
   // 4. OPTIMISTIC STATE UPDATE & INSTANT RENDER
   const nextState = shouldPlay ? "playing" : "paused";
@@ -397,6 +404,9 @@ export async function handlePlayPauseAction(context, forcePlay) {
 
   // 5. COMMAND DISPATCH
   let handledLocally = false;
+
+  // FIX: Always enable bridge command for Media Toggle Mode when in media mode
+  const isBridgeActiveForMediaMode = isMediaMode && mode === "desktop" || isMediaMode && mode === "device";
 
   // A. Local Website Elements (Hosted videos, YouTube/Spotify Iframes)
   if (typeof toggleLocalPlayback === "function") {
@@ -420,14 +430,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
   // C. Bridge Commands
   const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
   
-  // Decide if we actually need to send a command to the bridge.
-  // If we are already in the requested state (e.g. asking to pause while already paused), skip it.
-  const isAlreadyInState = (mode === "app") 
-    ? (shouldPlay === (localState === "playing"))
-    : (shouldPlay === isPlayingOnSystem);
 
-  const sendToBridge = ((mode === "desktop" || mode === "device") && !isAlreadyInState) 
-    || (!shouldPlay && (desktopSnapshot?.active || nativeSnapshot?.active) && !isAlreadyInState);
 
   if (sendToBridge) {
     try {
@@ -505,9 +508,13 @@ export function handlePreviousAction(context) {
     }
   } else {
     // System state check with Source Isolation
-    const heroControlSource = state.heroControlSource;
-    const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+    // FIX FOR MEDIA TOGGLE MODE: Add heroControlSource from context for consistency
+    const hcSource = context.heroControlSource || state.heroControlSource;
+    const preferredSource = (hcSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
     const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
+    
+    // FIX FOR MEDIA TOGGLE MODE: Always use bridge when in media mode, regardless of source lock state
+    const isBridgeMode = isSourceLocked || isMediaMode;
 
     const snapshot = mode === "desktop" ? desktopSnapshot : (mode === "device" ? nativeSnapshot : null);
     const appPkg = (snapshot?.appPackage || "").toLowerCase();
@@ -526,8 +533,8 @@ export function handlePreviousAction(context) {
     );
 
     // If source is locked, we ALWAYS want to send the command to the bridge so it can target the correct app independently.
-    // If source is not locked ("All"), and system is idle, we fall back to local stepping (unless explicitly in a bridge mode).
-    const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube || mode === "desktop" || mode === "device";
+    // FIX FOR MEDIA TOGGLE MODE: When in media toggle mode, always send to bridge regardless of source lock state
+    const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube || isMediaMode || mode === "desktop" || mode === "device";
 
     if (!shouldSendToBridge) {
       // Fallback to local feed stepping
@@ -537,8 +544,12 @@ export function handlePreviousAction(context) {
         if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
       }
     } else {
-      if (mode === "desktop") performDesktopAction(DESKTOP_ACTION_PREVIOUS);
-      else if (mode === "device") performNativeAction(NATIVE_ACTION_PREVIOUS);
+      // FIX FOR MEDIA TOGGLE MODE: Always send to bridge when in media mode, regardless of source lock state
+      if (shouldSendToBridge) {
+        const isDesktop = true;
+        if (isDesktop) performDesktopAction(DESKTOP_ACTION_PREVIOUS);
+        else performNativeAction(NATIVE_ACTION_PREVIOUS);
+      }
 
       // Refresh immediately after bridge action
       if (typeof refreshDesktopSnapshot === "function") refreshDesktopSnapshot({ force: true, renderAfter: true });
@@ -570,6 +581,12 @@ export function handleNextAction(context) {
   // Mode Resolution
   const isFeedMode = state.heroControlMode === "feed";
   const isMediaMode = state.heroControlMode === "media";
+  const heroControlSource = state.heroControlSource;
+  const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+  const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
+  
+  // FIX FOR MEDIA TOGGLE MODE: Always use bridge when in media mode
+  const isBridgeMode = isSourceLocked || isMediaMode;
   const mode = target === "mini" ? "app" : (isFeedMode ? "app" : (isMediaMode ? (isNativeCapacitorApp() ? "device" : "desktop") : heroMode));
 
   console.log(`[Hero] handleNext. Mode: ${mode}, Target: ${target || 'hero'}`);
@@ -611,8 +628,8 @@ export function handleNextAction(context) {
     );
 
     // If source is locked, we ALWAYS want to send the command to the bridge so it can target the correct app independently.
-    // If source is not locked ("All"), and system is idle, we fall back to local stepping (unless explicitly in a bridge mode).
-    const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube || mode === "desktop" || mode === "device";
+    // FIX FOR MEDIA TOGGLE MODE: When in media toggle mode, always send to bridge regardless of source lock state
+    const shouldSendToBridge = isSourceLocked || systemIsSpotify || systemIsYouTube || isMediaMode || mode === "desktop" || mode === "device";
 
     if (!shouldSendToBridge) {
       // Fallback to local feed stepping
@@ -622,8 +639,12 @@ export function handleNextAction(context) {
         if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
       }
     } else {
-      if (mode === "desktop") performDesktopAction(DESKTOP_ACTION_NEXT);
-      else if (mode === "device") performNativeAction(NATIVE_ACTION_NEXT);
+      // FIX FOR MEDIA TOGGLE MODE: Always send to bridge when in media mode, regardless of source lock state
+      if (shouldSendToBridge) {
+        const isDesktop = true;
+        if (isDesktop) performDesktopAction(DESKTOP_ACTION_NEXT);
+        else performNativeAction(NATIVE_ACTION_NEXT);
+      }
 
       // Refresh immediately after bridge action
       if (typeof refreshDesktopSnapshot === "function") refreshDesktopSnapshot({ force: true, renderAfter: true });
@@ -644,7 +665,11 @@ export function handleVolumeAction(context, event) {
     render, target
   } = context;
 
-  const mode = target === "mini" ? "app" : getEffectiveHeroMode(getControllablePlayerPost());
+  const heroControlSource = state.heroControlSource;
+  const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+  const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
+  const isBridgeMode = isSourceLocked || (state.heroControlMode === "media");
+  const mode = target === "mini" ? "app" : (isBridgeMode ? (state.platform === "android" ? "device" : "desktop") : getEffectiveHeroMode(getControllablePlayerPost()));
 
   if (debounce("volume", 100)) return;
 
@@ -654,13 +679,10 @@ export function handleVolumeAction(context, event) {
   state.playerVolume = volume;
   savePlayerVolume(state.playerVolume);
 
-  if (mode === "device") {
-    const bridge = getNativeBridge();
-    if (bridge && typeof bridge.setNowPlayingVolume === "function") {
-      bridge.setNowPlayingVolume(volume);
-    }
-  } else if (mode === "desktop") {
-    // Unsupported
+  // FIX FOR MEDIA TOGGLE MODE: Volume handled by native bridge when in media mode
+  const nativeBridge = getNativeBridge();
+  if (isBridgeMode && nativeBridge && typeof nativeBridge.setNowPlayingVolume === "function") {
+    nativeBridge.setNowPlayingVolume(volume);
   } else if (mode === "app") {
     if (typeof applyPlayerVolumeToActiveElement === "function") applyPlayerVolumeToActiveElement();
     const fallbackMedia = getFallbackPageMediaElement();
