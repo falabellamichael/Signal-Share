@@ -4,6 +4,10 @@
  * and System Media control (Play/Pause, Next, Previous).
  */
 import { debounce, memoGet } from './shared-utils.js';
+import {
+  getActiveYouTubeVideo,
+  detectPlayingYouTubeVideo
+} from './youtube-player-detection.js';
 
 /**
  * Throttles high-frequency actions to prevent hardware/bridge flooding.
@@ -111,6 +115,17 @@ export function handleOpenMediaAction(context) {
     }
     return "";
   };
+
+  // CRITICAL FIX: Check for currently playing YouTube video before opening new URLs
+  const isYouTubeMode = preferredSource === "youtube";
+  if (isYouTubeMode && typeof detectPlayingYouTubeVideo === "function") {
+    const activeVideo = getActiveYouTubeVideo();
+    if (activeVideo && activeVideo.title) {
+      console.log("[YouTube-Auto-Open] Already playing:", activeVideo.title, "ID:", activeVideo.videoId);
+      // Update the hero stage with the current YouTube video info
+      return; // Skip opening new URLs while YouTube is already playing in browser
+    }
+  }
 
   // Resolve initial target URL from post
   let targetUrl = post?.externalUrl || post?.src || post?.mediaUrl;

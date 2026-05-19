@@ -5,6 +5,10 @@ import {
   handleVolumeAction, handleRefreshAction
 } from "./hero-media-player-actions.js?v=1.1";
 import { isThenable, normalizeText, toCleanString, cleanDisplayText, isExternalUrlPost, formatProviderName } from './shared-utils.js';
+import {
+  getActiveYouTubeVideo,
+  detectPlayingYouTubeVideo
+} from './youtube-player-detection.js';
 
 
 
@@ -184,13 +188,30 @@ The companion bridge is designed with several security layers to keep your PC sa
   const externalHeaderMetadataInFlight = new Map();
 
 
+  // CRITICAL FIX: Add YouTube auto-detection for Media -> Youtube mode
+  function initializeYouTubeAutoDetection() {
+    if (!isYouTubeMode) return;
+    
+    console.log("[YouTube-Auto-Detect] Starting YouTube video detection for Media -> Youtube mode.");
+    
+    // Check for currently playing YouTube video
+    const activeVideo = getActiveYouTubeVideo();
+    if (activeVideo && activeVideo.title) {
+      console.log("[YouTube-Auto-Detect] Found playing video:", activeVideo.title, "ID:", activeVideo.videoId);
+      // This will be picked up by render() or status update calls
+    } else {
+      console.log("[YouTube-Auto-Detect] No active YouTube video found yet. Will poll periodically.");
+    }
+    
+    // Start periodic polling to detect YouTube videos in browser
+    startYouTubeVideoDetectionPolling();
+  }
+
   function initializeSdkHooks() {
     // Spotify Web Playback SDK initialization
     if (typeof window !== "undefined") {
       window.onSpotifyWebPlaybackSDKReady = () => {
         console.log("[Spotify] Web Playback SDK is ready.");
-        // If we have an active Spotify post, we could initialize a player here.
-        // For now, we just ensure the callback exists and is logged.
       };
 
       // YouTube IFrame API initialization
@@ -198,6 +219,10 @@ The companion bridge is designed with several security layers to keep your PC sa
         console.log("[YouTube] IFrame API is ready.");
       };
     }
+    
+    // Initialize YouTube auto-detection when in YouTube mode
+    initializeYouTubeAutoDetection();
+    
     console.log("[Hero] SDK hooks initialized.");
   }
 
@@ -312,6 +337,17 @@ The companion bridge is designed with several security layers to keep your PC sa
     state.systemMediaSource = nextSource || "all";
 
     if (previousSource === nextSource) return;
+
+    // CRITICAL FIX: Start YouTube detection when switching to YouTube mode
+    if (nextSource === "youtube") {
+      console.log("[YouTube-Mode] Switched to YouTube mode, starting video detection");
+      startYouTubeVideoDetectionPolling();
+      initializeYouTubeAutoDetection();
+    } else if (previousSource === "youtube" && nextSource !== "youtube") {
+      // Stop YouTube detection when leaving YouTube mode
+      console.log("[YouTube-Mode] Leaving YouTube mode, stopping video detection");
+      stopYouTubeVideoDetectionPolling();
+    }
 
     // Do NOT clear desktopSnapshotEndpoint here; keep the last working endpoint
     // to avoid unnecessary re-probing of the local network.
@@ -777,6 +813,31 @@ The companion bridge is designed with several security layers to keep your PC sa
   function startNativeSnapshotPolling() {
     // Only perform a single refresh now, as per user request to avoid constant polling.
     refreshNativeSnapshot({ renderAfter: true });
+  }
+
+  // CRITICAL FIX: YouTube video auto-detection polling for Media -> Youtube mode
+  let youtubeVideoDetectorPollTimerId = null;
+  
+  function startYouTubeVideoDetectionPolling() {
+    if (!isYouTubeMode) return;
+    if (youtubeVideoDetectorPollTimerId) return; // Already polling
+    
+    // Start periodic YouTube video detection
+    youtubeVideoDetectorPollTimerId = setInterval(() => {
+      const activeVideo = getActiveYouTubeVideo();
+      if (activeVideo && activeVideo.title) {
+        console.log("[YouTube-Poll] Found playing video:", activeVideo.title, "ID:", activeVideo.videoId);
+        // Render to update the hero player stage
+        render();
+      }
+    }, 5000); // Check every 5 seconds for YouTube videos
+  }
+
+  function stopYouTubeVideoDetectionPolling() {
+    if (youtubeVideoDetectorPollTimerId) {
+      clearInterval(youtubeVideoDetectorPollTimerId);
+      youtubeVideoDetectorPollTimerId = null;
+    }
   }
 
   function stopNativeSnapshotPolling() {

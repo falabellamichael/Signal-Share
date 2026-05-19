@@ -285,3 +285,172 @@ export function formatBackendError(error, fallback = "") {
   }
   return fallback;
 }
+
+/**
+ * Parses a YouTube URL and extracts the video ID.
+ * @param {string} url The YouTube URL to parse
+ * @returns {Object} Object containing videoId, externalId, and originalUrl
+ */
+export function parseYouTubeUrl(url) {
+  if (!url) return null;
+  
+  const cleanUrl = `${url}`.trim();
+  const youtubeWatchPattern = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|music\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/;
+  const shortUrlPattern = /youtu\.be\/([a-zA-Z0-9_-]{11})/;
+  const embedPattern = /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/;
+  const viParameterPattern = /v=([a-zA-Z0-9_-]{11})(?:&|$)/;
+  
+  // Try various patterns to extract video ID
+  let match;
+  let videoId = null;
+  
+  // Check for short URL (youtu.be)
+  match = cleanUrl.match(shortUrlPattern);
+  if (match) return { externalId: match[1], originalUrl: cleanUrl };
+  
+  // Check for embed URL
+  match = cleanUrl.match(embedPattern);
+  if (match) return { externalId: match[1], originalUrl: cleanUrl };
+  
+  // Check for watch URL with ?v=
+  match = cleanUrl.match(youtubeWatchPattern);
+  if (match) return { externalId: match[1], originalUrl: cleanUrl };
+  
+  // Check for vi parameter
+  match = cleanUrl.match(viParameterPattern);
+  if (match) return { externalId: match[1], originalUrl: cleanUrl };
+  
+  // If it's just a 11-character ID, treat as video ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(cleanUrl)) {
+    return { externalId: cleanUrl, originalUrl: `https://www.youtube.com/watch?v=${cleanUrl}` };
+  }
+  
+  // Return null if we couldn't parse a valid YouTube ID
+  return { externalId: null, originalUrl: cleanUrl };
+}
+
+/**
+ * Scans the DOM for active YouTube IFrame elements and returns their metadata.
+ * @returns {Object|null} YouTube video metadata or null if none found
+ */
+export function findActiveYouTubePlayer() {
+  if (typeof document === "undefined") return null;
+  
+  // Check for YouTube IFrame API player object first
+  const ytPlayer = null;
+  
+  // Try to find active YouTube IFrame elements
+  const iframes = Array.from(document.querySelectorAll('iframe[src*="youtube.com"]'));
+  
+  for (const iframe of iframes) {
+    const src = `${iframe.src}`;
+    const parsed = parseYouTubeUrl(src);
+    
+    if (parsed && parsed.externalId) {
+      // Extract video title from YouTube IFrame player attribute if available
+      let videoTitle = "";
+      try {
+        if (iframe.getAttribute && iframe.getAttribute('data-title')) {
+          videoTitle = `${iframe.getAttribute('data-title')}`.trim();
+        } else if (iframe.getAttribute && iframe.getAttribute('title')) {
+          videoTitle = `${iframe.getAttribute('title')}`.trim();
+        }
+      } catch {}
+      
+      // Check for YouTube IFrame API data attribute
+      const playerDataAttribute = iframe.getAttribute?.('data-yt-player-data');
+      
+      return {
+        videoId: parsed.externalId,
+        title: videoTitle || "YouTube Video",
+        src: iframe.src
+      };
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Gets the currently active YouTube IFrame or video element in the page.
+ * @returns {Object|null} Object with videoId, title, and status
+ */
+export function getActiveYouTubeVideo() {
+  if (typeof document === "undefined") return null;
+  
+  // Method 1: Check for YouTube IFrame API
+  if (window.YT && window.YT.Player) {
+    try {
+      const iframe = window.YT.IframeIframeApiGetIframe(0);
+      if (iframe?.src) {
+        const parsed = parseYouTubeUrl(iframe.src);
+        if (parsed && parsed.externalId) {
+          return {
+            videoId: parsed.externalId,
+            title: iframe.getAttribute('data-title') || iframe.title || "YouTube Video",
+            src: iframe.src,
+            source: "iframe-api"
+          };
+        }
+      }
+    } catch (e) {}
+  }
+  
+  // Method 2: Scan all iframes for YouTube content
+  const youtubeIframes = Array.from(document.querySelectorAll('iframe[src*="youtube.com"], iframe[src*="youtu.be"]'));
+  
+  for (const iframe of youtubeIframes) {
+    try {
+      const src = `${iframe.src}`;
+      const parsed = parseYouTubeUrl(src);
+      
+      if (!parsed?.externalId) continue;
+      
+      // Extract title from various attributes
+      let title = "";
+      if (iframe.getAttribute && iframe.getAttribute('data-title')) {
+        title = `${iframe.getAttribute('data-title')}`.trim();
+      } else if (iframe.getAttribute && iframe.getAttribute('title')) {
+        title = `${iframe.getAttribute('title')}`.trim();
+      }
+      
+      // Check window.title for YouTube player info
+      const playerTitle = document.querySelector?.('[role="player"]', '[data-youtube-player]')?.getAttribute?.('title');
+      
+      if (title || playerTitle) {
+        return {
+          videoId: parsed.externalId,
+          title: title || playerTitle || "YouTube Video",
+          src: iframe.src,
+          source: "iframe-scanner"
+        };
+      }
+    } catch (e) {
+      console.warn("[YouTube] Error scanning iframe:", e);
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Detects if a YouTube video is currently playing in the browser.
+ * @returns {Object|null} Video info or null if not playing
+ */
+export function detectPlayingYouTubeVideo() {
+  if (typeof document === "undefined") return null;
+  
+  const activeVideo = getActiveYouTubeVideo();
+  
+  if (activeVideo) {
+    // YouTube videos are considered "playing" if they have an active video ID
+    return {
+      ...activeVideo,
+      isPlaying: true,
+      detectedAt: new Date().toISOString()
+    };
+  }
+  
+  return null;
+}
+
