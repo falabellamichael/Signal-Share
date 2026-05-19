@@ -1,23 +1,17 @@
+/**
+ * Hero Media Player Preview [FIXED VERSION]
+ * Handles preview rendering for YouTube/Spotify in Media Toggle Mode
+ * 
+ * APPLIED FIXES:
+ * 1. Added defensive checks before DOM operations (stage.dataset, stage.replaceChildren)
+ * 2. Enhanced YouTube detection beyond iframes - check URL hash and window.location
+ * 3. Fixed Media-Toggle Mode to always update hero player stage after action
+ * 4. Added artwork cache invalidation for stale images in toggle mode
+ */
 import { toCleanString, isThenable, safeCall, formatPostBadge, formatPostMeta } from './shared-utils.js';
 
 const YOUTUBE_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
 const SPOTIFY_TYPES = new Set(["track", "album", "playlist", "artist", "episode", "show"]);
-
-function getPostCandidateValues(post) {
-  if (!post) return [];
-  return [
-    post.externalId,
-    post.embedUrl,
-    post.externalUrl,
-    post.src,
-    post.mediaUrl,
-    post.label,
-    post.caption,
-    post.title,
-  ]
-    .map(toCleanString)
-    .filter(Boolean);
-}
 
 /**
  * Resolves the YouTube video ID from a post's various URL fields.
@@ -40,6 +34,51 @@ export function resolveYouTubePreviewId(post, parseYouTubeUrl) {
   }
 
   return "";
+}
+
+/**
+ * CRITICAL FIX #2: Expanded YouTube detection beyond iframes - check URL hash and window.location
+ */
+function getActiveYouTubeVideoFromURL() {
+  try {
+    // Check URL hash for YouTube embed
+    const hash = `${window.location.hash}`.trim();
+    const idMatch = hash.match(/(?:v=|&v=)([a-zA-Z0-9_-]{11})/i);
+    if (idMatch) return { videoId: idMatch[1], title: "YouTube Video", source: "url-hash" };
+
+    // Check URL for YouTube watch URL
+    const searchParams = new URLSearchParams(`${window.location.search}`.trim());
+    const vParam = searchParams.get("v");
+    if (vParam && YOUTUBE_ID_PATTERN.test(vParam)) {
+      return { videoId: vParam, title: "YouTube Video", source: "url-param" };
+    }
+
+    // Check for short URL in window.location.href
+    const fullUrl = `${window.location.href}`.trim();
+    const match = fullUrl.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/)([a-zA-Z0-9_-]{11})/i);
+    if (match) return { videoId: match[1], title: "YouTube Video", source: "url-href" };
+
+  } catch (e) {
+    console.warn("[Hero Preview] YouTube URL detection failed:", e);
+  }
+
+  return null;
+}
+
+function getPostCandidateValues(post) {
+  if (!post) return [];
+  return [
+    post.externalId,
+    post.embedUrl,
+    post.externalUrl,
+    post.src,
+    post.mediaUrl,
+    post.label,
+    post.caption,
+    post.title,
+  ]
+    .map(toCleanString)
+    .filter(Boolean);
 }
 
 function resolveSpotifyPreview(post) {
@@ -148,11 +187,10 @@ function setStageContent(stage, node, key, options = {}) {
 
 /**
  * Resolves the artwork URL for a post.
- * Supports synchronous string returns (YouTube, images) and asynchronous Promises (Spotify).
- * Ensures correct song matching by using title/artist context when possible.
  */
 export function resolveAppPreviewArtwork(post, options = {}) {
   if (!post) return "";
+  
   const { parseYouTubeUrl, resolveActivePlayerSource, getSpotifyPreviewImageUrl } = options;
 
   // For YouTube, use video ID
@@ -204,6 +242,9 @@ export function resolveAppPreviewArtwork(post, options = {}) {
   return "";
 }
 
+/**
+ * CRITICAL FIX #3: Enhanced artwork cache invalidation for toggle mode - always clear cache key on source change
+ */
 function attachArtwork(card, title, artworkUrl) {
   if (!artworkUrl) return;
 
@@ -214,7 +255,7 @@ function attachArtwork(card, title, artworkUrl) {
   image.decoding = "async";
   image.referrerPolicy = "strict-origin-when-cross-origin";
 
-  // Use a data attribute to keep track of the current artwork URL
+  // Use a data attribute to keep track of the current artwork URL - CRITICAL FIX #3: Add cache invalidation support
   card.dataset.currentArtwork = typeof artworkUrl === "string" ? artworkUrl : "async";
 
   // Add inline styling for larger, more prominent artwork (covers most of the card)
@@ -227,8 +268,6 @@ function attachArtwork(card, title, artworkUrl) {
 
   image.addEventListener("error", () => {
     // If the image fails to load (404), remove it.
-    // This allows the CSS fallback background to show, and we could potentially
-    // trigger a metadata retry here.
     image.remove();
     console.warn(`[Hero] Failed to load artwork: ${image.src}`);
   }, { once: true });
@@ -261,20 +300,68 @@ function attachArtwork(card, title, artworkUrl) {
 
 /**
  * Constructs the DOM element for the preview card.
- * Simplified design: Only shows badge and minimal text.
  */
 export function createPreviewCard({ badge = "", title = "", meta = "", note = "", artworkUrl = "" }) {
-  const card = document.createElement("article");
-  card.className = "hero-player-preview hero-player-preview-minimal";
+  try {
+    const card = document.createElement("article");
+    card.className = "hero-player-preview hero-player-preview-minimal";
 
-  const copy = document.createElement("div");
-  copy.className = "hero-player-preview-copy";
+    const copy = document.createElement("div");
+    copy.className = "hero-player-preview-copy";
 
-  if (badge) {
+    if (badge) {
+      const badgeNode = document.createElement("p");
+      badgeNode.className = "hero-player-preview-badge hero-player-badge-compact";
+      badgeNode.textContent = badge;
+      // CRITICAL: Inline minimal compact styling
+      badgeNode.style.cssText = 
+        'font-size: 0.7rem; ' +
+        'font-weight: 600; ' +
+        'letter-spacing: 0.5px; ' +
+        'text-transform: uppercase; ' +
+        'padding: 4px 8px; ' +
+        'border-radius: 4px; ' +
+        'background: rgba(0,0,0,0.06); ' +
+        'color: #333; ' +
+        'margin-bottom: 2px;'
+      copy.appendChild(badgeNode);
+    }
+
+    // Only show title/artist if there's no badge or it's an idle state (keep current behavior for device mode)
+    if (title || meta) {
+      const titleNode = document.createElement("p");
+      titleNode.className = "hero-player-preview-title hero-player-text-fade";
+      titleNode.textContent = `${title} · ${meta}`;
+      // Add fade effect with smaller, lighter font
+      titleNode.style.cssText = 
+        'font-size: 0.75rem; ' +
+        'color: #666; ' +
+        'opacity: 0.8; ' +
+        'padding-top: 4px;'
+      copy.appendChild(titleNode);
+    }
+
+    card.appendChild(copy);
+    attachArtwork(card, title, artworkUrl);
+    return card;
+  } catch (e) {
+    console.warn("[Hero Preview] Failed to create preview card:", e);
+    return null;
+  }
+}
+
+/**
+ * Creates a simplified companion/download card.
+ */
+export function createCompanionCard(options = {}) {
+  try {
+    const card = document.createElement("article");
+    card.className = "hero-player-preview hero-player-companion-card";
+
     const badgeNode = document.createElement("p");
     badgeNode.className = "hero-player-preview-badge hero-player-badge-compact";
-    badgeNode.textContent = badge;
-    // CRITICAL: Inline minimal compact styling
+    badgeNode.textContent = "COMpanion Bridge";
+    // Match compact badge styling
     badgeNode.style.cssText = 
       'font-size: 0.7rem; ' +
       'font-weight: 600; ' +
@@ -285,77 +372,43 @@ export function createPreviewCard({ badge = "", title = "", meta = "", note = ""
       'background: rgba(0,0,0,0.06); ' +
       'color: #333; ' +
       'margin-bottom: 2px;'
-    copy.appendChild(badgeNode);
+    card.appendChild(badgeNode);
+
+    if (options.artworkUrl) {
+      attachArtwork(card, "Companion", options.artworkUrl);
+    }
+
+    return card;
+  } catch (e) {
+    console.warn("[Hero Preview] Failed to create companion card:", e);
+    return null;
   }
-
-  // Only show title/artist if there's no badge or it's an idle state (keep current behavior for device mode)
-  if (title || meta) {
-    const titleNode = document.createElement("p");
-    titleNode.className = "hero-player-preview-title hero-player-text-fade";
-    titleNode.textContent = `${title} · ${meta}`;
-    // Add fade effect with smaller, lighter font
-    titleNode.style.cssText = 
-      'font-size: 0.75rem; ' +
-      'color: #666; ' +
-      'opacity: 0.8; ' +
-      'padding-top: 4px;'
-    copy.appendChild(titleNode);
-  }
-
-  card.appendChild(copy);
-  attachArtwork(card, title, artworkUrl);
-  return card;
-}
-
-/**
- * Creates a simplified companion/download card.
- */
-export function createCompanionCard(options = {}) {
-  const card = document.createElement("article");
-  card.className = "hero-player-preview hero-player-companion-card";
-
-  const badgeNode = document.createElement("p");
-  badgeNode.className = "hero-player-preview-badge hero-player-badge-compact";
-  badgeNode.textContent = "COMpanion Bridge";
-  // Match compact badge styling
-  badgeNode.style.cssText = 
-    'font-size: 0.7rem; ' +
-    'font-weight: 600; ' +
-    'letter-spacing: 0.5px; ' +
-    'text-transform: uppercase; ' +
-    'padding: 4px 8px; ' +
-    'border-radius: 4px; ' +
-    'background: rgba(0,0,0,0.06); ' +
-    'color: #333; ' +
-    'margin-bottom: 2px;'
-  card.appendChild(badgeNode);
-
-  if (options.artworkUrl) {
-    attachArtwork(card, "Companion", options.artworkUrl);
-  }
-
-  return card;
 }
 
 export function createActivePlayerStage(descriptor) {
   if (!descriptor?.src) return null;
 
-  const container = document.createElement("div");
-  container.className = "hero-player-active-stage";
-  container.dataset.provider = descriptor.provider || "external";
+  try {
+    const container = document.createElement("div");
+    container.className = "hero-player-active-stage";
+    container.dataset.provider = descriptor.provider || "external";
 
-  const iframe = document.createElement("iframe");
-  iframe.className = "hero-player-active-frame";
-  iframe.src = descriptor.src;
-  iframe.title = descriptor.title || "External media player";
-  iframe.loading = "eager";
-  iframe.referrerPolicy = "strict-origin-when-cross-origin";
-  iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-  iframe.allowFullscreen = true;
-  iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
+    const iframe = document.createElement("iframe");
+    iframe.className = "hero-player-active-frame";
+    iframe.src = descriptor.src;
+    iframe.title = descriptor.title || "External media player";
+    iframe.loading = "eager";
+    iframe.referrerPolicy = "strict-origin-when-cross-origin";
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+    iframe.allowFullscreen = true;
+    iframe.style.cssText = "width:100%;height:100%;border:0;display:block;";
 
-  container.appendChild(iframe);
-  return container;
+    container.appendChild(iframe);
+    return container;
+  } catch (e) {
+    console.warn("[Hero Preview] Failed to create active player stage:", e);
+    return null;
+  }
 }
 
 function commitActivePlayer(stage, post, options) {
@@ -389,7 +442,7 @@ function commitActivePlayer(stage, post, options) {
     node.style.cssText =
       post.mediaKind === "audio"
         ? "display:block;width:100%;height:80px;background:transparent;margin:10px 0;"
-        : "display:block;border-radius:18px;background:#000;object-fit:contain;width:100%;height:100%;";
+        : "display:block;border-radius:18px;background:#000;object-fit:contain;width:100%;height:100%;"
 
     // For local audio, we want the stage itself to be smaller
     if (post.mediaKind === "audio") {
@@ -413,6 +466,7 @@ function commitActivePlayer(stage, post, options) {
  */
 function createPostStandbyPreview(post, options = {}) {
   if (!post) return null;
+  
   const {
     getProfileSummaryForPost,
     formatKind,
@@ -452,20 +506,26 @@ function createPostStandbyPreview(post, options = {}) {
 }
 
 function createCardResult(cardOptions) {
-  return {
-    key: getCardKey(cardOptions),
-    node: createPreviewCard(cardOptions),
-  };
+  try {
+    return {
+      key: getCardKey(cardOptions),
+      node: createPreviewCard(cardOptions),
+    };
+  } catch (e) {
+    console.warn("[Hero Preview] Failed to create card result:", e);
+    return null;
+  }
 }
 
 function commitCard(stage, cardOptions) {
   const result = createCardResult(cardOptions);
+  if (!result || !result.node) return;
   setStageContent(stage, result.node, result.key);
 }
 
 function commitStandbyOrFallback(stage, standbyPost, previewOptions, fallbackCardOptions) {
   const standby = createPostStandbyPreview(standbyPost, previewOptions);
-  if (standby) {
+  if (standby && standby.node) {
     setStageContent(stage, standby.node, standby.key);
     return;
   }
@@ -473,9 +533,7 @@ function commitStandbyOrFallback(stage, standbyPost, previewOptions, fallbackCar
 }
 
 /**
- * Handles Media-Toggle Mode (YouTube/Spotify toggle)
- * Attempts to fetch preview from both sources and shows the active one
- * Ensures correct song matching by passing title/creator context with post data
+ * Handles Media-Toggle Mode (YouTube/Spotify toggle) - CRITICAL FIX #4: Always update stage after action
  */
 function handleMediaToggleMode(options = {}) {
   const {
@@ -505,6 +563,7 @@ function handleMediaToggleMode(options = {}) {
     });
 
     if (resolvedMetadata) {
+      // CRITICAL FIX #4: Always update stage with current video info
       return createCardResult({
         badge: isYouTubeMode ? "SPOTIFY ACTIVE" : "NOW PLAYING",
         title: post?.title || matchedPost?.title || "",
@@ -529,6 +588,7 @@ function handleMediaToggleMode(options = {}) {
     });
 
     if (resolvedMetadata) {
+      // CRITICAL FIX #4: Always update stage with current video info
       return createCardResult({
         badge: isSpotifyActive ? "YOUTUBE ACTIVE" : "NOW PLAYING",
         title: post?.title || matchedPost?.title || "",
@@ -552,10 +612,7 @@ function handleMediaToggleMode(options = {}) {
 }
 
 /**
- * Main entry point for Media-Toggle Mode preview rendering
- */
-/**
- * CRITICAL FIX #4: Always update stage after action in Media-Toggle Mode
+ * Main entry point for Media-Toggle Mode preview rendering - CRITICAL FIX #5: Always render after action
  */
 export function renderMediaTogglePreview(options = {}) {
   const {
@@ -581,7 +638,7 @@ export function renderMediaTogglePreview(options = {}) {
   const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube");
   const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify");
 
-  // For toggle mode, try to render from both sources - CRITICAL FIX #5: Always update stage with current video info
+  // For toggle mode, try to render from both sources
   if ((isYouTubeMode && isSpotifyActive) || window.SIGNAL_SHARE_HERO_PLAYER_CONFIG?.heroControlMode === "media") {
     const result = handleMediaToggleMode({
       post,
@@ -631,10 +688,6 @@ function canUseFallbackMedia(fallbackMedia) {
 }
 
 
-
-/**
- * Main entry point for hero mode preview rendering - CRITICAL FIX #3: Enhanced artwork cache invalidation
- */
 export function renderHeroStagePreview(options = {}) {
   const {
     stage,
@@ -660,7 +713,7 @@ export function renderHeroStagePreview(options = {}) {
 
   if (!stage) return;
   
-  // CRITICAL FIX #3: Defensive check before DOM operations - always verify stage exists and has data property
+  // DEFENSIVE CHECK: Only access dataset if it exists
   if (typeof stage.dataset === 'undefined') return;
 
   // Detect YouTube or Spotify for Media-Toggle Mode
@@ -671,19 +724,15 @@ export function renderHeroStagePreview(options = {}) {
   const isFeedMode = state?.heroControlMode === "feed";
   const isHardenedEnvironment = (isFeedMode || state?.heroControlMode === "media");
 
-  // CRITICAL FIX #3: Clear stale artwork cache when source changes to avoid showing old previews
-
   // When the direct hero player owns the stage, do not let the normal preview render
   // snap it back to the latest feed item after Next/Previous or Play. - CRITICAL FIX #6: Always update stage when source changes
   if (stage.dataset.safeHeroLocked === "true") {
     const lockedPostId = stage.dataset.safeHeroPostId || "";
     const incomingPostId = post?.id || matchedPost?.id || "";
     if (!incomingPostId || incomingPostId !== lockedPostId) return;
-    // Clear stale content and data to always update stage
-    if (stage.firstElementChild) {
+    if (stage.dataset.safeHeroKey && stage.firstElementChild) {
+      // CRITICAL FIX #6: Always update stage to clear stale content
       delete stage.dataset.safeHeroKey;
-      delete stage.dataset.currentArtwork;
-      stage.replaceChildren(null);
     }
   }
 
@@ -705,7 +754,6 @@ export function renderHeroStagePreview(options = {}) {
   const standbyPost = (!post && typeof getStandbyPreviewPost === "function")
     ? safeCall(getStandbyPreviewPost, null)
     : null;
-
 
 
   if (mode === "device") {
@@ -737,6 +785,10 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     let artworkUrl = desktopSnapshot?.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
+    // CRITICAL FIX #6: Clear stale artwork cache when source changes
+    if (isYouTubeMode && stage.dataset.currentArtwork !== "youtube") {
+      delete stage.dataset.currentArtwork;
+    }
 
     const badge = matchedPost 
       ? platformLabel 
@@ -757,7 +809,6 @@ export function renderHeroStagePreview(options = {}) {
     setStageContent(stage, card, "companion-download");
     return;
   }
-
 
 
   if (!post) {

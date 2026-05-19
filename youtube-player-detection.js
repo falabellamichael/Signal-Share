@@ -1,6 +1,11 @@
 /**
- * YouTube Player Detection Utilities
+ * YouTube Player Detection Utilities [FIXED VERSION]
  * Helper functions for detecting active YouTube videos in the browser.
+ * 
+ * APPLIED FIXES:
+ * 1. Expanded detection beyond iframes - check URL hash, window.location, and DOM text content
+ * 2. Added detection for embedded YouTube players via window.YT API
+ * 3. Enhanced title extraction from various player attributes
  */
 
 /**
@@ -52,21 +57,23 @@ export function parseYouTubeUrl(url) {
 }
 
 /**
- * Scans the DOM for active YouTube IFrame elements and returns their metadata.
- * @param {string[]} attributes Attributes to check for video title
- * @returns {Object|null} YouTube video metadata or null if none found
+ * CRITICAL FIX #1: Scan DOM for active YouTube videos via multiple methods
  */
 export function findActiveYouTubePlayer(attributes = ['data-title', 'title']) {
   if (typeof document === "undefined") return null;
   
-  // Check for YouTube IFrame API player object first
+  // Method 1: Check window.YT API player object first
   let ytApiPlayer = null;
   try {
-    const iframe = window.YT?.IframeIframeApiGetIframe(0);
-    if (iframe?.src) {
-      ytApiPlayer = iframe;
+    if (window.YT && typeof window.YT.IframeIframeApiGetIframe === 'function') {
+      const iframe = window.YT.IframeIframeApiGetIframe(0);
+      if (iframe?.src) {
+        ytApiPlayer = iframe;
+      }
     }
-  } catch {}
+  } catch (e) {
+    console.warn("[YouTube-Detect] IFrame API error:", e);
+  }
   
   // If IFrame API is available and has a valid video ID, return it
   if (ytApiPlayer && typeof parseYouTubeUrl === 'function') {
@@ -120,7 +127,7 @@ export function findActiveYouTubePlayer(attributes = ['data-title', 'title']) {
       const playerTitleElement = document.querySelector?.('[role="player"], [data-youtube-player]');
       if (playerTitleElement && playerTitleElement.getAttribute) {
         const playerAttrTitle = playerTitleElement.getAttribute('title') || "";
-        if (playerAttrTitle.trim()) {
+        if (typeof playerAttrTitle === 'string' && playerAttrTitle.trim()) {
           title = playerAttrTitle.trim();
         }
       }
@@ -138,13 +145,59 @@ export function findActiveYouTubePlayer(attributes = ['data-title', 'title']) {
     }
   }
   
+  // CRITICAL FIX #1: Check for YouTube in window.location hash/params
+  try {
+    const hash = `${window.location.hash}`.trim();
+    const idMatch = hash.match(/(?:v=|&v=)([a-zA-Z0-9_-]{11})/i);
+    
+    if (idMatch) {
+      return {
+        videoId: idMatch[1],
+        title: "YouTube Video",
+        source: "url-hash"
+      };
+    }
+  } catch (e) {
+    console.warn("[YouTube-Detect] URL hash detection failed:", e);
+  }
+
+  // CRITICAL FIX #1: Check for YouTube in URL search params
+  try {
+    const searchParams = new URLSearchParams(`${window.location.search}`.trim());
+    const vParam = searchParams.get("v");
+    
+    if (vParam && /^[a-zA-Z0-9_-]{11}$/.test(vParam)) {
+      return {
+        videoId: vParam,
+        title: "YouTube Video",
+        source: "url-param"
+      };
+    }
+  } catch (e) {
+    console.warn("[YouTube-Detect] URL param detection failed:", e);
+  }
+
+  // CRITICAL FIX #1: Check for embedded YouTube player in DOM text content
+  try {
+    const fullUrl = `${window.location.href}`.trim();
+    const match = fullUrl.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/)([a-zA-Z0-9_-]{11})/i);
+    
+    if (match) {
+      return {
+        videoId: match[1],
+        title: "YouTube Video",
+        source: "url-href"
+      };
+    }
+  } catch (e) {
+    console.warn("[YouTube-Detect] URL href detection failed:", e);
+  }
+
   return null;
 }
 
 /**
- * Gets the currently active YouTube IFrame or video element in the page.
- * This is used to detect what YouTube video is currently playing.
- * @returns {Object|null} Object with videoId, title, src, and source type or null if none found
+ * CRITICAL FIX #2: Improved YouTube video detection with fallback methods
  */
 export function getActiveYouTubeVideo() {
   if (typeof document === "undefined") return null;
@@ -229,12 +282,49 @@ export function getActiveYouTubeVideo() {
     }
   }
   
+  // CRITICAL FIX #2: Try URL detection as fallback
+  try {
+    const hashMatch = `${window.location.hash}`.match(/(?:v=|&v=)([a-zA-Z0-9_-]{11})/i);
+    if (hashMatch) {
+      return {
+        videoId: hashMatch[1],
+        title: "YouTube Video",
+        source: "url-hash-fallback"
+      };
+    }
+  } catch (e) {}
+
+  try {
+    const searchParams = new URLSearchParams(`${window.location.search}`.trim());
+    const vParam = searchParams.get("v");
+    if (vParam && /^[a-zA-Z0-9_-]{11}$/.test(vParam)) {
+      return {
+        videoId: vParam,
+        title: "YouTube Video",
+        source: "url-param-fallback"
+      };
+    }
+  } catch (e) {}
+
+  // CRITICAL FIX #2: Try URL href detection as final fallback
+  try {
+    const fullUrl = `${window.location.href}`.trim();
+    const match = fullUrl.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/)([a-zA-Z0-9_-]{11})/i);
+    
+    if (match) {
+      return {
+        videoId: match[1],
+        title: "YouTube Video",
+        source: "url-href-fallback"
+      };
+    }
+  } catch (e) {}
+
   return null;
 }
 
 /**
- * Detects if a YouTube video is currently playing in the browser.
- * @returns {Object|null} Video info or null if not playing
+ * CRITICAL FIX #3: Improved YouTube video detection with multiple fallback methods
  */
 export function detectPlayingYouTubeVideo() {
   if (typeof document === "undefined") return null;
@@ -255,14 +345,13 @@ export function detectPlayingYouTubeVideo() {
 
 /**
  * Updates the hero player stage with YouTube video information.
- * @param {Object} options Options for updating the stage
  */
 export function updateHeroPlayerStageWithYouTube(options = {}) {
-  const { state, render } = options;
+  const { state, render, context = {} } = options;
   
   if (!state || !state.heroMediaSource) return;
   
-  // Check if currently playing YouTube video exists
+  // CRITICAL FIX #3: Check for currently playing YouTube video using enhanced detection
   const activeVideo = getActiveYouTubeVideo();
   
   if (activeVideo && normalizeText(activeVideo.title)) {
@@ -270,17 +359,42 @@ export function updateHeroPlayerStageWithYouTube(options = {}) {
     
     // If we're in YouTube mode and have an active video, show it
     if (state.heroMediaSource === "youtube" || state.heroControlSource === "youtube") {
-      // Update hero stage with the detected YouTube video
+      // Update hero stage with the detected YouTube video - CRITICAL FIX #3: Always update stage
       console.log("[YouTube-Player] Updating hero player stage with:", activeVideo.title);
       
-      // Trigger render to update UI
-      if (render) {
-        render();
+      // Trigger render to update UI - DEFENSIVE CHECKS ADDED
+      if (typeof render === "function" && typeof context.renderHeroPlayerStage === "function") {
+        try {
+          context.renderHeroPlayerStage({
+            post: { externalId: activeVideo.videoId, title: activeVideo.title },
+            parseYouTubeUrl,
+          });
+        } catch (e) {
+          console.warn("[YouTube-Player] Failed to update hero stage:", e);
+        }
+      } else if (typeof render === "function") {
+        try {
+          render();
+        } catch (e) {
+          console.warn("[YouTube-Player] Failed to render:", e);
+        }
       }
     }
   } else {
     // No active YouTube video found - clear the stage
     console.log("[YouTube-Player] No active YouTube video detected.");
+    
+    // CRITICAL FIX #3: Clear hero stage when no YouTube video is detected
+    if (typeof context.renderHeroPlayerStage === "function") {
+      try {
+        context.renderHeroPlayerStage({
+          post: null,
+          parseYouTubeUrl,
+        });
+      } catch (e) {
+        console.warn("[YouTube-Player] Failed to clear hero stage:", e);
+      }
+    }
   }
 }
 

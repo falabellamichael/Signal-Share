@@ -1981,10 +1981,26 @@ The companion bridge is designed with several security layers to keep your PC sa
     return "app";
   }
 
+  function renderHeroPlayerStage(customOptions = {}) {
+    const controllablePost = getControllablePlayerPost();
+    const mode = getEffectiveHeroMode(controllablePost);
+    const fallbackMedia = getFallbackPageMediaElement();
+    const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
 
-
-
-
+    renderHeroStagePreview(Object.assign({}, options, {
+      stage: elements.heroPlayerStage,
+      mode,
+      post: customOptions.post !== undefined ? customOptions.post : (mode === "app" ? getHeroPost() : null),
+      fallbackMedia,
+      desktopSnapshot,
+      nativeSnapshot,
+      matchedPost,
+      showCompanionCard: !isNativeCapacitorApp() && mode === "desktop" && !desktopSnapshot,
+      active: mode !== "app",
+      parseYouTubeUrl: customOptions.parseYouTubeUrl || parseYouTubeUrl,
+      state
+    }));
+  }
 
   function getActionContext() {
     const controllablePost = getControllablePlayerPost();
@@ -1992,7 +2008,7 @@ The companion bridge is designed with several security layers to keep your PC sa
     return {
       state, elements, getControllablePlayerPost, getEffectiveHeroMode,
       getFallbackPageMediaElement, getActivePlayerMediaElement,
-      playHeroMedia, render,
+      playHeroMedia, render, renderHeroPlayerStage,
       nativeSnapshot, performNativeAction, NATIVE_ACTION_PLAY_PAUSE,
       NATIVE_ACTION_NEXT, NATIVE_ACTION_PREVIOUS, NATIVE_ACTION_COOLDOWN_MS,
       desktopSnapshot, performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE,
