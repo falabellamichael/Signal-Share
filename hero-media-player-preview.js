@@ -192,7 +192,7 @@ function attachArtwork(card, title, artworkUrl) {
   if (!artworkUrl) return;
 
   const image = document.createElement("img");
-  image.className = "hero-player-preview-image";
+  image.className = "hero-player-preview-image hero-player-large-artwork";
   image.alt = title ? `${title} preview` : "Playback preview";
   image.loading = "lazy";
   image.decoding = "async";
@@ -200,6 +200,14 @@ function attachArtwork(card, title, artworkUrl) {
 
   // Use a data attribute to keep track of the current artwork URL
   card.dataset.currentArtwork = typeof artworkUrl === "string" ? artworkUrl : "async";
+
+  // Add inline styling for larger, more prominent artwork (covers most of the card)
+  image.style.cssText =
+    'max-width: 100%;' +
+    'max-height: 58vh;' +
+    'border-radius: 18px;' +
+    'object-fit: cover;' +
+    'display: block;'
 
   image.addEventListener("error", () => {
     // If the image fails to load (404), remove it.
@@ -237,50 +245,45 @@ function attachArtwork(card, title, artworkUrl) {
 
 /**
  * Constructs the DOM element for the preview card.
- * Handles both synchronous image sources and asynchronous Promises.
+ * Simplified design: Only shows badge and minimal text.
  */
-export function createPreviewCard({ badge = "", title = "", meta = "", note = "", artworkUrl = "", showMetadata = false, user = "" }) {
+export function createPreviewCard({ badge = "", title = "", meta = "", note = "", artworkUrl = "" }) {
   const card = document.createElement("article");
-  card.className = "hero-player-preview";
+  card.className = "hero-player-preview hero-player-preview-minimal";
 
   const copy = document.createElement("div");
   copy.className = "hero-player-preview-copy";
 
   if (badge) {
     const badgeNode = document.createElement("p");
-    badgeNode.className = "hero-player-preview-badge";
+    badgeNode.className = "hero-player-preview-badge hero-player-badge-compact";
     badgeNode.textContent = badge;
+    // CRITICAL: Inline minimal compact styling
+    badgeNode.style.cssText = 
+      'font-size: 0.7rem; ' +
+      'font-weight: 600; ' +
+      'letter-spacing: 0.5px; ' +
+      'text-transform: uppercase; ' +
+      'padding: 4px 8px; ' +
+      'border-radius: 4px; ' +
+      'background: rgba(0,0,0,0.06); ' +
+      'color: #333; ' +
+      'margin-bottom: 2px;'
     copy.appendChild(badgeNode);
   }
 
-  if (showMetadata) {
-    if (title) {
-      const titleNode = document.createElement("p");
-      titleNode.className = "hero-player-preview-title";
-      titleNode.textContent = title;
-      copy.appendChild(titleNode);
-    }
-
-    if (meta) {
-      const metaNode = document.createElement("p");
-      metaNode.className = "hero-player-preview-meta";
-      metaNode.textContent = meta;
-      copy.appendChild(metaNode);
-    }
-
-    if (user) {
-      const userNode = document.createElement("p");
-      userNode.className = "hero-player-preview-user";
-      userNode.textContent = `User: ${user}`;
-      copy.appendChild(userNode);
-    }
-
-    if (note) {
-      const noteNode = document.createElement("p");
-      noteNode.className = "hero-player-preview-note";
-      noteNode.textContent = note;
-      copy.appendChild(noteNode);
-    }
+  // Only show title/artist if there's no badge or it's an idle state (keep current behavior for device mode)
+  if (title || meta) {
+    const titleNode = document.createElement("p");
+    titleNode.className = "hero-player-preview-title hero-player-text-fade";
+    titleNode.textContent = `${title} · ${meta}`;
+    // Add fade effect with smaller, lighter font
+    titleNode.style.cssText = 
+      'font-size: 0.75rem; ' +
+      'color: #666; ' +
+      'opacity: 0.8; ' +
+      'padding-top: 4px;'
+    copy.appendChild(titleNode);
   }
 
   card.appendChild(copy);
@@ -289,82 +292,28 @@ export function createPreviewCard({ badge = "", title = "", meta = "", note = ""
 }
 
 /**
- * Creates a card specifically for downloading the companion app.
+ * Creates a simplified companion/download card.
  */
 export function createCompanionCard(options = {}) {
   const card = document.createElement("article");
   card.className = "hero-player-preview hero-player-companion-card";
 
-  const copy = document.createElement("div");
-  copy.className = "hero-player-preview-copy";
+  const badgeNode = document.createElement("p");
+  badgeNode.className = "hero-player-preview-badge hero-player-badge-compact";
+  badgeNode.textContent = "COMpanion Bridge";
+  // Match compact badge styling
+  badgeNode.style.cssText = 
+    'font-size: 0.7rem; ' +
+    'font-weight: 600; ' +
+    'letter-spacing: 0.5px; ' +
+    'text-transform: uppercase; ' +
+    'padding: 4px 8px; ' +
+    'border-radius: 4px; ' +
+    'background: rgba(0,0,0,0.06); ' +
+    'color: #333; ' +
+    'margin-bottom: 2px;'
+  card.appendChild(badgeNode);
 
-  const badge = document.createElement("p");
-  badge.className = "hero-player-preview-badge";
-  badge.textContent = "Optional Companion";
-  copy.appendChild(badge);
-
-  const title = document.createElement("p");
-  title.className = "hero-player-preview-title";
-  title.textContent = "Control your PC media";
-  copy.appendChild(title);
-
-  const meta = document.createElement("p");
-  meta.className = "hero-player-preview-meta";
-  meta.textContent = "Download the desktop bridge to sync YouTube and Spotify from this PC.";
-  copy.appendChild(meta);
-
-  const action = document.createElement("div");
-  action.className = "hero-player-preview-actions";
-  action.style.display = "grid";
-  action.style.gap = "10px";
-  action.style.justifyItems = "center";
-
-  const downloadBtn = document.createElement("button");
-  downloadBtn.className = "button button-primary hero-companion-download-btn";
-  downloadBtn.textContent = "Download Now";
-  downloadBtn.type = "button";
-
-  const securityActions = document.createElement("p");
-  securityActions.className = "hero-player-preview-note";
-  securityActions.style.marginTop = "8px";
-  securityActions.style.fontSize = "0.75rem";
-  securityActions.style.opacity = "0.8";
-
-  const downloadSecurity = document.createElement("a");
-  downloadSecurity.href = "#";
-  downloadSecurity.id = "companionSecurityLinkCard";
-  downloadSecurity.style.textDecoration = "underline";
-  downloadSecurity.style.color = "inherit";
-  downloadSecurity.textContent = "download safety measures HERE";
-  downloadSecurity.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (window.heroMediaPlayerController && typeof window.heroMediaPlayerController.downloadSecurityReadme === "function") {
-      window.heroMediaPlayerController.downloadSecurityReadme();
-    }
-  });
-
-  const securitySeparator = document.createTextNode(" or ");
-
-  const viewSecurity = document.createElement("a");
-  viewSecurity.href = "security.html";
-  viewSecurity.target = "_blank";
-  viewSecurity.style.textDecoration = "underline";
-  viewSecurity.style.color = "inherit";
-  viewSecurity.textContent = "read in browser HERE";
-  viewSecurity.addEventListener("click", (e) => { e.stopPropagation(); });
-
-  securityActions.appendChild(downloadSecurity);
-  securityActions.appendChild(securitySeparator);
-  securityActions.appendChild(viewSecurity);
-
-  action.appendChild(downloadBtn);
-  action.appendChild(securityActions);
-  copy.appendChild(action);
-
-  card.appendChild(copy);
-
-  // Optional: Add a graphic or icon if artworkUrl is provided
   if (options.artworkUrl) {
     attachArtwork(card, "Companion", options.artworkUrl);
   }
@@ -443,6 +392,9 @@ function commitActivePlayer(stage, post, options) {
   return false;
 }
 
+/**
+ * Creates a minimal standby/idle preview card - simplified design.
+ */
 function createPostStandbyPreview(post, options = {}) {
   if (!post) return null;
   const {
@@ -456,31 +408,24 @@ function createPostStandbyPreview(post, options = {}) {
     isSpotifyActive,
   } = options;
 
-  const creatorSummary = safeCall(getProfileSummaryForPost, null, post);
-  const creatorName = creatorSummary?.displayName ?? post.creator ?? "Signal Share";
-  const formatLabel = safeCall(formatKind, "", post.mediaKind);
   const providerLabel = post.sourceKind === "youtube"
-    ? "YouTube"
+    ? "YOUTUBE" 
     : post.sourceKind === "spotify"
-      ? "Spotify"
-      : "";
-  const meta = [creatorName, formatLabel, providerLabel].filter(Boolean).join(" · ");
+      ? "SPOTIFY" 
+      : "APPMEDIA";
+  
+  const badge = `${providerLabel} PREVIEW`;
   const artworkUrl = resolveAppPreviewArtwork(post, {
     parseYouTubeUrl,
     resolveActivePlayerSource,
     getSpotifyPreviewImageUrl,
   });
 
-  const isSelectedPlatform = (post.sourceKind === "spotify" && isSpotifyActive) || (post.sourceKind === "youtube" && isYouTubeMode);
-  const badge = isSelectedPlatform 
-    ? `${providerLabel.toUpperCase()} PREVIEW` 
-    : `UP NEXT · ${providerLabel || "App Media"}`;
-
+  // Minimal card with just badge and status (no title/meta)
   const cardData = {
     badge: badge,
     title: "",
     meta: "",
-    note: "Press Play to start playback.",
     artworkUrl,
   };
 
@@ -729,126 +674,64 @@ export function renderHeroStagePreview(options = {}) {
 
 
   if (mode === "device") {
-    if (nativeSnapshot?.permissionRequired) {
-      commitCard(stage, {
-        badge: "ON-DEVICE MEDIA",
-        title: "Enable access",
-        meta: "Allow media access to control this device.",
-        note: "Use Play to open settings.",
-        showMetadata: true
-      });
-      return;
-    }
+    // Minimal device mode preview - just badge and status
+    const playbackStatus = nativeSnapshot?.playbackState || "";
+    const badge = nativeSnapshot?.active 
+      ? `ON-DEVICE · ${playbackStatus.toUpperCase()}` 
+      : "ON-DEVICE MEDIA";
 
-    if (nativeSnapshot?.active) {
-      const creatorSummary = matchedPost ? safeCall(getProfileSummaryForPost, null, matchedPost) : null;
-      const artworkUrl = matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot.artworkUri || "");
-
-      commitCard(stage, {
-        badge: (matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "ON-DEVICE MEDIA"),
-        title: "",
-        meta: "",
-        note: (nativeSnapshot.playbackState === "paused" ? "Paused" : "Playing"),
-        artworkUrl: artworkUrl,
-        showMetadata: true
-      });
-      return;
-    }
-
-    const preferredSource = isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "");
-    const idleTitle = (preferredSource === "Spotify" || preferredSource === "YouTube") ? "Idle" : "No active playback";
-    const idleMeta = isSpotifyActive 
-      ? "Idle"
-      : (isYouTubeMode ? "Idle" : "Start a track in any media app on this device.");
-
-    commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "ON-DEVICE MEDIA",
-      title: idleTitle,
-      meta: idleMeta,
-      showMetadata: true
+    commitCard(stage, {
+      badge: badge,
+      title: nativeSnapshot?.title || matchedPost?.title || "",
+      meta: nativeSnapshot?.meta || matchedPost?.creator || "",  // Keep only if needed for device mode
+      artworkUrl: matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot?.artworkUri || "")
     });
     return;
   }
 
   if (mode === "desktop") {
-    if (desktopSnapshot?.active || desktopSnapshot?.playbackState === "paused") {
-      // Determine the platform label from the snapshot's sourceProvider or the active toggle.
-      const snapshotProvider = (desktopSnapshot.sourceProvider || "").toLowerCase();
-      let platformLabel = "PC SYSTEM MEDIA";
-      if (snapshotProvider === "youtube" || isYouTubeMode) {
-        platformLabel = "YOUTUBE";
-      } else if (snapshotProvider === "spotify" || isSpotifyActive) {
-        platformLabel = "SPOTIFY";
-      }
-
-      // PRIORITIZE BRIDGE ARTWORK: The bridge has the live thumbnail for what's actually playing.
-      // We fall back to the matched feed item's artwork if the bridge is missing it.
-      let artworkUrl = desktopSnapshot.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
-
-      const playbackNote = desktopSnapshot.playbackState === "paused" ? "Paused" : "Playing";
-
-      commitCard(stage, {
-        badge: matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : platformLabel,
-        title: desktopSnapshot.title || "",
-        meta: desktopSnapshot.meta || "",
-        note: playbackNote,
-        artworkUrl: artworkUrl,
-        showMetadata: true
-      });
-
-      return;
+    // Minimal desktop mode preview - just badge and status
+    const playbackStatus = desktopSnapshot?.playbackState || "";
+    const snapshotProvider = (desktopSnapshot?.sourceProvider || "").toLowerCase();
+    
+    let platformLabel = matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA";
+    if (snapshotProvider === "youtube" || isYouTubeMode) {
+      platformLabel = "YOUTUBE";
+    } else if (snapshotProvider === "spotify" || isSpotifyActive) {
+      platformLabel = "SPOTIFY";
     }
 
+    let artworkUrl = desktopSnapshot.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
 
-    if (options.showCompanionCard) {
-      const card = createCompanionCard();
-      setStageContent(stage, card, "companion-download");
-      return;
-    }
-
-    const preferredSource = isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "");
-    const idleTitle = preferredSource ? `${preferredSource} · Waiting` : "Waiting for playback";
-    const idleMeta = isSpotifyActive
-      ? "Open Spotify and start a track."
-      : (isYouTubeMode ? "Open YouTube in a browser or app." : "Start YouTube, Spotify, or another desktop app.");
-
-    commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: preferredSource ? `${preferredSource.toUpperCase()} · IDLE` : "PC SYSTEM MEDIA",
-      title: idleTitle,
-      meta: idleMeta,
-      showMetadata: true
-    });
-    return;
-  }
-
-
-
-  if (!post && canUseFallbackMedia(fallbackMedia)) {
-    const metadata = safeCall(getBrowserMediaMetadata, null);
-    const fallbackTitle = metadata?.title || fallbackMedia.getAttribute("title") || "Browser playback";
-    const fallbackMetaRaw = [metadata?.artist, metadata?.album].filter(Boolean).join(" · ");
-    const fallbackMeta = typeof sanitizeSnapshotMeta === "function"
-      ? safeCall(sanitizeSnapshotMeta, fallbackMetaRaw, fallbackMetaRaw, "")
-      : fallbackMetaRaw;
+    const badge = matchedPost 
+      ? platformLabel 
+      : `${platformLabel} · ${playbackStatus.toUpperCase()}`;
 
     commitCard(stage, {
-      badge: "",
-      title: "",
-      meta: "",
-      note: "",
-      artworkUrl: metadata?.artworkUrl || "",
-      showMetadata: true
+      badge: badge,
+      title: desktopSnapshot.title || matchedPost?.title || "",
+      meta: desktopSnapshot.meta || matchedPost?.creator || "",  // Keep creator only for metadata mode
+      artworkUrl: artworkUrl
     });
+
     return;
   }
 
+  if (options.showCompanionCard) {
+    const card = createCompanionCard();
+    setStageContent(stage, card, "companion-download");
+    return;
+  }
+
+
+
   if (!post) {
+    // Minimal fallback - just artwork with status badge (if available)
     commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "",
+      badge: "NOW PLAYING",  // Show status
       title: "",
       meta: "",
-      note: "",
-      showMetadata: true
+      artworkUrl: metadata?.artworkUrl || fallbackMedia?.getAttribute("data-artwork") || ""
     });
     return;
   }
