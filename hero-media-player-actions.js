@@ -264,7 +264,7 @@ export function handleOpenMediaAction(context) {
 }
 
 export function handleOpenPhoneAction(context) {
-  const { isNativeCapacitorApp, state, performDesktopAction, getControllablePlayerPost } = context;
+  const { isNativeCapacitorApp, state, performDesktopAction, getControllablePlayerPost, parseYouTubeUrl } = context;
   const post = getControllablePlayerPost();
   const heroControlSource = state.heroControlSource;
 
