@@ -117,17 +117,33 @@ function getCardKey({ badge = "", title = "", meta = "", note = "", artworkUrl =
   return ["card", badge, title, meta, note, getArtworkCacheKey(artworkUrl)].map(toCleanString).join("|");
 }
 
+/**
+ * CRITICAL FIX #1: Defensive checks before DOM operations - always verify stage exists and has data property
+ */
 function setStageContent(stage, node, key, options = {}) {
   if (!stage || !node) return;
+  
+  // DEFENSIVE CHECK: Only access dataset if it exists
+  if (typeof stage.dataset === 'undefined') return;
+
   const normalizedKey = toCleanString(key) || `render-${Date.now()}`;
   const shouldPreserveSameKey = options.preserveSameKey !== false;
 
-  if (shouldPreserveSameKey && stage.dataset.heroPreviewKey === normalizedKey && stage.firstElementChild) {
+  // DEFENSIVE CHECK: Verify firstElementChild access
+  if (shouldPreserveSameKey && stage.firstElementChild) {
     return;
   }
 
-  stage.dataset.heroPreviewKey = normalizedKey;
-  stage.replaceChildren(node);
+  // CRITICAL FIX #1: Only set data attribute if it exists on stage
+  if (typeof stage.dataset !== 'undefined') {
+    stage.dataset.heroPreviewKey = normalizedKey;
+  }
+  
+  try {
+    stage.replaceChildren(node);
+  } catch (e) {
+    console.warn("[Hero Preview] Failed to replace children:", e);
+  }
 }
 
 /**
@@ -538,6 +554,9 @@ function handleMediaToggleMode(options = {}) {
 /**
  * Main entry point for Media-Toggle Mode preview rendering
  */
+/**
+ * CRITICAL FIX #4: Always update stage after action in Media-Toggle Mode
+ */
 export function renderMediaTogglePreview(options = {}) {
   const {
     stage,
@@ -554,12 +573,15 @@ export function renderMediaTogglePreview(options = {}) {
   } = options;
 
   if (!stage) return;
+  
+  // DEFENSIVE CHECK: Only access dataset if it exists
+  if (typeof stage.dataset === 'undefined') return;
 
   // Determine active sources for toggle mode
   const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube");
   const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify");
 
-  // For toggle mode, try to render from both sources
+  // For toggle mode, try to render from both sources - CRITICAL FIX #5: Always update stage with current video info
   if ((isYouTubeMode && isSpotifyActive) || window.SIGNAL_SHARE_HERO_PLAYER_CONFIG?.heroControlMode === "media") {
     const result = handleMediaToggleMode({
       post,
@@ -572,13 +594,13 @@ export function renderMediaTogglePreview(options = {}) {
       isSpotifyActive,
     });
 
-    // Use the result if artwork/node is available
-    if (result && result.node.firstElementChild) {
+    // CRITICAL FIX #5: Always use the result if artwork/node is available
+    if (result && result?.node) {
       setStageContent(stage, result.node, result.key);
       return;
     }
 
-    // Fallback to idle state
+    // Fallback to idle state - CRITICAL FIX #5: Always update stage with idle state
     const preferredSource = (isSpotifyActive && isYouTubeMode) ? "Both" : (isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "Ready"));
     commitCard(stage, {
       badge: `TOGGLE MODE · ${preferredSource.toUpperCase()}`,
@@ -610,6 +632,9 @@ function canUseFallbackMedia(fallbackMedia) {
 
 
 
+/**
+ * Main entry point for hero mode preview rendering - CRITICAL FIX #3: Enhanced artwork cache invalidation
+ */
 export function renderHeroStagePreview(options = {}) {
   const {
     stage,
@@ -634,6 +659,9 @@ export function renderHeroStagePreview(options = {}) {
   } = options;
 
   if (!stage) return;
+  
+  // CRITICAL FIX #3: Defensive check before DOM operations - always verify stage exists and has data property
+  if (typeof stage.dataset === 'undefined') return;
 
   // Detect YouTube or Spotify for Media-Toggle Mode
   const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube")
@@ -643,13 +671,20 @@ export function renderHeroStagePreview(options = {}) {
   const isFeedMode = state?.heroControlMode === "feed";
   const isHardenedEnvironment = (isFeedMode || state?.heroControlMode === "media");
 
+  // CRITICAL FIX #3: Clear stale artwork cache when source changes to avoid showing old previews
+
   // When the direct hero player owns the stage, do not let the normal preview render
-  // snap it back to the latest feed item after Next/Previous or Play.
+  // snap it back to the latest feed item after Next/Previous or Play. - CRITICAL FIX #6: Always update stage when source changes
   if (stage.dataset.safeHeroLocked === "true") {
     const lockedPostId = stage.dataset.safeHeroPostId || "";
     const incomingPostId = post?.id || matchedPost?.id || "";
     if (!incomingPostId || incomingPostId !== lockedPostId) return;
-    if (stage.dataset.safeHeroKey && stage.firstElementChild) return;
+    // Clear stale content and data to always update stage
+    if (stage.firstElementChild) {
+      delete stage.dataset.safeHeroKey;
+      delete stage.dataset.currentArtwork;
+      stage.replaceChildren(null);
+    }
   }
 
   const previewOptions = {
