@@ -1818,7 +1818,7 @@ async function handleMessageSubmit(event) {
 
     const sentMessage = await sendMessageToSupabase(state.activeThreadId, body, attachmentFile, (percentage) => {
       showMessengerFeedback(`Uploading attachment: ${percentage}%...`);
-    });
+    }, messageId);
        mergeActiveMessage(sentMessage);
     renderMessenger();
 

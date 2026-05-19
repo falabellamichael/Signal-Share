@@ -380,16 +380,16 @@ export async function getOrCreateDirectThread(partnerId) {
   return normalizeDirectThread(inserted);
 }
 
-export async function sendMessageToSupabase(threadId, text, attachmentFile, onProgress) {
+export async function sendMessageToSupabase(threadId, text, attachmentFile, onProgress, messageId) {
   if (!apiContext.state.currentUser || !threadId) throw new Error("Missing requirements for message delivery.");
-  const messageId = crypto.randomUUID();
+  const finalMessageId = messageId || crypto.randomUUID();
   let attachment = null;
   if (attachmentFile) {
-    attachment = await uploadMessageAttachment(threadId, messageId, attachmentFile, onProgress);
+    attachment = await uploadMessageAttachment(threadId, finalMessageId, attachmentFile, onProgress);
   }
 
   const payload = {
-    id: messageId,
+    id: finalMessageId,
     thread_id: threadId,
     sender_id: apiContext.state.currentUser.id,
     body: text || "",

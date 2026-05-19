@@ -75,10 +75,10 @@ window.MessengerRealtime = class MessengerRealtime {
       return;
     }
 
-    this.isConnecting = true;
-    
     // Cleanup before connecting
     this.stop();
+
+    this.isConnecting = true;
 
     const userId = this.state.currentUser.id;
     const channelName = `messenger_live_${userId.slice(0, 8)}`; 
