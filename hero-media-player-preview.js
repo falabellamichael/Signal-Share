@@ -727,20 +727,9 @@ export function renderHeroStagePreview(options = {}) {
   const standbyPost = (!post && typeof getStandbyPreviewPost === "function")
     ? safeCall(getStandbyPreviewPost, null)
     : null;
-  const fallbackPreviewPost = matchedPost || post || standbyPost;
 
 
   if (mode === "device") {
-    if (!nativeSnapshot?.active && fallbackPreviewPost) {
-      commitStandbyOrFallback(stage, fallbackPreviewPost, previewOptions, {
-        badge: "ON-DEVICE PREVIEW",
-        title: "",
-        meta: "",
-        artworkUrl: "",
-      });
-      return;
-    }
-
     // Minimal device mode preview - just badge and status
     const playbackStatus = nativeSnapshot?.playbackState || "";
     const badge = nativeSnapshot?.active 
@@ -749,45 +738,35 @@ export function renderHeroStagePreview(options = {}) {
 
     commitCard(stage, {
       badge: badge,
-      title: nativeSnapshot?.title || fallbackPreviewPost?.title || "",
-      meta: nativeSnapshot?.meta || fallbackPreviewPost?.creator || "",
-      artworkUrl: nativeSnapshot?.artworkUri || (fallbackPreviewPost ? resolveAppPreviewArtwork(fallbackPreviewPost, previewOptions) : "")
+      title: nativeSnapshot?.title || matchedPost?.title || "",
+      meta: nativeSnapshot?.meta || matchedPost?.creator || "",  // Keep only if needed for device mode
+      artworkUrl: matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot?.artworkUri || "")
     });
     return;
   }
 
   if (mode === "desktop") {
-    if (!desktopSnapshot?.active && fallbackPreviewPost) {
-      commitStandbyOrFallback(stage, fallbackPreviewPost, previewOptions, {
-        badge: isSourceLocked ? `${sourceFilter.toUpperCase()} PREVIEW` : "PC MEDIA PREVIEW",
-        title: "",
-        meta: "",
-        artworkUrl: "",
-      });
-      return;
-    }
-
     // Minimal desktop mode preview - just badge and status
     const playbackStatus = desktopSnapshot?.playbackState || "";
     const snapshotProvider = (desktopSnapshot?.sourceProvider || "").toLowerCase();
     
-    let platformLabel = fallbackPreviewPost ? formatPostBadge(fallbackPreviewPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA";
+    let platformLabel = matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA";
     if (snapshotProvider === "youtube" || isYouTubeMode) {
       platformLabel = "YOUTUBE";
     } else if (snapshotProvider === "spotify" || isSpotifyActive) {
       platformLabel = "SPOTIFY";
     }
 
-    let artworkUrl = desktopSnapshot?.artworkUri || (fallbackPreviewPost ? resolveAppPreviewArtwork(fallbackPreviewPost, previewOptions) : "");
+    let artworkUrl = desktopSnapshot?.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
 
-    const badge = fallbackPreviewPost 
+    const badge = matchedPost 
       ? platformLabel 
       : `${platformLabel} · ${playbackStatus.toUpperCase()}`;
 
     commitCard(stage, {
       badge: badge,
-      title: desktopSnapshot?.title || fallbackPreviewPost?.title || "",
-      meta: desktopSnapshot?.meta || fallbackPreviewPost?.creator || "",
+      title: desktopSnapshot?.title || matchedPost?.title || "",
+      meta: desktopSnapshot?.meta || matchedPost?.creator || "",  // Keep creator only for metadata mode
       artworkUrl: artworkUrl
     });
 
