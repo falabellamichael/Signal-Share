@@ -46,7 +46,7 @@ export function createHeroMediaPlayerController(options) {
   } = options;
 
   // CRITICAL FIX: Synchronize optional parameters with actual state for toggle mode detection
-  const { isSpotifyActive, isYouTubeMode } = options || {};
+  let { isSpotifyActive, isYouTubeMode } = options || {};
   
   // If not explicitly provided, derive from state (for Media Toggle Mode)
   if (isSpotifyActive === undefined) {
