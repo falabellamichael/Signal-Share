@@ -157,24 +157,20 @@ function getCardKey({ badge = "", title = "", meta = "", note = "", artworkUrl =
 }
 
 /**
- * CRITICAL FIX #1: Defensive checks before DOM operations - always verify stage exists and has data property
+ * Sets preview content in the hero player stage.
  */
 function setStageContent(stage, node, key, options = {}) {
   if (!stage || !node) return;
-  
-  // DEFENSIVE CHECK: Only access dataset if it exists
-  if (typeof stage.dataset === 'undefined') return;
 
   const normalizedKey = toCleanString(key) || `render-${Date.now()}`;
   const shouldPreserveSameKey = options.preserveSameKey !== false;
 
-  // DEFENSIVE CHECK: Verify firstElementChild access
   if (shouldPreserveSameKey && stage.firstElementChild) {
     return;
   }
 
-  // CRITICAL FIX #1: Only set data attribute if it exists on stage
-  if (typeof stage.dataset !== 'undefined') {
+  // Only set data attribute if it exists on stage
+  if (stage.dataset) {
     stage.dataset.heroPreviewKey = normalizedKey;
   }
   
@@ -599,14 +595,9 @@ function handleMediaToggleMode(options = {}) {
   }
 
   // Return idle state if no active source found
-  const preferredSource = (isSpotifyActive && isYouTubeMode) ? "Both" : (isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "Ready"));
-  const idleTitle = preferredSource === "Both" 
-    ? "Ready for YouTube or Spotify" 
-    : `${preferredSource} Playback`;
-
   return createCardResult({
-    badge: `TOGGLE MODE · ${preferredSource.toUpperCase()}`,
-    title: post?.title || matchedPost?.title || idleTitle,
+    badge: `TOGGLE MODE · READY`,
+    title: post?.title || matchedPost?.title || "",
     meta: (post?.creator || matchedPost?.creator || "Signal Share"),
   });
 }
@@ -630,9 +621,6 @@ export function renderMediaTogglePreview(options = {}) {
   } = options;
 
   if (!stage) return;
-  
-  // DEFENSIVE CHECK: Only access dataset if it exists
-  if (typeof stage.dataset === 'undefined') return;
 
   // Determine active sources for toggle mode
   const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube");
@@ -712,9 +700,6 @@ export function renderHeroStagePreview(options = {}) {
   } = options;
 
   if (!stage) return;
-  
-  // DEFENSIVE CHECK: Only access dataset if it exists
-  if (typeof stage.dataset === 'undefined') return;
 
   // Detect YouTube or Spotify for Media-Toggle Mode
   const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube")
@@ -723,18 +708,6 @@ export function renderHeroStagePreview(options = {}) {
     || window.SIGNAL_SHARE_HERO_PLAYER_CONFIG?.heroMediaSource === "spotify";
   const isFeedMode = state?.heroControlMode === "feed";
   const isHardenedEnvironment = (isFeedMode || state?.heroControlMode === "media");
-
-  // When the direct hero player owns the stage, do not let the normal preview render
-  // snap it back to the latest feed item after Next/Previous or Play. - CRITICAL FIX #6: Always update stage when source changes
-  if (stage.dataset.safeHeroLocked === "true") {
-    const lockedPostId = stage.dataset.safeHeroPostId || "";
-    const incomingPostId = post?.id || matchedPost?.id || "";
-    if (!incomingPostId || incomingPostId !== lockedPostId) return;
-    if (stage.dataset.safeHeroKey && stage.firstElementChild) {
-      // CRITICAL FIX #6: Always update stage to clear stale content
-      delete stage.dataset.safeHeroKey;
-    }
-  }
 
   const previewOptions = {
     getProfileSummaryForPost,
@@ -785,10 +758,6 @@ export function renderHeroStagePreview(options = {}) {
     }
 
     let artworkUrl = desktopSnapshot?.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
-    // CRITICAL FIX #6: Clear stale artwork cache when source changes
-    if (isYouTubeMode && stage.dataset.currentArtwork !== "youtube") {
-      delete stage.dataset.currentArtwork;
-    }
 
     const badge = matchedPost 
       ? platformLabel 
