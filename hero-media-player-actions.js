@@ -506,18 +506,22 @@ export async function handlePlayPauseAction(context, forcePlay) {
     || (!shouldPlay && (desktopSnapshot?.active || nativeSnapshot?.active) && !isAlreadyInState);
 
   if (sendToBridge) {
+    let bridgeActionSucceeded = false;
     try {
       if (mode === "desktop") {
         if (!isNativeCapacitorApp() && !companionPromptDismissed && !desktopSnapshot) {
           if (shouldPlay && typeof showCompanionPrompt === "function") showCompanionPrompt();
         } else {
-          await performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE);
+          bridgeActionSucceeded = Boolean(await performDesktopAction(DESKTOP_ACTION_PLAY_PAUSE));
         }
       } else if (mode === "device") {
         if (nativeSnapshot?.permissionRequired) {
-          if (shouldPlay && typeof getNativeBridge === "function") getNativeBridge()?.openNowPlayingAccessSettings();
+          if (shouldPlay && typeof getNativeBridge === "function") {
+            getNativeBridge()?.openNowPlayingAccessSettings();
+            bridgeActionSucceeded = true;
+          }
         } else {
-          performNativeAction(NATIVE_ACTION_PLAY_PAUSE);
+          bridgeActionSucceeded = Boolean(performNativeAction(NATIVE_ACTION_PLAY_PAUSE));
         }
       }
 
@@ -530,6 +534,22 @@ export async function handlePlayPauseAction(context, forcePlay) {
       }
     } catch (error) {
       console.warn("[Hero] Bridge action failed:", error);
+    }
+
+    // Media mode fallback: if bridge action could not execute, use local player controls.
+    if (isMediaMode && mode === "desktop" && !bridgeActionSucceeded && !handledLocally) {
+      if (shouldPlay && typeof playHeroMedia === "function") {
+        if (elements.heroPlayerStage && typeof elements.heroPlayerStage.appendChild === "function") {
+          playHeroMedia(true);
+          handledLocally = true;
+        }
+      } else if (!shouldPlay && typeof toggleLocalPlayback === "function") {
+        try {
+          handledLocally = toggleLocalPlayback(false, { target }) || handledLocally;
+        } catch (e) {
+          console.warn("[Hero] Media mode local pause fallback failed:", e);
+        }
+      }
     }
 
     // Final Measure: If we are 'Pausing' on the bridge, ensure local is also stopped - DEFENSIVE CHECKS ADDED
@@ -572,6 +592,16 @@ export function handlePreviousAction(context) {
   const isFeedMode = state.heroControlMode === "feed";
   const isMediaMode = state.heroControlMode === "media";
   const mode = target === "mini" ? "app" : (isFeedMode ? "app" : (isMediaMode ? (isNativeCapacitorApp() ? "device" : "desktop") : heroMode));
+  let localFallbackUsed = false;
+  const fallbackToLocalPrevious = () => {
+    if (localFallbackUsed) return;
+    localFallbackUsed = true;
+    if (target === "mini") {
+      if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
+    } else {
+      if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
+    }
+  };
 
   console.log(`[Hero] handlePrevious. Mode: ${mode}, Target: ${target || 'hero'}`);
 
@@ -626,17 +656,29 @@ export function handlePreviousAction(context) {
 
     if (!shouldSendToBridge) {
       // Fallback to local feed stepping - DEFENSIVE CHECKS ADDED
-      if (target === "mini") {
-        if (typeof stepMiniPlayer === "function") stepMiniPlayer(-1);
-      } else {
-        if (typeof stepHeroPlayer === "function") stepHeroPlayer(-1);
-      }
+      fallbackToLocalPrevious();
     } else {
       // CRITICAL FIX #3: Always send to bridge when in media mode, regardless of source lock state
       if (shouldSendToBridge) {
-        const isDesktop = true;
-        if (isDesktop && typeof performDesktopAction === "function") performDesktopAction(DESKTOP_ACTION_PREVIOUS);
-        else if (typeof performNativeAction === "function") performNativeAction(NATIVE_ACTION_PREVIOUS);
+        if (mode === "desktop" && typeof performDesktopAction === "function") {
+          const desktopResult = performDesktopAction(DESKTOP_ACTION_PREVIOUS);
+          if (desktopResult && typeof desktopResult.then === "function") {
+            desktopResult
+              .then((ok) => {
+                if (!ok && isMediaMode) fallbackToLocalPrevious();
+              })
+              .catch(() => {
+                if (isMediaMode) fallbackToLocalPrevious();
+              });
+          } else if (!desktopResult && isMediaMode) {
+            fallbackToLocalPrevious();
+          }
+        } else if (mode === "device" && typeof performNativeAction === "function") {
+          const nativeOk = performNativeAction(NATIVE_ACTION_PREVIOUS);
+          if (!nativeOk && isMediaMode) fallbackToLocalPrevious();
+        } else if (isMediaMode) {
+          fallbackToLocalPrevious();
+        }
       }
 
       // Refresh immediately after bridge action - DEFENSIVE CHECKS ADDED
@@ -685,6 +727,16 @@ export function handleNextAction(context) {
   // CRITICAL FIX #4: Always use bridge when in media mode
   const isBridgeMode = isSourceLocked || isMediaMode;
   const mode = target === "mini" ? "app" : (isFeedMode ? "app" : (isMediaMode ? (isNativeCapacitorApp() ? "device" : "desktop") : heroMode));
+  let localFallbackUsed = false;
+  const fallbackToLocalNext = () => {
+    if (localFallbackUsed) return;
+    localFallbackUsed = true;
+    if (target === "mini") {
+      if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
+    } else {
+      if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
+    }
+  };
 
   console.log(`[Hero] handleNext. Mode: ${mode}, Target: ${target || 'hero'}`);
 
@@ -736,17 +788,29 @@ export function handleNextAction(context) {
 
     if (!shouldSendToBridge) {
       // Fallback to local feed stepping - DEFENSIVE CHECKS ADDED
-      if (target === "mini") {
-        if (typeof stepMiniPlayer === "function") stepMiniPlayer(1);
-      } else {
-        if (typeof stepHeroPlayer === "function") stepHeroPlayer(1);
-      }
+      fallbackToLocalNext();
     } else {
       // CRITICAL FIX #4: Always send to bridge when in media mode, regardless of source lock state
       if (shouldSendToBridge) {
-        const isDesktop = true;
-        if (isDesktop && typeof performDesktopAction === "function") performDesktopAction(DESKTOP_ACTION_NEXT);
-        else if (typeof performNativeAction === "function") performNativeAction(NATIVE_ACTION_NEXT);
+        if (mode === "desktop" && typeof performDesktopAction === "function") {
+          const desktopResult = performDesktopAction(DESKTOP_ACTION_NEXT);
+          if (desktopResult && typeof desktopResult.then === "function") {
+            desktopResult
+              .then((ok) => {
+                if (!ok && isMediaMode) fallbackToLocalNext();
+              })
+              .catch(() => {
+                if (isMediaMode) fallbackToLocalNext();
+              });
+          } else if (!desktopResult && isMediaMode) {
+            fallbackToLocalNext();
+          }
+        } else if (mode === "device" && typeof performNativeAction === "function") {
+          const nativeOk = performNativeAction(NATIVE_ACTION_NEXT);
+          if (!nativeOk && isMediaMode) fallbackToLocalNext();
+        } else if (isMediaMode) {
+          fallbackToLocalNext();
+        }
       }
 
       // Refresh immediately after bridge action - DEFENSIVE CHECKS ADDED
