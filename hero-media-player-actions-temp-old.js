@@ -452,6 +452,8 @@ export async function handlePlayPauseAction(context, forcePlay) {
 
   // Identify modes and sources
   const isMediaMode = state.heroControlMode === "media";
+  const heroControlSource = context.heroControlSource || state.heroControlSource;
+  const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
 
   // Mode Resolution (authoritative in actions module)
@@ -633,7 +635,6 @@ export async function handlePlayPauseAction(context, forcePlay) {
   }
 
   // ===================== POST-ACTION SOURCE FILTERING =====================
-const heroControlSource = state.heroControlSource;
 if (heroControlSource && ['youtube', 'spotify'].includes(heroControlSource.toLowerCase())) {
   // Apply toggle source filter for both app and browser tabs
   const filteredResult = applyToggleSourceFilter({
