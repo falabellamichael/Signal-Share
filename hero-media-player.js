@@ -3,7 +3,7 @@ import {
   handleOpenMediaAction, handleOpenPhoneAction,
   handlePlayPauseAction, handleNextAction, handlePreviousAction,
   handleVolumeAction, handleRefreshAction
-} from "./hero-media-player-actions.js?v=1.1";
+} from "./hero-media-player-actions.js?v=1.2";
 import { isThenable, normalizeText, toCleanString, cleanDisplayText, isExternalUrlPost, formatProviderName } from './shared-utils.js';
 import {
   getActiveYouTubeVideo,

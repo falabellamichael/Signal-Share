@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=1.4";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=1.5";
 import { createPreviewCard, createActivePlayerStage, createActivePlayerDescriptor, resolveAppPreviewArtwork, resolveYouTubePreviewId } from "./hero-media-player-preview.js";
 import { EMOJI_PACK, EMOJI_CATEGORIES } from "./emojis.js";
 import { isDirectMessengerAiEnabled, isDirectMessengerAiProfile } from "./direct-messenger-ai-config.js";
