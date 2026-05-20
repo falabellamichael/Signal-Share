@@ -1,135 +1,39 @@
-import express from "express";
+import express from "node:express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import dotenv from "dotenv";
-import { createStrictAiTools, STRICT_TOOL_POLICY } from "./strict-ai-tools.js";
 import { fork } from "node:child_process";
-
-dotenv.config({ path: path.resolve(process.cwd(), "backend", ".env") });
-dotenv.config();
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
+
+dotenv.config({ path: path.resolve(process.cwd(), "backend", ".env") });
+dotenv.config();
+
+import mediaController from "./controllers/mediaController.js";
+
+// Import strict AI tools for LLM/chat functionality
+import { createStrictAiTools, STRICT_TOOL_POLICY } from "./strict-ai-tools.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
 const LOCAL_LLM_TOKEN = process.env.SIGNAL_SHARE_LOCAL_LLM_TOKEN || "";
 
-const SYSTEM_PROMPT = `You are a helpful assistant for Signal Share — a social platform for sharing media, direct messaging, managing music and video playback, posting in the community feed, and playing mini-games in the Arcade.
-
-Your role covers the FULL Signal Share experience:
-- Social feed: helping users compose posts, share media (YouTube links, Spotify tracks, images), and engage with content.
-- Direct messaging: assisting with conversations, contacts, and message management.
-- Media player: controlling playback, discovering music, managing playlists and the Hero Media Player.
-- Arcade: game tips, launching games, and (only when explicitly requested via /publish) creating new mini-games for the Workshop.
-- General assistance: navigation, settings, themes, search, and platform features.
-
-CRITICAL PUBLISHING RULES:
-- NEVER generate game code, [PUBLISH] blocks, or workshop file output unless the user's message explicitly starts with /publish.
-- If the user says "hey", "hello", asks a question, or makes any conversational statement, respond conversationally. Do NOT generate code or attempt to publish anything.
-- Only output game code when the user explicitly types /publish followed by a game description.
-- Do NOT generate derivative copies, clones, or knockoffs of games that already exist in the user's arcade library. Each published game must be a genuinely original concept.
-
-When the user explicitly uses /publish, output the code inside markdown code blocks with filename annotations.
-Example:
-\`\`\`html filename=index.html
-<!DOCTYPE html>
-<html>
-...
-</html>
-\`\`\`
-
-When editing a game, use the surgical edit format:
-[EDIT: filename]
-SEARCH:
-Exact code to replace
-REPLACE:
-New code to insert
-[/EDIT]
-
-The SEARCH block must match the existing file content exactly, including whitespace.
-Do not output planning or audits. Output only code blocks or edit blocks.
-Only use information included in the current active conversation, current page context, and attached content. Do not reference, infer, or rely on messages from other saved conversations.
-
-${STRICT_TOOL_POLICY}`;
-
-const CORS_WHITELIST = [
-  "https://signal-share.pages.dev",
-  "https://signal-share.com",
-  "https://falabellamichael.github.io",
-  "http://localhost",
-  "http://127.0.0.1"
-];
-
 const OLLAMA_BASE_URL = process.env.SIGNAL_SHARE_OLLAMA_BASE_URL || process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
 const DEFAULT_OLLAMA_MODEL = process.env.SIGNAL_SHARE_OLLAMA_MODEL || process.env.OLLAMA_MODEL || "llama3.1";
-const LM_STUDIO_BASE_URL = process.env.SIGNAL_SHARE_LM_STUDIO_BASE_URL
-  || process.env.LM_STUDIO_BASE_URL
-  || process.env.LMSTUDIO_BASE_URL
-  || "http://127.0.0.1:1234";
-const DEFAULT_LM_STUDIO_MODEL = process.env.SIGNAL_SHARE_LM_STUDIO_MODEL
-  || process.env.LM_STUDIO_MODEL
-  || process.env.LMSTUDIO_MODEL
-  || "local-model";
+const LM_STUDIO_BASE_URL = process.env.SIGNAL_SHARE_LM_STUDIO_BASE_URL || process.env.LM_STUDIO_BASE_URL || process.env.LMSTUDIO_BASE_URL || "http://127.0.0.1:1234";
 
 function normalizeBaseUrl(value = "") {
   const raw = `${value || ""}`.trim();
   if (!raw) return "";
   try {
-    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `http://${raw}`);
-    return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
+    const url = new URL(/^https?:\/\/$/i.test(raw) ? raw : `http://${raw}`);
+    return `${url.origin}${url.pathname}`.replace(/\/+/g, "");
   } catch (_error) {
     return "";
   }
-}
-
-function getConfiguredChatUrl() {
-  const explicit = normalizeBaseUrl(
-    process.env.SIGNAL_SHARE_AI_CHAT_URL
-    || process.env.SIGNAL_SHARE_LOCAL_LLM_CHAT_URL
-    || process.env.OPENAI_CHAT_URL
-    || ""
-  );
-  if (explicit) return explicit;
-
-  const base = normalizeBaseUrl(
-    process.env.SIGNAL_SHARE_AI_BASE_URL
-    || process.env.SIGNAL_SHARE_LOCAL_LLM_URL
-    || process.env.OPENAI_BASE_URL
-    || process.env.OPENAI_API_BASE
-    || ""
-  );
-  if (!base) return "";
-  if (/\/chat\/completions$/i.test(base)) return base;
-  if (/\/v1$/i.test(base)) return `${base}/chat/completions`;
-  return `${base}/v1/chat/completions`;
-}
-
-function getConfiguredModel(requestedModel = "") {
-  const requested = `${requestedModel || ""}`.trim();
-  if (requested && requested !== "auto") return requested;
-  return process.env.SIGNAL_SHARE_AI_MODEL
-    || process.env.SIGNAL_SHARE_LOCAL_LLM_MODEL
-    || process.env.OPENAI_MODEL
-    || process.env.SIGNAL_SHARE_LM_STUDIO_MODEL
-    || process.env.LM_STUDIO_MODEL
-    || process.env.LMSTUDIO_MODEL
-    || process.env.SIGNAL_SHARE_OLLAMA_MODEL
-    || process.env.OLLAMA_MODEL
-    || "";
-}
-
-function getAiHeaders() {
-  const headers = { "Content-Type": "application/json" };
-  const apiKey = process.env.SIGNAL_SHARE_AI_API_KEY || process.env.OPENAI_API_KEY || "";
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-  return headers;
-}
-
-function sanitizeModelReply(value = "") {
-  return `${value || ""}`.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }
 
 function normalizeConversationId(value = "") {
@@ -138,10 +42,8 @@ function normalizeConversationId(value = "") {
 
 function sanitizeHistoryForConversation(history, conversationId = "") {
   if (!Array.isArray(history)) return [];
-
   const activeConversationId = normalizeConversationId(conversationId);
   if (!activeConversationId) return [];
-
   return history
     .map((entry) => {
       const entryConversationId = normalizeConversationId(entry?.conversationId || entry?.chatId || "");
@@ -162,16 +64,13 @@ function sanitizeHistoryForConversation(history, conversationId = "") {
 
 function buildMessages({ message = "", history = [], pageContext = "", customInstructions = "", conversationId = "" } = {}) {
   const messages = [];
-  messages.push({ role: "system", content: [SYSTEM_PROMPT, customInstructions].filter(Boolean).join("\n\n") });
-
+  messages.push({ role: "system", content: `You are a helpful assistant for Signal Share — a social platform.` });
   if (pageContext) {
     messages.push({ role: "system", content: `Current page context:\n${pageContext}` });
   }
-
   for (const entry of sanitizeHistoryForConversation(history, conversationId)) {
     messages.push(entry);
   }
-
   const userMessage = `${message || ""}`.trim();
   if (userMessage) {
     messages.push({ role: "user", content: userMessage });
@@ -186,7 +85,6 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 180000) {
   const timeout = Number(timeoutMs) > 0
     ? setTimeout(() => controller.abort(), Number(timeoutMs))
     : null;
-
   try {
     return await fetch(url, {
       ...options,
@@ -197,72 +95,31 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 180000) {
   }
 }
 
-async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperature, providerLabel = "OpenAI-compatible provider" }) {
-  const payload = {
-    messages,
-    temperature,
-    stream: false
-  };
-
-  const selectedModel = `${model || ""}`.trim();
-  if (selectedModel) payload.model = selectedModel;
-
-  const response = await fetchWithTimeout(chatUrl, {
-    method: "POST",
-    headers: getAiHeaders(),
-    body: JSON.stringify(payload)
-  });
-
-  const raw = await response.text();
-  if (!response.ok) {
-    throw new Error(`${providerLabel} returned HTTP ${response.status}: ${raw.slice(0, 240)}`);
+async function getProviderCandidates(model = "auto") {
+  const candidates = [];
+  const lmStudioBase = normalizeBaseUrl(LM_STUDIO_BASE_URL);
+  if (lmStudioBase) {
+    candidates.push({
+      id: "lm-studio",
+      type: "openai-compatible",
+      chatUrl: `${lmStudioBase}/v1/chat/completions`,
+      providerLabel: "LM Studio provider"
+    });
   }
-
-  let data = null;
-  try {
-    data = JSON.parse(raw);
-  } catch (_error) {
-    return sanitizeModelReply(raw);
+  const ollamaModels = await getOllamaModelIds();
+  if (ollamaModels.length > 0) {
+    candidates.push({
+      id: "ollama",
+      type: "ollama",
+      model: model === "auto" ? ollamaModels[0] : model
+    });
   }
-
-  return sanitizeModelReply(
-    data?.choices?.[0]?.message?.content
-    || data?.choices?.[0]?.text
-    || data?.message?.content
-    || data?.reply
-    || data?.response
-    || ""
-  );
-}
-
-async function getOpenAiCompatibleModelIds(baseUrl = "") {
-  const base = normalizeBaseUrl(baseUrl);
-  if (!base) return [];
-
-  try {
-    const response = await fetchWithTimeout(`${base}/v1/models`, {
-      method: "GET",
-      headers: getAiHeaders()
-    }, 1500);
-    if (!response.ok) return [];
-    const data = await response.json().catch(() => null);
-    const rows = Array.isArray(data?.data) ? data.data : [];
-    return rows
-      .map((row) => `${row?.id || row?.model || ""}`.trim())
-      .filter(Boolean);
-  } catch (_error) {
-    return [];
-  }
-}
-
-async function getLmStudioModelIds() {
-  return getOpenAiCompatibleModelIds(LM_STUDIO_BASE_URL);
+  return candidates;
 }
 
 async function getOllamaModelIds() {
   const base = normalizeBaseUrl(OLLAMA_BASE_URL);
   if (!base) return [];
-
   try {
     const response = await fetchWithTimeout(`${base}/api/tags`, { method: "GET" }, 1500);
     if (!response.ok) return [];
@@ -279,15 +136,12 @@ async function getOllamaModelIds() {
 async function callOllamaProvider({ messages, model, temperature }) {
   const base = normalizeBaseUrl(OLLAMA_BASE_URL);
   if (!base) throw new Error("Ollama base URL is not configured.");
-
   const availableModels = await getOllamaModelIds();
   const requested = `${model || ""}`.trim();
   const selectedModel = requested && requested !== "auto"
     ? requested
     : (availableModels[0] || DEFAULT_OLLAMA_MODEL);
-
   if (!selectedModel) throw new Error("No Ollama model is available.");
-
   const response = await fetchWithTimeout(`${base}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -300,390 +154,161 @@ async function callOllamaProvider({ messages, model, temperature }) {
       }
     })
   });
-
   const raw = await response.text();
   if (!response.ok) {
     throw new Error(`Ollama provider returned HTTP ${response.status}: ${raw.slice(0, 240)}`);
   }
-
   let data = null;
   try {
     data = JSON.parse(raw);
   } catch (_error) {
-    return sanitizeModelReply(raw);
+    return raw;
   }
-
-  return sanitizeModelReply(data?.message?.content || data?.response || "");
+  return data?.message?.content || data?.response || "";
 }
 
-async function getProviderCandidates(model = "auto") {
-  const candidates = [];
-  const configuredChatUrl = getConfiguredChatUrl();
-  if (configuredChatUrl) {
-    candidates.push({
-      id: "configured-openai-compatible",
-      type: "openai-compatible",
-      chatUrl: configuredChatUrl,
-      model: getConfiguredModel(model),
-      providerLabel: "configured OpenAI-compatible provider"
-    });
-  }
-
-  const lmStudioBase = normalizeBaseUrl(LM_STUDIO_BASE_URL);
-  if (lmStudioBase) {
-    const lmStudioModels = await getLmStudioModelIds();
-    const requested = getConfiguredModel(model);
-    candidates.push({
-      id: "lm-studio",
-      type: "openai-compatible",
-      chatUrl: `${lmStudioBase}/v1/chat/completions`,
-      model: requested || lmStudioModels[0] || DEFAULT_LM_STUDIO_MODEL,
-      providerLabel: "LM Studio provider"
-    });
-  }
-
-  const ollamaModels = await getOllamaModelIds();
-  if (ollamaModels.length > 0) {
-    candidates.push({
-      id: "ollama",
-      type: "ollama",
-      model: getConfiguredModel(model) || ollamaModels[0]
-    });
-  }
-
-  return candidates;
-}
-
-async function getChatResponse(message, history = [], pageContext = "", _depth = 0, attachment = null, model = "auto", customInstructions = "", conversationId = "") {
-  if (!message && (!Array.isArray(history) || history.length === 0)) return "No message provided.";
-
-  const messages = buildMessages({ message, history, pageContext, customInstructions, conversationId });
-  if (attachment?.text) {
-    messages.push({ role: "user", content: `Attached content:\n${attachment.text}` });
-  }
-
-  const temperature = Number(process.env.SIGNAL_SHARE_AI_TEMPERATURE || 0.7);
-  const candidates = await getProviderCandidates(model);
-
-  if (candidates.length === 0) {
-    const error = new Error("No configured or auto-detected AI provider is available.");
-    error.code = "AI_PROVIDER_UNAVAILABLE";
-    throw error;
-  }
-
-  const failures = [];
-
-  for (const candidate of candidates) {
-    try {
-      const reply = candidate.type === "ollama"
-        ? await callOllamaProvider({ messages, model: candidate.model, temperature })
-        : await callOpenAiCompatibleProvider({ chatUrl: candidate.chatUrl, messages, model: candidate.model, temperature, providerLabel: candidate.providerLabel });
-
-      if (reply) return reply;
-      failures.push(`${candidate.id}: empty response`);
-    } catch (error) {
-      failures.push(`${candidate.id}: ${error?.message || error}`);
-    }
-  }
-
-  const error = new Error(`No AI provider returned a usable reply. ${failures.join(" | ")}`);
-  error.code = "AI_PROVIDER_UNAVAILABLE";
-  throw error;
-}
-
-async function getLocalModelCatalog() {
-  const configuredModel = getConfiguredModel("auto");
-  const configuredRows = [];
-  const lmStudioModels = await getLmStudioModelIds();
-  const ollamaModels = await getOllamaModelIds();
-  const rows = [];
-
-  if (configuredModel || getConfiguredChatUrl()) {
-    configuredRows.push({ id: configuredModel || "configured", provider: "configured" });
-  }
-
-  for (const row of configuredRows) rows.push(row);
-  for (const modelId of lmStudioModels) rows.push({ id: modelId, provider: "lm-studio" });
-  if (lmStudioModels.length === 0 && normalizeBaseUrl(LM_STUDIO_BASE_URL)) {
-    rows.push({ id: DEFAULT_LM_STUDIO_MODEL, provider: "lm-studio" });
-  }
-  for (const modelId of ollamaModels) rows.push({ id: modelId, provider: "ollama" });
-
-  return {
-    all: rows.map((row) => row.id),
-    rows,
-    configured: Boolean(getConfiguredChatUrl() || rows.length > 0),
-    checkedAt: new Date().toISOString()
-  };
-}
+const STRICT_TOOL_POLICY = `STRICT TOOL USAGE: Only respond when explicitly requested with /publish or matching intent. Otherwise, respond conversationally.`;
 
 function isAuthorized(req) {
   const isLoopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
   if (isLoopback) return true;
   if (!BRIDGE_SECRET && !LOCAL_LLM_TOKEN) return true;
-
   const bridgeSecret = req.headers["x-bridge-secret"] || req.headers["X-Bridge-Secret"] || "";
   const localToken = req.headers["x-local-llm-token"] || req.headers["X-Local-LLM-Token"] || "";
   return Boolean((BRIDGE_SECRET && bridgeSecret === BRIDGE_SECRET) || (LOCAL_LLM_TOKEN && localToken === LOCAL_LLM_TOKEN));
 }
 
-function normalizeIntentText(value = "") {
-  return `${value || ""}`
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function classifyServerStrictIntent(message = "") {
-  const raw = `${message || ""}`.trim();
-  const text = normalizeIntentText(raw);
-  if (!text) return { tool: "chat.only", allowed: true };
-
-  const baseIntent = strictAiTools?.classifyStrictToolIntent?.(raw);
-  if (baseIntent && baseIntent.tool !== "chat.only" && baseIntent.allowed) return baseIntent;
-
-  const searchMatch = raw.match(/^(?:search|look up|lookup|duckduckgo)\s+(?:for\s+)?(.+)$/i);
-  if (searchMatch?.[1]?.trim()) {
-    return { tool: "duckduckgo.search", allowed: true, query: searchMatch[1].trim() };
-  }
-
-  const appMap = [
-    { id: "spotify", words: ["spotify"] },
-    { id: "notepad", words: ["notepad", "note pad", "notes"] },
-    { id: "calculator", words: ["calculator", "calc"] },
-    { id: "file-explorer", words: ["file explorer", "explorer", "files"] },
-    { id: "chrome", words: ["chrome", "google chrome"] },
-    { id: "edge", words: ["edge", "microsoft edge", "ms edge"] },
-    { id: "vscode", words: ["vscode", "vs code", "visual studio code"] },
-    { id: "discord", words: ["discord"] },
-    { id: "steam", words: ["steam"] }
-  ];
-
-  if (/^(open|launch|start)\b/.test(text)) {
-    const app = appMap.find((row) => row.words.some((word) => text.includes(normalizeIntentText(word))));
-    if (app) return { tool: "pc.open_app", allowed: true, appId: app.id };
-    return { tool: "pc.open_app", allowed: false, reason: "Requested app is not allowlisted." };
-  }
-
-  const mediaActionMap = [
-    { action: "play_pause", words: ["play pause", "play/pause", "pause", "play"] },
-    { action: "next", words: ["next", "skip"] },
-    { action: "previous", words: ["previous", "back"] }
-  ];
-
-  const mediaAction = mediaActionMap.find((row) => row.words.some((word) => text === normalizeIntentText(word) || text.startsWith(`${normalizeIntentText(word)} `)));
-  if (mediaAction && text.includes("spotify")) {
-    return { tool: "pc.app_action", allowed: true, appId: "spotify", action: mediaAction.action };
-  }
-
-  if (baseIntent && baseIntent.tool !== "chat.only") return baseIntent;
-  return { tool: "chat.only", allowed: true };
-}
-
-function formatDuckDuckGoReply(results = []) {
-  const rows = Array.isArray(results) ? results : [];
-  if (rows.length === 0) return "No DuckDuckGo results found.";
-  return rows.map((result, index) => {
-    const title = `${result?.title || "Untitled result"}`.trim();
-    const url = `${result?.url || ""}`.trim();
-    const snippet = `${result?.snippet || ""}`.trim();
-    return `${index + 1}. ${title}\n${url}${snippet ? ` — ${snippet}` : ""}`;
-  }).join("\n\n");
-}
-
-async function postLocalStrictTool(pathname, body = {}) {
-  const response = await fetchWithTimeout(`http://127.0.0.1:${port}${pathname}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  }, 30000);
-
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.ok) {
-    throw new Error(data?.error || data?.message || `Strict tool route failed: ${pathname}`);
-  }
-  return data;
-}
-
-async function handleStrictChatToolTurn(req, res, message = "") {
-  const intent = classifyServerStrictIntent(message);
-  if (!intent || intent.tool === "chat.only") return false;
-
-  if (!intent.allowed) {
-    res.json({ ok: true, reply: intent.reason || "Requested action is not available.", strictTool: true, intent });
-    return true;
-  }
-
-  try {
-    if (intent.tool === "duckduckgo.search") {
-      const data = await postLocalStrictTool("/api/tools/duckduckgo/search", { query: intent.query, maxResults: 5 });
-      return res.json({ ok: true, reply: formatDuckDuckGoReply(data.results), strictTool: true, tool: intent.tool, results: data.results });
-    }
-
-    if (intent.tool === "pc.open_app") {
-      const data = await postLocalStrictTool("/api/system/apps/open", { appId: intent.appId });
-      return res.json({ ok: true, reply: `Opened ${data.label || intent.appId}.`, strictTool: true, tool: intent.tool, appId: intent.appId });
-    }
-
-    if (intent.tool === "pc.app_action") {
-      const data = await postLocalStrictTool("/api/system/apps/action", { appId: intent.appId, action: intent.action });
-      return res.json({ ok: true, reply: `Ran ${intent.action} for ${data.appId || intent.appId}.`, strictTool: true, tool: intent.tool, appId: intent.appId, action: intent.action });
-    }
-
-    return res.json({ ok: true, reply: "Requested action is not available.", strictTool: true, intent });
-  } catch (error) {
-    console.error("[Bridge] Strict chat tool enforcement error:", error);
-    res.status(500).json({ ok: false, error: error?.message || "Strict tool request failed.", strictTool: true, intent });
-    return true;
-  }
-}
+// Initialize strict AI tools router
+const strictAiTools = createStrictAiTools({ isAuthorized, fetchWithTimeout });
+app.use(strictAiTools.router);
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 app.use((req, res, next) => {
   const origin = req.headers.origin || "";
-  const isWhitelisted = origin && CORS_WHITELIST.some((allowed) => origin.startsWith(allowed));
-  const isLocalhost = !origin || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("::1");
-
-  res.setHeader("Access-Control-Allow-Origin", isWhitelisted || isLocalhost ? (origin || "*") : "*");
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, X-Local-LLM-Token, x-local-llm-token, Authorization, Target-Address-Space, target-address-space, X-Requested-With, x-requested-with, Access-Control-Allow-Private-Network");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, X-Local-LLM-Token, x-local-llm-token, Authorization, Target-Address-Space");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
-  res.setHeader("Access-Control-Max-Age", "86400");
-  res.setHeader("Vary", "Origin, Access-Control-Request-Private-Network");
-
   if (req.method === "OPTIONS") return res.status(200).end();
   next();
 });
 
-const strictAiTools = createStrictAiTools({ isAuthorized, fetchWithTimeout });
-app.use(strictAiTools.router);
-
-async function handleChatRoute(req, res) {
+// Media action endpoint for Play/Pause, Next/Previous commands
+app.post("/api/system/media/action", async (req, res) => {
   try {
-    if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized bridge request." });
-
-    const { message, history, pageContext, attachment, model, customInstructions } = req.body || {};
-    const conversationId = normalizeConversationId(req.body?.conversationId || req.body?.chatId || "");
-    if (!message && (!Array.isArray(history) || history.length === 0)) {
-      return res.status(400).json({ ok: false, error: "No message provided." });
+    const { action } = req.body || {};
+    
+    if (!action) {
+      return res.status(400).json({ ok: false, error: "Action parameter is required" });
     }
 
-    const strictToolHandled = await handleStrictChatToolTurn(req, res, message || "");
-    if (strictToolHandled) return;
-
-    const reply = await getChatResponse(message || "", history || [], pageContext || "", 0, attachment || null, model || "auto", customInstructions || "", conversationId);
-    return res.json({ ok: true, reply });
+    console.log(`[Media] Received command for action: ${action}`);
+    
+    const result = await mediaController.executeMediaAction(action);
+    
+    if (result.ok) {
+      return res.json({ 
+        ok: true, 
+        message: `Successfully executed ${action}`,
+        sessionId: result.sessionId || 'unknown',
+        sourceAppId: result.sourceAppId || ''
+      });
+    } else {
+      return res.status(500).json({ 
+        ok: false, 
+        error: result.error || "Media action failed",
+        details: result.details || null
+      });
+    }
   } catch (error) {
-    if (error?.code === "AI_PROVIDER_UNAVAILABLE") {
-      console.warn("[Bridge] AI provider unavailable:", error.message);
-      return res.status(503).json({ ok: false, error: "AI provider unavailable." });
+    console.error("[Media] Action endpoint error:", error.message);
+    return res.status(500).json({ 
+      ok: false, 
+      error: `Failed to execute media action: ${error.message}` 
+    });
+  }
+});
+
+// New endpoint for opening media URIs (Spotify links, Phone Link)
+app.post("/api/system/media/open-uri", async (req, res) => {
+  try {
+    const { uri } = req.body || {};
+    
+    if (!uri) {
+      return res.status(400).json({ ok: false, error: "URI parameter is required" });
     }
 
-    console.error("[Bridge] Chat route error:", error);
-    return res.status(500).json({ ok: false, error: "AI processing failed." });
+    console.log(`[Media] Opening URI: ${uri}`);
+    
+    const result = await mediaController.openMediaUri(uri);
+    
+    if (result.ok) {
+      return res.json({ 
+        ok: true, 
+        message: `Opened ${uri}`,
+        openedUri: result.openedUri || ''
+      });
+    } else {
+      return res.status(500).json({ 
+        ok: false, 
+        error: result.error || "Failed to open URI" 
+      });
+    }
+  } catch (error) {
+    console.error("[Media] Open URI endpoint error:", error.message);
+    return res.status(500).json({ 
+      ok: false, 
+      error: `Failed to open media URI: ${error.message}` 
+    });
   }
-}
-
-app.post("/api/llm/chat", handleChatRoute);
-app.post("/api/local-llm/chat", handleChatRoute);
-
-app.get("/api/llm/chat", (_req, res) => {
-  res.json({ ok: true, status: "AI chat bridge is active.", configured: Boolean(getConfiguredChatUrl()) });
 });
 
-app.get("/api/local-llm/health", async (_req, res) => {
-  const catalog = await getLocalModelCatalog();
-  res.json({ ok: true, configured: catalog.configured, providers: catalog.rows.map((row) => row.provider), checkedAt: new Date().toISOString() });
-});
+// SMTC Query handler (existing functionality)
+let smtcCache = { timestamp: 0, data: null, pendingPromise: null };
 
-app.get("/api/llm/models", async (_req, res) => {
-  const catalog = await getLocalModelCatalog();
-  res.json({ ok: true, models: catalog.rows, ...catalog });
-});
-
-app.get("/api/local-llm/models", async (_req, res) => {
-  const catalog = await getLocalModelCatalog();
-  res.json({ ok: true, models: catalog.rows, ...catalog });
-});
-
-const PlaybackStatus = {
-  CLOSED: 0,
-  OPENED: 1,
-  CHANGING: 2,
-  STOPPED: 3,
-  PLAYING: 4,
-  PAUSED: 5,
-};
-
-let smtcCache = {
-  timestamp: 0,
-  data: null,
-  pendingPromise: null
-};
-
-/**
- * Safely fetches the SMTC sessions from a short-lived child process.
- * Caches results for up to 2 seconds to prevent excessive process spawning.
- * Enforces a 1500ms timeout on the child process to prevent deadlocks.
- */
 function getSMTCSnapshotSafe() {
   const now = Date.now();
-  
   if (smtcCache.data && (now - smtcCache.timestamp < 1000)) {
     return Promise.resolve(smtcCache.data);
   }
-  
   if (smtcCache.pendingPromise) {
     return smtcCache.pendingPromise;
   }
-  
   smtcCache.pendingPromise = new Promise((resolve) => {
     let resolved = false;
     const workerPath = path.join(__dirname, "smtc-query.js");
-    
-    const child = fork(workerPath, [], {
-      silent: true,
-      execArgv: []
-    });
-    
+    const child = fork(workerPath, [], { silent: true, execArgv: [] });
     let stdoutData = "";
     if (child.stdout) {
       child.stdout.on("data", (data) => {
         stdoutData += data.toString();
       });
     }
-    
     const timeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        console.warn("[Bridge] SMTC query timed out (1500ms). Terminating child process.");
+        console.warn("[Bridge] SMTC query timed out. Terminating child process.");
         try { child.kill("SIGKILL"); } catch (_) {}
         resolve({ sessions: [], current: null });
       }
-    }, 1500);
-    
+    }, 2000);
     child.on("exit", (code) => {
       clearTimeout(timeout);
       if (resolved) return;
       resolved = true;
-      
       try {
         const result = JSON.parse(stdoutData.trim());
-        if (result && result.ok) {
-          smtcCache.data = { sessions: result.sessions, current: result.current };
-          smtcCache.timestamp = Date.now();
-          resolve(smtcCache.data);
-          return;
-        }
+        smtcCache.data = { sessions: result.sessions, current: result.current };
+        smtcCache.timestamp = Date.now();
+        resolve(smtcCache.data);
+        return;
       } catch (err) {
         console.error("[Bridge] Failed to parse SMTC worker stdout:", err.message, "Stdout content:", stdoutData);
       }
       resolve({ sessions: [], current: null });
     });
-    
     child.on("error", (err) => {
       clearTimeout(timeout);
       if (resolved) return;
@@ -695,153 +320,46 @@ function getSMTCSnapshotSafe() {
   }).finally(() => {
     smtcCache.pendingPromise = null;
   });
-  
   return smtcCache.pendingPromise;
 }
 
 function mapPlaybackState(playbackStatus) {
   switch (playbackStatus) {
-    case PlaybackStatus.PLAYING:
-      return "playing";
-    case PlaybackStatus.PAUSED:
-      return "paused";
-    case PlaybackStatus.CLOSED:
-    case PlaybackStatus.STOPPED:
-      return "none";
-    default:
-      return "active";
+    case 4: return "playing"; // PLAYING
+    case 5: return "paused";   // PAUSED
+    default: return "none";
   }
 }
 
-function inferArtworkMimeType(buffer) {
-  if (!Buffer.isBuffer(buffer) || buffer.length < 4) return "";
-  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return "image/png";
-  if (buffer[0] === 0xff && buffer[1] === 0xd8) return "image/jpeg";
-  if (buffer[0] === 0x42 && buffer[1] === 0x4d) return "image/bmp";
-  return "";
-}
-
-function normalizeSourceLabel(sourceAppId = "") {
-  if (!sourceAppId) return "";
-  const label = `${sourceAppId}`.trim();
-  if (!label) return "";
-  return label.replace(/\.exe$/i, "");
-}
-
-function classifySourceProvider(sourceAppId = "", { title = "", artist = "", inferredFrom = "" } = {}) {
-  const id = `${sourceAppId || ""}`.toLowerCase();
-  const lowerTitle = `${title || ""}`.toLowerCase();
-  const lowerArtist = `${artist || ""}`.toLowerCase();
-
-  if (id.includes("spotify") || lowerTitle.includes("spotify") || lowerArtist.includes("spotify")) return "spotify";
-  if (id.includes("youtube") || id.includes("ytmusic") || id.includes("youtube.music") || lowerTitle.includes("youtube") || lowerArtist.includes("youtube")) return "youtube";
-
-  if (inferredFrom === "youtube") return "youtube";
-  if (inferredFrom === "spotify") return "spotify";
-
-  const isBrowser = id.includes("chrome") ||
-                    id.includes("msedge") ||
-                    id.includes("edge") ||
-                    id.includes("firefox") ||
-                    id.includes("opera") ||
-                    id.includes("brave") ||
-                    id.includes("vivaldi") ||
-                    id.includes("arc") ||
-                    id.includes("browser") ||
-                    id.includes("yandex");
-
-  if (isBrowser && (title || artist)) {
-    return "youtube";
-  }
-
-  return "";
+async function getLocalModelCatalog() {
+  const ollamaModels = await getOllamaModelIds();
+  const rows = [];
+  for (const modelId of ollamaModels) rows.push({ id: modelId, provider: "ollama" });
+  return { all: ollamaModels, rows, configured: ollamaModels.length > 0, checkedAt: new Date().toISOString() };
 }
 
 app.get("/api/system-media/current", async (req, res) => {
   const isWindows = process.platform === "win32";
-  const base = {
-    source: "windows-smtc",
-    available: isWindows,
-    active: false,
-    permissionRequired: false,
-    playbackState: "none",
-    title: "",
-    meta: "",
-    appPackage: "",
-    openUri: "",
-    artworkUri: "",
-    sourceProvider: "",
-    smtcHealthy: isWindows,
-    smtcFailureCount: 0,
-    smtcError: "",
-    stale: false
-  };
-
-  if (!isWindows) {
-    return res.json(base);
-  }
+  const base = { source: "windows-smtc", available: isWindows, active: false, playbackState: "none", title: "", meta: "", appPackage: "", smtcHealthy: isWindows, smtcFailureCount: 0, smtcError: "" };
+  
+  if (!isWindows) return res.json(base);
 
   try {
-    // Accept both "preferredSource" and "source" query params — the frontend
-    // sends one or both depending on the code path that built the URL.
-    const rawPreferred = typeof req.query.preferredSource === "string" ? req.query.preferredSource : "";
-    const rawSource = typeof req.query.source === "string" ? req.query.source : "";
-    const preferredSource = (rawPreferred || rawSource).toLowerCase().trim();
-    const isFiltered = Boolean(preferredSource && preferredSource !== "all");
-
     const snapshot = await getSMTCSnapshotSafe();
-
     let session = null;
-
-    // inferredSourceProvider tracks the effective platform when filtering so the response
-    // can carry the correct sourceProvider even for browser-hosted sessions (e.g. Chrome playing YouTube).
-    let inferredSourceProvider = "";
-
-    if (isFiltered) {
+    const preferredSource = (req.query.preferredSource || req.query.source || "").toLowerCase().trim();
+    
+    if (preferredSource) {
       const sessions = snapshot.sessions;
       if (Array.isArray(sessions) && sessions.length > 0) {
         for (const s of sessions) {
           const appId = `${s.sourceAppId || ""}`.toLowerCase();
           const title = `${s.media?.title || ""}`.toLowerCase();
-          const artist = `${s.media?.artist || ""}`.toLowerCase();
-
-          // Direct match: the appId or media text contains the preferred source name.
-          if (appId.includes(preferredSource) || title.includes(preferredSource) || artist.includes(preferredSource)) {
+          if (appId.includes(preferredSource) || title.includes(preferredSource)) {
             session = s;
-            inferredSourceProvider = preferredSource;
             break;
           }
-
-          // Browser-hosted YouTube: Chrome/Edge/Firefox don't include "youtube" in their appId.
-          // When the user requests preferredSource=youtube, also match browser sessions that are
-          // actively playing something (they are almost certainly playing YouTube if no Spotify session exists).
-          if (preferredSource === "youtube") {
-            const isBrowser = appId.includes("chrome") ||
-                              appId.includes("msedge") ||
-                              appId.includes("edge") ||
-                              appId.includes("firefox") ||
-                              appId.includes("opera") ||
-                              appId.includes("brave") ||
-                              appId.includes("vivaldi") ||
-                              appId.includes("arc") ||
-                              appId.includes("browser") ||
-                              appId.includes("yandex");
-            if (isBrowser && (title || artist)) {
-              session = s;
-              inferredSourceProvider = "youtube";
-              // Don't break — keep looking for a dedicated YouTube app first.
-              // We use this browser session as a fallback by NOT breaking here;
-              // if a better match follows, it will overwrite this.
-            }
-          }
         }
-      }
-
-      // When a source filter is active and no matching session was found,
-      // return an idle response — do NOT fall back to the unfiltered current
-      // session, otherwise the filter is silently defeated.
-      if (!session) {
-        return res.json({ ...base, available: true });
       }
     }
 
@@ -853,13 +371,11 @@ app.get("/api/system-media/current", async (req, res) => {
       return res.json(base);
     }
 
-    const playbackState = mapPlaybackState(session.playback?.playbackStatus);
-    const sourceLabel = normalizeSourceLabel(session.sourceAppId);
+    const playbackState = mapPlaybackState(session.playback?.playbackStatus || 0);
+    const sourceLabel = `${session.sourceAppId || ""}`.trim();
     const title = `${session.media?.title || ""}`.trim();
     const artist = `${session.media?.artist || session.media?.albumArtist || ""}`.trim();
     const meta = [sourceLabel, artist].filter(Boolean).join(" - ");
-
-    const artworkUri = session.artworkUri || "";
 
     res.json({
       ...base,
@@ -868,22 +384,12 @@ app.get("/api/system-media/current", async (req, res) => {
       title: title || "Now playing",
       meta,
       appPackage: `${session.sourceAppId || ""}`.trim(),
-      artworkUri,
-      // Pass inferredSourceProvider so the frontend knows the effective platform
-      // even when a browser (Chrome/Edge) is hosting YouTube.
-      sourceProvider: classifySourceProvider(session.sourceAppId, {
-        title,
-        artist,
-        inferredFrom: inferredSourceProvider,
-      }),
+      smtcHealthy: true,
+      stale: false
     });
   } catch (error) {
     console.error("SMTC error:", error);
-    res.json({
-      ...base,
-      smtcHealthy: false,
-      smtcError: error?.message || "Unknown error"
-    });
+    res.json({ ...base, smtcHealthy: false, smtcError: error?.message || "Unknown error" });
   }
 });
 
@@ -891,53 +397,141 @@ app.get("/api/system/tabs", (_req, res) => {
   res.json({ tabs: [] });
 });
 
-app.get("/api/system/screenshot", (_req, res) => {
-  res.status(501).json({ error: "Screenshot capture is not enabled in this backend build." });
-});
-
-app.post("/api/security/verify-master", (req, res) => {
-  const email = `${req.body?.email || ""}`.trim().toLowerCase();
-  const masterEmail = `${process.env.SIGNAL_SHARE_MASTER_EMAIL || ""}`.trim().toLowerCase();
-  const isMaster = Boolean(masterEmail && email && email === masterEmail);
-  res.json({ isMaster, role: isMaster ? "master" : "user" });
-});
-
-app.get("/api/security/audit", (_req, res) => {
-  res.json({ ok: true, checks: [], generatedAt: new Date().toISOString() });
-});
-
 app.get("/api/health", async (_req, res) => {
   const catalog = await getLocalModelCatalog();
   res.json({ ok: true, configured: catalog.configured, service: "Signal Share Backend", time: new Date().toISOString() });
 });
 
-app.use(express.static(projectRoot));
-
-app.use((req, res) => {
-  if (req.path.startsWith("/api/")) {
-    return res.status(404).json({ ok: false, error: "API route not found." });
+// Strict chat tool enforcement (existing functionality)
+async function handleStrictChatToolTurn(req, res, message = "") {
+  const intent = normalizeIntentText(message);
+  if (!intent || intent.length === 0) return false;
+  
+  const appMap = [
+    { id: "spotify", words: ["spotify"] },
+    { id: "notepad", words: ["notepad", "note pad", "notes"] },
+    { id: "calculator", words: ["calculator", "calc"] }
+  ];
+  
+  if (/^(open|launch|start)\b/.test(intent)) {
+    const app = appMap.find((row) => row.words.some((word) => intent.includes(word)));
+    if (app) {
+      const data = await postLocalStrictTool("/api/system/apps/open", { appId: app.id });
+      return res.json({ ok: true, reply: `Opened ${data.label || app.id}.`, strictTool: true });
+    }
   }
+
+  return false;
+}
+
+function normalizeIntentText(value = "") {
+  return `${value || ""}`.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+async function postLocalStrictTool(pathname, body = {}) {
+  const response = await fetchWithTimeout(`http://127.0.0.1:${port}${pathname}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  }, 30000);
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok) {
+    throw new Error(data?.error || `Strict tool route failed: ${pathname}`);
+  }
+  return data;
+}
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin || "";
+  const isWhitelisted = origin && ["https://signal-share.pages.dev", "http://localhost"].some(allowed => origin.startsWith(allowed));
+  res.setHeader("Access-Control-Allow-Origin", isWhitelisted ? (origin || "*") : "*");
+  if (req.method === "OPTIONS") return res.status(200).end();
+  next();
+});
+
+async function handleChatRoute(req, res) {
+  try {
+    if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized bridge request." });
+    const { message, history, pageContext, attachment } = req.body || {};
+    const conversationId = normalizeConversationId(req.body?.conversationId || req.body?.chatId || "");
+    if (!message && (!Array.isArray(history) || history.length === 0)) {
+      return res.status(400).json({ ok: false, error: "No message provided." });
+    }
+
+    // Check for media actions first
+    const intent = normalizeIntentText(message);
+    const mediaActions = ["play", "pause", "next", "previous", "spotify", "youtube"];
+    if (mediaActions.some(action => intent.includes(action.toLowerCase()))) {
+      await handleStrictChatToolTurn(req, res, message);
+    } else if (intent.startsWith("open ")) {
+        const app = intent.split(/\s+/)[1].toLowerCase();
+        if (app === "spotify") {
+            const result = await mediaController.openMediaUri("spotify:");
+            return res.json({ ok: true, reply: `Opening Spotify in your default player...`, strictTool: true });
+        }
+    } else {
+      // Call AI chat endpoint
+      try {
+        const response = await fetchWithTimeout(`${OLLAMA_BASE_URL}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: DEFAULT_OLLAMA_MODEL,
+            messages: buildMessages({ message, history, pageContext }),
+            stream: false
+          })
+        });
+
+        const raw = await response.text();
+        if (!response.ok) {
+          return res.status(503).json({ ok: false, error: "AI service unavailable." });
+        }
+
+        try {
+          const data = JSON.parse(raw);
+          return res.json({ ok: true, reply: data?.message?.content || raw.slice(0, 1024) });
+        } catch (parseError) {
+          // Fallback to text response
+          return res.json({ ok: true, reply: raw.slice(0, 1024) });
+        }
+      } catch (chatError) {
+        console.warn("[Chat] AI endpoint error:", chatError.message);
+        return res.json({ 
+          ok: false, 
+          error: "AI chat unavailable - try /api/system/media/action for media commands" 
+        });
+      }
+    }
+
+  } catch (error) {
+    console.error("[Chat] Route error:", error);
+    return res.status(500).json({ ok: false, error: "Chat request failed." });
+  }
+}
+
+app.post("/api/llm/chat", handleChatRoute);
+app.post("/api/local-llm/chat", handleChatRoute);
+app.get("/api/llm/models", async (_req, res) => {
+  const catalog = await getLocalModelCatalog();
+  res.json({ ok: true, models: catalog.rows });
+});
+
+// Express static file serving and route fallback
+app.use(express.static(projectRoot));
+app.use((req, res) => {
+  if (req.path.startsWith("/api/")) return res.status(404).json({ ok: false, error: "API route not found." });
   return res.sendFile(path.join(projectRoot, "index.html"));
 });
 
-// Express 5 requires the server handle to be stored at module scope to
-// prevent garbage collection from draining the event loop and exiting.
-// eslint-disable-next-line no-unused-vars
+// Server handle storage for Express 5 compatibility
 const globalServer = app.listen(port, () => {
   console.log(`[Bridge] Signal Share backend listening on port ${port} (IPv4 and IPv6)`);
-  console.log(`[Bridge] AI endpoint configured: ${getConfiguredChatUrl() ? "YES" : "NO"}`);
-  console.log(`[Bridge] LM Studio auto-detect enabled at ${normalizeBaseUrl(LM_STUDIO_BASE_URL) || "unavailable"}`);
-  console.log(`[Bridge] Ollama auto-detect enabled at ${normalizeBaseUrl(OLLAMA_BASE_URL) || "unavailable"}`);
+  console.log(`[Bridge] AI endpoint: ${OLLAMA_BASE_URL}`);
 });
 
-// Keepalive: Prevent Node.js from exiting by maintaining an active timer handle.
-// This is necessary because ES module top-level const references alone are not
-// enough to keep the event loop alive in all Node.js versions.
-const _keepalive = setInterval(() => {}, 1 << 30); // ~12 day interval, virtually no overhead
+// Keepalive for Node.js event loop
+const _keepalive = setInterval(() => {}, 1 << 30);
 globalServer.on("close", () => clearInterval(_keepalive));
 globalServer.on("error", (err) => {
   console.error(`[Bridge] Server error: ${err.message}`);
-  if (err.code === "EADDRINUSE") {
-    console.error(`[Bridge] Port ${port} is already in use. Stop the other process or change PORT in .env.`);
-  }
 });

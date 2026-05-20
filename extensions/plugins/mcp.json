@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "website-files": {
+      "command": "C:/Program Files/nodejs/npx.cmd",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:/Users/Falab/OneDrive/Documents/Website Project"
+      ],
+      "env": {
+        "NODE_ENV": "production",
+        "npm_config_yes": "true",
+        "npm_config_cache": "C:/Users/Falab/.npm-cache"
+      }
+    }
+  }
+}
