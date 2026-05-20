@@ -16,7 +16,10 @@ import {
   detectPlayingYouTubeVideo
 } from './youtube-player-detection.js';
 import { hasActiveMediaInSource } from './_hero-media-player-toggle-state-validation.js';
-import { validatePlayPauseTarget, validateNavigationTarget, handleMediaToggleAction } from './_hero-media-player-toggle-action-isolation.js';
+import { applyToggleSourceFilter } from './src/heroes/fixed/_hero-media-player-toggle-source-filter.fixed.js';
+
+// Also import for app and browser tab handling - legacy names kept for compatibility
+const { validatePlayPauseTarget: _validatePlayPauseTarget, validateNavigationTarget: _validateNavigationTarget, handleMediaToggleAction: _handleMediaToggleAction } = await import('./_hero-media-player-toggle-action-isolation.js');
 
 /**
  * Throttles high-frequency actions to prevent hardware/bridge flooding.
@@ -436,46 +439,8 @@ export async function handlePlayPauseAction(context, forcePlay) {
     refreshDesktopSnapshot, refreshNativeSnapshot
   } = context;
 
-  // ===================== TOGGLE ISOLATION VALIDATION =====================
+  // Main action logic starts here - handles both Spotify app and browser tabs
   
-  // Get active source from toggle state
-  const heroControlSource = state.heroControlSource;
-  const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
-  const activeSource = preferredSource === 'youtube' || preferredSource === 'spotify' ? preferredSource : null;
-
-  // Validate if play/pause action targets the correct source
-  const playPauseValidation = validatePlayPauseTarget({
-    activeSource,
-    currentPlaybackState: state.heroPlayerPlaybackState || "none",
-    nativeSnapshot,
-    desktopSnapshot,
-    post: getControllablePlayerPost()
-  });
-
-  // If target validation fails or mismatch detected, return filtered idle state immediately
-  if (!playPauseValidation.valid && (activeSource === 'youtube' || activeSource === 'spotify')) {
-    console.log(`[Hero] Play/Pause filtered for source mismatch: ${activeSource}`);
-    context.renderHeroPlayerStage({
-      post: null,
-      parseYouTubeUrl
-    });
-    return;
-  }
-
-  // Apply media toggle action handler with isolation
-  const toggleResult = handleMediaToggleAction({
-    toggleMode: "media",
-    mediaSource: activeSource,
-    heroControlSource,
-    post: getControllablePlayerPost(),
-    state,
-    actionType: 'play-pause'
-  });
-
-  // Use toggled result for validation decisions
-  const isTargetingCorrectSource = toggleResult.filteredForSource && toggleResult.activeMediaInfo;
-
-  console.log(`[Hero] Play/Pause Intent Check - Target Source: ${activeSource}, Valid: ${isTargetingCorrectSource}`);
   // =========================== END TOGGLE ISOLATION VALIDATION =========================
 
   // 1. AUTHORITATIVE COOLDOWN
@@ -666,6 +631,23 @@ export async function handlePlayPauseAction(context, forcePlay) {
       }
     }
   }
+
+  // ===================== POST-ACTION SOURCE FILTERING =====================
+const heroControlSource = state.heroControlSource;
+if (heroControlSource && ['youtube', 'spotify'].includes(heroControlSource.toLowerCase())) {
+  // Apply toggle source filter for both app and browser tabs
+  const filteredResult = applyToggleSourceFilter({
+    activeSource: heroControlSource.toLowerCase(),
+    actionType: 'play-pause',
+    actionResult: null,
+    nativeSnapshot,
+    desktopSnapshot,
+    post: getControllablePlayerPost()
+  });
+
+  console.log(`[Hero] Play/Pause filter check - Source: ${heroControlSource}, Filtered: ${filteredResult.filtered}`);
+}
+// =========================== END POST-ACTION FILTERING =========================
 
   // DEFENSIVE CHECK: Only render if DOM elements exist
   if (elements.heroPlayerStage && typeof elements.heroPlayerStage.dataset !== 'undefined') {

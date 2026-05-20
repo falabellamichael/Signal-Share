@@ -516,6 +516,41 @@ app.get("/api/llm/models", async (_req, res) => {
   res.json({ ok: true, models: catalog.rows });
 });
 
+app.get("/api/local-llm/models", async (req, res) => {
+  if (!isAuthorized(req)) {
+    return res.status(401).json({ ok: false, error: "Unauthorized local LLM request." });
+  }
+  try {
+    const catalog = await getLocalModelCatalog();
+    const models = (catalog?.all || []).map((id) => ({
+      id,
+      provider: "local"
+    }));
+    return res.json({
+      ok: true,
+      models,
+      providers: {
+        local: catalog?.all || []
+      },
+      checkedAt: catalog?.checkedAt || new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("[Bridge] /api/local-llm/models error:", error);
+    return res.status(500).json({ ok: false, error: "Failed to read local model catalog." });
+  }
+});
+
+app.get("/api/local-llm/health", (req, res) => {
+  if (!isAuthorized(req)) {
+    return res.status(401).json({ ok: false, error: "Unauthorized local LLM request." });
+  }
+  return res.json({
+    ok: true,
+    authMode: LOCAL_LLM_TOKEN ? "token-or-bridge-secret" : "bridge-secret-or-loopback",
+    checkedAt: new Date().toISOString()
+  });
+});
+
 // Express static file serving and route fallback
 app.use(express.static(projectRoot));
 app.use((req, res) => {

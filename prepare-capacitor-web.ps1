@@ -24,7 +24,7 @@ $excludeFiles = @(
 )
 
 # Specific directories to copy entirely
-$directories = @("icons", "arcade-commands")
+$directories = @("icons", "arcade-commands", "src")
 
 # Clean and recreate dist
 if (Test-Path -LiteralPath $dist) {
