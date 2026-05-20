@@ -1,4 +1,4 @@
-import express from "node:express";
+import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { fork } from "node:child_process";
@@ -14,7 +14,7 @@ dotenv.config();
 import mediaController from "./controllers/mediaController.js";
 
 // Import strict AI tools for LLM/chat functionality
-import { createStrictAiTools, STRICT_TOOL_POLICY } from "./strict-ai-tools.js";
+import { createStrictAiTools } from "./strict-ai-tools.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
