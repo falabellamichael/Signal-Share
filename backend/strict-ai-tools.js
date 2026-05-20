@@ -17,6 +17,13 @@ const MEDIA_ACTION_KEYS = {
   stop: 0xB2
 };
 
+const WINRT_ACTION_METHODS = {
+  play_pause: "TryTogglePlayPauseAsync",
+  next: "TrySkipNextAsync",
+  previous: "TrySkipPreviousAsync",
+  stop: "TryStopAsync"
+};
+
 const PC_APP_ALLOWLIST = Object.freeze({
   notepad: {
     id: "notepad",
@@ -220,7 +227,7 @@ export function classifyStrictToolIntent(message = "") {
   return { tool: "chat.only", allowed: true };
 }
 
-function launchProcess(command, args = []) {
+function launchProcess(command, args = [], options = {}) {
   return new Promise((resolve, reject) => {
     if (process.platform !== "win32") {
       reject(new Error("PC app launching is only enabled on Windows."));
@@ -231,7 +238,8 @@ function launchProcess(command, args = []) {
       detached: true,
       stdio: "ignore",
       shell: false,
-      windowsHide: false
+      windowsHide: false,
+      ...options
     });
 
     let settled = false;
@@ -250,20 +258,214 @@ function launchProcess(command, args = []) {
   });
 }
 
-async function sendFixedMediaKey(actionName = "") {
-  const normalized = normalizeActionName(actionName);
-  const keyCode = MEDIA_ACTION_KEYS[normalized];
-  if (!keyCode) throw new Error("Unsupported media action.");
+async function sendSystemMediaKey(action, targetAppPackage = "", preferredSource = "") {
+  const vkCode = MEDIA_ACTION_KEYS[action];
+  const winrtMethodName = WINRT_ACTION_METHODS[action];
+  if (!vkCode || !winrtMethodName) {
+    throw new Error("Unsupported media action.");
+  }
 
-  const hexKey = `0x${keyCode.toString(16).toUpperCase()}`;
-  const className = `NativeMethods_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+  const mediaKeySenderName = `MediaKeySender_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+  const user32Name = `User32_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+
   const script = `
-$code = '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);'
-Add-Type -Namespace SignalShare -Name ${className} -MemberDefinition $code
-[SignalShare.${className}]::keybd_event(${hexKey},0,0,[UIntPtr]::Zero)
-[SignalShare.${className}]::keybd_event(${hexKey},0,2,[UIntPtr]::Zero)
-`;
-  
+$ErrorActionPreference = "Stop"
+$winRtSuccess = $false
+$targetApp = [string]$env:SIGNAL_SHARE_TARGET_APP
+$preferred = [string]$env:SIGNAL_SHARE_PREFERRED_SOURCE
+if ($null -eq $targetApp) { $targetApp = "" }
+if ($null -eq $preferred) { $preferred = "" }
+$targetApp = $targetApp.Trim()
+$preferred = $preferred.Trim().ToLowerInvariant()
+
+function Normalize-AppId([string]$value) {
+  if ([string]::IsNullOrWhiteSpace($value)) { return "" }
+  $normalized = $value.Trim().ToLowerInvariant()
+  $normalized = [regex]::Replace($normalized, "!.*$", "")
+  $normalized = [regex]::Replace($normalized, "\\\\.[0-9]+$", "")
+  $normalized = [regex]::Replace($normalized, "\\\\.exe$", "")
+  return $normalized
+}
+
+function Matches-AppId([string]$candidate, [string]$target) {
+  $candidateNorm = Normalize-AppId $candidate
+  $targetNorm = Normalize-AppId $target
+  if ([string]::IsNullOrWhiteSpace($candidateNorm) -or [string]::IsNullOrWhiteSpace($targetNorm)) { return $false }
+  return ($candidateNorm -eq $targetNorm) -or ($candidateNorm.StartsWith($targetNorm)) -or ($targetNorm.StartsWith($candidateNorm))
+}
+
+$appCommandSig = '[DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);'
+$user32 = Add-Type -MemberDefinition $appCommandSig -Name "${user32Name}" -Namespace "Win32" -PassThru
+function Send-AppCommand($cmd) {
+  $WM_APPCOMMAND = 0x0319
+  $targetHWnd = [IntPtr]0xffff # HWND_BROADCAST
+  $lParam = [IntPtr]($cmd -shl 16)
+  [Win32.${user32Name}]::SendMessage($targetHWnd, $WM_APPCOMMAND, [IntPtr]::Zero, $lParam)
+}
+
+function Is-Browser-App([string]$id) {
+  $n = Normalize-AppId $id
+  return ($n -match "chrome|msedge|edge|firefox|opera|browser")
+}
+
+function Get-Session-Text($session) {
+  $parts = New-Object System.Collections.Generic.List[string]
+  try { if ($session.SourceAppUserModelId) { $parts.Add($session.SourceAppUserModelId) } } catch {}
+  try {
+    $mediaOp = $session.TryGetMediaPropertiesAsync()
+    $asTaskMethod = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { 
+      $_.ToString() -match 'Task.*AsTask.*IAsyncOperation' -and $_.ToString() -notmatch 'WithProgress' 
+    } | Select-Object -First 1
+    if ($null -ne $asTaskMethod) {
+      $mediaTask = $asTaskMethod.MakeGenericMethod(@([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])).Invoke($null, @($mediaOp))
+      $media = $mediaTask.Result
+      if ($media.Title) { $parts.Add($media.Title) }
+      if ($media.Artist) { $parts.Add($media.Artist) }
+    }
+  } catch {}
+  return ([string]::Join(" ", $parts)).ToLowerInvariant()
+}
+
+function Is-Match-Source($session, [string]$source) {
+  if ([string]::IsNullOrWhiteSpace($source) -or $source -eq "all") { return $true }
+  $id = ""
+  try { $id = Normalize-AppId $session.SourceAppUserModelId } catch {}
+  $text = Get-Session-Text $session
+  $isBrowser = Is-Browser-App $id
+
+  $isYouTube = ($id -match "youtube|ytmusic") -or ($text -match "youtube\\\\.com|youtube -|- youtube|youtu\\\\.be|music\\\\.youtube")
+  $isSpotify = ($id -match "spotify") -or ($text -match "spotify|open\\\\.spotify")
+
+  if ($source -eq "spotify") {
+    if ($isYouTube) { return $false }
+    if ($isSpotify) { return $true }
+    return $isBrowser
+  }
+
+  if ($source -eq "youtube") {
+    if ($isSpotify) { return $false }
+    if ($isYouTube) { return $true }
+    return $isBrowser
+  }
+
+  return $true
+}
+
+try {
+  Add-Type -AssemblyName System.Runtime.WindowsRuntime
+  $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime]
+  $asTaskMethod = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+    $_.ToString() -match 'Task.*AsTask.*IAsyncOperation' -and $_.ToString() -notmatch 'WithProgress' -and $_.ToString() -notmatch 'CancellationToken' -and $_.ToString() -match 'TResult.*TResult'
+  } | Select-Object -First 1
+
+  if ($asTaskMethod -ne $null) {
+    $managerOp = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
+    $managerTask = $asTaskMethod.MakeGenericMethod(@([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])).Invoke($null, @($managerOp))
+    $manager = $managerTask.Result
+    $session = $null
+
+    if ($manager -ne $null) {
+      $sessions = $manager.GetSessions()
+      if ($sessions.Count -gt 0) {
+        $bestScore = -1
+        foreach ($candidate in $sessions) {
+          if ($null -eq $candidate) { continue }
+          try {
+            $score = 0
+            $candidateId = ""
+            try { $candidateId = $candidate.SourceAppUserModelId } catch {}
+            $isPreferred = [string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all" -or (Is-Match-Source $candidate $preferred)
+            
+            if (![string]::IsNullOrWhiteSpace($preferred) -and $preferred -ne "all") {
+              if ($isPreferred) { $score += 10000 } else { $score -= 20000 }
+
+              # Direct match bonus
+              $text = Get-Session-Text $candidate
+              $normId = Normalize-AppId $candidateId
+              $isYouTube = ($normId -match "youtube|ytmusic") -or ($text -match "youtube\\\\.com|youtube -|- youtube|youtu\\\\.be|music\\\\.youtube")
+              $isSpotify = ($normId -match "spotify") -or ($text -match "spotify|open\\\\.spotify")
+              if ($preferred -eq "spotify" -and $isSpotify) { $score += 20000 }
+              if ($preferred -eq "youtube" -and $isYouTube) { $score += 20000 }
+            }
+            if ($candidate.PlaybackInfo.PlaybackStatus -eq [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus]::Playing) { $score += 5000 }
+            
+            if ($score -gt $bestScore) { $bestScore = $score; $session = $candidate }
+          } catch {}
+        }
+      }
+
+      if ($session -eq $null) {
+        $session = $manager.GetCurrentSession()
+        if ($null -ne $session -and ![string]::IsNullOrWhiteSpace($preferred) -and $preferred -ne "all") {
+          if (-not (Is-Match-Source $session $preferred)) { $session = $null }
+        }
+      }
+    }
+
+    if ($session -ne $null) {
+      $actionMethod = $session.GetType().GetMethod('${winrtMethodName}', [Type[]]@())
+      if ($actionMethod -ne $null) {
+        try {
+          $actionOp = $actionMethod.Invoke($session, @())
+          $resultTask = $asTaskMethod.MakeGenericMethod(@([bool])).Invoke($null, @($actionOp))
+          $winRtSuccess = [bool]$resultTask.Result
+        } catch {
+          $winRtSuccess = $false
+        }
+      }
+    }
+  }
+} catch {
+  $winRtSuccess = $false
+}
+
+if ([string]::IsNullOrWhiteSpace($preferred) -or $preferred -eq "all") {
+  $WM_APPCOMMAND = 0x0319
+  $APPCOMMAND_MEDIA_PLAY_PAUSE = 14
+  $APPCOMMAND_MEDIA_NEXTTRACK = 11
+  $APPCOMMAND_MEDIA_PREVIOUSTRACK = 12
+
+  if ("${action}" -eq "play_pause") {
+    Send-AppCommand $APPCOMMAND_MEDIA_PLAY_PAUSE
+  } elseif ("${action}" -eq "next") {
+    Send-AppCommand $APPCOMMAND_MEDIA_NEXTTRACK
+  } elseif ("${action}" -eq "previous") {
+    Send-AppCommand $APPCOMMAND_MEDIA_PREVIOUSTRACK
+  }
+
+  $KEYEVENTF_EXTENDEDKEY = 0x0001
+  $KEYEVENTF_KEYUP = 0x0002
+
+  $keybdCode = '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);'
+  Add-Type -Namespace SignalShare -Name "${mediaKeySenderName}" -MemberDefinition $keybdCode
+  [SignalShare.${mediaKeySenderName}]::keybd_event(${vkCode}, 0, $KEYEVENTF_EXTENDEDKEY, [UIntPtr]::Zero)
+  Start-Sleep -Milliseconds 45
+  [SignalShare.${mediaKeySenderName}]::keybd_event(${vkCode}, 0, ($KEYEVENTF_EXTENDEDKEY -bor $KEYEVENTF_KEYUP), [UIntPtr]::Zero)
+
+  Write-Output "ok-global"
+  exit 0
+}
+
+if ($winRtSuccess -eq $false) {
+  if ("${action}" -eq "play_pause") {
+    if ($preferred -eq "youtube") {
+      try { Start-Process "https://www.youtube.com" } catch {}
+      Write-Output "ok-launched-youtube"
+      exit 0
+    } elseif ($preferred -eq "spotify") {
+      try { Start-Process "spotify:" } catch {}
+      Write-Output "ok-launched-spotify"
+      exit 0
+    }
+  }
+  Write-Output "fail-target-not-found"
+  exit 0
+}
+
+Write-Output "ok-winrt"
+exit 0
+`.trim();
+
   const encodedCommand = Buffer.from(script, 'utf16le').toString('base64');
 
   return launchProcess("powershell.exe", [
@@ -273,7 +475,14 @@ Add-Type -Namespace SignalShare -Name ${className} -MemberDefinition $code
     "Bypass",
     "-EncodedCommand",
     encodedCommand
-  ]);
+  ], {
+    windowsHide: true,
+    env: {
+      ...process.env,
+      SIGNAL_SHARE_TARGET_APP: targetAppPackage,
+      SIGNAL_SHARE_PREFERRED_SOURCE: preferredSource
+    }
+  });
 }
 
 async function openAllowedSystemUri(uri = "") {
@@ -318,7 +527,7 @@ async function runAllowedAppAction(app, actionName = "") {
   if (!action) throw new Error("App action is not allowlisted.");
 
   if (action.type === "media") {
-    return sendFixedMediaKey(action.key);
+    return sendSystemMediaKey(action.key, "", app.id);
   }
 
   throw new Error("App action type is not implemented.");
@@ -406,7 +615,10 @@ export function createStrictAiTools({ isAuthorized, fetchWithTimeout }) {
         return res.json({ ok: false, error: "Unsupported media action." });
       }
 
-      const result = await sendFixedMediaKey(action);
+      const preferredSource = typeof req.body?.preferredSource === "string" ? req.body.preferredSource.trim() : "";
+      const appPackage = typeof req.body?.appPackage === "string" ? req.body.appPackage.trim() : "";
+
+      const result = await sendSystemMediaKey(action, appPackage, preferredSource);
       return res.json({ ok: true, action, ...result });
     } catch (error) {
       console.error("[Bridge] Media action error:", error);
