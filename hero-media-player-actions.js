@@ -16,6 +16,7 @@ import {
   detectPlayingYouTubeVideo
 } from './youtube-player-detection.js';
 import { hasActiveMediaInSource } from './_hero-media-player-toggle-state-validation.js';
+import { validatePlayPauseTarget, validateNavigationTarget, handleMediaToggleAction } from './_hero-media-player-toggle-action-isolation.js';
 
 /**
  * Throttles high-frequency actions to prevent hardware/bridge flooding.
@@ -435,6 +436,48 @@ export async function handlePlayPauseAction(context, forcePlay) {
     refreshDesktopSnapshot, refreshNativeSnapshot
   } = context;
 
+  // ===================== TOGGLE ISOLATION VALIDATION =====================
+  
+  // Get active source from toggle state
+  const heroControlSource = state.heroControlSource;
+  const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+  const activeSource = preferredSource === 'youtube' || preferredSource === 'spotify' ? preferredSource : null;
+
+  // Validate if play/pause action targets the correct source
+  const playPauseValidation = validatePlayPauseTarget({
+    activeSource,
+    currentPlaybackState: state.heroPlayerPlaybackState || "none",
+    nativeSnapshot,
+    desktopSnapshot,
+    post: getControllablePlayerPost()
+  });
+
+  // If target validation fails or mismatch detected, return filtered idle state immediately
+  if (!playPauseValidation.valid && (activeSource === 'youtube' || activeSource === 'spotify')) {
+    console.log(`[Hero] Play/Pause filtered for source mismatch: ${activeSource}`);
+    context.renderHeroPlayerStage({
+      post: null,
+      parseYouTubeUrl
+    });
+    return;
+  }
+
+  // Apply media toggle action handler with isolation
+  const toggleResult = handleMediaToggleAction({
+    toggleMode: "media",
+    mediaSource: activeSource,
+    heroControlSource,
+    post: getControllablePlayerPost(),
+    state,
+    actionType: 'play-pause'
+  });
+
+  // Use toggled result for validation decisions
+  const isTargetingCorrectSource = toggleResult.filteredForSource && toggleResult.activeMediaInfo;
+
+  console.log(`[Hero] Play/Pause Intent Check - Target Source: ${activeSource}, Valid: ${isTargetingCorrectSource}`);
+  // =========================== END TOGGLE ISOLATION VALIDATION =========================
+
   // 1. AUTHORITATIVE COOLDOWN
   if (debounce("play-pause", 500)) return;
 
@@ -444,8 +487,6 @@ export async function handlePlayPauseAction(context, forcePlay) {
 
   // Identify modes and sources
   const isMediaMode = state.heroControlMode === "media";
-  const heroControlSource = state.heroControlSource;
-  const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
 
   // Mode Resolution (authoritative in actions module)
@@ -647,6 +688,46 @@ export function handlePreviousAction(context) {
     isNativeCapacitorApp, refreshDesktopSnapshot, refreshNativeSnapshot
   } = context;
 
+  // ===================== TOGGLE ISOLATION VALIDATION =====================
+  
+  // Get active source from toggle state
+  const heroControlSource = state.heroControlSource;
+  const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+  const activeSource = preferredSource === 'youtube' || preferredSource === 'spotify' ? preferredSource : null;
+
+  // Validate if previous/next action targets the correct source
+  const navigationValidation = validateNavigationTarget({
+    activeSource,
+    currentPlaybackState: state.heroPlayerPlaybackState || "none",
+    nativeSnapshot,
+    desktopSnapshot,
+    post: getControllablePlayerPost(),
+    feedPostIndex: null // null for media mode
+  });
+
+  // If target validation fails or mismatch detected, return filtered idle state immediately
+  if (!navigationValidation.valid && (activeSource === 'youtube' || activeSource === 'spotify')) {
+    console.log(`[Hero] Previous/Next filtered for source mismatch: ${activeSource}`);
+    context.renderHeroPlayerStage({
+      post: null,
+      parseYouTubeUrl
+    });
+    return;
+  }
+
+  // Apply media toggle action handler with isolation
+  const toggleResult = handleMediaToggleAction({
+    toggleMode: "media",
+    mediaSource: activeSource,
+    heroControlSource,
+    post: getControllablePlayerPost(),
+    state,
+    actionType: 'previous'
+  });
+
+  console.log(`[Hero] Previous Action Check - Target Source: ${activeSource}, Valid: ${toggleResult.filteredForSource}`);
+  // =========================== END TOGGLE ISOLATION VALIDATION =========================
+
   if (debounce("previous", 500)) return;
 
   const now = Date.now();
@@ -783,6 +864,46 @@ export function handleNextAction(context) {
     isNativeCapacitorApp, refreshDesktopSnapshot, refreshNativeSnapshot
   } = context;
 
+  // ===================== TOGGLE ISOLATION VALIDATION =====================
+  
+  // Get active source from toggle state
+  const heroControlSource = state.heroControlSource;
+  const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+  const activeSource = preferredSource === 'youtube' || preferredSource === 'spotify' ? preferredSource : null;
+
+  // Validate if previous/next action targets the correct source
+  const navigationValidation = validateNavigationTarget({
+    activeSource,
+    currentPlaybackState: state.heroPlayerPlaybackState || "none",
+    nativeSnapshot,
+    desktopSnapshot,
+    post: getControllablePlayerPost(),
+    feedPostIndex: null // null for media mode
+  });
+
+  // If target validation fails or mismatch detected, return filtered idle state immediately
+  if (!navigationValidation.valid && (activeSource === 'youtube' || activeSource === 'spotify')) {
+    console.log(`[Hero] Previous/Next filtered for source mismatch: ${activeSource}`);
+    context.renderHeroPlayerStage({
+      post: null,
+      parseYouTubeUrl
+    });
+    return;
+  }
+
+  // Apply media toggle action handler with isolation
+  const toggleResult = handleMediaToggleAction({
+    toggleMode: "media",
+    mediaSource: activeSource,
+    heroControlSource,
+    post: getControllablePlayerPost(),
+    state,
+    actionType: 'next'
+  });
+
+  console.log(`[Hero] Next Action Check - Target Source: ${activeSource}, Valid: ${toggleResult.filteredForSource}`);
+  // =========================== END TOGGLE ISOLATION VALIDATION =========================
+
   if (debounce("next", 500)) return;
 
   const now = Date.now();
@@ -790,8 +911,6 @@ export function handleNextAction(context) {
 
   // Mode Resolution (authoritative in actions module)
   const isMediaMode = state.heroControlMode === "media";
-  const heroControlSource = state.heroControlSource;
-  const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
   
   // CRITICAL FIX #4: Always use bridge when in media mode
