@@ -1,13 +1,15 @@
 /**
- * Hero Media Player Preview [FIXED VERSION]
- * Handles preview rendering for YouTube/Spotify in Media Toggle Mode
+ * Hero Media Player Preview - FIXED VERSION
+ * Implements INDEPENDENT toggle functionality for Feed/Media and YouTube/Spotify
  * 
- * APPLIED FIXES:
- * 1. Added defensive checks before DOM operations (stage.dataset, stage.replaceChildren)
- * 2. Enhanced YouTube detection beyond iframes - check URL hash and window.location
- * 3. Fixed Media-Toggle Mode to always update hero player stage after action
- * 4. Added artwork cache invalidation for stale images in toggle mode
+ * TOGGLE FUNCTIONALITY:
+ * 1. FEED Toggle (Feed/Media): Shows/feed posts, switches to respective feed post type exclusively
+ * 2. MEDIA Toggle (YouTube/Spotify): Shows information and preview based on application/browser tab
+ * 
+ * Both toggles are completely independent - one action only affects its own toggle state.
+ * Both show "pre-preview" (standby) when nothing is playing.
  */
+
 import { toCleanString, isThenable, safeCall, formatPostBadge, formatPostMeta } from './shared-utils.js';
 
 const YOUTUBE_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
@@ -239,7 +241,59 @@ export function resolveAppPreviewArtwork(post, options = {}) {
 }
 
 /**
- * CRITICAL FIX #3: Enhanced artwork cache invalidation for toggle mode - always clear cache key on source change
+ * Constructs the DOM element for the preview card.
+ */
+export function createPreviewCard({ badge = "", title = "", meta = "", note = "", artworkUrl = "" }) {
+  try {
+    const card = document.createElement("article");
+    card.className = "hero-player-preview hero-player-preview-minimal";
+
+    const copy = document.createElement("div");
+    copy.className = "hero-player-preview-copy";
+
+    if (badge) {
+      const badgeNode = document.createElement("p");
+      badgeNode.className = "hero-player-preview-badge hero-player-badge-compact";
+      badgeNode.textContent = badge;
+      // CRITICAL: Inline minimal compact styling
+      badgeNode.style.cssText = 
+        'font-size: 0.7rem; ' +
+        'font-weight: 600; ' +
+        'letter-spacing: 0.5px; ' +
+        'text-transform: uppercase; ' +
+        'padding: 4px 8px; ' +
+        'border-radius: 4px; ' +
+        'background: rgba(0,0,0,0.06); ' +
+        'color: #333; ' +
+        'margin-bottom: 2px;';
+      copy.appendChild(badgeNode);
+    }
+
+    // Only show title/artist if there's no badge or it's an idle state (keep current behavior for device mode)
+    if (title || meta) {
+      const titleNode = document.createElement("p");
+      titleNode.className = "hero-player-preview-title hero-player-text-fade";
+      titleNode.textContent = `${title} · ${meta}`;
+      // Add fade effect with smaller, lighter font
+      titleNode.style.cssText = 
+        'font-size: 0.75rem; ' +
+        'color: #666; ' +
+        'opacity: 0.8; ' +
+        'padding-top: 4px;';
+      copy.appendChild(titleNode);
+    }
+
+    card.appendChild(copy);
+    attachArtwork(card, title, artworkUrl);
+    return card;
+  } catch (e) {
+    console.warn("[Hero Preview] Failed to create preview card:", e);
+    return null;
+  }
+}
+
+/**
+ * Attaches artwork image to preview card with cache invalidation support.
  */
 function attachArtwork(card, title, artworkUrl) {
   if (!artworkUrl) return;
@@ -260,7 +314,7 @@ function attachArtwork(card, title, artworkUrl) {
     'max-height: 58vh;' +
     'border-radius: 18px;' +
     'object-fit: cover;' +
-    'display: block;'
+    'display: block;';
 
   image.addEventListener("error", () => {
     // If the image fails to load (404), remove it.
@@ -295,58 +349,6 @@ function attachArtwork(card, title, artworkUrl) {
 }
 
 /**
- * Constructs the DOM element for the preview card.
- */
-export function createPreviewCard({ badge = "", title = "", meta = "", note = "", artworkUrl = "" }) {
-  try {
-    const card = document.createElement("article");
-    card.className = "hero-player-preview hero-player-preview-minimal";
-
-    const copy = document.createElement("div");
-    copy.className = "hero-player-preview-copy";
-
-    if (badge) {
-      const badgeNode = document.createElement("p");
-      badgeNode.className = "hero-player-preview-badge hero-player-badge-compact";
-      badgeNode.textContent = badge;
-      // CRITICAL: Inline minimal compact styling
-      badgeNode.style.cssText = 
-        'font-size: 0.7rem; ' +
-        'font-weight: 600; ' +
-        'letter-spacing: 0.5px; ' +
-        'text-transform: uppercase; ' +
-        'padding: 4px 8px; ' +
-        'border-radius: 4px; ' +
-        'background: rgba(0,0,0,0.06); ' +
-        'color: #333; ' +
-        'margin-bottom: 2px;'
-      copy.appendChild(badgeNode);
-    }
-
-    // Only show title/artist if there's no badge or it's an idle state (keep current behavior for device mode)
-    if (title || meta) {
-      const titleNode = document.createElement("p");
-      titleNode.className = "hero-player-preview-title hero-player-text-fade";
-      titleNode.textContent = `${title} · ${meta}`;
-      // Add fade effect with smaller, lighter font
-      titleNode.style.cssText = 
-        'font-size: 0.75rem; ' +
-        'color: #666; ' +
-        'opacity: 0.8; ' +
-        'padding-top: 4px;'
-      copy.appendChild(titleNode);
-    }
-
-    card.appendChild(copy);
-    attachArtwork(card, title, artworkUrl);
-    return card;
-  } catch (e) {
-    console.warn("[Hero Preview] Failed to create preview card:", e);
-    return null;
-  }
-}
-
-/**
  * Creates a simplified companion/download card.
  */
 export function createCompanionCard(options = {}) {
@@ -356,7 +358,7 @@ export function createCompanionCard(options = {}) {
 
     const badgeNode = document.createElement("p");
     badgeNode.className = "hero-player-preview-badge hero-player-badge-compact";
-    badgeNode.textContent = "COMpanion Bridge";
+    badgeNode.textContent = "COMPANION BRIDGE";
     // Match compact badge styling
     badgeNode.style.cssText = 
       'font-size: 0.7rem; ' +
@@ -367,7 +369,7 @@ export function createCompanionCard(options = {}) {
       'border-radius: 4px; ' +
       'background: rgba(0,0,0,0.06); ' +
       'color: #333; ' +
-      'margin-bottom: 2px;'
+      'margin-bottom: 2px;';
     card.appendChild(badgeNode);
 
     if (options.artworkUrl) {
@@ -381,6 +383,106 @@ export function createCompanionCard(options = {}) {
   }
 }
 
+/**
+ * Creates a simplified feed post preview card.
+ * FEED TOGGLE: Shows feed posts and switches to respective feed post type exclusively
+ */
+function createFeedPreviewCard({ badge = "", title = "", meta = "" }) {
+  try {
+    const card = document.createElement("article");
+    card.className = "hero-player-preview hero-player-feed-preview";
+
+    const copy = document.createElement("div");
+    copy.className = "hero-player-preview-copy";
+
+    if (badge) {
+      const badgeNode = document.createElement("p");
+      badgeNode.className = "hero-player-preview-badge hero-player-badge-compact";
+      badgeNode.textContent = badge;
+      badgeNode.style.cssText = 
+        'font-size: 0.7rem; ' +
+        'font-weight: 600; ' +
+        'letter-spacing: 0.5px; ' +
+        'text-transform: uppercase; ' +
+        'padding: 4px 8px; ' +
+        'border-radius: 4px; ' +
+        'background: rgba(0,0,0,0.06); ' +
+        'color: #333; ' +
+        'margin-bottom: 2px;';
+      copy.appendChild(badgeNode);
+    }
+
+    if (title || meta) {
+      const titleNode = document.createElement("p");
+      titleNode.className = "hero-player-preview-title";
+      titleNode.textContent = `${title} · ${meta}`;
+      titleNode.style.cssText = 
+        'font-size: 0.8rem; ' +
+        'color: #444; ' +
+        'padding-top: 6px;';
+      copy.appendChild(titleNode);
+    }
+
+    card.appendChild(copy);
+    return card;
+  } catch (e) {
+    console.warn("[Hero Preview] Failed to create feed preview:", e);
+    return null;
+  }
+}
+
+/**
+ * Creates an empty idle/standby preview.
+ * Both toggles show "pre-preview" when nothing is playing.
+ */
+function createIdleCard(badge, title, meta) {
+  try {
+    const card = document.createElement("article");
+    card.className = "hero-player-preview hero-player-idle-preview";
+
+    const copy = document.createElement("div");
+    copy.className = "hero-player-preview-copy";
+
+    if (badge) {
+      const badgeNode = document.createElement("p");
+      badgeNode.className = "hero-player-preview-badge hero-player-badge-compact";
+      badgeNode.textContent = badge;
+      badgeNode.style.cssText = 
+        'font-size: 0.7rem; ' +
+        'font-weight: 600; ' +
+        'letter-spacing: 0.5px; ' +
+        'text-transform: uppercase; ' +
+        'padding: 4px 8px; ' +
+        'border-radius: 4px; ' +
+        'background: rgba(0,0,0,0.06); ' +
+        'color: #333; ' +
+        'margin-bottom: 2px;';
+      copy.appendChild(badgeNode);
+    }
+
+    if (title || meta) {
+      const titleNode = document.createElement("p");
+      titleNode.className = "hero-player-preview-title hero-player-text-fade";
+      titleNode.textContent = `${title} · ${meta}`;
+      titleNode.style.cssText = 
+        'font-size: 0.75rem; ' +
+        'color: #666; ' +
+        'opacity: 0.8; ' +
+        'padding-top: 4px;';
+      copy.appendChild(titleNode);
+    }
+
+    card.appendChild(copy);
+    return card;
+  } catch (e) {
+    console.warn("[Hero Preview] Failed to create idle card:", e);
+    return null;
+  }
+}
+
+/**
+ * Creates a simplified companion/download card.
+ */
 export function createActivePlayerStage(descriptor) {
   if (!descriptor?.src) return null;
 
@@ -458,36 +560,441 @@ function commitActivePlayer(stage, post, options) {
 }
 
 /**
- * Creates a minimal standby/idle preview card - simplified design.
+ * Handles Feed Toggle Mode - FEED TOGGLE: Shows/feed posts and switches to respective feed post type exclusively
  */
-function createPostStandbyPreview(post, options = {}) {
-  if (!post) return null;
-  
+function handleFeedToggleMode(options = {}) {
   const {
-    getProfileSummaryForPost,
-    formatKind,
+    stage,
+    mode,
+    post,
+    fallbackMedia,
+    nativeSnapshot,
+    desktopSnapshot,
+    getStandbyPreviewPost,
+    state,
     parseYouTubeUrl,
     resolveActivePlayerSource,
     getSpotifyPreviewImageUrl,
-    isHardenedEnvironment,
-    isYouTubeMode,
-    isSpotifyActive,
   } = options;
 
-  const providerLabel = post.sourceKind === "youtube"
-    ? "YOUTUBE" 
-    : post.sourceKind === "spotify"
-      ? "SPOTIFY" 
-      : "APPMEDIA";
+  if (!stage) return;
+
+  // Detect current source filter for feed mode
+  const sourceFilter = (state?.heroControlSource || state?.heroMediaSource || "").toLowerCase();
   
-  const badge = `${providerLabel} PREVIEW`;
+  // Determine feed post type based on source
+  let badge = "FEED MODE";
+  let title = "";
+  let meta = "";
+
+  if (post) {
+    const providerLabel = post.sourceKind === "youtube" ? "YOUTUBE POST" : 
+                         post.sourceKind === "spotify" ? "SPOTIFY POST" : 
+                         "APP MEDIA";
+    
+    badge = `${providerLabel} · ${state.heroControlMode.toUpperCase()}`;
+    title = post?.title || "";
+    meta = post?.creator || state.currentUser?.name || "Signal Share";
+
+    // Check for active player first (active feed post)
+    const isActivePlayer = commitActivePlayer(stage, post, options);
+    if (isActivePlayer) return;
+
+  } else {
+    // No active post - show idle/pre-preview state for feed mode
+    commitCard(stage, {
+      badge: "FEED MODE · READY",
+      title: "Browse posts to start playback",
+      meta: "Switch sources via toggle button"
+    });
+    return;
+  }
+
+  // Get artwork for feed post
+  const creatorSummary = safeCall(getProfileSummaryForPost, null, post);
   const artworkUrl = resolveAppPreviewArtwork(post, {
     parseYouTubeUrl,
     resolveActivePlayerSource,
     getSpotifyPreviewImageUrl,
   });
 
-  // Minimal card with just badge and status (no title/meta)
+  // Create and commit feed preview card
+  commitCard(stage, {
+    badge: badge,
+    title: title || "",
+    meta: meta || "",
+    artworkUrl: artworkUrl,
+    showMetadata: false
+  });
+}
+
+/**
+ * Handles Media Toggle Mode (YouTube/Spotify toggle) - MEDIA TOGGLE: Shows information and preview based on app/browser tab
+ */
+function handleMediaToggleMode(options = {}) {
+  const {
+    post,
+    matchedPost,
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
+    isYouTubeMode,
+    isSpotifyActive,
+  } = options;
+
+  // CRITICAL INDEPENDENCE FIX: Each toggle only affects its own preview state
+  
+  // Check for active YouTube video from browser tab first (Media Toggle)
+  const youtubeFromTab = getActiveYouTubeVideoFromURL();
+  
+  // Check for Spotify/YouTube toggle source
+  const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify");
+  const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube");
+
+  // Handle YouTube Mode Preview (when YouTube toggle is active)
+  if (isYouTubeMode) {
+    // Check for active video in YouTube player first
+    if (post && post.sourceKind === "youtube") {
+      const cleanTitle = toCleanString(post.title || "");
+      const cleanCreator = toCleanString(post.creator || "");
+
+      const resolvedMetadata = resolveAppPreviewArtwork({
+        ...post,
+        title: cleanTitle,
+        creator: cleanCreator,
+      }, {
+        parseYouTubeUrl,
+        resolveActivePlayerSource,
+      });
+
+      if (resolvedMetadata) {
+        return createCardResult({
+          badge: "YOUTUBE ACTIVE",
+          title: post?.title || matchedPost?.title || "",
+          meta: matchedPost?.creator || post?.creator || "Signal Share",
+          artworkUrl: resolvedMetadata,
+        });
+      }
+    }
+
+    // If no explicit YouTube post, check browser tab for active video
+    if (youtubeFromTab) {
+      console.log("[Media Toggle] Found YouTube video in browser tab:", youtubeFromTab.title);
+      return createCardResult({
+        badge: "BROWSER YOUTUBE",
+        title: youtubeFromTab.title || "YouTube Video",
+        meta: `Source: ${youtubeFromTab.source.toUpperCase()}`,
+        artworkUrl: `https://i.ytimg.com/vi/${youtubeFromTab.videoId}/hqdefault.jpg`,
+      });
+    }
+
+    // If no active YouTube video, show idle state
+    return createCardResult({
+      badge: "YOUTUBE · READY",
+      title: "Open a YouTube video to play",
+      meta: "Or switch to Spotify in the toggle menu",
+    });
+  }
+
+  // Handle Spotify Mode Preview (when Spotify toggle is active)
+  if (isSpotifyActive && post?.sourceKind === "spotify") {
+    const cleanTitle = toCleanString(post.title || "");
+    const cleanCreator = toCleanString(post.creator || "");
+
+    const resolvedMetadata = resolveAppPreviewArtwork({
+      ...post,
+      title: cleanTitle,
+      creator: cleanCreator,
+    }, {
+      parseYouTubeUrl,
+      resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
+    });
+
+    if (resolvedMetadata) {
+      return createCardResult({
+        badge: "SPOTIFY ACTIVE",
+        title: post?.title || matchedPost?.title || "",
+        meta: matchedPost?.creator || post?.creator || "Signal Share",
+        artworkUrl: resolvedMetadata,
+      });
+    }
+  }
+
+  // Check for active Spotify in browser tab (Media Toggle)
+  if (isSpotifyActive && !post) {
+    const metadata = safeCall(getBrowserMediaMetadata, null);
+    if (metadata?.artworkUrl && metadata.title) {
+      console.log("[Media Toggle] Found Spotify track in browser tab");
+      return createCardResult({
+        badge: "BROWSER SPOTIFY",
+        title: metadata.title || "Spotify Track",
+        meta: metadata.artist || metadata.creator || "Spotify",
+        artworkUrl: metadata.artworkUrl,
+      });
+    }
+  }
+
+  // Return idle state if no active source found (for Media Toggle)
+  return createCardResult({
+    badge: "TOGGLE MODE · READY",
+    title: isYouTubeMode ? "Open YouTube or Spotify to begin" : "Select a source above",
+    meta: isYouTubeMode ? "Toggle menu: Feed ↔ Media" : "",
+  });
+}
+
+/**
+ * Creates a preview card result.
+ */
+function createCardResult(cardOptions) {
+  try {
+    return {
+      key: getCardKey(cardOptions),
+      node: createPreviewCard(cardOptions),
+    };
+  } catch (e) {
+    console.warn("[Hero Preview] Failed to create card result:", e);
+    return null;
+  }
+}
+
+function commitCard(stage, cardOptions) {
+  const result = createCardResult(cardOptions);
+  if (!result || !result.node) return;
+  setStageContent(stage, result.node, result.key);
+}
+
+/**
+ * Main entry point for hero stage preview rendering.
+ * Implements INDEPENDENT toggle functionality:
+ * - Feed Toggle (Feed/Media): Shows/feed posts exclusively
+ * - Media Toggle (YouTube/Spotify): Shows app/browser tab info exclusively
+ */
+export function renderHeroStagePreview(options = {}) {
+  const {
+    stage,
+    mode,
+    post,
+    fallbackMedia,
+    nativeSnapshot,
+    desktopSnapshot,
+    getStandbyPreviewPost,
+    state,
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
+  } = options;
+
+  if (!stage) return;
+
+  // Get configuration for mode detection
+  const config = window.SIGNAL_SHARE_HERO_PLAYER_CONFIG || {};
+  const heroControlMode = config.heroControlMode || "feed";
+  
+  // Determine active sources for media toggle mode
+  const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube");
+  const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify");
+  
+  // Check for native snapshot (preferred source)
+  let preferredSnapshot = null;
+  if (hasNativeSnapshotBridge()) {
+    const bridge = getNativeBridge();
+    if (bridge?.getNowPlayingSnapshot) {
+      const source = state?.heroControlSource || "spotify";
+      const snapshotData = bridge.getNowPlayingSnapshot(source);
+      try {
+        const parsed = JSON.parse(snapshotData);
+        preferredSnapshot = normalizeNativeSnapshot(parsed);
+      } catch {}
+    }
+  }
+
+  // CRITICAL INDEPENDENCE: Handle each toggle mode exclusively
+  if (config.heroControlMode === "feed" || state?.heroControlMode === "feed") {
+    // FEED TOGGLE MODE: Show feed posts exclusively, independent of media toggle
+    handleFeedToggleMode({
+      stage,
+      mode,
+      post,
+      fallbackMedia,
+      nativeSnapshot: preferredSnapshot,
+      desktopSnapshot,
+      getStandbyPreviewPost,
+      state,
+      parseYouTubeUrl,
+      resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
+    });
+  } else if (config.heroControlMode === "media" || state?.heroControlMode === "media") {
+    // MEDIA TOGGLE MODE: Show YouTube/Spotify info exclusively, independent of feed toggle
+    handleMediaToggleMode({
+      post,
+      matchedPost: null,
+      parseYouTubeUrl,
+      resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
+      isYouTubeMode,
+      isSpotifyActive,
+    });
+  } else {
+    // Default mode - try standard rendering
+    renderStandardPreview({
+      stage,
+      mode,
+      post,
+      fallbackMedia,
+      nativeSnapshot: preferredSnapshot,
+      desktopSnapshot,
+      getStandbyPreviewPost,
+      state,
+      parseYouTubeUrl,
+      resolveActivePlayerSource,
+      getSpotifyPreviewImageUrl,
+    });
+  }
+}
+
+/**
+ * Standard preview rendering (fallback for non-toggle modes).
+ */
+function renderStandardPreview(options = {}) {
+  const {
+    stage,
+    mode,
+    post,
+    fallbackMedia,
+    nativeSnapshot,
+    desktopSnapshot,
+    getStandbyPreviewPost,
+    state,
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
+  } = options;
+
+  if (!stage) return;
+
+  // Standard rendering logic for non-toggle modes
+  const standbyPost = (!post && typeof getStandbyPreviewPost === "function")
+    ? safeCall(getStandbyPreviewPost, null)
+    : null;
+
+  if (mode === "device") {
+    const playbackStatus = nativeSnapshot?.playbackState || "";
+    const badge = nativeSnapshot?.active 
+      ? `ON-DEVICE · ${playbackStatus.toUpperCase()}` 
+      : "ON-DEVICE MEDIA";
+
+    commitCard(stage, {
+      badge: badge,
+      title: nativeSnapshot?.title || post?.title || "",
+      meta: nativeSnapshot?.meta || post?.creator || "",
+      artworkUrl: post ? resolveAppPreviewArtwork(post, options) : (nativeSnapshot?.artworkUri || "")
+    });
+    return;
+  }
+
+  if (mode === "desktop") {
+    const playbackStatus = desktopSnapshot?.playbackState || "";
+    const snapshotProvider = (desktopSnapshot?.sourceProvider || "").toLowerCase();
+    
+    let platformLabel = post ? formatPostBadge(post, formatKind(getSignalLabel)) : "PC SYSTEM MEDIA";
+    if (snapshotProvider === "youtube" || state?.heroMediaSource === "youtube") {
+      platformLabel = "YOUTUBE";
+    } else if (snapshotProvider === "spotify" || state?.heroMediaSource === "spotify") {
+      platformLabel = "SPOTIFY";
+    }
+
+    let artworkUrl = desktopSnapshot?.artworkUri || (post ? resolveAppPreviewArtwork(post, options) : "");
+
+    const badge = post 
+      ? platformLabel 
+      : `${platformLabel} · ${playbackStatus.toUpperCase()}`;
+
+    commitCard(stage, {
+      badge: badge,
+      title: desktopSnapshot?.title || post?.title || "",
+      meta: desktopSnapshot?.meta || post?.creator || "",
+      artworkUrl: artworkUrl
+    });
+
+    return;
+  }
+
+  if (!post) {
+    const metadata = safeCall(getBrowserMediaMetadata, null);
+    commitStandbyOrFallback(stage, standbyPost, options, {
+      badge: "NOW PLAYING",
+      title: "",
+      meta: "",
+      artworkUrl: metadata?.artworkUrl || fallbackMedia?.getAttribute("data-artwork") || ""
+    });
+    return;
+  }
+
+  const creatorSummary = safeCall(getProfileSummaryForPost, null, post);
+  const artworkUrl = resolveAppPreviewArtwork(post, {
+    parseYouTubeUrl,
+    resolveActivePlayerSource,
+    getSpotifyPreviewImageUrl,
+  });
+
+  commitCard(stage, {
+    badge: "NOW PLAYING",
+    title: "",
+    meta: "",
+    artworkUrl: artworkUrl,
+    showMetadata: true
+  });
+}
+
+function canUseFallbackMedia(fallbackMedia) {
+  return typeof HTMLMediaElement !== "undefined" && fallbackMedia instanceof HTMLMediaElement;
+}
+
+/**
+ * Normalizes native snapshot data.
+ */
+function normalizeNativeSnapshot(raw = {}) {
+  const playbackState = raw.playbackState || raw.playback?.state || "none";
+  return {
+    title: typeof raw.title === "string" ? raw.title.trim() : "",
+    meta: typeof raw.meta === "string" ? raw.meta.trim() : "",
+    appPackage: typeof raw.appPackage === "string" ? raw.appPackage.trim() : "",
+    openUri: typeof raw.openUri === "string" ? raw.openUri.trim() : "",
+    artworkUri: typeof raw.artworkUri === "string" ? raw.artworkUri.trim() : "",
+    active: Boolean(raw.active),
+    playbackState,
+  };
+}
+
+/**
+ * Checks for native snapshot bridge availability.
+ */
+function hasNativeSnapshotBridge() {
+  return (window?.NativeBridge && typeof window.NativeBridge === "object" && 
+          typeof window.NativeBridge.getNowPlayingSnapshot === "function");
+}
+
+/**
+ * Gets the native snapshot bridge instance.
+ */
+function getNativeBridge() {
+  return window?.NativeBridge && typeof window.NativeBridge === "object" ? window.NativeBridge : null;
+}
+
+/**
+ * Creates a simplified standby/idle preview card for fallback scenarios.
+ */
+function createPostStandbyPreview(post, options = {}) {
+  if (!post) return null;
+  
+  const providerLabel = post.sourceKind === "youtube" ? "YOUTUBE" : 
+                       post.sourceKind === "spotify" ? "SPOTIFY" : "APPMEDIA";
+  
+  const badge = `${providerLabel} PREVIEW`;
+  const artworkUrl = resolveAppPreviewArtwork(post, options);
+
   const cardData = {
     badge: badge,
     title: "",
@@ -529,86 +1036,63 @@ function commitStandbyOrFallback(stage, standbyPost, previewOptions, fallbackCar
 }
 
 /**
- * Handles Media-Toggle Mode (YouTube/Spotify toggle) - CRITICAL FIX #4: Always update stage after action
+ * Helper function to get signal label for formatting.
  */
-function handleMediaToggleMode(options = {}) {
-  const {
-    post,
-    matchedPost,
-    parseYouTubeUrl,
-    resolveActivePlayerSource,
-    getSpotifyPreviewImageUrl,
-    isYouTubeMode,
-    isSpotifyActive,
-  } = options;
-
-  // Check for Spotify preview first (higher priority when in media toggle mode)
-  if (isSpotifyActive && post?.sourceKind === "spotify") {
-    const cleanTitle = toCleanString(post.title || "");
-    const cleanCreator = toCleanString(post.creator || "");
-
-    // Pass enriched post data with context for correct artwork matching
-    const resolvedMetadata = resolveAppPreviewArtwork({
-      ...post,
-      title: cleanTitle,
-      creator: cleanCreator,
-    }, {
-      parseYouTubeUrl,
-      resolveActivePlayerSource,
-      getSpotifyPreviewImageUrl,
-    });
-
-    if (resolvedMetadata) {
-      // CRITICAL FIX #4: Always update stage with current video info
-      return createCardResult({
-        badge: isYouTubeMode ? "SPOTIFY ACTIVE" : "NOW PLAYING",
-        title: post?.title || matchedPost?.title || "",
-        meta: matchedPost?.creator || post?.creator || "Signal Share",
-        artworkUrl: resolvedMetadata,
-      });
-    }
-  }
-
-  // Check for YouTube preview (lower priority)
-  if (isYouTubeMode || (post && post.sourceKind === "youtube")) {
-    const cleanTitle = toCleanString(post.title || "");
-    const cleanCreator = toCleanString(post.creator || "");
-
-    const resolvedMetadata = resolveAppPreviewArtwork({
-      ...post,
-      title: cleanTitle,
-      creator: cleanCreator,
-    }, {
-      parseYouTubeUrl,
-      resolveActivePlayerSource,
-    });
-
-    if (resolvedMetadata) {
-      // CRITICAL FIX #4: Always update stage with current video info
-      return createCardResult({
-        badge: isSpotifyActive ? "YOUTUBE ACTIVE" : "NOW PLAYING",
-        title: post?.title || matchedPost?.title || "",
-        meta: matchedPost?.creator || post?.creator || "Signal Share",
-        artworkUrl: resolvedMetadata,
-      });
-    }
-  }
-
-  // Return idle state if no active source found
-  return createCardResult({
-    badge: `TOGGLE MODE · READY`,
-    title: post?.title || matchedPost?.title || "",
-    meta: (post?.creator || matchedPost?.creator || "Signal Share"),
-  });
+function getSignalLabel() {
+  return "SIGNAL SHARE";
 }
 
 /**
- * Main entry point for Media-Toggle Mode preview rendering - CRITICAL FIX #5: Always render after action
+ * Helper function to format post badge.
+ */
+function formatKind(label) {
+  if (!label) return "";
+  const lower = label.toLowerCase();
+  if (lower.includes("spotify")) return "SPOTIFY";
+  if (lower.includes("youtube") || lower.includes("video")) return "VIDEO";
+  if (lower.includes("audio")) return "AUDIO";
+  if (lower.includes("track")) return "TRACK";
+  return label;
+}
+
+/**
+ * Helper function to format post badge.
+ */
+function formatPostBadge(post, kindFn, getSignalLabel) {
+  if (!post) return "";
+  const label = kindFn(post.sourceKind);
+  return label || post.sourceKind?.toUpperCase() || "MEDIA";
+}
+
+/**
+ * Helper function to get browser media metadata.
+ */
+function getBrowserMediaMetadata() {
+  // Implementation would go here for browser SMTC API integration
+  try {
+    if (navigator.mediaSession) {
+      const metadata = navigator.mediaSession.metadata;
+      if (metadata?.title && metadata?.artist) {
+        return {
+          title: metadata.title,
+          artist: metadata.artist,
+          artworkUrl: metadata?.artwork?.src || "",
+          openUri: "",
+          appPackage: "",
+          sourceProvider: "",
+        };
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+/**
+ * Render preview for YouTube/Spotify toggle mode (Media Toggle).
  */
 export function renderMediaTogglePreview(options = {}) {
   const {
     stage,
-    mode,
     post,
     fallbackMedia,
     nativeSnapshot,
@@ -626,7 +1110,7 @@ export function renderMediaTogglePreview(options = {}) {
   const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube");
   const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify");
 
-  // For toggle mode, try to render from both sources
+  // For media toggle, try to render from both sources
   if ((isYouTubeMode && isSpotifyActive) || window.SIGNAL_SHARE_HERO_PLAYER_CONFIG?.heroControlMode === "media") {
     const result = handleMediaToggleMode({
       post,
@@ -639,24 +1123,25 @@ export function renderMediaTogglePreview(options = {}) {
       isSpotifyActive,
     });
 
-    // CRITICAL FIX #5: Always use the result if artwork/node is available
     if (result && result?.node) {
       setStageContent(stage, result.node, result.key);
       return;
     }
 
-    // Fallback to idle state - CRITICAL FIX #5: Always update stage with idle state
-    const preferredSource = (isSpotifyActive && isYouTubeMode) ? "Both" : (isSpotifyActive ? "Spotify" : (isYouTubeMode ? "YouTube" : "Ready"));
+    // Fallback to idle state
+    const preferredSource = (isSpotifyActive && isYouTubeMode) ? "Both" : 
+                           (isSpotifyActive ? "Spotify" : 
+                            (isYouTubeMode ? "YouTube" : "Ready"));
     commitCard(stage, {
       badge: `TOGGLE MODE · ${preferredSource.toUpperCase()}`,
       title: "Ready for playback",
-      meta: "Start YouTube or Spotify to begin",
+      meta: isYouTubeMode ? "Open YouTube or Spotify to begin" : "Select a source above",
     });
     return;
   }
 
   // Standard rendering for non-toggle modes
-  renderHeroStagePreview({
+  renderStandardPreview({
     stage,
     mode,
     post,
@@ -668,173 +1153,5 @@ export function renderMediaTogglePreview(options = {}) {
     parseYouTubeUrl,
     resolveActivePlayerSource,
     getSpotifyPreviewImageUrl,
-  });
-}
-
-function canUseFallbackMedia(fallbackMedia) {
-  return typeof HTMLMediaElement !== "undefined" && fallbackMedia instanceof HTMLMediaElement;
-}
-
-
-export function renderHeroStagePreview(options = {}) {
-  const {
-    stage,
-    mode,
-    post,
-    fallbackMedia,
-    nativeSnapshot,
-    desktopSnapshot,
-    getStandbyPreviewPost,
-    getProfileSummaryForPost,
-    formatKind,
-    getSignalLabel,
-    formatTimestamp,
-    getBrowserMediaMetadata,
-    sanitizeSnapshotMeta,
-    parseYouTubeUrl,
-    resolveActivePlayerSource,
-    getSpotifyPreviewImageUrl,
-    matchedPost,
-    externalMetadata,
-    state,
-  } = options;
-
-  if (!stage) return;
-
-  // Detect YouTube or Spotify for Media-Toggle Mode
-  const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube")
-    || window.SIGNAL_SHARE_HERO_PLAYER_CONFIG?.heroMediaSource === "youtube";
-  const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify")
-    || window.SIGNAL_SHARE_HERO_PLAYER_CONFIG?.heroMediaSource === "spotify";
-  const isFeedMode = state?.heroControlMode === "feed";
-  const isHardenedEnvironment = (isFeedMode || state?.heroControlMode === "media");
-
-  const previewOptions = {
-    getProfileSummaryForPost,
-    formatKind,
-    parseYouTubeUrl,
-    resolveActivePlayerSource,
-    getSpotifyPreviewImageUrl,
-    isHardenedEnvironment,
-    isYouTubeMode,
-    isSpotifyActive,
-  };
-
-  // Resolve current source filter
-  const sourceFilter = (state?.heroControlSource || state?.heroMediaSource || "").toLowerCase();
-  const isSourceLocked = sourceFilter === "youtube" || sourceFilter === "spotify";
-
-  const standbyPost = (!post && typeof getStandbyPreviewPost === "function")
-    ? safeCall(getStandbyPreviewPost, null)
-    : null;
-
-
-  if (mode === "device") {
-    // Minimal device mode preview - just badge and status
-    const playbackStatus = nativeSnapshot?.playbackState || "";
-    const badge = nativeSnapshot?.active 
-      ? `ON-DEVICE · ${playbackStatus.toUpperCase()}` 
-      : "ON-DEVICE MEDIA";
-
-    commitCard(stage, {
-      badge: badge,
-      title: nativeSnapshot?.title || matchedPost?.title || "",
-      meta: nativeSnapshot?.meta || matchedPost?.creator || "",  // Keep only if needed for device mode
-      artworkUrl: matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : (nativeSnapshot?.artworkUri || "")
-    });
-    return;
-  }
-
-  if (mode === "desktop") {
-    // Minimal desktop mode preview - just badge and status
-    const playbackStatus = desktopSnapshot?.playbackState || "";
-    const snapshotProvider = (desktopSnapshot?.sourceProvider || "").toLowerCase();
-    
-    let platformLabel = matchedPost ? formatPostBadge(matchedPost, formatKind, getSignalLabel) : "PC SYSTEM MEDIA";
-    if (snapshotProvider === "youtube" || isYouTubeMode) {
-      platformLabel = "YOUTUBE";
-    } else if (snapshotProvider === "spotify" || isSpotifyActive) {
-      platformLabel = "SPOTIFY";
-    }
-
-    let artworkUrl = desktopSnapshot?.artworkUri || (matchedPost ? resolveAppPreviewArtwork(matchedPost, previewOptions) : "");
-
-    const badge = matchedPost 
-      ? platformLabel 
-      : `${platformLabel} · ${playbackStatus.toUpperCase()}`;
-
-    commitCard(stage, {
-      badge: badge,
-      title: desktopSnapshot?.title || matchedPost?.title || "",
-      meta: desktopSnapshot?.meta || matchedPost?.creator || "",  // Keep creator only for metadata mode
-      artworkUrl: artworkUrl
-    });
-
-    return;
-  }
-
-  if (options.showCompanionCard) {
-    const card = createCompanionCard();
-    setStageContent(stage, card, "companion-download");
-    return;
-  }
-
-
-  if (!post) {
-    const metadata = safeCall(getBrowserMediaMetadata, null);
-    // Minimal fallback - just artwork with status badge (if available)
-    commitStandbyOrFallback(stage, standbyPost, previewOptions, {
-      badge: "NOW PLAYING",  // Show status
-      title: "",
-      meta: "",
-      artworkUrl: metadata?.artworkUrl || fallbackMedia?.getAttribute("data-artwork") || ""
-    });
-    return;
-  }
-
-  // Always use static preview cards for hero mode
-  // if (options.active && commitActivePlayer(stage, post, previewOptions)) return;
-
-  const creatorSummary = safeCall(getProfileSummaryForPost, null, post);
-  const artworkUrl = resolveAppPreviewArtwork(post, {
-    parseYouTubeUrl,
-    resolveActivePlayerSource,
-    getSpotifyPreviewImageUrl,
-  });
-
-  // Handle async metadata resolution for preview card
-  let resolvedMetadata = externalMetadata;
-  if (externalMetadata instanceof Promise) {
-    commitCard(stage, {
-      badge: "NOW PLAYING",
-      title: "",
-      meta: "",
-      artworkUrl: artworkUrl,
-      showMetadata: true
-    });
-
-    // Fetch metadata and update card when available
-    externalMetadata.then(metadata => {
-      if (metadata) {
-        commitCard(stage, {
-          badge: "NOW PLAYING",
-          title: "",
-          meta: "",
-          artworkUrl: metadata?.artworkUrl || artworkUrl,
-          showMetadata: true
-        });
-      }
-    }).catch(() => {
-      // Silently ignore errors, card already rendered with fallback
-    });
-    return;
-  }
-
-  commitCard(stage, {
-    badge: "NOW PLAYING",
-    title: "",
-    meta: "",
-    artworkUrl: resolvedMetadata?.artworkUrl || artworkUrl,
-    showMetadata: true
   });
 }
