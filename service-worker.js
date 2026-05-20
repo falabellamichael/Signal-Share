@@ -1,4 +1,4 @@
-const CACHE_NAME = "signal-share-shell-v137";
+const CACHE_NAME = "signal-share-shell-v138";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -212,7 +212,8 @@ async function cacheFirst(request) {
 }
 
 async function fetchAndScrubChatResponse(request) {
-  const response = await fetch(request, { cache: "no-store" });
+  const fetchOptions = request.method === "GET" ? { cache: "no-store" } : undefined;
+  const response = await fetch(request, fetchOptions);
   const contentType = response.headers.get("content-type") || "";
   const text = await response.clone().text().catch(() => "");
   if (!text || !isLegacyLocalModelErrorPayload(text)) return response;
@@ -262,7 +263,8 @@ self.addEventListener("fetch", (event) => {
       event.respondWith(fetchAndScrubChatResponse(request));
       return;
     }
-    event.respondWith(fetch(request, { cache: "no-store" }));
+    const fetchOptions = request.method === "GET" ? { cache: "no-store" } : undefined;
+    event.respondWith(fetch(request, fetchOptions));
     return;
   }
 
