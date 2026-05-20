@@ -1,4 +1,4 @@
-import { createHeroMediaPlayerController } from "./hero-media-player.js?v=1.5";
+import { createHeroMediaPlayerController } from "./hero-media-player.js?v=1.7";
 import { createPreviewCard, createActivePlayerStage, createActivePlayerDescriptor, resolveAppPreviewArtwork, resolveYouTubePreviewId } from "./hero-media-player-preview.js";
 import { EMOJI_PACK, EMOJI_CATEGORIES } from "./emojis.js";
 import { isDirectMessengerAiEnabled, isDirectMessengerAiProfile } from "./direct-messenger-ai-config.js";
@@ -335,9 +335,10 @@ export function createAppUi(context) {
   }
 
   function getStandbyPreviewPost() {
+    if (state.heroControlMode === "media") return null;
+
     // Pick the most recent playable post from the feed that matches the current source
     const posts = getAllPosts() || [];
-    const isFeedMode = state.heroControlMode === "feed";
     const source = (state.heroControlSource || state.heroMediaSource || "").toLowerCase();
 
     if (source === "youtube" || source === "spotify") {
@@ -2457,6 +2458,8 @@ export function createAppUi(context) {
   }
 
   function getControllablePlayerPost() {
+    if (state.heroControlMode === "media") return null;
+
     // Priority: explicitly mounted hero post, then explicitly open mini player post, then standby preview post
     const heroPost = (typeof getHeroPost === "function" ? getHeroPost() : null);
     const mini = getPostById(state.activePlayerPostId || state.playerPostId);

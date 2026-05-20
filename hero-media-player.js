@@ -1799,6 +1799,8 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function getStandbyPreviewPost() {
+    if (state.heroControlMode === "media") return null;
+
     const playableIds = getPlayableVisiblePostIds();
     if (!playableIds.length) return null;
     if (typeof getPostById !== "function") return null;
@@ -2316,11 +2318,13 @@ The companion bridge is designed with several security layers to keep your PC sa
 
     if (mode === "device") {
       const modeLabel = getSystemMediaHeaderLabel();
+      const preferredSource = getPreferredHeroControlSource();
+      const isCorrectSource = !preferredSource || isPreferredNowPlayingSnapshot(nativeSnapshot);
       if (nativeSnapshot?.permissionRequired) {
         nextTitle = "Enable device media access";
         nextCaption = "Allow notification access to control playback.";
         nextStatus = modeLabel;
-      } else if (nativeSnapshot?.active) {
+      } else if (nativeSnapshot?.active && isCorrectSource) {
         nextTitle = cleanSnapshotTitle(nativeSnapshot.title);
         nextCaption = (matchedPost && matchedPost.creator) ? matchedPost.creator : cleanSnapshotCreator(nativeSnapshot, "Device playback");
         nextStatus = matchedPost ? "MATCHED FROM FEED" : modeLabel;
@@ -2330,7 +2334,10 @@ The companion bridge is designed with several security layers to keep your PC sa
         syncArtist = nextCaption;
         syncArtwork = nativeSnapshot.artworkUri || "";
       } else {
-        const preferredSource = getPreferredHeroControlSource();
+        if (preferredSource) {
+          playbackState = "none";
+          nextHeader = "READY";
+        }
         nextTitle = (preferredSource === "spotify" || preferredSource === "youtube") ? "Idle" : "Device media idle";
         nextCaption = (preferredSource === "spotify" || preferredSource === "youtube") ? "Idle" : "Start playback in any media app.";
         nextStatus = modeLabel;
@@ -2351,6 +2358,10 @@ The companion bridge is designed with several security layers to keep your PC sa
         syncArtist = nextCaption;
         syncArtwork = desktopSnapshot.artworkUri || "";
       } else {
+        if (preferredSource) {
+          playbackState = "none";
+          nextHeader = "READY";
+        }
         nextTitle = (preferredSource === "spotify" || preferredSource === "youtube") ? "Idle" : "PC media idle";
         nextCaption = preferredSource === "spotify"
           ? "Idle"
