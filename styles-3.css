@@ -2230,6 +2230,7 @@
 
     /* Theme-aware icon/button gradients. Sunset keeps the tan reference swatch. */
     body {
+      --accent-text: #ffffff;
       --icon-gradient-main: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
       --icon-gradient-outgoing: linear-gradient(135deg, var(--accent) 0%, var(--surface-dark) 100%);
     }
@@ -2249,7 +2250,7 @@
     .source-toggle-button.is-active,
     .hero-companion-download-btn {
       background: var(--icon-gradient-main) !important;
-      color: #ffffff !important;
+      color: var(--accent-text) !important;
       border-color: transparent !important;
     }
 
@@ -2260,11 +2261,11 @@
     .message-row.is-self .message-bubble {
       background: var(--icon-gradient-outgoing) !important;
       border: none !important;
-      color: #ffffff !important;
+      color: var(--accent-text) !important;
     }
 
     .message-row.is-self .message-bubble p,
     .message-row.is-self .message-bubble span {
-      color: #ffffff !important;
+      color: var(--accent-text) !important;
       border: none !important;
     }
