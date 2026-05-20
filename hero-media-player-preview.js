@@ -10,7 +10,7 @@
  * Both show "pre-preview" (standby) when nothing is playing.
  */
 
-import { toCleanString, isThenable, safeCall, formatPostBadge, formatPostMeta } from './shared-utils.js';
+import { toCleanString, isThenable, safeCall, formatPostMeta } from './shared-utils.js';
 
 const YOUTUBE_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
 const SPOTIFY_TYPES = new Set(["track", "album", "playlist", "artist", "episode", "show"]);
@@ -646,10 +646,6 @@ function handleMediaToggleMode(options = {}) {
   
   // Check for active YouTube video from browser tab first (Media Toggle)
   const youtubeFromTab = getActiveYouTubeVideoFromURL();
-  
-  // Check for Spotify/YouTube toggle source
-  const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify");
-  const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube");
 
   // Handle YouTube Mode Preview (when YouTube toggle is active)
   if (isYouTubeMode) {
@@ -1006,24 +1002,6 @@ function createPostStandbyPreview(post, options = {}) {
     key: getCardKey(cardData),
     node: createPreviewCard(cardData),
   };
-}
-
-function createCardResult(cardOptions) {
-  try {
-    return {
-      key: getCardKey(cardOptions),
-      node: createPreviewCard(cardOptions),
-    };
-  } catch (e) {
-    console.warn("[Hero Preview] Failed to create card result:", e);
-    return null;
-  }
-}
-
-function commitCard(stage, cardOptions) {
-  const result = createCardResult(cardOptions);
-  if (!result || !result.node) return;
-  setStageContent(stage, result.node, result.key);
 }
 
 function commitStandbyOrFallback(stage, standbyPost, previewOptions, fallbackCardOptions) {
