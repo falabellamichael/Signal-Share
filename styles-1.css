@@ -224,7 +224,7 @@ body[data-theme="midnight"] {
   --muted: #9db0bf;
   --line: rgba(164, 184, 201, 0.16);
   --accent: #7dd3fc;
-  --accent-2: #34d399;
+  --accent-2: #0ea5e9;
   --accent-3: #f59e0b;
   --shadow: 0 28px 72px rgba(0, 0, 0, 0.44);
   --scrollbar-track: rgba(157, 176, 191, 0.08);
@@ -238,7 +238,7 @@ body[data-theme="midnight"] {
     ),
     radial-gradient(
       circle at top right,
-      rgba(52, 211, 153, 0.14),
+      rgba(14, 165, 233, 0.14),
       transparent 24%
     ),
     linear-gradient(180deg, #081017 0%, #0c151d 50%, #111b23 100%);
@@ -439,7 +439,7 @@ body[data-theme="midnight"]
   background: linear-gradient(
     135deg,
     rgba(125, 211, 252, 0.26),
-    rgba(52, 211, 153, 0.26)
+    rgba(14, 165, 233, 0.26)
   );
   border-color: rgba(125, 211, 252, 0.22);
 }
@@ -448,7 +448,7 @@ body[data-theme="midnight"] .dropzone {
   background:
     linear-gradient(
       145deg,
-      rgba(52, 211, 153, 0.16),
+      rgba(14, 165, 233, 0.16),
       rgba(125, 211, 252, 0.14)
     ),
     rgba(12, 20, 28, 0.72);
@@ -476,16 +476,10 @@ body[data-theme="midnight"] .message-bubble {
 body[data-theme="midnight"] .message-row.is-self .message-bubble {
   background: linear-gradient(
     135deg,
-    rgba(125, 211, 252, 0.9),
-    rgba(52, 211, 153, 0.84)
-  );
-  color: #000000 !important;
-  border: none !important;
-}
-
-body[data-theme="midnight"] .message-row.is-self .message-bubble span,
-body[data-theme="midnight"] .message-row.is-self .message-bubble p {
-  color: #000000;
+    rgba(125, 211, 252, 0.95) 0%,
+    rgba(255, 255, 255, 0.2) 200%
+  ) !important;
+  color: #0c151d !important;
 }
 
 body[data-theme="midnight"] .profile-view-dialog {
