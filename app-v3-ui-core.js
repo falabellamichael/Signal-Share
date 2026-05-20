@@ -253,6 +253,7 @@ export function createAppUi(context) {
     heroPlayerOpenMiniButton: document.querySelector("#heroPlayerOpenMiniButton"),
     heroModeFeed: document.querySelector("#heroModeFeed"),
     heroModeMedia: document.querySelector("#heroModeMedia"),
+    heroSourceAll: document.querySelector("#heroSourceAll"),
     heroSourceYoutube: document.querySelector("#heroSourceYoutube"),
     heroSourceSpotify: document.querySelector("#heroSourceSpotify"),
     heroPlayerOpenPhoneButton: document.querySelector("#heroPlayerOpenPhoneButton"),
@@ -637,6 +638,7 @@ export function createAppUi(context) {
       state.desktopBridgeSuspended = false;
       setHeroControlMode("media");
     });
+    elements.heroSourceAll?.addEventListener("click", () => setHeroControlSource("all"));
     elements.heroSourceYoutube?.addEventListener("click", () => setHeroControlSource("youtube"));
     elements.heroSourceSpotify?.addEventListener("click", () => setHeroControlSource("spotify"));
     elements.miniPlayerHead.addEventListener("pointerdown", beginMiniPlayerDrag);
@@ -753,7 +755,7 @@ export function createAppUi(context) {
   function setHeroControlMode(mode) {
     state.heroControlMode = mode;
 
-    // If switching to media, ensure bridge is active and restore the last chosen specific source if current is "all"
+    // If switching to media, ensure bridge is active.
     if (mode === "media") {
       state.desktopBridgeSuspended = false;
       state._mediaActionLockoutUntil = 0;  // Clear any lockout to allow immediate snapshot fetch
@@ -766,19 +768,12 @@ export function createAppUi(context) {
       if (heroMediaPlayerController && typeof heroMediaPlayerController.refreshDesktopSnapshot === "function") {
         heroMediaPlayerController.refreshDesktopSnapshot({ force: true, renderAfter: true });
       }
-
-      if (state.heroControlSource === "all") {
-        const sourceToRestore = state.lastHeroControlSource || "youtube";
-        setHeroControlSource(sourceToRestore);
-        return; // setHeroControlSource calls render()
-      }
     }
 
     render();
   }
 
   function setHeroControlSource(source) {
-    const isFeedMode = state.heroControlMode === "feed";
     const currentSource = state.heroControlSource;
 
     // Remember the last specific source chosen for future restoration in Media Mode
@@ -786,9 +781,9 @@ export function createAppUi(context) {
       state.lastHeroControlSource = source;
     }
 
-    // In Feed mode, clicking an already active source toggle turns it off (sets back to "all")
+    // Clicking an already active source toggle turns it off (sets back to "all")
     let targetSource = source;
-    if (isFeedMode && currentSource === source) {
+    if (currentSource === source && (source === "youtube" || source === "spotify")) {
       targetSource = "all";
     }
 
@@ -835,6 +830,12 @@ export function createAppUi(context) {
       sourceToggleGroup.classList.toggle("is-dimmed", false);
     }
 
+    if (elements.heroSourceAll) {
+      const isAllActive = !state.heroControlSource || state.heroControlSource === "all";
+      elements.heroSourceAll.classList.toggle("is-active", isAllActive);
+      elements.heroSourceAll.classList.toggle("is-disabled", false);
+      elements.heroSourceAll.disabled = false;
+    }
     if (elements.heroSourceYoutube) {
       const isYoutubeActive = state.heroControlSource === "youtube";
       elements.heroSourceYoutube.classList.toggle("is-active", isYoutubeActive);
@@ -3582,4 +3583,3 @@ export function createAppUi(context) {
 
   return ui;
 }
-

@@ -692,6 +692,41 @@ function handleMediaToggleMode(options = {}) {
     return provider === "spotify" || appPkg.includes("spotify") || title.includes("spotify") || meta.includes("spotify");
   };
 
+  const hasSnapshotPlaybackContext = (snapshot) => {
+    if (!snapshot) return false;
+    if (snapshot.active) return true;
+    const playbackState = `${snapshot.playbackState || ""}`.trim().toLowerCase();
+    if (playbackState && playbackState !== "none") return true;
+    if (typeof snapshot.title === "string" && snapshot.title.trim()) return true;
+    if (typeof snapshot.meta === "string" && snapshot.meta.trim()) return true;
+    return false;
+  };
+
+  const isBrowserFamilyPackage = (value = "") => {
+    const appPkg = `${value || ""}`.toLowerCase();
+    return (
+      appPkg.includes("chrome")
+      || appPkg.includes("msedge")
+      || appPkg.includes("edge")
+      || appPkg.includes("firefox")
+      || appPkg.includes("opera")
+      || appPkg.includes("brave")
+      || appPkg.includes("vivaldi")
+      || appPkg.includes("arc")
+      || appPkg.includes("browser")
+      || appPkg.includes("yandex")
+    );
+  };
+
+  const isOtherBrowserSnapshot = (snapshot) => {
+    if (!snapshot) return false;
+    if (!hasSnapshotPlaybackContext(snapshot)) return false;
+    if (isYouTubeSnapshot(snapshot) || isSpotifySnapshot(snapshot)) return false;
+    const provider = `${snapshot.sourceProvider || ""}`.toLowerCase();
+    if (provider === "browser" || provider === "web") return true;
+    return isBrowserFamilyPackage(snapshot.appPackage || "");
+  };
+
   // Check for active YouTube video from browser tab first (Media Toggle)
   const youtubeFromTab = getActiveYouTubeVideoFromURL();
 
@@ -811,11 +846,41 @@ function handleMediaToggleMode(options = {}) {
     });
   }
 
+  // "Any" / no-toggle branch: show non-YouTube/non-Spotify browser media.
+  const genericBrowserSnapshot = isOtherBrowserSnapshot(nativeSnapshot)
+    ? nativeSnapshot
+    : (isOtherBrowserSnapshot(desktopSnapshot) ? desktopSnapshot : null);
+
+  if (genericBrowserSnapshot) {
+    const playbackStatus = (genericBrowserSnapshot.playbackState || "playing").toUpperCase();
+    return createCardResult({
+      badge: `BROWSER MEDIA · ${playbackStatus}`,
+      title: genericBrowserSnapshot.title || "Now playing in browser",
+      meta: genericBrowserSnapshot.meta || "Media session",
+      artworkUrl: genericBrowserSnapshot.artworkUri || "",
+    });
+  }
+
+  const browserMetadata = safeCall(getBrowserMediaMetadata, null);
+  const browserTitle = toCleanString(browserMetadata?.title || "");
+  const browserArtist = toCleanString(browserMetadata?.artist || browserMetadata?.creator || "");
+  const browserBlob = `${browserTitle} ${browserArtist}`.toLowerCase();
+  const isExcludedSource = browserBlob.includes("youtube") || browserBlob.includes("spotify");
+
+  if (browserTitle && !isExcludedSource) {
+    return createCardResult({
+      badge: "BROWSER MEDIA · PLAYING",
+      title: browserTitle,
+      meta: browserArtist || "Media session",
+      artworkUrl: browserMetadata?.artworkUrl || "",
+    });
+  }
+
   // Return idle state if no active source found (for Media Toggle)
   return createCardResult({
-    badge: "TOGGLE MODE · READY",
-    title: "Select a source above",
-    meta: "Toggle menu: Feed ↔ Media",
+    badge: "MEDIA · ANY SOURCE",
+    title: "Play media in another browser tab",
+    meta: "YouTube and Spotify are hidden in this view",
   });
 }
 

@@ -880,10 +880,15 @@
       margin-bottom: 2px;
     }
 
-    .hero-player-mode-toggle,
-    .hero-player-source-toggle {
+    .hero-player-mode-toggle {
       display: grid;
       grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .hero-player-source-toggle {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 6px;
     }
 
