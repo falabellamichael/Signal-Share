@@ -167,7 +167,7 @@ function setStageContent(stage, node, key, options = {}) {
   const normalizedKey = toCleanString(key) || `render-${Date.now()}`;
   const shouldPreserveSameKey = options.preserveSameKey !== false;
 
-  if (shouldPreserveSameKey && stage.firstElementChild) {
+  if (shouldPreserveSameKey && stage.firstElementChild && stage.dataset?.heroPreviewKey === normalizedKey) {
     return;
   }
 
@@ -601,6 +601,32 @@ function handleFeedToggleMode(options = {}) {
     if (isActivePlayer) return;
 
   } else {
+    // No active feed post - check if we can show system media preview if a source toggle is active and matches
+    const isYouTubeMode = (state?.heroControlSource === "youtube" || state?.heroMediaSource === "youtube" || state?.systemMediaSource === "youtube");
+    const isSpotifyActive = (state?.heroControlSource === "spotify" || state?.heroMediaSource === "spotify" || state?.systemMediaSource === "spotify");
+    
+    if (isSpotifyActive || isYouTubeMode) {
+      const result = handleMediaToggleMode({
+        post: null,
+        desktopSnapshot,
+        nativeSnapshot,
+        matchedPost: null,
+        parseYouTubeUrl,
+        resolveActivePlayerSource,
+        getSpotifyPreviewImageUrl,
+        isYouTubeMode,
+        isSpotifyActive,
+      });
+
+      if (result && result.node) {
+        const isIdleResult = result.key && (result.key.includes("READY") || result.key.includes("idle") || result.key.includes("Select a source"));
+        if (!isIdleResult) {
+          setStageContent(stage, result.node, result.key);
+          return;
+        }
+      }
+    }
+
     // No active post - show idle/pre-preview state for feed mode
     commitCard(stage, {
       badge: "FEED MODE · READY",
@@ -634,6 +660,8 @@ function handleFeedToggleMode(options = {}) {
 function handleMediaToggleMode(options = {}) {
   const {
     post,
+    desktopSnapshot,
+    nativeSnapshot,
     matchedPost,
     parseYouTubeUrl,
     resolveActivePlayerSource,
@@ -642,14 +670,43 @@ function handleMediaToggleMode(options = {}) {
     isSpotifyActive,
   } = options;
 
-  // CRITICAL INDEPENDENCE FIX: Each toggle only affects its own preview state
-  
+  // Helper functions to identify Spotify or YouTube in SMTC snapshots
+  const isYouTubeSnapshot = (snapshot) => {
+    if (!snapshot) return false;
+    const provider = (snapshot.sourceProvider || "").toLowerCase();
+    const appPkg = (snapshot.appPackage || "").toLowerCase();
+    const title = (snapshot.title || "").toLowerCase();
+    const meta = (snapshot.meta || "").toLowerCase();
+    return provider === "youtube" || appPkg.includes("youtube") || appPkg.includes("ytmusic") || title.includes("youtube") || meta.includes("youtube");
+  };
+
+  const isSpotifySnapshot = (snapshot) => {
+    if (!snapshot) return false;
+    const provider = (snapshot.sourceProvider || "").toLowerCase();
+    const appPkg = (snapshot.appPackage || "").toLowerCase();
+    const title = (snapshot.title || "").toLowerCase();
+    const meta = (snapshot.meta || "").toLowerCase();
+    return provider === "spotify" || appPkg.includes("spotify") || title.includes("spotify") || meta.includes("spotify");
+  };
+
   // Check for active YouTube video from browser tab first (Media Toggle)
   const youtubeFromTab = getActiveYouTubeVideoFromURL();
 
   // Handle YouTube Mode Preview (when YouTube toggle is active)
   if (isYouTubeMode) {
-    // Check for active video in YouTube player first
+    // 1. Check for active desktop/system snapshot representing YouTube first
+    const activeSnapshot = isYouTubeSnapshot(nativeSnapshot) ? nativeSnapshot : (isYouTubeSnapshot(desktopSnapshot) ? desktopSnapshot : null);
+    if (activeSnapshot && (activeSnapshot.active || activeSnapshot.title)) {
+      const playbackStatus = activeSnapshot.playbackState || "playing";
+      return createCardResult({
+        badge: `YOUTUBE · ${playbackStatus.toUpperCase()}`,
+        title: activeSnapshot.title || "YouTube Video",
+        meta: activeSnapshot.meta || "YouTube Player",
+        artworkUrl: activeSnapshot.artworkUri || "",
+      });
+    }
+
+    // 2. Check for active video in YouTube player first
     if (post && post.sourceKind === "youtube") {
       const cleanTitle = toCleanString(post.title || "");
       const cleanCreator = toCleanString(post.creator || "");
@@ -673,7 +730,7 @@ function handleMediaToggleMode(options = {}) {
       }
     }
 
-    // If no explicit YouTube post, check browser tab for active video
+    // 3. If no explicit YouTube post, check browser tab for active video
     if (youtubeFromTab) {
       console.log("[Media Toggle] Found YouTube video in browser tab:", youtubeFromTab.title);
       return createCardResult({
@@ -693,32 +750,45 @@ function handleMediaToggleMode(options = {}) {
   }
 
   // Handle Spotify Mode Preview (when Spotify toggle is active)
-  if (isSpotifyActive && post?.sourceKind === "spotify") {
-    const cleanTitle = toCleanString(post.title || "");
-    const cleanCreator = toCleanString(post.creator || "");
-
-    const resolvedMetadata = resolveAppPreviewArtwork({
-      ...post,
-      title: cleanTitle,
-      creator: cleanCreator,
-    }, {
-      parseYouTubeUrl,
-      resolveActivePlayerSource,
-      getSpotifyPreviewImageUrl,
-    });
-
-    if (resolvedMetadata) {
+  if (isSpotifyActive) {
+    // 1. Check for active desktop/system snapshot representing Spotify first
+    const activeSnapshot = isSpotifySnapshot(nativeSnapshot) ? nativeSnapshot : (isSpotifySnapshot(desktopSnapshot) ? desktopSnapshot : null);
+    if (activeSnapshot && (activeSnapshot.active || activeSnapshot.title)) {
+      const playbackStatus = activeSnapshot.playbackState || "playing";
       return createCardResult({
-        badge: "SPOTIFY ACTIVE",
-        title: post?.title || matchedPost?.title || "",
-        meta: matchedPost?.creator || post?.creator || "Signal Share",
-        artworkUrl: resolvedMetadata,
+        badge: `SPOTIFY · ${playbackStatus.toUpperCase()}`,
+        title: activeSnapshot.title || "Spotify Track",
+        meta: activeSnapshot.meta || "Spotify Player",
+        artworkUrl: activeSnapshot.artworkUri || "",
       });
     }
-  }
 
-  // Check for active Spotify in browser tab (Media Toggle)
-  if (isSpotifyActive && !post) {
+    // 2. Check for explicit post
+    if (post && post.sourceKind === "spotify") {
+      const cleanTitle = toCleanString(post.title || "");
+      const cleanCreator = toCleanString(post.creator || "");
+
+      const resolvedMetadata = resolveAppPreviewArtwork({
+        ...post,
+        title: cleanTitle,
+        creator: cleanCreator,
+      }, {
+        parseYouTubeUrl,
+        resolveActivePlayerSource,
+        getSpotifyPreviewImageUrl,
+      });
+
+      if (resolvedMetadata) {
+        return createCardResult({
+          badge: "SPOTIFY ACTIVE",
+          title: post?.title || matchedPost?.title || "",
+          meta: matchedPost?.creator || post?.creator || "Signal Share",
+          artworkUrl: resolvedMetadata,
+        });
+      }
+    }
+
+    // 3. Check for active Spotify in browser tab (Media Toggle)
     const metadata = safeCall(getBrowserMediaMetadata, null);
     if (metadata?.artworkUrl && metadata.title) {
       console.log("[Media Toggle] Found Spotify track in browser tab");
@@ -729,13 +799,20 @@ function handleMediaToggleMode(options = {}) {
         artworkUrl: metadata.artworkUrl,
       });
     }
+
+    // Default Spotify idle state
+    return createCardResult({
+      badge: "SPOTIFY · READY",
+      title: "Open Spotify to play",
+      meta: "Or switch to YouTube in the toggle menu",
+    });
   }
 
   // Return idle state if no active source found (for Media Toggle)
   return createCardResult({
     badge: "TOGGLE MODE · READY",
-    title: isYouTubeMode ? "Open YouTube or Spotify to begin" : "Select a source above",
-    meta: isYouTubeMode ? "Toggle menu: Feed ↔ Media" : "",
+    title: "Select a source above",
+    meta: "Toggle menu: Feed ↔ Media",
   });
 }
 
@@ -823,8 +900,10 @@ export function renderHeroStagePreview(options = {}) {
     });
   } else if (config.heroControlMode === "media" || state?.heroControlMode === "media") {
     // MEDIA TOGGLE MODE: Show YouTube/Spotify info exclusively, independent of feed toggle
-    handleMediaToggleMode({
+    const result = handleMediaToggleMode({
       post,
+      desktopSnapshot,
+      nativeSnapshot: preferredSnapshot,
       matchedPost: null,
       parseYouTubeUrl,
       resolveActivePlayerSource,
@@ -832,6 +911,9 @@ export function renderHeroStagePreview(options = {}) {
       isYouTubeMode,
       isSpotifyActive,
     });
+    if (result && result.node) {
+      setStageContent(stage, result.node, result.key);
+    }
   } else {
     // Default mode - try standard rendering
     renderStandardPreview({
