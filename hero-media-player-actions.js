@@ -33,6 +33,39 @@ export function debounceAction(state, actionName, cooldownLimit = 0) {
   return false;
 }
 
+function hasSnapshotPlaybackContext(snapshot = null) {
+  if (!snapshot) return false;
+  if (snapshot.active) return true;
+  const playbackState = `${snapshot.playbackState || ""}`.trim().toLowerCase();
+  if (playbackState && playbackState !== "none") return true;
+  if (typeof snapshot.title === "string" && snapshot.title.trim()) return true;
+  if (typeof snapshot.meta === "string" && snapshot.meta.trim()) return true;
+  if (typeof snapshot.openUri === "string" && snapshot.openUri.trim()) return true;
+  return false;
+}
+
+function resolveControlMode(context = {}) {
+  const {
+    state,
+    target,
+    heroMode,
+    desktopSnapshot,
+    isNativeCapacitorApp,
+  } = context;
+
+  const isFeedMode = state?.heroControlMode === "feed";
+  const isMediaMode = state?.heroControlMode === "media";
+  const isNative = typeof isNativeCapacitorApp === "function" && isNativeCapacitorApp();
+
+  if (target === "mini") return "app";
+  if (isFeedMode) return "app";
+  if (isMediaMode) {
+    if (isNative) return "device";
+    return hasSnapshotPlaybackContext(desktopSnapshot) ? "desktop" : "app";
+  }
+  return heroMode || "app";
+}
+
 
 /**
  * CRITICAL FIX #1: handleOpenMediaAction - Always update hero player stage, never early-return without UI refresh
@@ -41,7 +74,7 @@ export function handleOpenMediaAction(context) {
   const {
     isNativeCapacitorApp, openViewer, desktopSnapshot, nativeSnapshot,
     performDesktopAction, parseYouTubeUrl, state, findMatchedPost,
-    getControllablePlayerPost, getEffectiveHeroMode, getNativeBridge
+    getControllablePlayerPost, getNativeBridge
   } = context;
 
   if (debounceAction(state, "open_media", 0)) return;
@@ -51,7 +84,7 @@ export function handleOpenMediaAction(context) {
   const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
 
   const controllablePost = memoGet(`controllable_post`, () => getControllablePlayerPost(), 100);
-  const mode = getEffectiveHeroMode(controllablePost);
+  const mode = resolveControlMode(context);
   let post = null;
 
   if (mode === "app") {
@@ -381,14 +414,13 @@ export async function handlePlayPauseAction(context, forcePlay) {
   state._mediaActionLockoutUntil = now + 0;
 
   // Identify modes and sources
-  const isFeedMode = state.heroControlMode === "feed";
   const isMediaMode = state.heroControlMode === "media";
   const heroControlSource = state.heroControlSource;
   const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
 
-  // Mode Resolution
-  const mode = target === "mini" ? "app" : (isFeedMode ? "app" : (isMediaMode ? (isNativeCapacitorApp() ? "device" : "desktop") : heroMode));
+  // Mode Resolution (authoritative in actions module)
+  const mode = resolveControlMode(context);
 
   // CRITICAL FIX #2: Always use bridge when in media mode, regardless of source lock state
   const isBridgeMode = isSourceLocked || isMediaMode;
@@ -588,10 +620,9 @@ export function handlePreviousAction(context) {
   const now = Date.now();
   state._mediaActionLockoutUntil = now + 0;
 
-  // Mode Resolution
-  const isFeedMode = state.heroControlMode === "feed";
+  // Mode Resolution (authoritative in actions module)
   const isMediaMode = state.heroControlMode === "media";
-  const mode = target === "mini" ? "app" : (isFeedMode ? "app" : (isMediaMode ? (isNativeCapacitorApp() ? "device" : "desktop") : heroMode));
+  const mode = resolveControlMode(context);
   let localFallbackUsed = false;
   const fallbackToLocalPrevious = () => {
     if (localFallbackUsed) return;
@@ -717,8 +748,7 @@ export function handleNextAction(context) {
   const now = Date.now();
   state._mediaActionLockoutUntil = now + 0;
 
-  // Mode Resolution
-  const isFeedMode = state.heroControlMode === "feed";
+  // Mode Resolution (authoritative in actions module)
   const isMediaMode = state.heroControlMode === "media";
   const heroControlSource = state.heroControlSource;
   const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
@@ -726,7 +756,7 @@ export function handleNextAction(context) {
   
   // CRITICAL FIX #4: Always use bridge when in media mode
   const isBridgeMode = isSourceLocked || isMediaMode;
-  const mode = target === "mini" ? "app" : (isFeedMode ? "app" : (isMediaMode ? (isNativeCapacitorApp() ? "device" : "desktop") : heroMode));
+  const mode = resolveControlMode(context);
   let localFallbackUsed = false;
   const fallbackToLocalNext = () => {
     if (localFallbackUsed) return;
@@ -834,7 +864,7 @@ export function handleNextAction(context) {
  */
 export function handleVolumeAction(context, event) {
   const {
-    state, elements, getControllablePlayerPost, getEffectiveHeroMode,
+    state, elements, getControllablePlayerPost,
     normalizePlayerVolume, savePlayerVolume,
     getNativeBridge, applyPlayerVolumeToActiveElement,
     getFallbackPageMediaElement, getActivePlayerMediaElement,
@@ -844,8 +874,8 @@ export function handleVolumeAction(context, event) {
   const heroControlSource = state.heroControlSource;
   const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
-  const isBridgeMode = isSourceLocked || (state.heroControlMode === "media");
-  const mode = target === "mini" ? "app" : (isBridgeMode ? (state.platform === "android" ? "device" : "desktop") : getEffectiveHeroMode(getControllablePlayerPost()));
+  const mode = resolveControlMode(context);
+  const isBridgeMode = mode === "desktop" || mode === "device";
 
   if (debounce("volume", 100)) return;
 
