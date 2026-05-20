@@ -1733,8 +1733,9 @@
       border-radius: 999px !important;
       min-width: 0 !important;
     }
+  }
 
-    @media (max-width: 980px) and (orientation: landscape) {
+  @media (max-width: 980px) and (orientation: landscape) {
       .profile-view {
         padding:
           calc(max(var(--viewport-offset-top), env(safe-area-inset-top, 0px)) + 10px) 8px calc(max(var(--viewport-offset-bottom), env(safe-area-inset-bottom, 0px)) + 8px);

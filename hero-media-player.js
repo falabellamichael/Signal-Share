@@ -1268,8 +1268,9 @@ The companion bridge is designed with several security layers to keep your PC sa
       if (!candidate || candidate.sourceKind !== "spotify") return;
       const id = `${candidate.id || ""}`.trim() || `${candidate.externalId || candidate.embedUrl || candidate.externalUrl || ""}`.trim();
       if (!id || seenIds.has(id)) return;
-      const score = scoreCandidate(candidate) + boost;
-      if (hasSnapshotText && score <= 0) return;
+      const baseScore = scoreCandidate(candidate);
+      if (hasSnapshotText && baseScore <= 0) return;
+      const score = baseScore + boost;
       seenIds.add(id);
       ranked.push({ candidate, score });
     };

@@ -319,6 +319,7 @@ function attachArtwork(card, title, artworkUrl) {
   image.addEventListener("error", () => {
     // If the image fails to load (404), remove it.
     image.remove();
+    card.classList.remove("has-image");
     console.warn(`[Hero] Failed to load artwork: ${image.src}`);
   }, { once: true });
 
@@ -328,11 +329,13 @@ function attachArtwork(card, title, artworkUrl) {
     if (!cleanUrl || !card.isConnected) return;
     image.src = cleanUrl;
     if (!image.parentNode) card.prepend(image);
+    card.classList.add("has-image");
   };
 
   if (typeof artworkUrl === "string") {
     image.src = artworkUrl;
     card.prepend(image);
+    card.classList.add("has-image");
     return;
   }
 
