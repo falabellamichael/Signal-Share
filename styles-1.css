@@ -322,6 +322,7 @@ body[data-theme="contrast"] {
   --accent: #fff200;
   --accent-2: #00e5ff;
   --accent-3: #ff3d5a;
+  --accent-text: #000000;
   --shadow: 0 28px 80px rgba(0, 0, 0, 0.74);
   --scrollbar-track: rgba(255, 255, 255, 0.12);
   --scrollbar-thumb: rgba(255, 242, 0, 0.62);
