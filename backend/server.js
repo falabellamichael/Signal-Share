@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { createStrictAiTools, STRICT_TOOL_POLICY } from "./strict-ai-tools.js";
-import { SMTCMonitor, PlaybackStatus } from "@coooookies/windows-smtc-monitor";
+import { fork } from "node:child_process";
 
 dotenv.config({ path: path.resolve(process.cwd(), "backend", ".env") });
 dotenv.config();
@@ -609,6 +609,96 @@ app.get("/api/local-llm/models", async (_req, res) => {
   res.json({ ok: true, models: catalog.rows, ...catalog });
 });
 
+const PlaybackStatus = {
+  CLOSED: 0,
+  OPENED: 1,
+  CHANGING: 2,
+  STOPPED: 3,
+  PLAYING: 4,
+  PAUSED: 5,
+};
+
+let smtcCache = {
+  timestamp: 0,
+  data: null,
+  pendingPromise: null
+};
+
+/**
+ * Safely fetches the SMTC sessions from a short-lived child process.
+ * Caches results for up to 2 seconds to prevent excessive process spawning.
+ * Enforces a 1500ms timeout on the child process to prevent deadlocks.
+ */
+function getSMTCSnapshotSafe() {
+  const now = Date.now();
+  
+  if (smtcCache.data && (now - smtcCache.timestamp < 2000)) {
+    return Promise.resolve(smtcCache.data);
+  }
+  
+  if (smtcCache.pendingPromise) {
+    return smtcCache.pendingPromise;
+  }
+  
+  smtcCache.pendingPromise = new Promise((resolve) => {
+    let resolved = false;
+    const workerPath = path.join(__dirname, "smtc-query.js");
+    
+    const child = fork(workerPath, [], {
+      silent: true,
+      execArgv: []
+    });
+    
+    let stdoutData = "";
+    if (child.stdout) {
+      child.stdout.on("data", (data) => {
+        stdoutData += data.toString();
+      });
+    }
+    
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        console.warn("[Bridge] SMTC query timed out (1500ms). Terminating child process.");
+        try { child.kill("SIGKILL"); } catch (_) {}
+        resolve({ sessions: [], current: null });
+      }
+    }, 1500);
+    
+    child.on("exit", (code) => {
+      clearTimeout(timeout);
+      if (resolved) return;
+      resolved = true;
+      
+      try {
+        const result = JSON.parse(stdoutData.trim());
+        if (result && result.ok) {
+          smtcCache.data = { sessions: result.sessions, current: result.current };
+          smtcCache.timestamp = Date.now();
+          resolve(smtcCache.data);
+          return;
+        }
+      } catch (err) {
+        console.error("[Bridge] Failed to parse SMTC worker stdout:", err.message, "Stdout content:", stdoutData);
+      }
+      resolve({ sessions: [], current: null });
+    });
+    
+    child.on("error", (err) => {
+      clearTimeout(timeout);
+      if (resolved) return;
+      resolved = true;
+      console.error("[Bridge] SMTC worker process error:", err);
+      try { child.kill("SIGKILL"); } catch (_) {}
+      resolve({ sessions: [], current: null });
+    });
+  }).finally(() => {
+    smtcCache.pendingPromise = null;
+  });
+  
+  return smtcCache.pendingPromise;
+}
+
 function mapPlaybackState(playbackStatus) {
   switch (playbackStatus) {
     case PlaybackStatus.PLAYING:
@@ -652,7 +742,7 @@ function classifySourceProvider(sourceAppId = "", { title = "", artist = "", inf
   return "";
 }
 
-app.get("/api/system-media/current", (req, res) => {
+app.get("/api/system-media/current", async (req, res) => {
   const isWindows = process.platform === "win32";
   const base = {
     source: "windows-smtc",
@@ -684,6 +774,8 @@ app.get("/api/system-media/current", (req, res) => {
     const preferredSource = (rawPreferred || rawSource).toLowerCase().trim();
     const isFiltered = Boolean(preferredSource && preferredSource !== "all");
 
+    const snapshot = await getSMTCSnapshotSafe();
+
     let session = null;
 
     // inferredSourceProvider tracks the effective platform when filtering so the response
@@ -691,7 +783,7 @@ app.get("/api/system-media/current", (req, res) => {
     let inferredSourceProvider = "";
 
     if (isFiltered) {
-      const sessions = SMTCMonitor.getMediaSessions();
+      const sessions = snapshot.sessions;
       if (Array.isArray(sessions) && sessions.length > 0) {
         for (const s of sessions) {
           const appId = `${s.sourceAppId || ""}`.toLowerCase();
@@ -730,7 +822,7 @@ app.get("/api/system-media/current", (req, res) => {
     }
 
     if (!session) {
-      session = SMTCMonitor.getCurrentMediaSession();
+      session = snapshot.current;
     }
 
     if (!session) {
@@ -743,14 +835,7 @@ app.get("/api/system-media/current", (req, res) => {
     const artist = `${session.media?.artist || session.media?.albumArtist || ""}`.trim();
     const meta = [sourceLabel, artist].filter(Boolean).join(" - ");
 
-    let artworkUri = "";
-    const thumbnail = session.media?.thumbnail;
-    if (Buffer.isBuffer(thumbnail) && thumbnail.length > 0 && thumbnail.length <= 140000) {
-      const mimeType = inferArtworkMimeType(thumbnail);
-      if (mimeType) {
-        artworkUri = `data:${mimeType};base64,${thumbnail.toString("base64")}`;
-      }
-    }
+    const artworkUri = session.artworkUri || "";
 
     res.json({
       ...base,
