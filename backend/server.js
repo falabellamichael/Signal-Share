@@ -632,7 +632,7 @@ let smtcCache = {
 function getSMTCSnapshotSafe() {
   const now = Date.now();
   
-  if (smtcCache.data && (now - smtcCache.timestamp < 2000)) {
+  if (smtcCache.data && (now - smtcCache.timestamp < 1000)) {
     return Promise.resolve(smtcCache.data);
   }
   
@@ -730,14 +730,29 @@ function normalizeSourceLabel(sourceAppId = "") {
 
 function classifySourceProvider(sourceAppId = "", { title = "", artist = "", inferredFrom = "" } = {}) {
   const id = `${sourceAppId || ""}`.toLowerCase();
-  if (id.includes("spotify")) return "spotify";
-  if (id.includes("youtube") || id.includes("ytmusic") || id.includes("youtube.music")) return "youtube";
+  const lowerTitle = `${title || ""}`.toLowerCase();
+  const lowerArtist = `${artist || ""}`.toLowerCase();
 
-  // Browsers (Chrome, Edge, Firefox) hosting YouTube will NOT have "youtube" in their appId.
-  // If a caller already confirmed the session was matched for "youtube" (via preferredSource filter),
-  // trust that context and classify it as "youtube".
+  if (id.includes("spotify") || lowerTitle.includes("spotify") || lowerArtist.includes("spotify")) return "spotify";
+  if (id.includes("youtube") || id.includes("ytmusic") || id.includes("youtube.music") || lowerTitle.includes("youtube") || lowerArtist.includes("youtube")) return "youtube";
+
   if (inferredFrom === "youtube") return "youtube";
   if (inferredFrom === "spotify") return "spotify";
+
+  const isBrowser = id.includes("chrome") ||
+                    id.includes("msedge") ||
+                    id.includes("edge") ||
+                    id.includes("firefox") ||
+                    id.includes("opera") ||
+                    id.includes("brave") ||
+                    id.includes("vivaldi") ||
+                    id.includes("arc") ||
+                    id.includes("browser") ||
+                    id.includes("yandex");
+
+  if (isBrowser && (title || artist)) {
+    return "youtube";
+  }
 
   return "";
 }
@@ -801,7 +816,16 @@ app.get("/api/system-media/current", async (req, res) => {
           // When the user requests preferredSource=youtube, also match browser sessions that are
           // actively playing something (they are almost certainly playing YouTube if no Spotify session exists).
           if (preferredSource === "youtube") {
-            const isBrowser = appId.includes("chrome") || appId.includes("msedge") || appId.includes("edge") || appId.includes("firefox") || appId.includes("opera");
+            const isBrowser = appId.includes("chrome") ||
+                              appId.includes("msedge") ||
+                              appId.includes("edge") ||
+                              appId.includes("firefox") ||
+                              appId.includes("opera") ||
+                              appId.includes("brave") ||
+                              appId.includes("vivaldi") ||
+                              appId.includes("arc") ||
+                              appId.includes("browser") ||
+                              appId.includes("yandex");
             if (isBrowser && (title || artist)) {
               session = s;
               inferredSourceProvider = "youtube";

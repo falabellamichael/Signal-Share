@@ -699,7 +699,16 @@ The companion bridge is designed with several security layers to keep your PC sa
       // Browser-hosted YouTube: Chrome/Edge/Firefox playing media via SMTC.
       // The bridge now sets sourceProvider="youtube" for these, but we also accept them
       // via appPackage heuristic as a fallback for older bridge versions.
-      const isBrowserApp = app.includes("chrome") || app.includes("msedge") || app.includes("edge") || app.includes("firefox") || app.includes("opera");
+      const isBrowserApp = app.includes("chrome") ||
+                           app.includes("msedge") ||
+                           app.includes("edge") ||
+                           app.includes("firefox") ||
+                           app.includes("opera") ||
+                           app.includes("brave") ||
+                           app.includes("vivaldi") ||
+                           app.includes("arc") ||
+                           app.includes("browser") ||
+                           app.includes("yandex");
       if (isBrowserApp && (normalizeText(snapshot.title) || normalizeText(snapshot.meta))) return true;
       return false;
     }
@@ -1183,7 +1192,7 @@ The companion bridge is designed with several security layers to keep your PC sa
       }
     }
 
-    const genericPrefixPattern = /^(?:spotify[a-z0-9._!-]*|operasoftware\.[a-z0-9._!-]*|msedge(?:\.exe)?|chrome(?:\.exe)?|firefox(?:\.exe)?|bluetooth|phone link)\s*(?:[-:|]\s*)?/i;
+    const genericPrefixPattern = /^(?:spotify[a-z0-9._!-]*|operasoftware\.[a-z0-9._!-]*|msedge(?:\.exe)?|chrome(?:\.exe)?|firefox(?:\.exe)?|brave(?:\.exe)?|vivaldi(?:\.exe)?|arc(?:\.exe)?|yandex(?:\.exe)?|bluetooth|phone link)\s*(?:[-:|]\s*)?/i;
     const genericStripped = meta.replace(genericPrefixPattern, "").trim();
     if (genericStripped) meta = genericStripped;
 
