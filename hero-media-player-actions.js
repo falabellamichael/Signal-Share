@@ -498,7 +498,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
 
   // 5. COMMAND DISPATCH - CRITICAL FIX: Always send to bridge when in media toggle mode, regardless of source lock
   const isBridgeActiveForMediaToggle = isBridgeModeForToggle 
-    || ((mode === "desktop" || mode === "device") && !isPlayingOnState);
+    || (isMediaMode && (mode === "desktop" || mode === "device"));
 
   // A. Local Website Elements (Hosted videos, YouTube/Spotify Iframes)
   let handledLocally = false;
@@ -536,7 +536,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
     : (shouldPlay === isPlayingOnSystem);
 
   // CRITICAL FIX #2: Always send to bridge when in media mode, regardless of source lock state
-  const sendToBridge = isBridgeActiveForMediaMode 
+  const sendToBridge = isBridgeActiveForMediaToggle 
     || ((mode === "desktop" || mode === "device") && !isAlreadyInState) 
     || (!shouldPlay && (desktopSnapshot?.active || nativeSnapshot?.active) && !isAlreadyInState);
 
