@@ -369,7 +369,8 @@ export async function handlePlayPauseAction(context, forcePlay) {
     performDesktopAction, DESKTOP_ACTION_PLAY_PAUSE, isNativeCapacitorApp,
     companionPromptDismissed, showCompanionPrompt,
     toggleLocalPlayback, playHeroMedia, getNativeBridge, target,
-    getActivePlayerMediaElement, normalizePlaybackState
+    getActivePlayerMediaElement, normalizePlaybackState,
+    refreshDesktopSnapshot, refreshNativeSnapshot
   } = context;
 
   // 1. AUTHORITATIVE COOLDOWN
@@ -559,7 +560,7 @@ export function handlePreviousAction(context) {
     getControllablePlayerPost, heroMode,
     getDesktopSnapshotSignature, stepHeroPlayer,
     ensureControllablePost, stepMiniPlayer, mountPersistentPlayer, target,
-    isNativeCapacitorApp
+    isNativeCapacitorApp, refreshDesktopSnapshot, refreshNativeSnapshot
   } = context;
 
   if (debounce("previous", 500)) return;
@@ -666,7 +667,7 @@ export function handleNextAction(context) {
     getControllablePlayerPost, heroMode,
     getDesktopSnapshotSignature, stepHeroPlayer,
     ensureControllablePost, stepMiniPlayer, mountPersistentPlayer, target,
-    isNativeCapacitorApp
+    isNativeCapacitorApp, refreshDesktopSnapshot, refreshNativeSnapshot
   } = context;
 
   if (debounce("next", 500)) return;
@@ -769,7 +770,7 @@ export function handleNextAction(context) {
  */
 export function handleVolumeAction(context, event) {
   const {
-    state, getControllablePlayerPost, getEffectiveHeroMode,
+    state, elements, getControllablePlayerPost, getEffectiveHeroMode,
     normalizePlayerVolume, savePlayerVolume,
     getNativeBridge, applyPlayerVolumeToActiveElement,
     getFallbackPageMediaElement, getActivePlayerMediaElement,

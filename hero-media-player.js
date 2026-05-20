@@ -2091,22 +2091,7 @@ The companion bridge is designed with several security layers to keep your PC sa
 
   function handleRefresh(options = {}) {
     if (!hasUi()) return;
-
-    // Visual feedback on the stage/status
-    const prevStatus = elements.heroPlayerStatus.textContent;
-    elements.heroPlayerStatus.textContent = "REFRESHING...";
-    elements.heroPlayerRefreshButton?.classList.add("loading");
-
-    try {
-      handleRefreshAction({ ...getActionContext(), ...options });
-    } finally {
-      setTimeout(() => {
-        elements.heroPlayerRefreshButton?.classList.remove("loading");
-        if (elements.heroPlayerStatus.textContent === "REFRESHING...") {
-          elements.heroPlayerStatus.textContent = prevStatus;
-        }
-      }, 800);
-    }
+    handleRefreshAction({ ...getActionContext(), ...options });
   }
 
   function renderStagePreview(mode, post, fallbackMedia) {
