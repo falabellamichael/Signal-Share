@@ -253,7 +253,6 @@ export function createAppUi(context) {
     heroPlayerOpenMiniButton: document.querySelector("#heroPlayerOpenMiniButton"),
     heroModeFeed: document.querySelector("#heroModeFeed"),
     heroModeMedia: document.querySelector("#heroModeMedia"),
-    heroSourceAll: document.querySelector("#heroSourceAll"),
     heroSourceYoutube: document.querySelector("#heroSourceYoutube"),
     heroSourceSpotify: document.querySelector("#heroSourceSpotify"),
     heroPlayerOpenPhoneButton: document.querySelector("#heroPlayerOpenPhoneButton"),
@@ -638,7 +637,6 @@ export function createAppUi(context) {
       state.desktopBridgeSuspended = false;
       setHeroControlMode("media");
     });
-    elements.heroSourceAll?.addEventListener("click", () => setHeroControlSource("all"));
     elements.heroSourceYoutube?.addEventListener("click", () => setHeroControlSource("youtube"));
     elements.heroSourceSpotify?.addEventListener("click", () => setHeroControlSource("spotify"));
     elements.miniPlayerHead.addEventListener("pointerdown", beginMiniPlayerDrag);
@@ -830,12 +828,6 @@ export function createAppUi(context) {
       sourceToggleGroup.classList.toggle("is-dimmed", false);
     }
 
-    if (elements.heroSourceAll) {
-      const isAllActive = !state.heroControlSource || state.heroControlSource === "all";
-      elements.heroSourceAll.classList.toggle("is-active", isAllActive);
-      elements.heroSourceAll.classList.toggle("is-disabled", false);
-      elements.heroSourceAll.disabled = false;
-    }
     if (elements.heroSourceYoutube) {
       const isYoutubeActive = state.heroControlSource === "youtube";
       elements.heroSourceYoutube.classList.toggle("is-active", isYoutubeActive);
