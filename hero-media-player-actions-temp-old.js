@@ -16,7 +16,7 @@ import {
   detectPlayingYouTubeVideo
 } from './youtube-player-detection.js';
 import { hasActiveMediaInSource } from './_hero-media-player-toggle-state-validation.js';
-import { applyToggleSourceFilter } from './src/heroes/fixed/_hero-media-player-toggle-source-filter.fixed.js';
+import { applyToggleSourceFilter } from './src/heroes/fixed/_hero-media-player-toggle-source-filter.js';
 
 // Also import for app and browser tab handling - legacy names kept for compatibility
 const { validatePlayPauseTarget: _validatePlayPauseTarget, validateNavigationTarget: _validateNavigationTarget, handleMediaToggleAction: _handleMediaToggleAction } = await import('./_hero-media-player-toggle-action-isolation.js');
