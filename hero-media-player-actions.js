@@ -15,6 +15,7 @@ import {
   getActiveYouTubeVideo,
   detectPlayingYouTubeVideo
 } from './youtube-player-detection.js';
+import { hasActiveMediaInSource } from './src/heroes/fixed/_hero-media-player-toggle-state-validation';
 
 /**
  * Throttles high-frequency actions to prevent hardware/bridge flooding.
@@ -254,11 +255,39 @@ export function handleOpenMediaAction(context) {
 
   if (!targetUrl) {
     console.error("handleOpenMediaAction: Could not resolve target URL.", { post, desktopSnapshot });
-    // FIX: Update stage to prevent stale UI even when no URL found
-    context.renderHeroPlayerStage({
-      post: null,
-      parseYouTubeUrl,
-    });
+
+    // CRITICAL FIX #5: Check for active media before rendering idle state
+    const heroControlSource = state.heroControlSource;
+    const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
+    const isYouTubeMode = preferredSource === "youtube";
+    const isSpotifyActive = preferredSource === "spotify";
+
+    // If in toggle mode with no valid URL, validate for zero bleed-through
+    if (isYouTubeMode || isSpotifyActive) {
+      const hasYouTubeMedia = hasActiveMediaInSource('youtube', nativeSnapshot, desktopSnapshot);
+      const hasSpotifyMedia = hasActiveMediaInSource('spotify', nativeSnapshot, desktopSnapshot);
+
+      // If in toggle mode but no active media exists, show idle state immediately (zero bleed-through)
+      if ((!hasYouTubeMedia && isYouTubeMode) || (!hasSpotifyMedia && isSpotifyActive)) {
+        console.log('[Hero Actions] Zero bleed-through: Toggle source has no active media');
+        context.renderHeroPlayerStage({
+          post: null,
+          parseYouTubeUrl,
+        });
+      } else {
+        // Update stage to prevent stale UI even when no URL found
+        context.renderHeroPlayerStage({
+          post: null,
+          parseYouTubeUrl,
+        });
+      }
+    } else {
+      // Not in toggle mode, just update stage
+      context.renderHeroPlayerStage({
+        post: null,
+        parseYouTubeUrl,
+      });
+    }
     return;
   }
 

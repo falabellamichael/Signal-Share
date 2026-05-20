@@ -11,6 +11,11 @@
  */
 
 import { toCleanString, isThenable, safeCall, formatPostMeta } from './shared-utils.js';
+import {
+  hasActiveMediaInSource,
+  createZeroBleedThroughIdleResult,
+  validateMediaToggleState
+} from './src/heroes/fixed/_hero-media-player-toggle-state-validation';
 
 const YOUTUBE_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
 const SPOTIFY_TYPES = new Set(["track", "album", "playlist", "artist", "episode", "show"]);
@@ -672,6 +677,25 @@ function handleMediaToggleMode(options = {}) {
     isYouTubeMode,
     isSpotifyActive,
   } = options;
+
+  // CRITICAL FIX #5: Validate toggle state BEFORE rendering to prevent bleed-through
+  const validation = validateMediaToggleState({
+    isYouTubeMode,
+    isSpotifyActive,
+    nativeSnapshot,
+    desktopSnapshot,
+    post,
+  });
+
+  // If validation requires idle state, return proper idle result immediately
+  if (validation.needsIdleState) {
+    const idleResult = createZeroBleedThroughIdleResult();
+    return createCardResult({
+      badge: idleResult.badge,
+      title: idleResult.title,
+      meta: idleResult.meta,
+    });
+  }
 
   // Helper functions to identify Spotify or YouTube in SMTC snapshots
   const isYouTubeSnapshot = (snapshot) => {
