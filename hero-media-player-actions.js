@@ -15,7 +15,7 @@ import {
   getActiveYouTubeVideo,
   detectPlayingYouTubeVideo
 } from './youtube-player-detection.js';
-import { hasActiveMediaInSource } from './src/heroes/fixed/_hero-media-player-toggle-state-validation';
+import { hasActiveMediaInSource } from './_hero-media-player-toggle-state-validation.js';
 
 /**
  * Throttles high-frequency actions to prevent hardware/bridge flooding.

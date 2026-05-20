@@ -3,35 +3,85 @@
  * Zero bleed-through validation for Media Toggle mode (YouTube/Spotify)
  * 
  * FIXES:
- * 1. hasActiveMediaInSource() - checks if media source is valid
+ * 1. hasActiveMediaInSource() - supports both object signature and positional signature
  * 2. validateMediaToggleState() - validates toggle state to prevent bleed-through
  * 3. createZeroBleedThroughIdleResult() - creates proper idle result for transitions
  */
 
 /**
  * Checks if there's active media in the source (YouTube/Spotify)
- * Returns: true if valid active media exists, false otherwise
+ * Supports:
+ * - Object signature: hasActiveMediaInSource({ isYouTubeMode, isSpotifyActive, post, state })
+ * - Positional signature: hasActiveMediaInSource(source, nativeSnapshot, desktopSnapshot)
  */
-export function hasActiveMediaInSource(options = {}) {
-  const {
-    isYouTubeMode,
-    isSpotifyActive,
-    post,
-    state
-  } = options;
+export function hasActiveMediaInSource(sourceOrOptions = '', nativeSnapshot = null, desktopSnapshot = null) {
+  // 1. Handle Options Object signature
+  if (sourceOrOptions && typeof sourceOrOptions === 'object') {
+    const {
+      isYouTubeMode,
+      isSpotifyActive,
+      post,
+      state
+    } = sourceOrOptions;
 
-  // Check YouTube mode
-  if (isYouTubeMode) {
-    if (post && post.sourceKind === "youtube") return true;
-    if (state?.heroControlSource === "youtube" || 
-        state?.heroMediaSource === "youtube") return true;
+    // Check YouTube mode
+    if (isYouTubeMode) {
+      if (post && post.sourceKind === "youtube") return true;
+      if (state?.heroControlSource === "youtube" || 
+          state?.heroMediaSource === "youtube") return true;
+    }
+
+    // Check Spotify active
+    if (isSpotifyActive) {
+      if (post && post.sourceKind === "spotify") return true;
+      if (state?.heroControlSource === "spotify" || 
+          state?.heroMediaSource === "spotify") return true;
+    }
+
+    return false;
   }
 
-  // Check Spotify active
-  if (isSpotifyActive) {
-    if (post && post.sourceKind === "spotify") return true;
-    if (state?.heroControlSource === "spotify" || 
-        state?.heroMediaSource === "spotify") return true;
+  // 2. Handle Positional signature: (source, nativeSnapshot, desktopSnapshot)
+  const source = `${sourceOrOptions || ""}`.toLowerCase().trim();
+  const isSpotify = source === 'spotify';
+  const isYouTube = source === 'youtube';
+
+  const snapshotToCheck = nativeSnapshot || desktopSnapshot;
+  if (!snapshotToCheck) return false;
+
+  const snapshotMatchesSource = (snapshot, preferredSource) => {
+    if (!preferredSource) return true; // Any source matches when not specified
+    
+    const provider = (snapshot.sourceProvider || '').toLowerCase();
+    const appPkg = (snapshot.appPackage || '').toLowerCase();
+    const title = (snapshot.title || '').toLowerCase();
+    const meta = (snapshot.meta || '').toLowerCase();
+    
+    if (preferredSource === 'spotify') {
+      return provider.includes('spotify') || 
+             appPkg.includes('spotify') || 
+             title.includes('spotify') || 
+             meta.includes('spotify');
+    } else if (preferredSource === 'youtube') {
+      return provider.includes('youtube') || 
+             appPkg.includes('youtube') || 
+             appPkg.includes('ytmusic') || 
+             title.includes('youtube') || 
+             meta.includes('youtube') ||
+             /^[A-Za-z0-9_-]{11}$/.test(provider) ||
+             /^[?&]v=([A-Za-z0-9_-]{11})$/.test(snapshot.openUri);
+    }
+    return false;
+  };
+
+  // Check native snapshot first
+  if (snapshotMatchesSource(snapshotToCheck, source) && snapshotToCheck.active) {
+    return true;
+  }
+
+  // Check desktop snapshot as fallback
+  if (desktopSnapshot && snapshotMatchesSource(desktopSnapshot, source) && (desktopSnapshot.active || desktopSnapshot.title)) {
+    return true;
   }
 
   return false;
@@ -103,8 +153,6 @@ export function validateMediaToggleState(options = {}) {
 /**
  * Creates zero bleed-through idle result for Media Toggle mode transitions
  * Returns proper idle state with badge/title/meta that prevents previous session info from showing
- * 
- * FIXES: hasActiveMediaInSource(), validateMediaToggleState(), createZeroBleedThroughIdleResult()
  */
 export function createZeroBleedThroughIdleResult(options = {}) {
   const {

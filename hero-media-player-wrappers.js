@@ -1,6 +1,6 @@
 // Wrapper Functions for Hero Media Player Actions
 // These bridge simplified names to imported action handlers from hero-media-player-actions.js
-import { hasActiveMediaInSource } from './src/heroes/fixed/_hero-media-player-toggle-state-validation';
+import { hasActiveMediaInSource } from './_hero-media-player-toggle-state-validation.js';
 
 export function handleNext(options = {}) {
   const { context, render } = options;
