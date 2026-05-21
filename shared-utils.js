@@ -379,7 +379,7 @@ export function getActiveYouTubeVideo() {
   if (typeof document === "undefined") return null;
   
   // Method 1: Check for YouTube IFrame API
-  if (window.YT && window.YT.Player) {
+  if (window.YT && window.YT.Player && typeof window.YT.IframeIframeApiGetIframe === 'function') {
     try {
       const iframe = window.YT.IframeIframeApiGetIframe(0);
       if (iframe?.src) {

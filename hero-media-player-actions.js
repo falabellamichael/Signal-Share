@@ -102,9 +102,18 @@ export function handleOpenMediaAction(context) {
     post = typeof findMatchedPost === "function" ? findMatchedPost(nativeSnapshot) : null;
   }
 
-  if (!post && !desktopSnapshot?.available) {
-    console.warn("handleOpenMediaAction: No active post or desktop session.");
-    return;
+  // CRITICAL FIX: Handle case where no post available but still need to render idle state
+  const hasNoPost = !post && !desktopSnapshot?.available;
+  
+  if (hasNoPost) {
+    console.debug("handleOpenMediaAction: No active post available - checking system snapshots");
+    
+    // Try to get info from snapshots even without explicit post
+    if (mode === "desktop" && desktopSnapshot) {
+      post = null; // Use snapshot for desktop mode
+    } else if (mode === "device" && nativeSnapshot) {
+      post = null; // Use snapshot for device mode  
+    }
   }
 
   // Identify preferred sources from toggle state
