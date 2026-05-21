@@ -22,9 +22,14 @@
 
 #compose .studio-overlay-head h2 {
   max-width: none;
-  color: var(--text);
+  color: #fff;
   font-size: clamp(1.8rem, 4vw, 3.2rem);
   text-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+}
+
+/* Midnight theme - white text on dark background */
+body[data-theme="midnight"] #compose .studio-overlay-head h2 {
+  color: #fff;
 }
 
 .publish-studio-layout {
@@ -39,8 +44,17 @@
   align-content: start;
   gap: 16px;
   padding: clamp(16px, 2.5vw, 24px);
-  background:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.14), transparent 58%),
+}
+
+/* Midnight theme - dark rail */
+body[data-theme="midnight"] .publish-studio-rail {
+  background: linear-gradient(150deg, rgba(75, 89, 100, 0.3), transparent 60%),
+    rgba(8, 14, 22, 0.96);
+}
+
+/* Light theme - white rail */
+body:not([data-theme="midnight"]) .publish-studio-rail {
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.14), transparent 58%),
     var(--surface-strong);
 }
 
@@ -69,11 +83,7 @@
   align-content: center;
   gap: 5px;
   padding: 12px;
-  border: 1px solid rgba(15, 23, 32, 0.12);
   border-radius: var(--radius-md);
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.86);
-  text-align: left;
   transition:
     background 180ms ease,
     border-color 180ms ease,
@@ -81,7 +91,7 @@
 }
 
 .publish-family-button span {
-  color: var(--accent);
+  color: #fff;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -89,19 +99,37 @@
 }
 
 .publish-family-button strong {
-  color: #fff;
+  color: var(--accent);
   font-size: 1rem;
   line-height: 1.12;
 }
 
-.publish-family-button:hover,
-.publish-family-button:focus-visible,
-.publish-family-button.is-active {
+#compose .publish-family-button:hover,
+#compose .publish-family-button:focus-visible,
+#compose .publish-family-button.is-active {
   border-color: var(--accent);
-  background:
-    linear-gradient(135deg, rgba(238, 108, 77, 0.26), rgba(42, 157, 143, 0.18)),
-    var(--surface-strong);
-  transform: translateY(-1px);
+}
+
+/* Midnight theme - dark background with white text */
+body[data-theme="midnight"] #compose .publish-family-button {
+  background: rgba(8, 14, 22, 0.96);
+  border-color: var(--line);
+  color: #fff;
+}
+
+body[data-theme="midnight"] #compose .publish-family-button span {
+  color: #fff;
+}
+
+/* Light theme - white background with dark text */
+body:not([data-theme="midnight"]) #compose .publish-family-button {
+  background: var(--surface-strong);
+  border-color: rgba(15, 23, 32, 0.16);
+  color: #0c151d;
+}
+
+body:not([data-theme="midnight"]) #compose .publish-family-button span {
+  color: var(--accent);
 }
 
 .publish-option-panel {
@@ -109,10 +137,7 @@
   display: grid;
   gap: 14px;
   padding: 16px;
-  border: 1px solid rgba(15, 23, 32, 0.12);
   border-radius: var(--radius-md);
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.86);
 }
 
 .publish-option-panel > div:first-child {
@@ -121,16 +146,35 @@
 }
 
 .publish-option-panel h3 {
-  color: var(--text);
+  color: #fff;
   font-size: clamp(1.35rem, 2vw, 1.8rem);
   line-height: 1.1;
 }
 
 .publish-option-panel p:not(.eyebrow) {
   margin: 0;
-  color: rgba(65, 74, 90, 0.78);
+  color: rgba(65, 74, 90, 0.8);
   line-height: 1.55;
 }
+
+/* Midnight theme - dark background with white text */
+body[data-theme="midnight"] .publish-option-panel {
+  background: rgba(8, 14, 22, 0.78);
+  border-color: var(--line);
+  color: #fff;
+}
+
+.publish-option-panel h3 {
+  color: #fff;
+}
+
+/* Light theme - white background with dark text */
+body:not([data-theme="midnight"]) .publish-option-panel {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(15, 23, 32, 0.12);
+  color: #0c151d;
+}
+
 
 .publish-option-note {
   padding: 11px 12px;
@@ -152,15 +196,7 @@
   gap: 12px;
   align-items: center;
   padding: 13px;
-  border: 1px solid rgba(15, 23, 32, 0.1);
   border-radius: var(--radius-sm);
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.94);
-  text-align: left;
-  transition:
-    background 180ms ease,
-    border-color 180ms ease,
-    transform 180ms ease;
 }
 
 .publish-option-tile::after {
@@ -177,10 +213,21 @@
 .publish-option-tile:focus-visible,
 .publish-option-tile.is-selected {
   border-color: var(--accent);
-  background:
-    linear-gradient(135deg, rgba(238, 108, 77, 0.14), rgba(42, 157, 143, 0.1)),
-    var(--surface-strong);
   transform: translateY(-1px);
+}
+
+/* Midnight theme - dark background with white text */
+body[data-theme="midnight"] .publish-option-tile {
+  background: rgba(8, 14, 22, 0.78);
+  border-color: var(--line);
+  color: #fff;
+}
+
+/* Light theme - white background with dark text */
+body:not([data-theme="midnight"]) .publish-option-tile {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(15, 23, 32, 0.1);
+  color: #0c151d;
 }
 
 .publish-option-tile.is-selected::after {
@@ -221,9 +268,14 @@
 .publish-github-repo {
   display: grid;
   gap: 8px;
-  color: rgba(242, 249, 255, 0.84);
+  color: #fff;
   font-size: 0.92rem;
   font-weight: 600;
+}
+
+/* Midnight theme - dark repo info */
+body[data-theme="midnight"] .publish-github-repo {
+  color: rgba(185, 198, 215, 0.9);
 }
 
 .publish-github-repo input {
@@ -253,10 +305,7 @@
   display: grid;
   gap: 7px;
   padding: 16px;
-  border: 1px solid rgba(15, 23, 32, 0.1);
   border-radius: var(--radius-md);
-  background: linear-gradient(140deg, rgba(238, 108, 77, 0.16), rgba(42, 157, 143, 0.12)),
-    var(--surface-strong);
 }
 
 .publish-selected-card span {
@@ -280,20 +329,34 @@
   line-height: 1.16;
 }
 
-.publish-selected-card p {
-  margin: 0;
-  color: rgba(65, 74, 90, 0.8);
-  line-height: 1.52;
+/* Midnight theme - dark background with white text */
+body[data-theme="midnight"] .publish-selected-card {
+  background: linear-gradient(135deg, rgba(8, 14, 22, 0.9), rgba(17, 26, 36, 0.9)), var(--surface-strong);
 }
 
+body[data-theme="midnight"] .publish-selected-card p {
+  color: #fff;
+}
+
+/* Light theme - white background with dark text */
+body:not([data-theme="midnight"]) .publish-selected-card {
+  background: linear-gradient(140deg, rgba(238, 108, 77, 0.16), rgba(42, 157, 143, 0.12)),
+    var(--surface-strong);
+}
+
+body:not([data-theme="midnight"]) .publish-selected-card p {
+  color: rgba(65, 74, 90, 0.8);
+}
+
+
 #compose .post-form label {
-  color: var(--text);
+  color: #fff;
 }
 
 #compose .post-form input,
 #compose .post-form textarea {
   border-color: rgba(15, 23, 32, 0.14);
-  color: var(--text);
+  color: #fff;
   background: rgba(255, 255, 255, 0.96);
 }
 
@@ -327,6 +390,24 @@
   color: #fff;
   border-color: rgba(15, 23, 32, 0.12);
   background: rgba(15, 23, 32, 0.78);
+}
+
+/* Midnight theme - dark input backgrounds with white text */
+body[data-theme="midnight"] #compose .post-form textarea {
+  color: var(--text);
+  background: rgba(8, 14, 22, 0.96);
+}
+
+body[data-theme="midnight"] #compose .dropzone {
+  border-color: var(--line);
+  background: linear-gradient(135deg, rgba(75, 205, 255, 0.14), rgba(125, 211, 252, 0.1)),
+    rgba(8, 14, 22, 0.92);
+}
+
+/* Light theme - white input backgrounds with dark text */
+body:not([data-theme="midnight"]) #compose .post-form textarea {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .publish-studio-actions {
@@ -466,6 +547,11 @@ body[data-theme="ember"] #compose .post-form textarea {
   color: var(--text);
 }
 
+/* Ember theme - dark repo info */
+body[data-theme="ember"] .publish-github-repo {
+  color: rgba(205, 187, 163, 0.9);
+}
+
 /* Responsive */
 @media (max-width: 560px) {
   #compose .publish-family-grid {
@@ -475,4 +561,105 @@ body[data-theme="ember"] #compose .post-form textarea {
   #compose .publish-studio-actions .button {
     width: 100%;
   }
+}
+
+/* Theme Overrides for Publish Overlay */
+
+body[data-theme="midnight"] #compose .studio-publish-dialog {
+  background:
+    radial-gradient(circle at top left, rgba(125, 211, 252, 0.12), transparent 32%),
+    var(--surface-strong);
+}
+
+body[data-theme="midnight"] #compose .publish-family-button {
+  background: rgba(8, 14, 22, 0.96);
+  border-color: var(--line);
+  color: #fff;
+}
+
+body[data-theme="midnight"] #compose .publish-family-button span {
+  color: #fff;
+}
+
+/* Light theme - white background with dark text */
+body:not([data-theme="midnight"]) #compose .publish-family-button {
+  background: var(--surface-strong);
+  border-color: rgba(15, 23, 32, 0.16);
+  color: #0c151d;
+}
+
+body:not([data-theme="midnight"]) #compose .publish-family-button span {
+  color: var(--accent);
+}
+
+body[data-theme="midnight"] #compose .publish-option-panel {
+  background: rgba(8, 14, 22, 0.78);
+  border-color: var(--line);
+  color: #fff;
+}
+
+body[data-theme="midnight"] #compose .publish-option-tile {
+  background: rgba(8, 14, 22, 0.78);
+  border-color: var(--line);
+  color: #fff;
+}
+
+/* Light theme - white backgrounds with dark text */
+body:not([data-theme="midnight"]) #compose .publish-option-panel {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(15, 23, 32, 0.12);
+  color: #0c151d;
+}
+
+body:not([data-theme="midnight"]) #compose .publish-option-tile {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(15, 23, 32, 0.1);
+  color: #0c151d;
+}
+
+body[data-theme="midnight"] #compose .publish-github-repo {
+  color: rgba(185, 198, 215, 0.9);
+}
+
+/* Light theme - white repo info */
+body:not([data-theme="midnight"]) #compose .publish-github-repo {
+  color: #fff;
+}
+
+body[data-theme="midnight"] #compose .post-form textarea {
+  color: var(--text);
+  background: rgba(8, 14, 22, 0.96);
+}
+
+body:not([data-theme="midnight"]) #compose .post-form textarea {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+/* Ember theme - dark backgrounds with white text */
+body[data-theme="ember"] #compose .publish-family-button {
+  background: rgba(31, 7, 5, 0.96);
+  border-color: rgba(255, 120, 82, 0.18);
+  color: #fff;
+}
+
+body[data-theme="ember"] #compose .publish-family-button span {
+  color: #fff;
+}
+
+body[data-theme="ember"] #compose .publish-option-panel {
+  background: rgba(31, 7, 5, 0.82);
+  border-color: var(--line);
+  color: #fff;
+}
+
+body[data-theme="ember"] #compose .publish-option-tile {
+  background: rgba(31, 7, 5, 0.82);
+  border-color: var(--line);
+  color: #fff;
+}
+
+/* Ember - orange repo info */
+body[data-theme="ember"] #compose .publish-github-repo {
+  color: rgba(247, 239, 216, 0.95);
 }
