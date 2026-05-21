@@ -18,10 +18,13 @@ import {
 import {
   hasActiveMediaInSource,
   validateNavigationTarget,
-  handleMediaToggleAction
-} from './_hero-media-player-toggle-action-isolations-new.js';
-
-import { applyToggleSourceFilter } from './src/heroes/fixed/_hero-media-player-toggle-source-filter.js';
+  handleMediaToggleAction,
+  applyToggleSourceFilter
+} from ['./_hero-media-player-toggle-action-isolations-new.js', './src/heroes/fixed/_hero-media-player-toggle-source-filter.js'];
+import {
+  validateMediaToggleState,
+  createZeroBleedThroughIdleResult
+} from './src/heroes/fixed/_hero-media-player-toggle-state-validation.fixed.js';
 
 /**
  * Throttles high-frequency actions to prevent hardware/bridge flooding.
@@ -712,6 +715,10 @@ export function handlePreviousAction(context) {
   console.log(`[Hero] Previous Action Check - Target Source: ${activeSource}, Valid: ${toggleResult.filteredForSource}`);
   // =========================== END TOGGLE ISOLATION VALIDATION =========================
 
+  const isYouTubeMode = preferredSource === "youtube";
+  const isSpotifyActive = preferredSource === "spotify";
+  const post = getControllablePlayerPost();
+
   // Validate toggle state before processing - zero bleed-through protection
   const validation = validateMediaToggleState({
     isYouTubeMode,
@@ -906,6 +913,10 @@ export function handleNextAction(context) {
 
   console.log(`[Hero] Next Action Check - Target Source: ${activeSource}, Valid: ${toggleResult.filteredForSource}`);
   // =========================== END TOGGLE ISOLATION VALIDATION =========================
+
+  const isYouTubeMode = preferredSource === "youtube";
+  const isSpotifyActive = preferredSource === "spotify";
+  const post = getControllablePlayerPost();
 
   // Validate toggle state before processing - zero bleed-through protection
   const validation = validateMediaToggleState({
