@@ -746,22 +746,25 @@ export function handlePreviousAction(context) {
   const isSpotifyActive = preferredSource === "spotify";
   const post = getControllablePlayerPost();
 
-  // Validate toggle state before processing - zero bleed-through protection
-  const validation = validateMediaToggleState({
-    isYouTubeMode,
-    isSpotifyActive,
-    nativeSnapshot,
-    desktopSnapshot,
-    post,
-  });
-
-  if (validation.needsIdleState) {
-    const idleResult = createZeroBleedThroughIdleResult();
-    context.renderHeroPlayerStage({
-      post: null,
-      parseYouTubeUrl
+  // Feed actions should avoid cross-source bleed-through; media mode must still
+  // dispatch its selected source to the desktop/device bridge while idle.
+  if (!isMediaMode) {
+    const validation = validateMediaToggleState({
+      isYouTubeMode,
+      isSpotifyActive,
+      nativeSnapshot,
+      desktopSnapshot,
+      post,
     });
-    return;
+
+    if (validation.needsIdleState) {
+      const idleResult = createZeroBleedThroughIdleResult();
+      context.renderHeroPlayerStage({
+        post: null,
+        parseYouTubeUrl
+      });
+      return;
+    }
   }
 
   if (debounce("previous", 500)) return;
@@ -955,22 +958,25 @@ export function handleNextAction(context) {
   const isSpotifyActive = preferredSource === "spotify";
   const post = getControllablePlayerPost();
 
-  // Validate toggle state before processing - zero bleed-through protection
-  const validation = validateMediaToggleState({
-    isYouTubeMode,
-    isSpotifyActive,
-    nativeSnapshot,
-    desktopSnapshot,
-    post,
-  });
-
-  if (validation.needsIdleState) {
-    const idleResult = createZeroBleedThroughIdleResult();
-    context.renderHeroPlayerStage({
-      post: null,
-      parseYouTubeUrl
+  // Feed actions should avoid cross-source bleed-through; media mode must still
+  // dispatch its selected source to the desktop/device bridge while idle.
+  if (!isMediaMode) {
+    const validation = validateMediaToggleState({
+      isYouTubeMode,
+      isSpotifyActive,
+      nativeSnapshot,
+      desktopSnapshot,
+      post,
     });
-    return;
+
+    if (validation.needsIdleState) {
+      const idleResult = createZeroBleedThroughIdleResult();
+      context.renderHeroPlayerStage({
+        post: null,
+        parseYouTubeUrl
+      });
+      return;
+    }
   }
 
   if (debounce("next", 500)) return;

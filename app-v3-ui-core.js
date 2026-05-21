@@ -640,7 +640,6 @@ export function createAppUi(context) {
     elements.heroSourceYoutube?.addEventListener("click", () => setHeroControlSource("youtube"));
     elements.heroSourceSpotify?.addEventListener("click", () => setHeroControlSource("spotify"));
     elements.miniPlayerHead.addEventListener("pointerdown", beginMiniPlayerDrag);
-    heroMediaPlayerController.attachEventListeners();
     initializeFeedScrollObserver();
     window.addEventListener("pointermove", handleMiniPlayerDrag);
     window.addEventListener("pointerup", endMiniPlayerDrag);

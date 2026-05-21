@@ -266,10 +266,6 @@ function isAuthorized(req) {
   return Boolean((BRIDGE_SECRET && bridgeSecret === BRIDGE_SECRET) || (LOCAL_LLM_TOKEN && localToken === LOCAL_LLM_TOKEN));
 }
 
-// Initialize strict AI tools router
-const strictAiTools = createStrictAiTools({ isAuthorized, fetchWithTimeout });
-app.use(strictAiTools.router);
-
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -282,6 +278,10 @@ app.use((req, res, next) => {
   if (req.method === "OPTIONS") return res.status(200).end();
   next();
 });
+
+// Initialize strict AI tools router after shared parsing and CORS middleware.
+const strictAiTools = createStrictAiTools({ isAuthorized, fetchWithTimeout });
+app.use(strictAiTools.router);
 
 // Media action endpoint for Play/Pause, Next/Previous commands
 app.post("/api/system/media/action", async (req, res) => {
