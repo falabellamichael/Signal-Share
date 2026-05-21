@@ -18,9 +18,12 @@ import {
 import {
   hasActiveMediaInSource,
   validateNavigationTarget,
-  handleMediaToggleAction,
+  handleMediaToggleAction
+} from './_hero-media-player-toggle-action-isolations-new.js';
+
+import {
   applyToggleSourceFilter
-} from ['./_hero-media-player-toggle-action-isolations-new.js', './src/heroes/fixed/_hero-media-player-toggle-source-filter.js'];
+} from './src/heroes/fixed/_hero-media-player-toggle-source-filter.js';
 import {
   validateMediaToggleState,
   createZeroBleedThroughIdleResult
