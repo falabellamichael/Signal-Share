@@ -15,11 +15,12 @@ import {
   getActiveYouTubeVideo,
   detectPlayingYouTubeVideo
 } from './youtube-player-detection.js';
-import { hasActiveMediaInSource } from './_hero-media-player-toggle-state-validation.js';
+import {
+  hasActiveMediaInSource,
+  validateNavigationTarget,
+  handleMediaToggleAction
+} from './_hero-media-player-action-isolations-new.js';
 import { applyToggleSourceFilter } from './src/heroes/fixed/_hero-media-player-toggle-source-filter.js';
-
-// Also import for app and browser tab handling.
-const { validatePlayPauseTarget, validateNavigationTarget, handleMediaToggleAction } = await import('./_hero-media-player-toggle-action-isolation.js');
 
 /**
  * Throttles high-frequency actions to prevent hardware/bridge flooding.

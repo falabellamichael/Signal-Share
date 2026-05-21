@@ -1,9 +1,9 @@
-import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js";
+import { renderHeroStagePreview, resolveAppPreviewArtwork } from "./hero-media-player-preview.js?v=1.1";
 import {
   handleOpenMediaAction, handleOpenPhoneAction,
   handlePlayPauseAction, handleNextAction, handlePreviousAction,
   handleVolumeAction, handleRefreshAction
-} from "./hero-media-player-actions.js?v=1.5";
+} from "./hero-media-player-actions.js?v=1.6";
 import { isThenable, normalizeText, toCleanString, cleanDisplayText, isExternalUrlPost, formatProviderName } from './shared-utils.js';
 import {
   getActiveYouTubeVideo,

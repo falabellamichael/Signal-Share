@@ -6,7 +6,9 @@
  * 2. YouTube/Spotify in browser tabs
  */
 
-import { hasActiveMediaInSource } from './_hero-media-player-toggle-state-validation.js';
+import { hasActiveMediaInSource } from './src/heroes/fixed/_hero-media-player-toggle-state-validation.fixed.js';
+
+export { hasActiveMediaInSource };
 
 /**
  * Gets all active media including native app AND browser tabs
@@ -306,4 +308,79 @@ export function handleVolumeWithIsolation(context, event) {
   if (typeof render === 'function') render();
 
   // =========================== END TOGGLE ISOLATION =========================
+}
+
+export function handleMediaToggleAction(options = {}) {
+  const {
+    toggleMode,
+    mediaSource,
+    heroControlSource,
+    post,
+    state,
+    actionType
+  } = options;
+
+  const source = (mediaSource || heroControlSource || state?.heroControlSource || state?.heroMediaSource || "").toLowerCase();
+  const isMediaMode = toggleMode === "media" || state?.heroControlMode === "media";
+  const hasMedia = source === "youtube" || source === "spotify"
+    ? hasActiveMediaInSource(source, state?.nativeSnapshot, state?.desktopSnapshot) || post?.sourceKind === source
+    : Boolean(post);
+
+  return {
+    ok: true,
+    toggleSwitch: {
+      mode: isMediaMode ? "media" : "feed",
+      source,
+      clearPreviousState: false,
+      immediateRender: false
+    },
+    filteredAction: {
+      ok: true,
+      filteredForSource: source === "youtube" || source === "spotify",
+      isActive: Boolean(hasMedia),
+      source: hasMedia ? source : null,
+      state: hasMedia ? (state?.heroPlayerPlaybackState || "idle") : "none",
+      actionType
+    },
+    activeMediaInfo: hasMedia ? { type: post ? "post" : "system", source, post } : null,
+    filtersForActiveSourceOnly: true,
+    noBleedThroughBetweenSources: true
+  };
+}
+
+export function validatePlayPauseTarget(options = {}) {
+  const { activeSource, nativeSnapshot, desktopSnapshot, post } = options;
+  if (!activeSource) return { valid: true, target: "system", source: null };
+  if (post?.sourceKind === activeSource) return { valid: true, target: "post", source: activeSource };
+  return validateSourceTarget(activeSource, nativeSnapshot, desktopSnapshot);
+}
+
+export function validateNavigationTarget(options = {}) {
+  const { activeSource, nativeSnapshot, desktopSnapshot, post, feedPostIndex } = options;
+  if (feedPostIndex !== null && feedPostIndex !== undefined) {
+    return { valid: true, target: "feed", index: feedPostIndex };
+  }
+  if (!activeSource) return { valid: true, target: "system", source: null };
+  if (post?.sourceKind === activeSource) return { valid: true, target: "post", source: activeSource };
+  return validateSourceTarget(activeSource, nativeSnapshot, desktopSnapshot);
+}
+
+function validateSourceTarget(activeSource, nativeSnapshot, desktopSnapshot) {
+  const source = `${activeSource || ""}`.toLowerCase();
+  if (source !== "youtube" && source !== "spotify") {
+    return { valid: true, target: "system", source: null };
+  }
+
+  const hasMatchingSource = hasActiveMediaInSource(source, nativeSnapshot, desktopSnapshot);
+  if (hasMatchingSource) {
+    return { valid: true, target: "system", source };
+  }
+
+  const hasOtherSystemMedia = Boolean(nativeSnapshot?.active || desktopSnapshot?.active);
+  return {
+    valid: !hasOtherSystemMedia,
+    target: hasOtherSystemMedia ? "none" : "system",
+    source,
+    reason: hasOtherSystemMedia ? "source-mismatch" : "no-active-source"
+  };
 }

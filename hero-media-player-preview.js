@@ -15,7 +15,7 @@ import {
   hasActiveMediaInSource,
   createZeroBleedThroughIdleResult,
   validateMediaToggleState
-} from './_hero-media-player-toggle-state-validation.js';
+} from './src/heroes/fixed/_hero-media-player-toggle-state-validation.fixed.js';
 
 const YOUTUBE_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
 const SPOTIFY_TYPES = new Set(["track", "album", "playlist", "artist", "episode", "show"]);

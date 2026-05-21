@@ -6,7 +6,7 @@
  * This prevents showing previous session info when no active browser tab exists.
  */
 
-import { getActiveYouTubeVideo, detectPlayingYouTubeVideo } from './youtube-player-detection.js';
+import { getActiveYouTubeVideo } from '../../../youtube-player-detection.js';
 
 /**
  * Validates whether there is actually active media in a given source
@@ -15,7 +15,21 @@ import { getActiveYouTubeVideo, detectPlayingYouTubeVideo } from './youtube-play
  * @param {Object} desktopSnapshot - Desktop snapshot data  
  * @returns {boolean} True if there is active media in the specified source
  */
-export function hasActiveMediaInSource(source = '', nativeSnapshot, desktopSnapshot) {
+export function hasActiveMediaInSource(sourceOrOptions = '', nativeSnapshot, desktopSnapshot) {
+  if (sourceOrOptions && typeof sourceOrOptions === 'object') {
+    const { isYouTubeMode, isSpotifyActive, post, state } = sourceOrOptions;
+    if (isYouTubeMode) {
+      if (post?.sourceKind === 'youtube') return true;
+      if (state?.heroControlSource === 'youtube' || state?.heroMediaSource === 'youtube') return true;
+    }
+    if (isSpotifyActive) {
+      if (post?.sourceKind === 'spotify') return true;
+      if (state?.heroControlSource === 'spotify' || state?.heroMediaSource === 'spotify') return true;
+    }
+    return false;
+  }
+
+  const source = `${sourceOrOptions || ''}`;
   // If no specific source required (empty string), check any source with activity
   if (!source && !!(nativeSnapshot?.active || nativeSnapshot?.title || desktopSnapshot?.active || desktopSnapshot?.title)) {
     return true;
@@ -30,6 +44,7 @@ export function hasActiveMediaInSource(source = '', nativeSnapshot, desktopSnaps
   
   // Helper to check if snapshot matches source
   const snapshotMatchesSource = (snapshot, preferredSource) => {
+    if (!snapshot) return false;
     if (!preferredSource) return true; // Any source matches when not specified
   
     const provider = (snapshot.sourceProvider || '').toLowerCase();
@@ -64,12 +79,7 @@ export function hasActiveMediaInSource(source = '', nativeSnapshot, desktopSnaps
   }
   
   // Check desktop snapshot as fallback
-  const isDesktopSpotify = snapshotMatchesSource(desktopSnapshot, 'spotify');
-  const isDesktopYouTube = snapshotMatchesSource(desktopSnapshot, 'youtube');
-  
-  if ((normalizedSource === '' && (desktopSnapshot.active || desktopSnapshot.title)) ||
-      (!isSpotify && isDesktopYouTube && (desktopSnapshot.active || desktopSnapshot.title)) ||
-      (!isYouTube && isDesktopSpotify && (desktopSnapshot.active || desktopSnapshot.title))) {
+  if (desktopSnapshot && snapshotMatchesSource(desktopSnapshot, normalizedSource) && (desktopSnapshot.active || desktopSnapshot.title)) {
     return true;
   }
   
@@ -116,6 +126,14 @@ export function validateMediaToggleState(options = {}) {
     desktopSnapshot,
     post,
   } = options;
+
+  if (isYouTubeMode && post?.sourceKind === 'youtube') {
+    return { needsIdleState: false };
+  }
+
+  if (isSpotifyActive && post?.sourceKind === 'spotify') {
+    return { needsIdleState: false };
+  }
   
   // CRITICAL FIX: When in YouTube mode, check for active YouTube media
   if (isYouTubeMode) {
