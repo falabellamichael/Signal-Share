@@ -3,7 +3,7 @@
  * Handles all source routing for YouTube, Spotify, and Feed mode properly
  */
 
-import { hasActiveMediaInSource } from './_hero-media-player-action-isolations-new.js';
+import { hasActiveMediaInSource } from './_hero-media-player-toggle-action-isolations-new.js';
 
 // ============================================================================
 // WRAPPER FUNCTIONS - Simplified public API

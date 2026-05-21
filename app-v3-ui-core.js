@@ -632,14 +632,6 @@ export function createAppUi(context) {
       if (postId) openMiniPlayer(postId, elements.heroPlayerOpenMiniButton);
     });
 
-    // HERO PLAYER CONTROLS - all missing! Add these to fix broken controls
-    if (elements.heroPlayerPlayPauseButton) elements.heroPlayerPlayPauseButton.addEventListener("click", () => heroMediaPlayerController.handlePlayPause());
-    if (elements.heroPlayerPrevButton) elements.heroPlayerPrevButton.addEventListener("click", () => heroMediaPlayerController.handlePrevious({ target: "hero" }));
-    if (elements.heroPlayerNextButton) elements.heroPlayerNextButton.addEventListener("click", () => heroMediaPlayerController.handleNext({ target: "hero" }));
-    if (elements.heroPlayerOpenMediaButton) elements.heroPlayerOpenMediaButton.addEventListener("click", () => heroMediaPlayerController.handleOpenMedia());
-    if (elements.heroPlayerOpenPhoneButton) elements.heroPlayerOpenPhoneButton.addEventListener("click", () => heroMediaPlayerController.handleOpenPhone());
-    if (elements.heroPlayerRefreshButton) elements.heroPlayerRefreshButton.addEventListener("click", () => heroMediaPlayerController.handleRefresh());
-
     elements.heroModeFeed?.addEventListener("click", () => setHeroControlMode("feed"));
     elements.heroModeMedia?.addEventListener("click", () => {
       state.desktopBridgeSuspended = false;

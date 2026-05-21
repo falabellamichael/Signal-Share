@@ -19,7 +19,8 @@ import {
   hasActiveMediaInSource,
   validateNavigationTarget,
   handleMediaToggleAction
-} from './_hero-media-player-action-isolations-new.js';
+} from './_hero-media-player-toggle-action-isolations-new.js';
+
 import { applyToggleSourceFilter } from './src/heroes/fixed/_hero-media-player-toggle-source-filter.js';
 
 /**
@@ -454,7 +455,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
   
   // =========================== END TOGGLE ISOLATION VALIDATION =========================
 
-  // 1. AUTHORITATIVE COOLDOWN
+  // 1. AUTHORITATIVE COOLDOWN - Check validation first before processing
   if (debounce("play-pause", 500)) return;
 
   // 2. STABILIZATION LOCKOUT
@@ -711,6 +712,24 @@ export function handlePreviousAction(context) {
   console.log(`[Hero] Previous Action Check - Target Source: ${activeSource}, Valid: ${toggleResult.filteredForSource}`);
   // =========================== END TOGGLE ISOLATION VALIDATION =========================
 
+  // Validate toggle state before processing - zero bleed-through protection
+  const validation = validateMediaToggleState({
+    isYouTubeMode,
+    isSpotifyActive,
+    nativeSnapshot,
+    desktopSnapshot,
+    post,
+  });
+
+  if (validation.needsIdleState) {
+    const idleResult = createZeroBleedThroughIdleResult();
+    context.renderHeroPlayerStage({
+      post: null,
+      parseYouTubeUrl
+    });
+    return;
+  }
+
   if (debounce("previous", 500)) return;
 
   const now = Date.now();
@@ -887,6 +906,24 @@ export function handleNextAction(context) {
 
   console.log(`[Hero] Next Action Check - Target Source: ${activeSource}, Valid: ${toggleResult.filteredForSource}`);
   // =========================== END TOGGLE ISOLATION VALIDATION =========================
+
+  // Validate toggle state before processing - zero bleed-through protection
+  const validation = validateMediaToggleState({
+    isYouTubeMode,
+    isSpotifyActive,
+    nativeSnapshot,
+    desktopSnapshot,
+    post,
+  });
+
+  if (validation.needsIdleState) {
+    const idleResult = createZeroBleedThroughIdleResult();
+    context.renderHeroPlayerStage({
+      post: null,
+      parseYouTubeUrl
+    });
+    return;
+  }
 
   if (debounce("next", 500)) return;
 
