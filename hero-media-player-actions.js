@@ -461,7 +461,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
   const mode = resolveControlMode(context);
 
   // CRITICAL FIX: For Media Toggle Mode, ALWAYS use bridge routing regardless of source lock state
-  const isBridgeModeForToggle = isMediaMode && heroMode === "media";
+  const isBridgeModeForToggle = isMediaMode && (heroMode === "media" || mode === "desktop" || mode === "device");
   
   // 3. RESOLVE INTENT (Strictly based on resolved mode)
   let shouldPlay = true;
@@ -610,7 +610,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
     }
 
     if (isMediaMode && !bridgeActionSucceeded) {
-      console.warn("[Hero] Media mode app action was not accepted by the bridge.", { action: DESKTOP_ACTION_PLAY_PAUSE, preferredSource });
+      console.debug("[Hero] Media mode bridge action did not report acceptance.", { action: DESKTOP_ACTION_PLAY_PAUSE, preferredSource });
     }
 
     // Final Measure: If we are 'Pausing' local app playback, ensure local media is stopped.

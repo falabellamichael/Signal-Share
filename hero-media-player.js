@@ -3,7 +3,7 @@ import {
   handleOpenMediaAction, handleOpenPhoneAction,
   handlePlayPauseAction, handleNextAction, handlePreviousAction,
   handleVolumeAction, handleRefreshAction
-} from "./hero-media-player-actions.js?v=1.3";
+} from "./hero-media-player-actions.js?v=1.5";
 import { isThenable, normalizeText, toCleanString, cleanDisplayText, isExternalUrlPost, formatProviderName } from './shared-utils.js';
 import {
   getActiveYouTubeVideo,
@@ -1908,9 +1908,9 @@ The companion bridge is designed with several security layers to keep your PC sa
     const preferredSource = getPreferredHeroControlSource();
     const actionKey = `${preferredSource || "all"}|${action}|${JSON.stringify(payload || {})}`;
 
-    if (desktopActionInFlight && actionKey === lastDesktopActionKey) return Promise.resolve(false);
+    if (desktopActionInFlight && actionKey === lastDesktopActionKey) return Promise.resolve(true);
     if (now - lastDesktopActionAt < DESKTOP_ACTION_COOLDOWN_MS && actionKey === lastDesktopActionKey) {
-      return Promise.resolve(false);
+      return Promise.resolve(true);
     }
 
     lastDesktopActionAt = now;
