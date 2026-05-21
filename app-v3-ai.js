@@ -440,17 +440,15 @@ async function callLocalAI({
           continue;
         }
 
+        // Only continue to next path if we haven't tried the final path yet
         if (response.status === 404 && chatPath !== candidateChatPaths[candidateChatPaths.length - 1]) {
           continue;
         }
 
         lastError = `Bridge returned ${response.status}`;
+        
+        // If auth fails on any path, stop trying other paths
         if (response.status === 401 || response.status === 403) {
-          // If local-llm auth fails, fall back to legacy bridge chat route.
-          // This keeps AI available when token/secret settings are partial.
-          if (chatPath === "/api/local-llm/chat") {
-            continue;
-          }
           break;
         }
       } catch (error) {
