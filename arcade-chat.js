@@ -2825,6 +2825,11 @@ window.sendChatMessage = async function (promptOverride = '') {
                                 attemptErrors.push(formatAttemptError(attemptPath, 'non-JSON payload', captureClientSourceLocation()));
                                 continue;
                             }
+                            if (data.ok === false) {
+                                const bridgeError = `${data.error || data.message || 'AI bridge request failed'}`.trim();
+                                attemptErrors.push(formatAttemptError(attemptPath, bridgeError, captureClientSourceLocation()));
+                                continue;
+                            }
                             const candidateReply = typeof data.reply === 'string' ? data.reply : '';
                             if (!candidateReply.trim()) {
                                 attemptErrors.push(formatAttemptError(attemptPath, 'empty AI reply', captureClientSourceLocation()));

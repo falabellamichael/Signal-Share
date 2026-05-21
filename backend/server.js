@@ -24,13 +24,16 @@ const LOCAL_LLM_TOKEN = process.env.SIGNAL_SHARE_LOCAL_LLM_TOKEN || "";
 const OLLAMA_BASE_URL = process.env.SIGNAL_SHARE_OLLAMA_BASE_URL || process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
 const DEFAULT_OLLAMA_MODEL = process.env.SIGNAL_SHARE_OLLAMA_MODEL || process.env.OLLAMA_MODEL || "llama3.1";
 const LM_STUDIO_BASE_URL = process.env.SIGNAL_SHARE_LM_STUDIO_BASE_URL || process.env.LM_STUDIO_BASE_URL || process.env.LMSTUDIO_BASE_URL || "http://127.0.0.1:1234";
+const AI_TEMPERATURE = Number.isFinite(Number(process.env.SIGNAL_SHARE_AI_TEMPERATURE))
+  ? Number(process.env.SIGNAL_SHARE_AI_TEMPERATURE)
+  : 0.7;
 
 function normalizeBaseUrl(value = "") {
   const raw = `${value || ""}`.trim();
   if (!raw) return "";
   try {
-    const url = new URL(/^https?:\/\/$/i.test(raw) ? raw : `http://${raw}`);
-    return `${url.origin}${url.pathname}`.replace(/\/+/g, "");
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `http://${raw}`);
+    return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
   } catch (_error) {
     return "";
   }
@@ -65,6 +68,9 @@ function sanitizeHistoryForConversation(history, conversationId = "") {
 function buildMessages({ message = "", history = [], pageContext = "", customInstructions = "", conversationId = "" } = {}) {
   const messages = [];
   messages.push({ role: "system", content: `You are a helpful assistant for Signal Share — a social platform.` });
+  if (`${customInstructions || ""}`.trim()) {
+    messages.push({ role: "system", content: `${customInstructions}`.trim() });
+  }
   if (pageContext) {
     messages.push({ role: "system", content: `Current page context:\n${pageContext}` });
   }
@@ -98,11 +104,13 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 180000) {
 async function getProviderCandidates(model = "auto") {
   const candidates = [];
   const lmStudioBase = normalizeBaseUrl(LM_STUDIO_BASE_URL);
-  if (lmStudioBase) {
+  const lmStudioModels = await getLmStudioModelIds();
+  if (lmStudioBase && lmStudioModels.length > 0) {
     candidates.push({
       id: "lm-studio",
       type: "openai-compatible",
       chatUrl: `${lmStudioBase}/v1/chat/completions`,
+      model: model === "auto" ? lmStudioModels[0] : model,
       providerLabel: "LM Studio provider"
     });
   }
@@ -115,6 +123,22 @@ async function getProviderCandidates(model = "auto") {
     });
   }
   return candidates;
+}
+
+async function getLmStudioModelIds() {
+  const base = normalizeBaseUrl(LM_STUDIO_BASE_URL);
+  if (!base) return [];
+  try {
+    const response = await fetchWithTimeout(`${base}/v1/models`, { method: "GET" }, 1500);
+    if (!response.ok) return [];
+    const data = await response.json().catch(() => null);
+    const models = Array.isArray(data?.data) ? data.data : [];
+    return models
+      .map((model) => `${model?.id || ""}`.trim())
+      .filter(Boolean);
+  } catch (_error) {
+    return [];
+  }
 }
 
 async function getOllamaModelIds() {
@@ -131,6 +155,38 @@ async function getOllamaModelIds() {
   } catch (_error) {
     return [];
   }
+}
+
+async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperature }) {
+  const selectedModel = `${model || ""}`.trim();
+  if (!chatUrl || !selectedModel) {
+    throw new Error("LM Studio chat model is unavailable.");
+  }
+
+  const response = await fetchWithTimeout(chatUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: selectedModel,
+      messages,
+      temperature,
+      stream: false
+    })
+  });
+  const raw = await response.text();
+  if (!response.ok) {
+    throw new Error(`LM Studio provider returned HTTP ${response.status}: ${raw.slice(0, 240)}`);
+  }
+
+  const data = JSON.parse(raw);
+  const messageContent = data?.choices?.[0]?.message?.content;
+  if (typeof messageContent === "string") return messageContent;
+  if (Array.isArray(messageContent)) {
+    return messageContent
+      .map((part) => typeof part === "string" ? part : `${part?.text || ""}`)
+      .join("");
+  }
+  return typeof data?.choices?.[0]?.text === "string" ? data.choices[0].text : "";
 }
 
 async function callOllamaProvider({ messages, model, temperature }) {
@@ -165,6 +221,38 @@ async function callOllamaProvider({ messages, model, temperature }) {
     return raw;
   }
   return data?.message?.content || data?.response || "";
+}
+
+async function getChatResponse({ message, history, pageContext, customInstructions, conversationId, model } = {}) {
+  const messages = buildMessages({ message, history, pageContext, customInstructions, conversationId });
+  const providers = await getProviderCandidates(model);
+  if (providers.length === 0) {
+    throw new Error("No local chat provider is available. Start LM Studio Local Server or Ollama and load a chat model.");
+  }
+
+  const providerErrors = [];
+  for (const provider of providers) {
+    try {
+      const reply = provider.type === "openai-compatible"
+        ? await callOpenAiCompatibleProvider({
+            chatUrl: provider.chatUrl,
+            messages,
+            model: provider.model,
+            temperature: AI_TEMPERATURE
+          })
+        : await callOllamaProvider({
+            messages,
+            model: provider.model,
+            temperature: AI_TEMPERATURE
+          });
+      if (`${reply || ""}`.trim()) return `${reply}`.trim();
+      providerErrors.push(`${provider.providerLabel || provider.id} returned an empty reply.`);
+    } catch (error) {
+      providerErrors.push(`${provider.providerLabel || provider.id} failed: ${error?.message || error}`);
+    }
+  }
+
+  throw new Error(providerErrors.join(" | ") || "Local AI chat failed.");
 }
 
 const STRICT_TOOL_POLICY = `STRICT TOOL USAGE: Only respond when explicitly requested with /publish or matching intent. Otherwise, respond conversationally.`;
@@ -332,10 +420,17 @@ function mapPlaybackState(playbackStatus) {
 }
 
 async function getLocalModelCatalog() {
+  const lmStudioModels = await getLmStudioModelIds();
   const ollamaModels = await getOllamaModelIds();
   const rows = [];
+  for (const modelId of lmStudioModels) rows.push({ id: modelId, provider: "lm-studio" });
   for (const modelId of ollamaModels) rows.push({ id: modelId, provider: "ollama" });
-  return { all: ollamaModels, rows, configured: ollamaModels.length > 0, checkedAt: new Date().toISOString() };
+  return {
+    all: [...lmStudioModels, ...ollamaModels],
+    rows,
+    configured: rows.length > 0,
+    checkedAt: new Date().toISOString()
+  };
 }
 
 app.get("/api/system-media/current", async (req, res) => {
@@ -452,7 +547,7 @@ app.use((req, res, next) => {
 async function handleChatRoute(req, res) {
   try {
     if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized bridge request." });
-    const { message, history, pageContext, attachment } = req.body || {};
+    const { message, history, pageContext, attachment, model, customInstructions } = req.body || {};
     const conversationId = normalizeConversationId(req.body?.conversationId || req.body?.chatId || "");
     if (!message && (!Array.isArray(history) || history.length === 0)) {
       return res.status(400).json({ ok: false, error: "No message provided." });
@@ -472,33 +567,20 @@ async function handleChatRoute(req, res) {
     } else {
       // Call AI chat endpoint
       try {
-        const response = await fetchWithTimeout(`${OLLAMA_BASE_URL}/api/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: DEFAULT_OLLAMA_MODEL,
-            messages: buildMessages({ message, history, pageContext }),
-            stream: false
-          })
+        const reply = await getChatResponse({
+          message,
+          history,
+          pageContext,
+          customInstructions,
+          conversationId,
+          model
         });
-
-        const raw = await response.text();
-        if (!response.ok) {
-          return res.status(503).json({ ok: false, error: "AI service unavailable." });
-        }
-
-        try {
-          const data = JSON.parse(raw);
-          return res.json({ ok: true, reply: data?.message?.content || raw.slice(0, 1024) });
-        } catch (parseError) {
-          // Fallback to text response
-          return res.json({ ok: true, reply: raw.slice(0, 1024) });
-        }
+        return res.json({ ok: true, reply });
       } catch (chatError) {
         console.warn("[Chat] AI endpoint error:", chatError.message);
-        return res.json({ 
+        return res.status(503).json({ 
           ok: false, 
-          error: "AI chat unavailable - try /api/system/media/action for media commands" 
+          error: chatError?.message || "AI chat unavailable - try /api/system/media/action for media commands" 
         });
       }
     }
@@ -522,10 +604,7 @@ app.get("/api/local-llm/models", async (req, res) => {
   }
   try {
     const catalog = await getLocalModelCatalog();
-    const models = (catalog?.all || []).map((id) => ({
-      id,
-      provider: "local"
-    }));
+    const models = Array.isArray(catalog?.rows) ? catalog.rows : [];
     return res.json({
       ok: true,
       models,
