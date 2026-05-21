@@ -24,6 +24,8 @@
     />
     <link rel="stylesheet" href="./styles.css?v=122" />
     <link rel="stylesheet" href="./studio-overlays.css?v=1.0" />
+    <link rel="stylesheet" href="./studio-auth-overlay.css?v=1.0" />
+    <link rel="stylesheet" href="./studio-publish-overlay.css?v=1.0" />
     <style>
       @keyframes optimistic-pulse {
         0% { transform: scale(1); opacity: 1; }
@@ -560,7 +562,66 @@
               <h2 id="publishOverlayTitle">Publish a new post</h2>
             </div>
 
-            <form id="postForm" class="post-form">
+            <div class="publish-studio-layout">
+              <aside class="publish-studio-rail" aria-label="Publish destinations">
+                <p class="eyebrow">Destinations</p>
+                <div class="publish-family-grid" id="publishFamilyGrid">
+                  <button class="publish-family-button is-active" type="button" data-publish-family="signal">
+                    <span>Signal</span>
+                    <strong>Feed</strong>
+                  </button>
+                  <button class="publish-family-button" type="button" data-publish-family="local">
+                    <span>Local</span>
+                    <strong>Storage</strong>
+                  </button>
+                  <button class="publish-family-button" type="button" data-publish-family="social">
+                    <span>Social</span>
+                    <strong>Share</strong>
+                  </button>
+                  <button class="publish-family-button" type="button" data-publish-family="github">
+                    <span>GitHub</span>
+                    <strong>Build</strong>
+                  </button>
+                  <button class="publish-family-button" type="button" data-publish-family="cloud">
+                    <span>Cloud</span>
+                    <strong>Sync</strong>
+                  </button>
+                  <button class="publish-family-button" type="button" data-publish-family="email">
+                    <span>Email</span>
+                    <strong>Send</strong>
+                  </button>
+                </div>
+
+                <section class="publish-option-panel" aria-live="polite">
+                  <div>
+                    <p class="eyebrow">Options</p>
+                    <h3 id="publishDestinationTitle">Signal Share feed</h3>
+                    <p id="publishDestinationCopy">Create a post for the feed with the media source below.</p>
+                  </div>
+                  <p class="publish-option-note">Choose one or more options in this destination.</p>
+                  <div class="publish-option-grid" id="publishOptionGrid"></div>
+                </section>
+
+                <label class="publish-github-repo" id="publishGithubRepoField" hidden>
+                  GitHub repository
+                  <input
+                    id="publishGithubRepoInput"
+                    type="url"
+                    inputmode="url"
+                    autocomplete="url"
+                    placeholder="https://github.com/owner/repo"
+                  />
+                </label>
+              </aside>
+
+              <div class="publish-composer-pane">
+                <div class="publish-selected-card">
+                  <span id="publishSelectedBadge">Signal Share</span>
+                  <strong id="publishSelectedAction">Publish feed post</strong>
+                  <p id="publishSelectedHint">The Publish post button keeps the existing feed workflow.</p>
+                </div>
+
+                <form id="postForm" class="post-form">
               <label>
                 Creator
                 <input
@@ -644,26 +705,43 @@
                 <div class="preview-shell" id="previewShell" hidden></div>
               </div>
 
-              <div class="form-actions">
-                <button class="button button-primary" type="submit">
-                  Publish post
-                </button>
-                <button
-                  class="button button-secondary"
-                  type="button"
-                  id="resetFormButton"
-                >
-                  Reset
-                </button>
-              </div>
-            </form>
+                  <div class="form-actions">
+                    <button class="button button-primary" type="submit">
+                      Publish post
+                    </button>
+                    <button
+                      class="button button-secondary"
+                      type="button"
+                      id="resetFormButton"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </form>
 
-            <p
-              class="form-feedback"
-              id="formFeedback"
-              role="status"
-              aria-live="polite"
-            ></p>
+                <div class="publish-studio-actions">
+                  <button class="button button-primary" id="publishStudioActionButton" type="button">
+                    Publish to feed
+                  </button>
+                  <button class="button button-secondary" id="publishShareSheetButton" type="button">
+                    Share sheet
+                  </button>
+                </div>
+
+                <p
+                  class="form-feedback"
+                  id="formFeedback"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+                <p
+                  class="publish-destination-feedback"
+                  id="publishDestinationFeedback"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -684,12 +762,18 @@
               Close
             </button>
 
-            <div class="section-heading studio-overlay-head">
+            <div class="section-heading studio-overlay-head auth-shine-head">
               <p class="eyebrow">Account</p>
-              <h2 id="accountOverlayTitle">Sign in and activate posting</h2>
+              <h2 id="accountOverlayTitle">Welcome back</h2>
             </div>
 
-            <div class="auth-state">
+            <div class="auth-shine-layout">
+              <aside class="auth-shine-side">
+                <p class="auth-shine-kicker">Signal access</p>
+                <strong>Sign in and activate posting.</strong>
+                <p>Return to your feed, publish live drops, and keep session control close.</p>
+
+                <div class="auth-state">
               <div class="auth-badge-row">
                 <span class="status-pill" id="authStatusPill">Local mode</span>
                 <span class="status-copy" id="authStatusCopy">
@@ -699,9 +783,11 @@
               <p class="auth-hint" id="authHint">
                 Signed-in and activated accounts can publish to the shared feed.
               </p>
-            </div>
+                </div>
+              </aside>
 
-            <form id="authForm" class="auth-form">
+              <div class="auth-shine-card">
+                <form id="authForm" class="auth-form">
               <label>
                 Account name
                 <input
@@ -756,9 +842,9 @@
                   Create account
                 </button>
               </div>
-            </form>
+                </form>
 
-            <div class="auth-account" id="authAccount" hidden>
+                <div class="auth-account" id="authAccount" hidden>
               <div class="account-summary">
                 <strong id="accountEmail">Not signed in</strong>
                 <p id="accountMeta">Publish to the live feed after activation.</p>
@@ -780,9 +866,9 @@
                   Sign out
                 </button>
               </div>
-            </div>
+                </div>
 
-            <div class="activation-panel" id="activationPanel" hidden>
+                <div class="activation-panel" id="activationPanel" hidden>
               <strong id="activationTitle">Check your inbox</strong>
               <p id="activationMessage">
                 Confirm your email address to activate posting on the shared feed.
@@ -796,14 +882,61 @@
                   Resend activation email
                 </button>
               </div>
+                </div>
+
+                <div class="auth-utility-row">
+                  <button class="auth-text-action" id="forgotPasswordButton" type="button">
+                    Forgot password?
+                  </button>
+                  <button class="auth-text-action" id="authSessionsButton" type="button">
+                    Sign out other devices
+                  </button>
+                </div>
+
+                <p
+                  class="form-feedback auth-feedback"
+                  id="authFeedback"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+              </div>
             </div>
 
-            <p
-              class="form-feedback auth-feedback"
-              id="authFeedback"
-              role="status"
-              aria-live="polite"
-            ></p>
+            <section class="auth-session-sheet" id="authSessionSheet" aria-hidden="true" hidden>
+              <button
+                class="auth-session-close"
+                id="authSessionCloseButton"
+                type="button"
+                aria-label="Close session manager"
+              >
+                Close
+              </button>
+              <div class="auth-session-head">
+                <p class="eyebrow">Sessions</p>
+                <h3>Active access</h3>
+              </div>
+              <div class="auth-session-list">
+                <article class="auth-session-item is-current">
+                  <div>
+                    <strong>Current browser</strong>
+                    <span id="authCurrentSessionCopy">This session stays signed in.</span>
+                  </div>
+                  <span class="auth-session-pill">Current</span>
+                </article>
+                <article class="auth-session-item">
+                  <div>
+                    <strong>Other devices</strong>
+                    <span>Revoke refresh sessions without closing this browser.</span>
+                  </div>
+                  <button class="button button-secondary" id="signOutOtherSessionsButton" type="button">
+                    Sign out
+                  </button>
+                </article>
+              </div>
+              <p class="auth-session-note" id="authSessionNote">
+                Sign in first to manage other signed-in devices.
+              </p>
+            </section>
 
           </div>
         </section>
@@ -1550,6 +1683,8 @@
     <script src="arcade-chat.js?v=1.52" defer></script>
     <script type="module" src="app-v3.js?v=1.37"></script>
     <script src="./studio-overlays.js?v=1.0" defer></script>
+    <script src="./studio-auth-overlay.js?v=1.0" defer></script>
+    <script src="./studio-publish-overlay.js?v=1.0" defer></script>
     <script>
         // Signal Share Android Optimization Suite - Detection
         (function() {

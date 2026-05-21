@@ -1268,7 +1268,7 @@ async function handleSignUpClick() {
 async function handleSignOutClick() {
   if (!state.supabase) return;
   await safelyUnlinkPushNotificationRegistration();
-  const { error } = await state.supabase.auth.signOut();
+  const { error } = await state.supabase.auth.signOut({ scope: "local" });
   if (error) { showAuthFeedback(error.message, true); return; }
   state.currentUser = null;
   state.currentUserBanned = false;
