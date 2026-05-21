@@ -16,6 +16,7 @@ import {
   createZeroBleedThroughIdleResult,
   validateMediaToggleState
 } from './src/heroes/fixed/_hero-media-player-toggle-state-validation.fixed.js';
+import { getActiveYouTubeVideo } from './youtube-player-detection.js';
 
 const YOUTUBE_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
 const SPOTIFY_TYPES = new Set(["track", "album", "playlist", "artist", "episode", "show"]);
@@ -43,34 +44,7 @@ export function resolveYouTubePreviewId(post, parseYouTubeUrl) {
   return "";
 }
 
-/**
- * CRITICAL FIX #2: Expanded YouTube detection beyond iframes - check URL hash and window.location
- */
-function getActiveYouTubeVideoFromURL() {
-  try {
-    // Check URL hash for YouTube embed
-    const hash = `${window.location.hash}`.trim();
-    const idMatch = hash.match(/(?:v=|&v=)([a-zA-Z0-9_-]{11})/i);
-    if (idMatch) return { videoId: idMatch[1], title: "YouTube Video", source: "url-hash" };
 
-    // Check URL for YouTube watch URL
-    const searchParams = new URLSearchParams(`${window.location.search}`.trim());
-    const vParam = searchParams.get("v");
-    if (vParam && YOUTUBE_ID_PATTERN.test(vParam)) {
-      return { videoId: vParam, title: "YouTube Video", source: "url-param" };
-    }
-
-    // Check for short URL in window.location.href
-    const fullUrl = `${window.location.href}`.trim();
-    const match = fullUrl.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/)([a-zA-Z0-9_-]{11})/i);
-    if (match) return { videoId: match[1], title: "YouTube Video", source: "url-href" };
-
-  } catch (e) {
-    console.warn("[Hero Preview] YouTube URL detection failed:", e);
-  }
-
-  return null;
-}
 
 function getPostCandidateValues(post) {
   if (!post) return [];
@@ -752,7 +726,7 @@ function handleMediaToggleMode(options = {}) {
   };
 
   // Check for active YouTube video from browser tab first (Media Toggle)
-  const youtubeFromTab = getActiveYouTubeVideoFromURL();
+  const youtubeFromTab = getActiveYouTubeVideo();
 
   // Handle YouTube Mode Preview (when YouTube toggle is active)
   if (isYouTubeMode) {

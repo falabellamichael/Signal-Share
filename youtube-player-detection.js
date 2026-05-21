@@ -57,289 +57,126 @@ export function parseYouTubeUrl(url) {
 }
 
 /**
- * CRITICAL FIX #1: Scan DOM for active YouTube videos via multiple methods
+ * CRITICAL FIX #1: /**
+ * Scans the DOM for active YouTube player iframe elements.
  */
-export function findActiveYouTubePlayer(attributes = ['data-title', 'title']) {
-  if (typeof document === "undefined") return null;
-  
-  // Method 1: Check window.YT API player object first
-  let ytApiPlayer = null;
-  try {
-    if (window.YT && typeof window.YT.IframeIframeApiGetIframe === 'function') {
-      const iframe = window.YT.IframeIframeApiGetIframe(0);
-      if (iframe?.src) {
-        ytApiPlayer = iframe;
-      }
-    }
-  } catch (e) {
-    console.warn("[YouTube-Detect] IFrame API error:", e);
-  }
-  
-  // If IFrame API is available and has a valid video ID, return it
-  if (ytApiPlayer && typeof parseYouTubeUrl === 'function') {
-    const parsed = parseYouTubeUrl(ytApiPlayer.src);
-    if (parsed && parsed.externalId) {
-      let title = "";
-      for (const attr of attributes) {
-        try {
-          if (ytApiPlayer.getAttribute && ytApiPlayer.getAttribute(attr)) {
-            title = `${ytApiPlayer.getAttribute(attr)}`.trim();
-            break;
-          }
-        } catch {}
-      }
-      
-      return {
-        videoId: parsed.externalId,
-        title: title || "YouTube Video",
-        src: ytApiPlayer.src,
-        source: "iframe-api"
-      };
-    }
-  }
-  
-  // Method 2: Scan all iframes for YouTube content
-  const youtubeIframes = Array.from(document.querySelectorAll(
-    'iframe[src*="youtube.com"], ' +
-    'iframe[src*="youtu.be"], ' +
-    'iframe[data-src*="youtube"]'
-  ));
-  
-  for (const iframe of youtubeIframes) {
-    try {
-      const src = `${iframe.src}`.trim();
-      const parsed = parseYouTubeUrl(src);
-      
-      if (!parsed || !parsed.externalId) continue;
-      
-      // Extract title from various attributes
-      let title = "";
-      for (const attr of attributes) {
-        try {
-          if (iframe.getAttribute && iframe.getAttribute(attr)) {
-            title = `${iframe.getAttribute(attr)}`.trim();
-            break;
-          }
-        } catch {}
-      }
-      
-      // Check window.title for YouTube player info
-      const playerTitleElement = document.querySelector?.('[role="player"], [data-youtube-player]');
-      if (playerTitleElement && playerTitleElement.getAttribute) {
-        const playerAttrTitle = playerTitleElement.getAttribute('title') || "";
-        if (typeof playerAttrTitle === 'string' && playerAttrTitle.trim()) {
-          title = playerAttrTitle.trim();
-        }
-      }
-      
-      if (title || title === "") {
-        return {
-          videoId: parsed.externalId,
-          title: title || "YouTube Video",
-          src: iframe.src,
-          source: "iframe-scanner"
-        };
-      }
-    } catch (e) {
-      console.warn("[YouTube-Detect] Error scanning iframe:", e);
-    }
-  }
-  
-  // CRITICAL FIX #1: Check for YouTube in window.location hash/params
-  try {
-    const hash = `${window.location.hash}`.trim();
-    const idMatch = hash.match(/(?:v=|&v=)([a-zA-Z0-9_-]{11})/i);
-    
-    if (idMatch) {
-      return {
-        videoId: idMatch[1],
-        title: "YouTube Video",
-        source: "url-hash"
-      };
-    }
-  } catch (e) {
-    console.warn("[YouTube-Detect] URL hash detection failed:", e);
-  }
-
-  // CRITICAL FIX #1: Check for YouTube in URL search params
-  try {
-    const searchParams = new URLSearchParams(`${window.location.search}`.trim());
-    const vParam = searchParams.get("v");
-    
-    if (vParam && /^[a-zA-Z0-9_-]{11}$/.test(vParam)) {
-      return {
-        videoId: vParam,
-        title: "YouTube Video",
-        source: "url-param"
-      };
-    }
-  } catch (e) {
-    console.warn("[YouTube-Detect] URL param detection failed:", e);
-  }
-
-  // CRITICAL FIX #1: Check for embedded YouTube player in DOM text content
-  try {
-    const fullUrl = `${window.location.href}`.trim();
-    const match = fullUrl.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/)([a-zA-Z0-9_-]{11})/i);
-    
-    if (match) {
-      return {
-        videoId: match[1],
-        title: "YouTube Video",
-        source: "url-href"
-      };
-    }
-  } catch (e) {
-    console.warn("[YouTube-Detect] URL href detection failed:", e);
-  }
-
-  return null;
+export function findActiveYouTubePlayer() {
+  return getActiveYouTubeVideo();
 }
 
 /**
- * CRITICAL FIX #2: Improved YouTube video detection with fallback methods
+ * Gets the active YouTube video metadata strictly via YouTube IFrame Player API.
  */
 export function getActiveYouTubeVideo() {
   if (typeof document === "undefined") return null;
-  
-  // First try IFrame API method
-  if (window.YT && window.YT.Player && typeof window.YT.IframeIframeApiGetIframe === 'function') {
-    try {
-      const iframe = window.YT.IframeIframeApiGetIframe(0);
-      if (iframe?.src && typeof parseYouTubeUrl === 'function') {
-        const parsed = parseYouTubeUrl(iframe.src);
-        if (parsed && parsed.externalId) {
-          // Extract title from various attributes
-          let title = "";
-          for (const attr of ['data-title', 'title']) {
-            try {
-              if (iframe.getAttribute && iframe.getAttribute(attr)) {
-                title = `${iframe.getAttribute(attr)}`.trim();
-                break;
-              }
-            } catch {}
-          }
-          
-          return {
-            videoId: parsed.externalId,
-            title: title || "YouTube Video",
-            src: iframe.src,
-            source: "iframe-api"
-          };
+
+  // Find the active YouTube iframe element in the DOM.
+  const iframe = document.querySelector(
+    '#heroPlayerStage iframe, ' +
+    '#miniPlayerStage iframe, ' +
+    '#viewerMediaContainer iframe, ' +
+    'iframe.hero-player-active-iframe, ' +
+    'iframe.hero-player-active-frame'
+  );
+
+  if (!iframe) return null;
+
+  // If YouTube API is not loaded yet, we cannot proceed with API binding
+  if (!window.YT) return null;
+
+  try {
+    let player = iframe._ytPlayer;
+    if (!player) {
+      if (typeof window.YT.get === 'function') {
+        player = window.YT.get(iframe);
+      }
+      if (!player && typeof window.YT.Player === 'function') {
+        player = new window.YT.Player(iframe);
+      }
+      if (player) {
+        iframe._ytPlayer = player;
+      }
+    }
+
+    if (player) {
+      let isPlaying = false;
+      if (typeof player.getPlayerState === 'function') {
+        try {
+          const state = player.getPlayerState();
+          isPlaying = (state === 1 || state === 3);
+        } catch (e) {
+          // player state query might fail if player is not fully ready
         }
       }
-    } catch (e) {
-      console.warn("[YouTube-Detect] IFrame API error:", e);
-    }
-  }
-  
-  // Fallback: Scan all iframes for YouTube content
-  const youtubeIframes = Array.from(document.querySelectorAll(
-    'iframe[src*="youtube.com"], ' +
-    'iframe[src*="youtu.be"], ' +
-    'iframe[data-src*="youtube"]'
-  ));
-  
-  for (const iframe of youtubeIframes) {
-    try {
-      const src = `${iframe.src}`.trim();
-      const parsed = parseYouTubeUrl(src);
-      
-      if (!parsed || !parsed.externalId) continue;
-      
-      // Extract title from various attributes
-      let title = "";
-      for (const attr of ['data-title', 'title']) {
+
+      let videoId = "";
+      let title = "YouTube Video";
+
+      if (typeof player.getVideoData === 'function') {
         try {
+          const videoData = player.getVideoData();
+          if (videoData) {
+            videoId = videoData.video_id || "";
+            title = videoData.title || title;
+          }
+        } catch (e) {
+          // video data query might fail if player is not fully ready
+        }
+      }
+
+      // If videoId is not retrieved via getVideoData yet, parse from iframe src
+      if (!videoId && iframe.src) {
+        const parsed = parseYouTubeUrl(iframe.src);
+        if (parsed) {
+          videoId = parsed.externalId;
+        }
+      }
+
+      // If title is default, try to read from iframe attributes
+      if (title === "YouTube Video" || !title) {
+        for (const attr of ['data-title', 'title']) {
           if (iframe.getAttribute && iframe.getAttribute(attr)) {
-            title = `${iframe.getAttribute(attr)}`.trim();
-            break;
+            const val = iframe.getAttribute(attr).trim();
+            if (val && val !== "YouTube player" && val !== "External media player") {
+              title = val;
+              break;
+            }
           }
-        } catch {}
+        }
       }
-      
-      // Check for player element with title attribute
-      const playerTitleElement = document.querySelector?.('[role="player"], [data-youtube-player]');
-      if (playerTitleElement && typeof playerTitleElement.getAttribute === 'function') {
-        try {
-          const playerAttrTitle = playerTitleElement.getAttribute('title') || "";
-          if (typeof playerAttrTitle === 'string' && playerAttrTitle.trim()) {
-            title = playerAttrTitle.trim();
-          }
-        } catch {}
-      }
-      
-      if (title) {
+
+      if (videoId) {
         return {
-          videoId: parsed.externalId,
-          title: title || "YouTube Video",
+          videoId,
+          title,
+          isPlaying,
           src: iframe.src,
-          source: "iframe-scanner"
+          source: "youtube-api"
         };
       }
-    } catch (e) {
-      console.warn("[YouTube-Detect] Error scanning iframe:", e);
     }
+  } catch (e) {
+    console.warn("[YouTube-Detect] Error binding YouTube Player API:", e);
   }
-  
-  // CRITICAL FIX #2: Try URL detection as fallback
-  try {
-    const hashMatch = `${window.location.hash}`.match(/(?:v=|&v=)([a-zA-Z0-9_-]{11})/i);
-    if (hashMatch) {
-      return {
-        videoId: hashMatch[1],
-        title: "YouTube Video",
-        source: "url-hash-fallback"
-      };
-    }
-  } catch (e) {}
-
-  try {
-    const searchParams = new URLSearchParams(`${window.location.search}`.trim());
-    const vParam = searchParams.get("v");
-    if (vParam && /^[a-zA-Z0-9_-]{11}$/.test(vParam)) {
-      return {
-        videoId: vParam,
-        title: "YouTube Video",
-        source: "url-param-fallback"
-      };
-    }
-  } catch (e) {}
-
-  // CRITICAL FIX #2: Try URL href detection as final fallback
-  try {
-    const fullUrl = `${window.location.href}`.trim();
-    const match = fullUrl.match(/(?:v=|embed\/|youtu\.be\/|shorts\/|live\/|vi\/)([a-zA-Z0-9_-]{11})/i);
-    
-    if (match) {
-      return {
-        videoId: match[1],
-        title: "YouTube Video",
-        source: "url-href-fallback"
-      };
-    }
-  } catch (e) {}
 
   return null;
 }
 
 /**
- * CRITICAL FIX #3: Improved YouTube video detection with multiple fallback methods
+ * Detects if a YouTube video is currently playing using the Player API.
  */
 export function detectPlayingYouTubeVideo() {
   if (typeof document === "undefined") return null;
-  
+
   const activeVideo = getActiveYouTubeVideo();
-  
-  if (activeVideo) {
-    // YouTube videos are considered "playing" if they have an active video ID
+
+  if (activeVideo && activeVideo.isPlaying) {
     return {
       ...activeVideo,
-      isPlaying: true,
       detectedAt: new Date().toISOString()
     };
   }
-  
+
   return null;
 }
 
