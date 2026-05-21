@@ -4,6 +4,47 @@
  * This "algorithm" allows the companion to feel like an A.I. by reacting to specific commands.
  */
 
+/**
+ * Helper function to call handlePlayPauseAction from chatbot engine
+ */
+function callHeroPlayPauseAction(heroController, forcePlay) {
+    if (!heroController || typeof heroController.handlePlayPause !== 'function') return;
+    
+    // Gather context from global state
+    const state = window.state || {};
+    const elements = window.elements || {};
+    const target = null; // Chatbot doesn't have specific target
+    
+    // Create minimal context object for handlePlayPauseAction
+    const context = {
+        state,
+        elements,
+        getControllablePlayerPost: () => {},
+        heroMode: state.heroControlMode || 'feed',
+        render: () => {},
+        nativeSnapshot: null,
+        performNativeAction: () => false,
+        NATIVE_ACTION_PLAY_PAUSE: 'play_pause',
+        desktopSnapshot: null,
+        performDesktopAction: () => Promise.resolve(false),
+        DESKTOP_ACTION_PLAY_PAUSE: 'play_pause',
+        isNativeCapacitorApp: () => false,
+        companionPromptDismissed: true,
+        showCompanionPrompt: () => {},
+        toggleLocalPlayback: () => {},
+        playHeroMedia: () => {},
+        getNativeBridge: () => null,
+        target,
+        getActivePlayerMediaElement: () => null,
+        normalizePlaybackState: (value) => value || 'none',
+        refreshDesktopSnapshot: () => {},
+        refreshNativeSnapshot: () => {}
+    };
+    
+    // Call the actual action handler
+    heroController.handlePlayPause(context, forcePlay);
+}
+
 window.ArcadeChatbotEngine = (function() {
     
     const intentHandlers = [
@@ -125,9 +166,8 @@ window.ArcadeChatbotEngine = (function() {
                         }
                     }
                     
-                    if (typeof window.heroMediaPlayerController.pause === 'function') {
-                        window.heroMediaPlayerController.pause();
-                    }
+                    // FIXED: Use handlePlayPauseAction instead of non-existent .pause() method
+                    callHeroPlayPauseAction(window.heroMediaPlayerController, false);
                 }
                 return "🎵 [Media Protocol]: Pausing active playback.";
             }
@@ -162,9 +202,8 @@ window.ArcadeChatbotEngine = (function() {
                         }
                     }
 
-                    if (typeof window.heroMediaPlayerController.play === 'function') {
-                        window.heroMediaPlayerController.play();
-                    }
+                    // FIXED: Use handlePlayPauseAction instead of non-existent .play() method
+                    callHeroPlayPauseAction(window.heroMediaPlayerController, true);
                 }
                 return "🎵 [Media Protocol]: Resuming media playback.";
             }

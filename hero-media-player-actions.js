@@ -462,7 +462,8 @@ export async function handlePlayPauseAction(context, forcePlay) {
   // =========================== END TOGGLE ISOLATION VALIDATION =========================
 
   // 1. AUTHORITATIVE COOLDOWN - Check validation first before processing
-  if (debounce("play-pause", 500)) return;
+  // FIX: Reduced from 500ms to 250ms for more responsive controls
+  if (debounce("play-pause", 250)) return;
 
   // 2. STABILIZATION LOCKOUT
   const now = Date.now();
@@ -561,19 +562,25 @@ export async function handlePlayPauseAction(context, forcePlay) {
     handledLocally = toggleLocalPlayback(shouldPlay, { target });
   }
 
-  // B. Local Player Activation (If nothing was playing locally but user pressed Play) - DEFENSIVE CHECKS ADDED
+  // B. Local Player Activation (If nothing was playing locally but user pressed Play)
+  // FIX: Ensure a controllable post is selected BEFORE attempting playback.
+  // This eliminates the double-click issue in feed mode where the first click would
+  // fail because no post was selected, and only the second click would work.
   if (!isMediaMode && !handledLocally && shouldPlay && mode === "app") {
+    // Ensure a post is selected if none is currently controllable
+    if (typeof context.ensureControllablePost === "function") {
+      context.ensureControllablePost();
+    }
+
     if (target === "mini" && state.playerPostId) {
       const p = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
       if (p && typeof context.mountPersistentPlayer === "function") {
-        // DEFENSIVE CHECK: Verify DOM element exists before mounting
         if (elements.miniPlayerStage && typeof elements.miniPlayerStage.appendChild === 'function') {
           context.mountPersistentPlayer(elements.miniPlayerStage, p, "mini", { autoplay: true });
           handledLocally = true;
         }
       }
     } else if (typeof playHeroMedia === "function") {
-      // DEFENSIVE CHECK: Verify DOM element exists before calling
       if (elements.heroPlayerStage && typeof elements.heroPlayerStage.appendChild === 'function') {
         playHeroMedia(shouldPlay);
         handledLocally = true;
@@ -626,8 +633,25 @@ export async function handlePlayPauseAction(context, forcePlay) {
       console.warn("[Hero] Bridge action failed:", error);
     }
 
+    // FIX: Show user notification when media mode bridge dispatch fails,
+    // so they know the companion bridge is required for media controls to work.
     if (isMediaMode && !bridgeActionSucceeded) {
       console.debug("[Hero] Media mode bridge action did not report acceptance.", { action: DESKTOP_ACTION_PLAY_PAUSE, preferredSource });
+
+      // Revert optimistic state since the action didn't actually go through
+      if (target === "mini") state.miniPlayerPlaybackState = shouldPlay ? "paused" : "playing";
+      else state.heroPlayerPlaybackState = shouldPlay ? "paused" : "playing";
+      render();
+
+      // Show actionable notification to the user
+      if (typeof window.showNotification === "function") {
+        const sourceName = preferredSource === "spotify" ? "Spotify" : preferredSource === "youtube" ? "YouTube" : "media";
+        window.showNotification({
+          title: "Media bridge not connected",
+          body: `To control ${sourceName} playback, run the Signal Share Companion on your PC or connect via Supabase sync.`,
+          kind: "warning"
+        });
+      }
     }
 
     // Final Measure: If we are 'Pausing' local app playback, ensure local media is stopped.
@@ -829,7 +853,17 @@ export function handlePreviousAction(context) {
           if (desktopResult && typeof desktopResult.then === "function") {
             desktopResult
               .then((ok) => {
-                if (!ok && isMediaMode) fallbackToLocalPrevious();
+                if (!ok && isMediaMode) {
+                  fallbackToLocalPrevious();
+                  // FIX: Notify user when bridge fails in media mode
+                  if (typeof window.showNotification === "function") {
+                    window.showNotification({
+                      title: "Media bridge not connected",
+                      body: "Run the Signal Share Companion on your PC to control media playback.",
+                      kind: "warning"
+                    });
+                  }
+                }
               })
               .catch(() => {
                 if (isMediaMode) fallbackToLocalPrevious();
@@ -1030,7 +1064,17 @@ export function handleNextAction(context) {
           if (desktopResult && typeof desktopResult.then === "function") {
             desktopResult
               .then((ok) => {
-                if (!ok && isMediaMode) fallbackToLocalNext();
+                if (!ok && isMediaMode) {
+                  fallbackToLocalNext();
+                  // FIX: Notify user when bridge fails in media mode
+                  if (typeof window.showNotification === "function") {
+                    window.showNotification({
+                      title: "Media bridge not connected",
+                      body: "Run the Signal Share Companion on your PC to control media playback.",
+                      kind: "warning"
+                    });
+                  }
+                }
               })
               .catch(() => {
                 if (isMediaMode) fallbackToLocalNext();
