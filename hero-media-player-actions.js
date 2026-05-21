@@ -66,6 +66,7 @@ function resolveControlMode(context = {}) {
   if (isFeedMode) return "app";
   if (isMediaMode) {
     if (isNative) return "device";
+    if (heroMode === "desktop" || heroMode === "device") return heroMode;
     return hasSnapshotPlaybackContext(desktopSnapshot) ? "desktop" : "app";
   }
   return heroMode || "app";
@@ -539,12 +540,12 @@ export async function handlePlayPauseAction(context, forcePlay) {
 
   // A. Local Website Elements (Hosted videos, YouTube/Spotify Iframes)
   let handledLocally = false;
-  if (typeof toggleLocalPlayback === "function") {
+  if (!isMediaMode && typeof toggleLocalPlayback === "function") {
     handledLocally = toggleLocalPlayback(shouldPlay, { target });
   }
 
   // B. Local Player Activation (If nothing was playing locally but user pressed Play) - DEFENSIVE CHECKS ADDED
-  if (!handledLocally && shouldPlay && mode === "app") {
+  if (!isMediaMode && !handledLocally && shouldPlay && mode === "app") {
     if (target === "mini" && state.playerPostId) {
       const p = (typeof context.getPostById === "function") ? context.getPostById(state.playerPostId) : null;
       if (p && typeof context.mountPersistentPlayer === "function") {
@@ -608,24 +609,12 @@ export async function handlePlayPauseAction(context, forcePlay) {
       console.warn("[Hero] Bridge action failed:", error);
     }
 
-    // Media mode fallback: if bridge action could not execute, use local player controls.
-    if (isMediaMode && mode === "desktop" && !bridgeActionSucceeded && !handledLocally) {
-      if (shouldPlay && typeof playHeroMedia === "function") {
-        if (elements.heroPlayerStage && typeof elements.heroPlayerStage.appendChild === "function") {
-          playHeroMedia(true);
-          handledLocally = true;
-        }
-      } else if (!shouldPlay && typeof toggleLocalPlayback === "function") {
-        try {
-          handledLocally = toggleLocalPlayback(false, { target }) || handledLocally;
-        } catch (e) {
-          console.warn("[Hero] Media mode local pause fallback failed:", e);
-        }
-      }
+    if (isMediaMode && !bridgeActionSucceeded) {
+      console.warn("[Hero] Media mode app action was not accepted by the bridge.", { action: DESKTOP_ACTION_PLAY_PAUSE, preferredSource });
     }
 
-    // Final Measure: If we are 'Pausing' on the bridge, ensure local is also stopped - DEFENSIVE CHECKS ADDED
-    if (!shouldPlay && typeof toggleLocalPlayback === "function") {
+    // Final Measure: If we are 'Pausing' local app playback, ensure local media is stopped.
+    if (!isMediaMode && !shouldPlay && typeof toggleLocalPlayback === "function") {
       try {
         toggleLocalPlayback(false, { target });
       } catch (e) {
@@ -674,6 +663,7 @@ export function handlePreviousAction(context) {
   // ===================== TOGGLE ISOLATION VALIDATION =====================
   
   // Get active source from toggle state
+  const isMediaMode = state.heroControlMode === "media";
   const heroControlSource = state.heroControlSource;
   const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const activeSource = preferredSource === 'youtube' || preferredSource === 'spotify' ? preferredSource : null;
@@ -689,7 +679,7 @@ export function handlePreviousAction(context) {
   });
 
   // If target validation fails or mismatch detected, return filtered idle state immediately
-  if (!navigationValidation.valid && (activeSource === 'youtube' || activeSource === 'spotify')) {
+  if (!isMediaMode && !navigationValidation.valid && (activeSource === 'youtube' || activeSource === 'spotify')) {
     console.log(`[Hero] Previous/Next filtered for source mismatch: ${activeSource}`);
     context.renderHeroPlayerStage({
       post: null,
@@ -717,10 +707,10 @@ export function handlePreviousAction(context) {
   state._mediaActionLockoutUntil = now + 0;
 
   // Mode Resolution (authoritative in actions module)
-  const isMediaMode = state.heroControlMode === "media";
   const mode = resolveControlMode(context);
   let localFallbackUsed = false;
   const fallbackToLocalPrevious = () => {
+    if (isMediaMode) return;
     if (localFallbackUsed) return;
     localFallbackUsed = true;
     if (target === "mini") {
@@ -732,7 +722,7 @@ export function handlePreviousAction(context) {
 
   console.log(`[Hero] handlePrevious. Mode: ${mode}, Target: ${target || 'hero'}`);
 
-  if (mode === "app") {
+  if (mode === "app" && !isMediaMode) {
     if (target === "mini") {
       if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
         const wasPlaying = state.miniPlayerPlaybackState === "playing";
@@ -850,6 +840,7 @@ export function handleNextAction(context) {
   // ===================== TOGGLE ISOLATION VALIDATION =====================
   
   // Get active source from toggle state
+  const isMediaMode = state.heroControlMode === "media";
   const heroControlSource = state.heroControlSource;
   const preferredSource = (heroControlSource || state?.heroMediaSource || state?.systemMediaSource || "").toLowerCase();
   const activeSource = preferredSource === 'youtube' || preferredSource === 'spotify' ? preferredSource : null;
@@ -865,7 +856,7 @@ export function handleNextAction(context) {
   });
 
   // If target validation fails or mismatch detected, return filtered idle state immediately
-  if (!navigationValidation.valid && (activeSource === 'youtube' || activeSource === 'spotify')) {
+  if (!isMediaMode && !navigationValidation.valid && (activeSource === 'youtube' || activeSource === 'spotify')) {
     console.log(`[Hero] Previous/Next filtered for source mismatch: ${activeSource}`);
     context.renderHeroPlayerStage({
       post: null,
@@ -893,7 +884,6 @@ export function handleNextAction(context) {
   state._mediaActionLockoutUntil = now + 0;
 
   // Mode Resolution (authoritative in actions module)
-  const isMediaMode = state.heroControlMode === "media";
   const isSourceLocked = preferredSource === "youtube" || preferredSource === "spotify";
   
   // CRITICAL FIX #4: Always use bridge when in media mode
@@ -901,6 +891,7 @@ export function handleNextAction(context) {
   const mode = resolveControlMode(context);
   let localFallbackUsed = false;
   const fallbackToLocalNext = () => {
+    if (isMediaMode) return;
     if (localFallbackUsed) return;
     localFallbackUsed = true;
     if (target === "mini") {
@@ -912,7 +903,7 @@ export function handleNextAction(context) {
 
   console.log(`[Hero] handleNext. Mode: ${mode}, Target: ${target || 'hero'}`);
 
-  if (mode === "app") {
+  if (mode === "app" && !isMediaMode) {
     if (target === "mini") {
       if (typeof ensureControllablePost === "function" && ensureControllablePost()) {
         const wasPlaying = state.miniPlayerPlaybackState === "playing";

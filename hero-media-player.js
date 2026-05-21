@@ -3,7 +3,7 @@ import {
   handleOpenMediaAction, handleOpenPhoneAction,
   handlePlayPauseAction, handleNextAction, handlePreviousAction,
   handleVolumeAction, handleRefreshAction
-} from "./hero-media-player-actions.js?v=1.2";
+} from "./hero-media-player-actions.js?v=1.3";
 import { isThenable, normalizeText, toCleanString, cleanDisplayText, isExternalUrlPost, formatProviderName } from './shared-utils.js';
 import {
   getActiveYouTubeVideo,
@@ -1799,8 +1799,6 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function getStandbyPreviewPost() {
-    if (state.heroControlMode === "media") return null;
-
     const playableIds = getPlayableVisiblePostIds();
     if (!playableIds.length) return null;
     if (typeof getPostById !== "function") return null;
@@ -2025,11 +2023,14 @@ The companion bridge is designed with several security layers to keep your PC sa
     const mode = getEffectiveHeroMode(controllablePost);
     const fallbackMedia = getFallbackPageMediaElement();
     const matchedPost = mode === "device" ? findMatchedPost(nativeSnapshot) : (mode === "desktop" ? findMatchedPost(desktopSnapshot) : null);
+    const stagePost = customOptions.post !== undefined
+      ? customOptions.post
+      : (mode === "app" ? getHeroPost() : (state.heroControlMode === "media" ? controllablePost : null));
 
     renderHeroStagePreview(Object.assign({}, options, {
       stage: elements.heroPlayerStage,
       mode,
-      post: customOptions.post !== undefined ? customOptions.post : (mode === "app" ? getHeroPost() : null),
+      post: stagePost,
       fallbackMedia,
       desktopSnapshot,
       nativeSnapshot,
@@ -2451,10 +2452,14 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
 
     if (!isHeroActive) {
+      const stagePost = mode === "app"
+        ? post
+        : (state.heroControlMode === "media" ? post : null);
+
       renderHeroStagePreview(Object.assign({}, options, {
         stage: elements.heroPlayerStage,
         mode,
-        post: mode === "app" ? post : null, // ONLY pass the feed post if we are in app mode
+        post: stagePost,
         fallbackMedia,
         desktopSnapshot,
         matchedPost,
