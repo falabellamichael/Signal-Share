@@ -23,6 +23,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css?v=122" />
+    <link rel="stylesheet" href="./studio-overlays.css?v=1.0" />
     <style>
       @keyframes optimistic-pulse {
         0% { transform: scale(1); opacity: 1; }
@@ -109,12 +110,12 @@
 
         <div class="header-tools">
           <nav class="site-nav" aria-label="Primary">
-            <a href="#compose">Upload</a>
+            <a href="#compose" data-studio-overlay-open="publish">Upload</a>
             <a href="#messages" id="messagesNavLink" aria-controls="messages" aria-expanded="false">
               Messages
             </a>
             <a href="#feed">Feed</a>
-            <a href="#account">Account</a>
+            <a href="#account" data-studio-overlay-open="account">Account</a>
             <a href="./mini-games.html" id="gamesNavLink">Games</a>
             <button id="notificationBell" class="notification-bell bell-icon" aria-controls="notificationsPanel" aria-expanded="false" title="Notifications" style="position: relative; flex: 0 0 auto; margin-left: 4px;">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -399,7 +400,7 @@
             </div>
 
             <div class="hero-actions">
-              <a class="button button-primary" href="#compose">Start sharing</a>
+              <a class="button button-primary" href="#compose" data-studio-overlay-open="publish">Start sharing</a>
               <a class="button button-secondary" href="#feed">Browse feed</a>
             </div>
 
@@ -413,6 +414,44 @@
                 <dd data-stat="creators">0</dd>
               </div>
             </dl>
+
+            <div class="hero-studio-options" aria-label="Studio options">
+              <button
+                class="studio-launch-option"
+                type="button"
+                data-studio-overlay-open="publish"
+                aria-controls="compose"
+                aria-haspopup="dialog"
+              >
+                <span>Publish</span>
+                <strong>New media post</strong>
+                <small>Upload a file or share a YouTube or Spotify link.</small>
+              </button>
+              <button
+                class="studio-launch-option"
+                type="button"
+                data-studio-overlay-open="account"
+                aria-controls="account"
+                aria-haspopup="dialog"
+              >
+                <span>Account</span>
+                <strong>Login and activation</strong>
+                <small>Sign in, create an account, or check posting access.</small>
+              </button>
+              <button
+                class="studio-launch-option studio-launch-admin"
+                id="adminLayoutOverlayButton"
+                type="button"
+                data-studio-overlay-open="admin"
+                aria-controls="adminLayoutOverlay"
+                aria-haspopup="dialog"
+                hidden
+              >
+                <span>Master admin</span>
+                <strong>Layout preferences</strong>
+                <small>Publish shell width, spacing, corners, and crop fit.</small>
+              </button>
+            </div>
           </div>
 
           <aside class="hero-panel" aria-label="Platform highlights">
@@ -496,22 +535,29 @@
                 </div>
               </div>
             </div>
-            <div class="panel-card">
-              <span>Flexible media</span>
-              <strong>Images, video, audio</strong>
-            </div>
-            <div class="panel-card">
-              <span>Discovery</span>
-              <strong>Search, tags, sort, filter</strong>
-            </div>
           </aside>
         </section>
 
-        <section class="composer-grid" id="compose">
-          <div class="compose-card">
-            <div class="section-heading">
+        <section class="studio-overlay" id="compose" aria-hidden="true" hidden>
+          <div class="studio-overlay-backdrop" data-studio-overlay-close="publish"></div>
+          <div
+            class="studio-overlay-dialog studio-publish-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="publishOverlayTitle"
+          >
+            <button
+              class="settings-close studio-overlay-close"
+              type="button"
+              data-studio-overlay-close="publish"
+              aria-label="Close publish overlay"
+            >
+              Close
+            </button>
+
+            <div class="section-heading studio-overlay-head">
               <p class="eyebrow">Compose</p>
-              <h2>Publish a new post</h2>
+              <h2 id="publishOverlayTitle">Publish a new post</h2>
             </div>
 
             <form id="postForm" class="post-form">
@@ -619,11 +665,28 @@
               aria-live="polite"
             ></p>
           </div>
+        </section>
 
-          <aside class="account-card" id="account">
-            <div class="section-heading">
+        <section class="studio-overlay" id="account" aria-hidden="true" hidden>
+          <div class="studio-overlay-backdrop" data-studio-overlay-close="account"></div>
+          <div
+            class="studio-overlay-dialog studio-account-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="accountOverlayTitle"
+          >
+            <button
+              class="settings-close studio-overlay-close"
+              type="button"
+              data-studio-overlay-close="account"
+              aria-label="Close account overlay"
+            >
+              Close
+            </button>
+
+            <div class="section-heading studio-overlay-head">
               <p class="eyebrow">Account</p>
-              <h2>Sign in and activate posting</h2>
+              <h2 id="accountOverlayTitle">Sign in and activate posting</h2>
             </div>
 
             <div class="auth-state">
@@ -742,10 +805,30 @@
               aria-live="polite"
             ></p>
 
+          </div>
+        </section>
+
+        <section class="studio-overlay" id="adminLayoutOverlay" aria-hidden="true" hidden>
+          <div class="studio-overlay-backdrop" data-studio-overlay-close="admin"></div>
+          <div
+            class="studio-overlay-dialog studio-admin-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="adminLayoutOverlayTitle"
+          >
+            <button
+              class="settings-close studio-overlay-close"
+              type="button"
+              data-studio-overlay-close="admin"
+              aria-label="Close layout preferences"
+            >
+              Close
+            </button>
+
             <section class="admin-editor" id="adminEditor" hidden>
               <div class="admin-editor-head">
                 <p class="eyebrow">Admin studio</p>
-                <h3>Layout and crop fit</h3>
+                <h3 id="adminLayoutOverlayTitle">Layout and crop fit</h3>
                 <p>
                   These controls publish a shared shell width, spacing, corner radius, and media fit
                   mode for everyone on the live site.
@@ -832,7 +915,7 @@
                 aria-live="polite"
               ></p>
             </section>
-          </aside>
+          </div>
         </section>
 
         <section class="messenger-section" id="messages" aria-label="Messenger" aria-expanded="false">
@@ -1466,6 +1549,7 @@
     <script src="arcade-chat-context.js?v=1.1"></script>
     <script src="arcade-chat.js?v=1.52" defer></script>
     <script type="module" src="app-v3.js?v=1.37"></script>
+    <script src="./studio-overlays.js?v=1.0" defer></script>
     <script>
         // Signal Share Android Optimization Suite - Detection
         (function() {

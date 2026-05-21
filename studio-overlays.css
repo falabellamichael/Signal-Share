@@ -1,0 +1,251 @@
+html.studio-overlay-open,
+body.studio-overlay-open {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.hero-copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-studio-options {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+  gap: 12px;
+  margin-top: auto;
+  padding-top: clamp(18px, 3vw, 30px);
+}
+
+.studio-launch-option {
+  min-width: 0;
+  min-height: 132px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.3), transparent 72%),
+    var(--surface-strong);
+  box-shadow: 0 16px 36px rgba(15, 23, 32, 0.08);
+  text-align: left;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.studio-launch-option:hover,
+.studio-launch-option:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 18px 42px rgba(15, 23, 32, 0.14);
+  transform: translateY(-2px);
+}
+
+.studio-launch-option span {
+  width: fit-content;
+  color: var(--accent);
+  font-size: 0.77rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.studio-launch-option strong {
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.18;
+}
+
+.studio-launch-option small {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.studio-launch-admin {
+  background:
+    linear-gradient(145deg, rgba(238, 108, 77, 0.12), rgba(42, 157, 143, 0.1)),
+    var(--surface-strong);
+}
+
+.studio-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 21000;
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 3vw, 32px);
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity 220ms ease,
+    visibility 0s linear 220ms;
+}
+
+.studio-overlay.is-open {
+  visibility: visible;
+  opacity: 1;
+  transition:
+    opacity 220ms ease,
+    visibility 0s linear 0s;
+}
+
+.studio-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 32, 0.56);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.studio-overlay-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(760px, calc(100vw - 2 * var(--container-padding)));
+  max-height: calc(var(--viewport-visible-height) - 2 * clamp(12px, 3vw, 32px));
+  display: grid;
+  gap: 18px;
+  overflow: auto;
+  padding: clamp(20px, 3vw, 34px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.22), transparent 28%),
+    var(--surface-strong);
+  box-shadow: 0 34px 96px rgba(0, 0, 0, 0.28);
+  scrollbar-gutter: stable;
+  transform: translateY(16px) scale(0.96);
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.studio-overlay.is-open .studio-overlay-dialog {
+  transform: translateY(0) scale(1);
+}
+
+.studio-publish-dialog {
+  width: min(820px, calc(100vw - 2 * var(--container-padding)));
+}
+
+.studio-account-dialog {
+  width: min(620px, calc(100vw - 2 * var(--container-padding)));
+}
+
+.studio-admin-dialog {
+  width: min(560px, calc(100vw - 2 * var(--container-padding)));
+}
+
+.studio-overlay-head {
+  padding-right: 58px;
+  margin-bottom: 2px;
+}
+
+.studio-overlay-head h2 {
+  max-width: 12ch;
+}
+
+.studio-overlay-close {
+  top: 20px;
+  right: 20px;
+}
+
+.studio-overlay .form-feedback {
+  margin-top: 0;
+}
+
+.studio-account-dialog .auth-state,
+.studio-account-dialog .auth-account,
+.studio-account-dialog .activation-panel {
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.24), transparent 68%),
+    var(--surface);
+}
+
+.studio-admin-dialog .admin-editor {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.studio-admin-dialog .setting-row select {
+  color: var(--text);
+}
+
+body[data-theme="midnight"] .studio-launch-option,
+body[data-theme="midnight"] .studio-overlay-dialog {
+  background:
+    radial-gradient(circle at top left, rgba(125, 211, 252, 0.08), transparent 30%),
+    var(--surface-strong);
+}
+
+body[data-theme="contrast"] .studio-launch-option,
+body[data-theme="contrast"] .studio-overlay-dialog {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.96);
+  box-shadow: none;
+}
+
+body[data-theme="contrast"] .studio-launch-admin {
+  background:
+    linear-gradient(145deg, rgba(255, 242, 0, 0.18), rgba(0, 229, 255, 0.16)),
+    rgba(0, 0, 0, 0.96);
+}
+
+body[data-theme="contrast"] .studio-account-dialog .auth-state,
+body[data-theme="contrast"] .studio-account-dialog .auth-account,
+body[data-theme="contrast"] .studio-account-dialog .activation-panel {
+  background: rgba(0, 0, 0, 0.94);
+}
+
+body[data-theme="ember"] .studio-launch-option,
+body[data-theme="ember"] .studio-overlay-dialog {
+  border-color: rgba(255, 120, 82, 0.22);
+  background:
+    radial-gradient(circle at top left, rgba(255, 138, 61, 0.09), transparent 28%),
+    rgba(31, 7, 5, 0.92);
+}
+
+body[data-theme="ember"] .studio-launch-admin {
+  background:
+    linear-gradient(145deg, rgba(255, 68, 56, 0.18), rgba(255, 138, 61, 0.12)),
+    rgba(31, 7, 5, 0.92);
+}
+
+@media (max-width: 760px) {
+  .hero-studio-options {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-launch-option {
+    min-height: 0;
+  }
+
+  .studio-overlay {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .studio-overlay-dialog,
+  .studio-publish-dialog,
+  .studio-account-dialog,
+  .studio-admin-dialog {
+    width: 100%;
+    max-height: calc(var(--viewport-visible-height) - 20px);
+    padding: 20px;
+    border-radius: var(--radius-lg);
+  }
+
+  .studio-overlay-head {
+    padding-right: 52px;
+  }
+
+  .studio-overlay-close {
+    top: 14px;
+    right: 14px;
+  }
+}
