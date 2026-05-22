@@ -480,6 +480,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
 
   // CRITICAL FIX: For Media Toggle Mode, ALWAYS use bridge routing regardless of source lock state
   const isBridgeModeForToggle = isMediaMode && (heroMode === "media" || mode === "desktop" || mode === "device");
+  const isBridgeMode = isSourceLocked || isMediaMode; // CRITICAL FIX: Same logic as handlePreviousAction and handleNextAction
   
   // 3. RESOLVE INTENT (Strictly based on resolved mode)
   let shouldPlay = true;
@@ -533,7 +534,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
       ((preferredSource === "youtube" && systemIsYouTube) || (preferredSource === "spotify" && systemIsSpotify));
 
     // CRITICAL FIX: For Media Toggle Mode, check if ANYTHING is playing on system regardless of source lock
-    const isMediaModeActive = isBridgeModeForToggle && snapshot?.playbackState !== "none";
+    const isMediaModeActive = isBridgeMode && snapshot?.playbackState !== "none"; // Use isBridgeMode (same logic as handlePreviousAction/Next)
     
     // Determine if the *system* should be controlling playback: it must be playing, and either we are not locked OR the lock matches what's playing.
     // For bridge mode (media toggle), check if system has matching activity
@@ -543,7 +544,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
     shouldPlay = (typeof forcePlay === "boolean") ? forcePlay : !isPlayingOnSystem;
   }
 
-  console.log(`[Hero] Intent: ${shouldPlay ? "PLAY" : "PAUSE"} (Mode: ${mode}, Locked: ${preferredSource || 'none'}, Bridge Mode: ${isBridgeModeForToggle})`);
+  console.log(`[Hero] Intent: ${shouldPlay ? "PLAY" : "PAUSE"} (Mode: ${mode}, Locked: ${preferredSource || 'none'}, Bridge Mode: ${isBridgeMode})`);
 
   // 4. OPTIMISTIC STATE UPDATE & INSTANT RENDER
   const nextState = shouldPlay ? "playing" : "paused";
@@ -552,9 +553,10 @@ export async function handlePlayPauseAction(context, forcePlay) {
 
   render();
 
-  // 5. COMMAND DISPATCH - CRITICAL FIX: Always send to bridge when in media toggle mode, regardless of source lock
-  const isBridgeActiveForMediaToggle = isBridgeModeForToggle 
-    || (isMediaMode && (mode === "desktop" || mode === "device"));
+  // 5. COMMAND DISPATCH - Always send to bridge when in media toggle mode or source-locked
+  // isBridgeMode already handles this correctly:
+  // - Returns true if heroControlSource is "youtube" or "spotify" (source locked)
+  // - Returns true if isMediaMode (media toggle mode)
 
   // A. Local Website Elements (Hosted videos, YouTube/Spotify Iframes)
   let handledLocally = false;
@@ -598,9 +600,7 @@ export async function handlePlayPauseAction(context, forcePlay) {
     : (shouldPlay === isPlayingOnSystem);
 
   // CRITICAL FIX #2: Always send to bridge when in media mode, regardless of source lock state
-  const sendToBridge = isBridgeActiveForMediaToggle 
-    || ((mode === "desktop" || mode === "device") && !isAlreadyInState) 
-    || (!shouldPlay && (desktopSnapshot?.active || nativeSnapshot?.active) && !isAlreadyInState);
+  const sendToBridge = isBridgeMode; // Simple and correct - use the same logic as handlePreviousAction/Next
 
   if (sendToBridge) {
     let bridgeActionSucceeded = false;
