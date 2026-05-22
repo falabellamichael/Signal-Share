@@ -337,8 +337,14 @@
   function socialProviderId(option) {
     return `${option?.id || ""}`.replace(/^social-/, "");
   }
-  function socialPublishErrorMessage(error, data) {
-    return data?.error || error?.context?.error || error?.message || "Direct Social publishing failed.";
+  async function socialPublishErrorMessage(error, data) {
+    if (data?.error) return data.error;
+    const response = error?.context;
+    if (response && typeof response.clone === "function") {
+      const payload = await response.clone().json().catch(() => null);
+      if (payload?.error) return payload.error;
+    }
+    return error?.message || "Direct Social publishing failed.";
   }
   async function publishSocialOptions(options, item) {
     const appState = window.state ?? window.__SIGNAL_SHARE_STATE__;
@@ -357,7 +363,7 @@
     });
 
     if (error || data?.error) {
-      throw new Error(socialPublishErrorMessage(error, data));
+      throw new Error(await socialPublishErrorMessage(error, data));
     }
 
     const results = Array.isArray(data?.results) ? data.results : [];
