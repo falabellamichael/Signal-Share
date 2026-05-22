@@ -38,6 +38,13 @@
     const textRequired = selectedIds.has("social-instagram") || selectedIds.has("social-x");
     const fields = [];
 
+    fields.push(field("socialDeliveryMode", {
+      label: "Social delivery",
+      mode: "select",
+      value: "direct",
+      options: [["direct", "Post directly"], ["draft", "Save as draft"]],
+    }));
+
     if (hasShareUrl) {
       fields.push(field("shareUrl", {
         label: multiSelected ? "Shared share URL" : "Share URL",

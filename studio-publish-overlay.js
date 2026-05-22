@@ -299,6 +299,25 @@
     if (options.length === 1) return options[0];
     return { name: options.map((option) => option.name).join(", ") };
   }
+  function socialDeliveryMode() {
+    return document.getElementById("publishTool-socialDeliveryMode")?.value || "direct";
+  }
+  function syncActionButtonLabel() {
+    const family = activeFamily();
+    const options = selectedOptions();
+    const isSocialDraft = activeFamilyId === "social" && socialDeliveryMode() === "draft";
+    actionButton.textContent = isSocialDraft
+      ? options.length === 1 ? `Save ${options[0].name} draft` : `Save ${options.length} Social drafts`
+      : options.length === 1 ? options[0].button : `Run ${options.length} ${family.badge} actions`;
+    if (!hint) return;
+    hint.textContent = isSocialDraft
+      ? options.length === 1
+        ? `Saves a ${options[0].name} draft without opening the provider.`
+        : `Saves drafts for ${options.map((option) => option.name).join(", ")} without opening providers.`
+      : options.length === 1
+        ? options[0].hint
+        : `Shared fields are organized for ${options.map((option) => option.name).join(", ")}.`;
+  }
   function downloadJson(payload, fileName) {
     const name = `${fileName || "signal-share-actions.json"}`.trim();
     const finalName = name.toLowerCase().endsWith(".json") ? name : `${name}.json`;
@@ -354,8 +373,12 @@
         storage.setItem(key, JSON.stringify(items.slice(0, 50)));
         toast(isSession ? "Saved to session storage" : "Saved to local storage");
       } else if (activeFamilyId === "social") {
-        for (const selectedOption of options) await runSocialOption(selectedOption, item);
-        toast(options.length === 1 ? "Social payload prepared" : `${options.length} social payloads prepared`);
+        if (item.details.socialDeliveryMode === "draft") {
+          toast(options.length === 1 ? "Social draft saved" : `${options.length} Social drafts saved`);
+        } else {
+          for (const selectedOption of options) await runSocialOption(selectedOption, item);
+          toast(options.length === 1 ? "Social provider opened" : `${options.length} Social providers opened`);
+        }
       } else if (activeFamilyId === "github") {
         const url = repoUrl(item.details.repoUrl);
         if (!url) { setFeedback("Enter a valid GitHub repository URL.", true); $("#publishTool-repoUrl")?.focus(); return; }
@@ -471,8 +494,12 @@
         if (!config.persist) return;
         input.value ? localStorage.setItem(config.storageKey, input.value) : localStorage.removeItem(config.storageKey);
       };
-      input.addEventListener("input", persist);
-      input.addEventListener("change", persist);
+      const syncField = () => {
+        persist();
+        if (config.key === "socialDeliveryMode") syncActionButtonLabel();
+      };
+      input.addEventListener("input", syncField);
+      input.addEventListener("change", syncField);
       label.append(text, input);
       return label;
     }));
@@ -490,19 +517,14 @@
     });
     if (badge) badge.textContent = family.badge;
     if (selectedAction) selectedAction.textContent = options.length === 1 ? options[0].name : `${options.length} ${family.badge} options`;
-    if (hint) {
-      hint.textContent = options.length === 1
-        ? options[0].hint
-        : `Shared fields are organized for ${options.map((option) => option.name).join(", ")}.`;
-    }
     if (detailsHint) {
       detailsHint.textContent = fieldOrganizer?.getDetailsText?.(activeFamilyId, options, family.detailsText)
         || family.detailsText
         || "Action-specific fields.";
     }
-    actionButton.textContent = options.length === 1 ? options[0].button : `Run ${options.length} ${family.badge} actions`;
     form.classList.toggle("is-tool-mode", !family.usesPostComposer);
     renderFields(selectedFields());
+    syncActionButtonLabel();
   }
 
   function selectOption(optionId) {
