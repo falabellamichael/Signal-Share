@@ -657,6 +657,7 @@
             `git checkout ${base}`,
             `git pull ${remote} ${base}`,
             `git checkout -b ${head}`,
+
             `git add ${files}`,
             `git commit -m ${quote(item.details.commitMessage)}`,
             `git push -u ${remote} ${head}`
@@ -696,17 +697,34 @@
         const from = item.details.emailFrom || "";
         const to = item.details.emailTo || "";
         const subject = item.details.emailSubject || "Project update";
-        const body = option.id === "forward"
-          ? ["Forwarded message:", item.details.originalFrom && `Original from: ${item.details.originalFrom}`, "", item.details.emailBody].filter(Boolean).join("\n")
-          : item.details.emailBody;
+        
+        let body = item.details.emailBody || "";
+        if (option.id === "forward") {
+          const forwardHeaders = [
+            "Forwarded message:",
+            item.details.originalFrom && `Original from: ${item.details.originalFrom}`
+          ].filter(Boolean);
+          body = [...forwardHeaders, "", item.details.emailBody || ""].join("\n");
+        }
+
         if (option.id === "copyEmail") {
-          await copyText([from && `From: ${from}`, to && `To: ${to}`, item.details.replyTo && `Reply-To: ${item.details.replyTo}`, `Subject: ${subject}`, "", body].filter((line) => line !== false).join("\n"));
+          const headers = [
+            from && `From: ${from}`,
+            to && `To: ${to}`,
+            item.details.replyTo && `Reply-To: ${item.details.replyTo}`,
+            `Subject: ${subject}`
+          ].filter(Boolean);
+          await copyText([...headers, "", body].join("\n"));
           toast("Email draft copied");
         } else {
-          const params = new URLSearchParams({ subject, body: [from && `From: ${from}`, body].filter(Boolean).join("\n\n") });
-          if (item.details.emailCc) params.set("cc", item.details.emailCc);
-          if (item.details.emailBcc) params.set("bcc", item.details.emailBcc);
-          location.href = `mailto:${encodeURIComponent(to)}?${params.toString()}`;
+          const emailBody = [from && `From: ${from}`, body].filter(Boolean).join("\n\n");
+          const queryParts = [
+            `subject=${encodeURIComponent(subject.replace(/\r?\n/g, "\r\n"))}`,
+            `body=${encodeURIComponent(emailBody.replace(/\r?\n/g, "\r\n"))}`
+          ];
+          if (item.details.emailCc) queryParts.push(`cc=${encodeURIComponent(item.details.emailCc)}`);
+          if (item.details.emailBcc) queryParts.push(`bcc=${encodeURIComponent(item.details.emailBcc)}`);
+          location.href = `mailto:${encodeURIComponent(to)}?${queryParts.join("&")}`;
           toast("Email composer opened");
         }
       } else completed = false;
