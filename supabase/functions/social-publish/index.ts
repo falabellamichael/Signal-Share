@@ -54,52 +54,57 @@ const X_OAUTH_CLIENT_SECRET = readString(Deno.env.get("X_OAUTH_CLIENT_SECRET"), 
 const META_GRAPH_API_VERSION = readString(Deno.env.get("META_GRAPH_API_VERSION"), 32);
 
 Deno.serve(async (request) => {
-  if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-  if (request.method !== "POST") {
-    return jsonResponse({ error: "Method not allowed." }, 405);
-  }
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
-    return jsonResponse({ error: "Supabase environment variables are incomplete." }, 500);
-  }
-  if (!SOCIAL_TOKEN_ENCRYPTION_KEY) {
-    return jsonResponse({ error: "Social token encryption is not configured." }, 500);
-  }
+  try {
+    if (request.method === "OPTIONS") {
+      return new Response("ok", { headers: corsHeaders });
+    }
+    if (request.method !== "POST") {
+      return jsonResponse({ error: "Method not allowed." }, 405);
+    }
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
+      return jsonResponse({ error: "Supabase environment variables are incomplete." }, 500);
+    }
+    if (!SOCIAL_TOKEN_ENCRYPTION_KEY) {
+      return jsonResponse({ error: "Social token encryption is not configured." }, 500);
+    }
 
-  const auth = await authenticateCaller(request);
-  if (!auth.user) {
-    return jsonResponse({ error: "Sign in before posting directly to connected Social providers." }, 401);
-  }
+    const auth = await authenticateCaller(request);
+    if (!auth.user) {
+      return jsonResponse({ error: "Sign in before posting directly to connected Social providers." }, 401);
+    }
 
-  const payload = await request.json().catch(() => ({} as SocialPublishPayload));
-  const providers = readProviders(payload.providers);
-  if (!providers.length) {
-    return jsonResponse({ error: "Select at least one Social provider." }, 400);
-  }
+    const payload = await request.json().catch(() => ({} as SocialPublishPayload));
+    const providers = readProviders(payload.providers);
+    if (!providers.length) {
+      return jsonResponse({ error: "Select at least one Social provider." }, 400);
+    }
 
-  const linkUrl = normalizeHttpUrl(payload.linkUrl);
-  if (readString(payload.linkUrl) && !linkUrl) {
-    return jsonResponse({ error: "Optional link URL must use http or https." }, 400);
-  }
-  const instagramImageUrl = normalizeHttpUrl(payload.instagramImageUrl);
-  if (readString(payload.instagramImageUrl) && !instagramImageUrl) {
-    return jsonResponse({ error: "Instagram image URL must use http or https." }, 400);
-  }
+    const linkUrl = normalizeHttpUrl(payload.linkUrl);
+    if (readString(payload.linkUrl) && !linkUrl) {
+      return jsonResponse({ error: "Optional link URL must use http or https." }, 400);
+    }
+    const instagramImageUrl = normalizeHttpUrl(payload.instagramImageUrl);
+    if (readString(payload.instagramImageUrl) && !instagramImageUrl) {
+      return jsonResponse({ error: "Instagram image URL must use http or https." }, 400);
+    }
 
-  const adminClient = createAdminClient();
-  const connections = await loadConnections(adminClient, auth.user.id, providers, readConnectionIds(payload.connectionIds));
-  const draft = {
-    text: readString(payload.text, 6000),
-    linkUrl,
-    instagramImageUrl,
-    instagramHashtags: readString(payload.instagramHashtags, 500),
-  };
-  const results: ProviderResult[] = [];
-  for (const provider of providers) {
-    results.push(await publishProvider(adminClient, provider, connections.get(provider), draft));
+    const adminClient = createAdminClient();
+    const connections = await loadConnections(adminClient, auth.user.id, providers, readConnectionIds(payload.connectionIds));
+    const draft = {
+      text: readString(payload.text, 6000),
+      linkUrl,
+      instagramImageUrl,
+      instagramHashtags: readString(payload.instagramHashtags, 500),
+    };
+    const results: ProviderResult[] = [];
+    for (const provider of providers) {
+      results.push(await publishProvider(adminClient, provider, connections.get(provider), draft));
+    }
+    return jsonResponse({ ok: results.every((result) => result.ok), results });
+  } catch (error) {
+    console.error("[Social Publish] Fatal error:", error);
+    return jsonResponse({ error: error instanceof Error ? error.message : "An unexpected server error occurred." }, 500);
   }
-  return jsonResponse({ ok: results.every((result) => result.ok), results });
 });
 
 async function publishProvider(
