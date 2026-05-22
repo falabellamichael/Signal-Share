@@ -722,23 +722,7 @@
                            window.Capacitor.getPlatform() !== "web";
           const isGmail = /@gmail\.com$/i.test(from.trim());
 
-          if (isNative) {
-            const emailBody = [from && `From: ${from}`, body].filter(Boolean).join("\n\n");
-            const queryParts = [
-              `subject=${encodeURIComponent(subject.replace(/\r?\n/g, "\r\n"))}`,
-              `body=${encodeURIComponent(emailBody.replace(/\r?\n/g, "\r\n"))}`
-            ];
-            if (item.details.emailCc) queryParts.push(`cc=${encodeURIComponent(item.details.emailCc)}`);
-            if (item.details.emailBcc) queryParts.push(`bcc=${encodeURIComponent(item.details.emailBcc)}`);
-            const mailtoUrl = `mailto:${encodeURIComponent(to)}?${queryParts.join("&")}`;
-
-            if (window.Capacitor?.Plugins?.App?.openUrl) {
-              window.Capacitor.Plugins.App.openUrl({ url: mailtoUrl });
-            } else {
-              location.href = mailtoUrl;
-            }
-            toast("Email composer opened (Check 'From' account in your app)");
-          } else if (isGmail) {
+          if (isGmail) {
             const gmailParams = [
               `view=cm`,
               `tf=1`,
@@ -749,8 +733,18 @@
             if (item.details.emailCc) gmailParams.push(`cc=${encodeURIComponent(item.details.emailCc)}`);
             if (item.details.emailBcc) gmailParams.push(`bcc=${encodeURIComponent(item.details.emailBcc)}`);
             
-            const gmailUrl = `https://mail.google.com/mail/u/${encodeURIComponent(from.trim())}/?${gmailParams.join("&")}`;
-            window.open(gmailUrl, "_blank", "noopener,noreferrer");
+            const composeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(from.trim())}/?${gmailParams.join("&")}`;
+            const chooserUrl = `https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(from.trim())}&continue=${encodeURIComponent(composeUrl)}`;
+
+            if (isNative) {
+              if (window.Capacitor?.Plugins?.App?.openUrl) {
+                window.Capacitor.Plugins.App.openUrl({ url: chooserUrl });
+              } else {
+                window.open(chooserUrl, "_blank", "noopener,noreferrer");
+              }
+            } else {
+              window.open(chooserUrl, "_blank", "noopener,noreferrer");
+            }
             toast("Gmail composer opened with specified sender account");
           } else {
             const emailBody = [from && `From: ${from}`, body].filter(Boolean).join("\n\n");
@@ -760,7 +754,17 @@
             ];
             if (item.details.emailCc) queryParts.push(`cc=${encodeURIComponent(item.details.emailCc)}`);
             if (item.details.emailBcc) queryParts.push(`bcc=${encodeURIComponent(item.details.emailBcc)}`);
-            location.href = `mailto:${encodeURIComponent(to)}?${queryParts.join("&")}`;
+            const mailtoUrl = `mailto:${encodeURIComponent(to)}?${queryParts.join("&")}`;
+
+            if (isNative) {
+              if (window.Capacitor?.Plugins?.App?.openUrl) {
+                window.Capacitor.Plugins.App.openUrl({ url: mailtoUrl });
+              } else {
+                location.href = mailtoUrl;
+              }
+            } else {
+              location.href = mailtoUrl;
+            }
             toast("Email composer opened (Check 'From' account in your app)");
           }
         }
