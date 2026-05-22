@@ -1,0 +1,114 @@
+/*
+  Signal Share - Android-only hero media player layout
+  Loaded through styles.css so Android WebView can pick up the mobile controls patch without changing desktop/iOS layout.
+*/
+
+@media (max-width: 760px) and (orientation: portrait) {
+  html.platform-android .panel-card-device-player {
+    display: grid !important;
+    justify-items: center !important;
+    align-items: start !important;
+    gap: 12px !important;
+  }
+
+  html.platform-android .panel-card-device-player > span,
+  html.platform-android .panel-card-device-player > strong,
+  html.platform-android .panel-card-device-player > p,
+  html.platform-android .panel-card-device-player > .hero-player-stage,
+  html.platform-android .panel-card-device-player > .hero-player-volume,
+  html.platform-android .panel-card-device-player > #heroDeepDivePanel {
+    width: 100% !important;
+  }
+
+  html.platform-android .hero-player-controls {
+    width: min(100%, 560px) !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    justify-content: center !important;
+    justify-items: stretch !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    margin: 2px auto 12px !important;
+  }
+
+  html.platform-android .hero-player-controls-col {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    min-width: 0 !important;
+  }
+
+  html.platform-android .hero-player-controls .button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 46px !important;
+    padding: 0 10px !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+  }
+
+  html.platform-android .hero-player-options {
+    width: min(100%, 440px) !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.4fr) minmax(86px, 0.6fr) !important;
+    justify-content: center !important;
+    justify-items: stretch !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin: 0 auto 16px !important;
+  }
+
+  html.platform-android .hero-player-options .hero-player-toggles-stack {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    justify-self: center !important;
+    align-items: center !important;
+    width: min(100%, 280px) !important;
+  }
+
+  html.platform-android #heroPlayerOpenMiniButton {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    min-height: 66px !important;
+    margin: 0 !important;
+  }
+
+  html.platform-android #toggleHeroDeepDive {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    justify-self: center !important;
+    width: 92px !important;
+    height: 66px !important;
+    margin: 0 !important;
+  }
+
+  html.platform-android .hero-player-mode-toggle,
+  html.platform-android .hero-player-source-toggle {
+    margin-inline: auto !important;
+  }
+}
+
+@media (max-width: 380px) and (orientation: portrait) {
+  html.platform-android .hero-player-controls {
+    gap: 8px !important;
+  }
+
+  html.platform-android .hero-player-controls .button {
+    min-height: 44px !important;
+    padding: 0 8px !important;
+    font-size: 0.82rem !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  html.platform-android .hero-player-options {
+    grid-template-columns: minmax(0, 1fr) 86px !important;
+    gap: 10px !important;
+  }
+
+  html.platform-android #toggleHeroDeepDive {
+    width: 86px !important;
+  }
+}
