@@ -717,15 +717,33 @@
           await copyText([...headers, "", body].join("\n"));
           toast("Email draft copied");
         } else {
-          const emailBody = [from && `From: ${from}`, body].filter(Boolean).join("\n\n");
-          const queryParts = [
-            `subject=${encodeURIComponent(subject.replace(/\r?\n/g, "\r\n"))}`,
-            `body=${encodeURIComponent(emailBody.replace(/\r?\n/g, "\r\n"))}`
-          ];
-          if (item.details.emailCc) queryParts.push(`cc=${encodeURIComponent(item.details.emailCc)}`);
-          if (item.details.emailBcc) queryParts.push(`bcc=${encodeURIComponent(item.details.emailBcc)}`);
-          location.href = `mailto:${encodeURIComponent(to)}?${queryParts.join("&")}`;
-          toast("Email composer opened");
+          const isGmail = /@gmail\.com$/i.test(from.trim());
+          if (isGmail) {
+            const gmailParams = [
+              `authuser=${encodeURIComponent(from.trim())}`,
+              `view=cm`,
+              `tf=1`,
+              `to=${encodeURIComponent(to)}`,
+              `su=${encodeURIComponent(subject.replace(/\r?\n/g, "\r\n"))}`,
+              `body=${encodeURIComponent(body.replace(/\r?\n/g, "\r\n"))}`
+            ];
+            if (item.details.emailCc) gmailParams.push(`cc=${encodeURIComponent(item.details.emailCc)}`);
+            if (item.details.emailBcc) gmailParams.push(`bcc=${encodeURIComponent(item.details.emailBcc)}`);
+            
+            const gmailUrl = `https://mail.google.com/mail/u/?${gmailParams.join("&")}`;
+            window.open(gmailUrl, "_blank", "noopener,noreferrer");
+            toast("Gmail composer opened with specified sender account");
+          } else {
+            const emailBody = [from && `From: ${from}`, body].filter(Boolean).join("\n\n");
+            const queryParts = [
+              `subject=${encodeURIComponent(subject.replace(/\r?\n/g, "\r\n"))}`,
+              `body=${encodeURIComponent(emailBody.replace(/\r?\n/g, "\r\n"))}`
+            ];
+            if (item.details.emailCc) queryParts.push(`cc=${encodeURIComponent(item.details.emailCc)}`);
+            if (item.details.emailBcc) queryParts.push(`bcc=${encodeURIComponent(item.details.emailBcc)}`);
+            location.href = `mailto:${encodeURIComponent(to)}?${queryParts.join("&")}`;
+            toast("Email composer opened (Check 'From' account in your app)");
+          }
         }
       } else completed = false;
 
