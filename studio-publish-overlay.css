@@ -178,7 +178,7 @@
 
 .publish-modal-body {
   min-width: 0;
-  padding: 22px;
+  padding: 22px 22px 112px;
 }
 
 .publish-context-banner {
@@ -558,11 +558,7 @@ body[data-theme="contrast"] #compose .publish-destination-feedback.is-error,
   gap: 12px;
   padding: 16px 22px 22px;
   border-top: 1px solid var(--publish-border);
-  background: linear-gradient(
-    to top,
-    var(--publish-panel-strong),
-    color-mix(in srgb, var(--publish-panel-strong) 84%, transparent)
-  );
+  background: #fff;
 }
 
 #compose .publish-modal-actions .button {
@@ -602,6 +598,10 @@ body[data-theme="contrast"] #compose .publish-destination-feedback.is-error,
   box-shadow: none;
 }
 
+#compose.is-generic-dark .publish-modal-actions {
+  background: #181818;
+}
+
 body[data-theme="contrast"] #compose .studio-publish-dialog,
 body[data-theme="contrast"] #compose .publish-family-button,
 #compose.is-generic-dark .publish-family-button {
@@ -618,6 +618,10 @@ body[data-theme="contrast"] #compose .publish-family-button,
   .publish-modal-actions {
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  .publish-modal-body {
+    padding-bottom: 176px;
   }
 
   .publish-modal-top {

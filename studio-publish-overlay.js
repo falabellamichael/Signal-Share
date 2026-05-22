@@ -66,13 +66,70 @@
       border-color: color-mix(in srgb, var(--publish-primary) 68%, var(--publish-border));
       box-shadow: 0 0 0 4px color-mix(in srgb, var(--publish-primary) 13%, transparent);
     }
+    #compose .social-connection-panel {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid var(--publish-border);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--publish-field) 84%, transparent);
+    }
+    #compose .social-connection-panel[hidden] {
+      display: none !important;
+    }
+    #compose .social-connection-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+    }
+    #compose .social-connection-row strong,
+    #compose .social-connection-row small {
+      display: block;
+      letter-spacing: 0;
+    }
+    #compose .social-connection-row small {
+      color: var(--publish-muted);
+      line-height: 1.35;
+    }
+    #compose .social-connection-action {
+      min-width: 96px;
+      padding: 10px 12px;
+      border: 1px solid var(--publish-border);
+      border-radius: 12px;
+      color: var(--publish-text);
+      background: var(--publish-field);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #compose .social-connection-action:hover,
+    #compose .social-connection-action:focus-visible {
+      border-color: color-mix(in srgb, var(--publish-primary) 58%, var(--publish-border));
+      outline: none;
+    }
+    #compose .social-connection-select {
+      width: min(100%, 280px);
+      margin-top: 6px;
+      padding: 8px 10px;
+      border: 1px solid var(--publish-border);
+      border-radius: 10px;
+      color: var(--publish-text);
+      background: var(--publish-field);
+      font: inherit;
+    }
   `;
   document.head.append(workflowStyle);
 
   const dynamicFields = document.createElement("div");
   dynamicFields.className = "publish-field-grid publish-dynamic-fields";
   dynamicFields.id = "publishDynamicFields";
-  form.before(dynamicFields);
+  const socialConnectionsPanel = document.createElement("div");
+  socialConnectionsPanel.className = "social-connection-panel";
+  socialConnectionsPanel.id = "publishSocialConnections";
+  socialConnectionsPanel.hidden = true;
+  form.before(socialConnectionsPanel, dynamicFields);
 
   const presets = {
     repoUrl: ["Repository URL", "https://github.com/owner/repo", "url"],
@@ -139,13 +196,13 @@
     social: {
       badge: "Social",
       title: "Social posting",
-      copy: "Save Social drafts or publish through connected provider accounts.",
+      copy: "Save Social drafts or post directly with connected accounts.",
       detailsText: "Post text, optional links, and provider-specific fields.",
       options: [
-        { id: "social-facebook", icon: "📘", name: "Facebook", note: "Text or link", button: "Post to Facebook", hint: "Publishes to the connected Facebook Page without opening Facebook.", fields: [field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a Facebook post", wide: true })] },
-        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Caption + image", button: "Post to Instagram", hint: "Publishes through Instagram when the draft includes a public image URL.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("instagramImageUrl", { label: "Instagram image URL", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
-        { id: "social-x", icon: "✕", name: "X", note: "Text or link", button: "Post to X", hint: "Publishes to the connected X account without opening X.", fields: [field("xHandle", { label: "From handle", placeholder: "@yourhandle" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write an X post", required: true, wide: true }), field("shareUrl", { label: "Optional link URL" })] },
-        { id: "social-linkedin", icon: "💼", name: "LinkedIn", note: "Text or link", button: "Post to LinkedIn", hint: "Publishes to the connected LinkedIn author without opening LinkedIn.", fields: [field("linkedinFrom", { label: "Profile or company", placeholder: "Signal Share" }), field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a LinkedIn post", wide: true })] }
+        { id: "social-facebook", icon: "📘", name: "Facebook", note: "Page connection", button: "Post to Facebook", hint: "Direct posting needs a connected Facebook Page.", fields: [field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a Facebook post", wide: true })] },
+        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Media connection", button: "Post to Instagram", hint: "Direct publishing needs a connected Instagram account and image media.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("instagramImageUrl", { label: "Instagram image URL", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
+        { id: "social-x", icon: "✕", name: "X", note: "Connect account", button: "Post to X", hint: "Posts with your connected X account without a provider handoff.", fields: [field("xHandle", { label: "From handle", placeholder: "@yourhandle" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write an X post", required: true, wide: true }), field("shareUrl", { label: "Optional link URL" })] },
+        { id: "social-linkedin", icon: "💼", name: "LinkedIn", note: "Connect member", button: "Post to LinkedIn", hint: "Posts with your connected LinkedIn member without a provider handoff.", fields: [field("linkedinFrom", { label: "Profile or company", placeholder: "Signal Share" }), field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a LinkedIn post", wide: true })] }
       ]
     },
     github: {
@@ -185,6 +242,9 @@
 
   let activeFamilyId = "signal";
   const selectedByFamily = new Map(Object.entries(families).map(([familyId, family]) => [familyId, new Set([family.options[0].id])]));
+  let socialConnectionState = { configured: {}, connections: [] };
+  const selectedSocialConnectionIds = {};
+  let socialConnectionsLoading = false;
   const readJson = (value, fallback) => { try { return value ? JSON.parse(value) : fallback; } catch { return fallback; } };
   const getValue = (selector) => `${$(selector)?.value || ""}`.trim();
   const activeFamily = () => families[activeFamilyId];
@@ -334,6 +394,9 @@
   function socialPublishFunctionName() {
     return `${window.SIGNAL_SHARE_CONFIG?.socialPublishFunctionName || "social-publish"}`.trim() || "social-publish";
   }
+  function socialConnectFunctionName() {
+    return `${window.SIGNAL_SHARE_CONFIG?.socialConnectFunctionName || "social-connect"}`.trim() || "social-connect";
+  }
   function socialProviderId(option) {
     return `${option?.id || ""}`.replace(/^social-/, "");
   }
@@ -359,6 +422,12 @@
         linkUrl: item.details.shareUrl || "",
         instagramImageUrl: item.details.instagramImageUrl || "",
         instagramHashtags: item.details.instagramHashtags || "",
+        connectionIds: options.reduce((ids, option) => {
+          const provider = socialProviderId(option);
+          const connection = socialConnection(provider);
+          if (connection?.id) ids[provider] = connection.id;
+          return ids;
+        }, {}),
       },
     });
 
@@ -373,6 +442,132 @@
     }
 
     return results;
+  }
+  function socialConnections(provider) {
+    return socialConnectionState.connections.filter((connection) => connection.provider === provider);
+  }
+  function socialConnection(provider) {
+    const connections = socialConnections(provider);
+    return connections.find((connection) => connection.id === selectedSocialConnectionIds[provider])
+      || connections[0]
+      || null;
+  }
+  function providerName(provider) {
+    return provider === "x" ? "X" : provider === "linkedin" ? "LinkedIn" : provider === "facebook" ? "Facebook" : "Instagram";
+  }
+  function directSocialProviderNote(provider) {
+    if (socialConnectionsLoading) return "Checking connection.";
+    const connection = socialConnection(provider);
+    if (connection) return connection.label || "Connected";
+    if (!socialConnectionState.configured?.[provider]) return "OAuth setup required.";
+    return "Not connected.";
+  }
+  function renderSocialConnections() {
+    if (!socialConnectionsPanel) return;
+    const directMode = socialDeliveryMode() !== "draft";
+    socialConnectionsPanel.hidden = activeFamilyId !== "social" || !directMode;
+    if (socialConnectionsPanel.hidden) return;
+    socialConnectionsPanel.replaceChildren(...selectedOptions().map((option) => {
+      const provider = socialProviderId(option);
+      const row = document.createElement("div");
+      row.className = "social-connection-row";
+      const copyWrap = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = providerName(provider);
+      const status = document.createElement("small");
+      status.textContent = directSocialProviderNote(provider);
+      copyWrap.append(name, status);
+      const connections = socialConnections(provider);
+      if (connections.length > 1) {
+        const select = document.createElement("select");
+        select.className = "social-connection-select";
+        select.dataset.socialProvider = provider;
+        select.dataset.socialConnectionSelect = "true";
+        connections.forEach((connection) => {
+          const option = document.createElement("option");
+          option.value = connection.id;
+          option.textContent = connection.label || connection.accountId || "Connected account";
+          option.selected = connection.id === socialConnection(provider)?.id;
+          select.append(option);
+        });
+        copyWrap.append(select);
+      }
+      row.append(copyWrap);
+      const connected = Boolean(socialConnection(provider));
+      const button = document.createElement("button");
+      button.className = "social-connection-action";
+      button.type = "button";
+      button.dataset.socialConnectionAction = connected ? "disconnect" : "connect";
+      button.dataset.socialProvider = provider;
+      button.disabled = socialConnectionsLoading || (!connected && !socialConnectionState.configured?.[provider]);
+      button.textContent = connected ? "Disconnect" : "Connect";
+      row.append(button);
+      return row;
+    }));
+  }
+  function socialAppState() {
+    const appState = window.state ?? window.__SIGNAL_SHARE_STATE__;
+    if (!appState?.supabase || appState.backendMode !== "supabase" || !appState.currentUser) {
+      throw new Error("Sign in before connecting Social providers.");
+    }
+    return appState;
+  }
+  async function socialConnectRequest(body) {
+    const appState = socialAppState();
+    const { data, error } = await appState.supabase.functions.invoke(socialConnectFunctionName(), { body });
+    if (error || data?.error) throw new Error(await socialPublishErrorMessage(error, data));
+    return data || {};
+  }
+  async function refreshSocialConnections() {
+    let appState = null;
+    try { appState = socialAppState(); } catch (_error) {}
+    if (!appState) {
+      socialConnectionState = { configured: {}, connections: [] };
+      socialConnectionsLoading = false;
+      renderSocialConnections();
+      return;
+    }
+    socialConnectionsLoading = true;
+    renderSocialConnections();
+    try {
+      const data = await socialConnectRequest({ action: "status" });
+      socialConnectionState = {
+        configured: data.configured || {},
+        connections: Array.isArray(data.connections) ? data.connections : [],
+      };
+    } catch (error) {
+      setFeedback(error?.message || "Social connections could not be loaded.", true);
+    } finally {
+      socialConnectionsLoading = false;
+      renderSocialConnections();
+    }
+  }
+  async function connectSocialProvider(provider) {
+    const returnTo = window.SIGNAL_SHARE_CONFIG?.authRedirectUrl || location.href;
+    const data = await socialConnectRequest({ action: "start", provider, returnTo });
+    if (!data.authorizeUrl) throw new Error(`${providerName(provider)} connection could not be started.`);
+    location.href = data.authorizeUrl;
+  }
+  async function disconnectSocialProvider(provider) {
+    const data = await socialConnectRequest({ action: "disconnect", provider });
+    socialConnectionState = {
+      configured: data.configured || socialConnectionState.configured,
+      connections: Array.isArray(data.connections) ? data.connections : [],
+    };
+    renderSocialConnections();
+    toast(`${providerName(provider)} disconnected`);
+  }
+  function consumeSocialConnectionResult() {
+    const url = new URL(location.href);
+    const status = url.searchParams.get("signal_social");
+    const message = url.searchParams.get("signal_social_message");
+    if (!status && !message) return;
+    const finalMessage = message || (status === "connected" ? "Social provider connected." : "Social connection failed.");
+    setFeedback(finalMessage, status !== "connected");
+    toast(finalMessage);
+    url.searchParams.delete("signal_social");
+    url.searchParams.delete("signal_social_message");
+    history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   async function runAction() {
@@ -550,6 +745,7 @@
     form.classList.toggle("is-tool-mode", !family.usesPostComposer);
     renderFields(selectedFields());
     syncActionButtonLabel();
+    renderSocialConnections();
   }
 
   function selectOption(optionId) {
@@ -606,6 +802,7 @@
       return button;
     }));
     syncSelectedOptions();
+    if (familyId === "social") void refreshSocialConnections();
   }
 
   familyGrid.querySelectorAll("[data-publish-family]").forEach((button) => { if (!families[button.dataset.publishFamily]) button.hidden = true; });
@@ -614,6 +811,25 @@
     if (button && families[button.dataset.publishFamily]) renderFamily(button.dataset.publishFamily);
   });
   actionButton.addEventListener("click", () => void runAction());
+  socialConnectionsPanel?.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest("[data-social-connection-action]") : null;
+    if (!button) return;
+    const provider = button.dataset.socialProvider;
+    button.disabled = true;
+    const task = button.dataset.socialConnectionAction === "disconnect"
+      ? disconnectSocialProvider(provider)
+      : connectSocialProvider(provider);
+    void task.catch((error) => {
+      button.disabled = false;
+      setFeedback(error?.message || "Social connection action failed.", true);
+    });
+  });
+  socialConnectionsPanel?.addEventListener("change", (event) => {
+    const select = event.target instanceof Element ? event.target.closest("[data-social-connection-select]") : null;
+    if (!select) return;
+    selectedSocialConnectionIds[select.dataset.socialProvider] = select.value;
+    renderSocialConnections();
+  });
   shareButton?.addEventListener("click", () => {
     const item = draft();
     if (!validateFields()) return;
@@ -629,6 +845,7 @@
 
   syncDark(localStorage.getItem(DARK_KEY) === "true");
   renderFamily(activeFamilyId);
+  consumeSocialConnectionResult();
   window.SignalSharePublishStudio = {
     selectFamily: renderFamily,
     selectOption,

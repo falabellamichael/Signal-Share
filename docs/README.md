@@ -123,18 +123,30 @@ After that:
 
 ## Enable Direct Social Publishing
 
-The Publish overlay can save Social drafts locally without provider setup. Direct Social posting uses this Supabase Edge Function so the website and Android wrapper do not need to open provider browser or app surfaces:
+The Publish overlay can save Social drafts locally without provider setup. Direct Social posting uses per-user provider connections so users connect their own accounts once, then later posts can be sent from the website or Android wrapper without a provider share handoff.
 
+Apply `supabase/schema.sql` so Supabase creates the private `social_connections` and `social_oauth_states` tables used by the Edge Functions. Deploy both Social functions and keep their names in `config.js`:
+
+- `supabase/functions/social-connect/index.ts`
 - `supabase/functions/social-publish/index.ts`
 
-Deploy the function, keep `socialPublishFunctionName` in `config.js` pointed at it, and set only the provider secrets you intend to use:
+Deploy `social-connect` with `--no-verify-jwt` so X and LinkedIn can reach its OAuth callback. Signed-in connection actions are still checked inside the function. Keep normal JWT verification on `social-publish`.
 
-- Facebook Page posts: `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`, optional `META_GRAPH_API_VERSION`
-- Instagram image posts: `INSTAGRAM_USER_ID`, `INSTAGRAM_ACCESS_TOKEN`, optional `META_GRAPH_API_VERSION`
-- X posts: either `X_USER_ACCESS_TOKEN` for an OAuth 2.0 user access token, or all four OAuth 1.0a user-context secrets: `X_API_KEY`, `X_API_KEY_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`
-- LinkedIn posts: `LINKEDIN_ACCESS_TOKEN`, `LINKEDIN_AUTHOR_URN`, `LINKEDIN_VERSION`
+The connected-account implementation supports direct posting through X, LinkedIn, Facebook Pages, and Instagram accounts returned by each user's OAuth connection. If a provider returns multiple connected accounts, the Socials panel lets the user choose the account before posting.
 
-Direct Social publishing is admin-only because those secrets post to connected provider accounts. Facebook, X, and LinkedIn accept draft text with an optional link URL. Instagram drafts can be saved as caption text, but direct Instagram publishing currently needs a public image URL in the Social fields. For Facebook, use a current Page access token instead of an app token. For X, an app-only Bearer Token cannot create posts.
+Set these Edge Function secrets before users connect providers:
+
+- `SOCIAL_TOKEN_ENCRYPTION_KEY`: a long random secret used to encrypt stored provider tokens
+- `SOCIAL_ALLOWED_RETURN_ORIGINS`: comma-separated browser origins allowed after OAuth callbacks, for example the hosted site origin and local dev origin
+- X OAuth: `X_OAUTH_CLIENT_ID`, optional `X_OAUTH_CLIENT_SECRET`
+- LinkedIn OAuth: `LINKEDIN_OAUTH_CLIENT_ID`, `LINKEDIN_OAUTH_CLIENT_SECRET`
+- Meta OAuth for Facebook Pages and Instagram accounts: `META_OAUTH_APP_ID`, `META_OAUTH_APP_SECRET`, optional `META_GRAPH_API_VERSION`
+
+Register the Social connect callback URL in each provider app before testing OAuth:
+
+- `https://<project-ref>.supabase.co/functions/v1/social-connect`
+
+X must grant user scopes for posting and refreshable access, including `tweet.write` and `offline.access`. LinkedIn must grant `w_member_social`; the current connection flow also requests OpenID profile scopes so it can identify the connected member. Meta OAuth needs Page post access for Facebook and Instagram publishing access for Instagram accounts available to that Meta user. Facebook, X, and LinkedIn accept text with an optional link URL in the Social fields. Instagram direct publishing still needs a public image URL.
 
 ## Enable Messenger Push Notifications
 

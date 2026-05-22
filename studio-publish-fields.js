@@ -42,7 +42,7 @@
       label: "Social delivery",
       mode: "select",
       value: "direct",
-      options: [["direct", "Post directly"], ["draft", "Save as draft"]],
+      options: [["direct", "Post with connected accounts"], ["draft", "Save as draft"]],
     }));
 
     if (hasShareUrl) {

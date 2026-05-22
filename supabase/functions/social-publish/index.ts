@@ -4,6 +4,7 @@ type SocialProvider = "facebook" | "instagram" | "x" | "linkedin";
 
 type SocialPublishPayload = {
   providers?: unknown;
+  connectionIds?: unknown;
   text?: unknown;
   linkUrl?: unknown;
   instagramImageUrl?: unknown;
@@ -17,11 +18,25 @@ type ProviderResult = {
   error?: string;
 };
 
-type XOAuth1Credentials = {
-  consumerKey: string;
-  consumerSecret: string;
-  accessToken: string;
-  accessTokenSecret: string;
+type SocialConnection = {
+  id: string;
+  provider: SocialProvider;
+  provider_account_id: string;
+  provider_account_label: string | null;
+  access_token: string;
+  refresh_token: string | null;
+  token_type: string | null;
+  scopes: string[] | null;
+  token_expires_at: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
+type TokenPayload = {
+  access_token?: unknown;
+  refresh_token?: unknown;
+  token_type?: unknown;
+  expires_in?: unknown;
+  scope?: unknown;
 };
 
 const corsHeaders = {
@@ -32,53 +47,29 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SOCIAL_TOKEN_ENCRYPTION_KEY = Deno.env.get("SOCIAL_TOKEN_ENCRYPTION_KEY") ?? "";
+const X_OAUTH_CLIENT_ID = readString(Deno.env.get("X_OAUTH_CLIENT_ID"), 500);
+const X_OAUTH_CLIENT_SECRET = readString(Deno.env.get("X_OAUTH_CLIENT_SECRET"), 2000);
 const META_GRAPH_API_VERSION = readString(Deno.env.get("META_GRAPH_API_VERSION"), 32);
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
-
   if (request.method !== "POST") {
     return jsonResponse({ error: "Method not allowed." }, 405);
   }
-
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
     return jsonResponse({ error: "Supabase environment variables are incomplete." }, 500);
   }
-
-  const authorization = request.headers.get("Authorization");
-  if (!authorization) {
-    return jsonResponse({ error: "Authentication required." }, 401);
+  if (!SOCIAL_TOKEN_ENCRYPTION_KEY) {
+    return jsonResponse({ error: "Social token encryption is not configured." }, 500);
   }
 
-  const callerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-    global: {
-      headers: {
-        Authorization: authorization,
-      },
-    },
-  });
-
-  const {
-    data: { user },
-    error: authError,
-  } = await callerClient.auth.getUser();
-  if (authError || !user) {
-    return jsonResponse({ error: "Authentication required." }, 401);
-  }
-
-  const { data: isAdmin, error: adminError } = await callerClient.rpc("is_signal_share_admin");
-  if (adminError) {
-    console.error("[Social Publish] Admin check failed:", adminError.message);
-    return jsonResponse({ error: "Social publishing permission check failed." }, 500);
-  }
-  if (!isAdmin) {
-    return jsonResponse({ error: "Only Signal Share admins can post to connected Social providers." }, 403);
+  const auth = await authenticateCaller(request);
+  if (!auth.user) {
+    return jsonResponse({ error: "Sign in before posting directly to connected Social providers." }, 401);
   }
 
   const payload = await request.json().catch(() => ({} as SocialPublishPayload));
@@ -91,32 +82,30 @@ Deno.serve(async (request) => {
   if (readString(payload.linkUrl) && !linkUrl) {
     return jsonResponse({ error: "Optional link URL must use http or https." }, 400);
   }
-
   const instagramImageUrl = normalizeHttpUrl(payload.instagramImageUrl);
   if (readString(payload.instagramImageUrl) && !instagramImageUrl) {
     return jsonResponse({ error: "Instagram image URL must use http or https." }, 400);
   }
 
+  const adminClient = createAdminClient();
+  const connections = await loadConnections(adminClient, auth.user.id, providers, readConnectionIds(payload.connectionIds));
   const draft = {
     text: readString(payload.text, 6000),
     linkUrl,
     instagramImageUrl,
     instagramHashtags: readString(payload.instagramHashtags, 500),
   };
-
   const results: ProviderResult[] = [];
   for (const provider of providers) {
-    results.push(await publishProvider(provider, draft));
+    results.push(await publishProvider(adminClient, provider, connections.get(provider), draft));
   }
-
-  return jsonResponse({
-    ok: results.every((result) => result.ok),
-    results,
-  });
+  return jsonResponse({ ok: results.every((result) => result.ok), results });
 });
 
 async function publishProvider(
+  adminClient: ReturnType<typeof createAdminClient>,
   provider: SocialProvider,
+  connection: SocialConnection | undefined,
   draft: {
     text: string;
     linkUrl: string;
@@ -125,18 +114,24 @@ async function publishProvider(
   }
 ): Promise<ProviderResult> {
   try {
-    switch (provider) {
-      case "facebook":
-        return await publishFacebook(draft.text, draft.linkUrl);
-      case "instagram":
-        return await publishInstagram(draft.text, draft.instagramHashtags, draft.instagramImageUrl);
-      case "x":
-        return await publishX(draft.text, draft.linkUrl);
-      case "linkedin":
-        return await publishLinkedIn(draft.text, draft.linkUrl);
-      default:
-        return { provider, ok: false, error: "Provider is not supported." };
+    if (!connection) {
+      return {
+        provider,
+        ok: false,
+        error: `Connect ${providerLabel(provider)} before posting directly.`,
+      };
     }
+    const readyConnection = await connectionForPublish(adminClient, connection);
+    if (provider === "facebook") {
+      return publishFacebook(readyConnection, draft.text, draft.linkUrl);
+    }
+    if (provider === "instagram") {
+      return publishInstagram(readyConnection, draft.text, draft.instagramHashtags, draft.instagramImageUrl);
+    }
+    if (provider === "x") {
+      return publishX(readyConnection, draft.text, draft.linkUrl);
+    }
+    return publishLinkedIn(readyConnection, draft.text, draft.linkUrl);
   } catch (error) {
     return {
       provider,
@@ -146,267 +141,280 @@ async function publishProvider(
   }
 }
 
-async function publishFacebook(text: string, linkUrl: string): Promise<ProviderResult> {
+async function publishFacebook(
+  connection: SocialConnection,
+  text: string,
+  linkUrl: string
+): Promise<ProviderResult> {
   const provider: SocialProvider = "facebook";
-  const pageId = readString(Deno.env.get("FACEBOOK_PAGE_ID"), 200);
-  const accessToken = readString(Deno.env.get("FACEBOOK_PAGE_ACCESS_TOKEN"), 4096);
-  if (!pageId || !accessToken) {
-    return { provider, ok: false, error: "Facebook publishing is not configured." };
-  }
   if (!text && !linkUrl) {
     return { provider, ok: false, error: "Facebook needs post text or an optional link URL." };
   }
-
-  const body = new URLSearchParams({ access_token: accessToken });
+  const body = new URLSearchParams({ access_token: await decryptToken(connection.access_token) });
   if (text) body.set("message", text);
   if (linkUrl) body.set("link", linkUrl);
-
-  const { payload } = await requestProviderJson(
-    metaGraphUrl(`${encodeURIComponent(pageId)}/feed`),
-    {
-      method: "POST",
-      body,
-    },
-    provider
-  );
-
-  return {
-    provider,
-    ok: true,
-    id: readString(payload?.id, 300),
-  };
+  const payload = await requestProviderJson(metaGraphUrl(`${encodeURIComponent(connection.provider_account_id)}/feed`), {
+    method: "POST",
+    body,
+  }, provider);
+  return { provider, ok: true, id: readString(recordValue(payload).id, 300) };
 }
 
 async function publishInstagram(
+  connection: SocialConnection,
   text: string,
   hashtags: string,
   imageUrl: string
 ): Promise<ProviderResult> {
   const provider: SocialProvider = "instagram";
-  const userId = readString(Deno.env.get("INSTAGRAM_USER_ID"), 200);
-  const accessToken = readString(Deno.env.get("INSTAGRAM_ACCESS_TOKEN"), 4096);
-  if (!userId || !accessToken) {
-    return { provider, ok: false, error: "Instagram publishing is not configured." };
-  }
   if (!imageUrl) {
     return { provider, ok: false, error: "Instagram direct publishing needs a public image URL." };
   }
-
+  const accessToken = await decryptToken(connection.access_token);
   const caption = [text, hashtags].filter(Boolean).join("\n\n");
-  const creationBody = new URLSearchParams({
-    access_token: accessToken,
-    image_url: imageUrl,
-  });
+  const creationBody = new URLSearchParams({ access_token: accessToken, image_url: imageUrl });
   if (caption) creationBody.set("caption", caption);
-
-  const { payload: container } = await requestProviderJson(
-    metaGraphUrl(`${encodeURIComponent(userId)}/media`),
+  const container = recordValue(await requestProviderJson(
+    metaGraphUrl(`${encodeURIComponent(connection.provider_account_id)}/media`),
+    { method: "POST", body: creationBody },
+    provider
+  ));
+  const creationId = readString(container.id, 300);
+  if (!creationId) throw new Error("Instagram did not return a media container id.");
+  const published = recordValue(await requestProviderJson(
+    metaGraphUrl(`${encodeURIComponent(connection.provider_account_id)}/media_publish`),
     {
       method: "POST",
-      body: creationBody,
+      body: new URLSearchParams({ access_token: accessToken, creation_id: creationId }),
     },
     provider
-  );
-  const creationId = readString(container?.id, 300);
-  if (!creationId) {
-    throw new Error("Instagram did not return a media container id.");
-  }
-
-  const publishBody = new URLSearchParams({
-    access_token: accessToken,
-    creation_id: creationId,
-  });
-  const { payload: published } = await requestProviderJson(
-    metaGraphUrl(`${encodeURIComponent(userId)}/media_publish`),
-    {
-      method: "POST",
-      body: publishBody,
-    },
-    provider
-  );
-
-  return {
-    provider,
-    ok: true,
-    id: readString(published?.id, 300),
-  };
+  ));
+  return { provider, ok: true, id: readString(published.id, 300) };
 }
 
-async function publishX(text: string, linkUrl: string): Promise<ProviderResult> {
+async function publishX(connection: SocialConnection, text: string, linkUrl: string): Promise<ProviderResult> {
   const provider: SocialProvider = "x";
-  const accessToken = readString(Deno.env.get("X_USER_ACCESS_TOKEN"), 4096);
-  const oauth1 = readXOAuth1Credentials();
   const postText = joinPostText(text, linkUrl);
-  if (!accessToken && !oauth1) {
-    return { provider, ok: false, error: "X publishing is not configured." };
-  }
   if (!postText) {
     return { provider, ok: false, error: "X needs post text or an optional link URL." };
   }
-
-  const authorization = oauth1
-    ? await xOAuth1Authorization("POST", "https://api.x.com/2/tweets", oauth1)
-    : `Bearer ${accessToken}`;
-  const { payload } = await requestProviderJson("https://api.x.com/2/tweets", {
-    method: "POST",
-    headers: {
-      Authorization: authorization,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ text: postText }),
-  }, provider);
-
-  return {
-    provider,
-    ok: true,
-    id: readString(payload?.data?.id, 300),
-  };
-}
-
-async function publishLinkedIn(text: string, linkUrl: string): Promise<ProviderResult> {
-  const provider: SocialProvider = "linkedin";
-  const accessToken = readString(Deno.env.get("LINKEDIN_ACCESS_TOKEN"), 4096);
-  const author = readString(Deno.env.get("LINKEDIN_AUTHOR_URN"), 300);
-  const version = readString(Deno.env.get("LINKEDIN_VERSION"), 32);
-  const commentary = joinPostText(text, linkUrl);
-  if (!accessToken || !author || !version) {
-    return { provider, ok: false, error: "LinkedIn publishing is not configured." };
-  }
-  if (!commentary) {
-    return { provider, ok: false, error: "LinkedIn needs post text or an optional link URL." };
-  }
-
-  const { response, payload } = await requestProviderJson("https://api.linkedin.com/rest/posts", {
+  const accessToken = await decryptToken(connection.access_token);
+  const payload = await requestProviderJson("https://api.x.com/2/tweets", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
-      "Linkedin-Version": version,
+    },
+    body: JSON.stringify({ text: postText }),
+  }, provider);
+  return { provider, ok: true, id: readString(recordValue(payload).data?.id, 300) };
+}
+
+async function publishLinkedIn(
+  connection: SocialConnection,
+  text: string,
+  linkUrl: string
+): Promise<ProviderResult> {
+  const provider: SocialProvider = "linkedin";
+  const commentary = joinPostText(text, linkUrl);
+  if (!commentary) {
+    return { provider, ok: false, error: "LinkedIn needs post text or an optional link URL." };
+  }
+  const accessToken = await decryptToken(connection.access_token);
+  const metadata = recordValue(connection.metadata);
+  const author = readString(metadata.authorUrn, 300) || `urn:li:person:${connection.provider_account_id}`;
+  const { response, payload } = await requestProviderResponse("https://api.linkedin.com/v2/ugcPosts", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
       "X-Restli-Protocol-Version": "2.0.0",
     },
     body: JSON.stringify({
       author,
-      commentary,
-      visibility: "PUBLIC",
       lifecycleState: "PUBLISHED",
-      distribution: {
-        feedDistribution: "MAIN_FEED",
-        targetEntities: [],
-        thirdPartyDistributionChannels: [],
+      specificContent: {
+        "com.linkedin.ugc.ShareContent": {
+          shareCommentary: { text: commentary },
+          shareMediaCategory: "NONE",
+        },
       },
-      isReshareDisabledByAuthor: false,
+      visibility: {
+        "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
+      },
     }),
   }, provider);
-
   return {
     provider,
     ok: true,
-    id: readString(response.headers.get("x-restli-id"), 300) || readString(payload?.id, 300),
+    id: readString(response.headers.get("x-restli-id"), 300) || readString(recordValue(payload).id, 300),
   };
 }
 
-async function requestProviderJson(url: string, options: RequestInit, provider?: SocialProvider) {
+async function connectionForPublish(
+  adminClient: ReturnType<typeof createAdminClient>,
+  connection: SocialConnection
+) {
+  if (!connection.token_expires_at || Date.parse(connection.token_expires_at) > Date.now() + 60_000) {
+    return connection;
+  }
+  if (connection.provider === "x" && connection.refresh_token && X_OAUTH_CLIENT_ID) {
+    return refreshXConnection(adminClient, connection);
+  }
+  throw new Error(`${providerLabel(connection.provider)} connection expired. Connect it again.`);
+}
+
+async function refreshXConnection(
+  adminClient: ReturnType<typeof createAdminClient>,
+  connection: SocialConnection
+) {
+  const refreshToken = await decryptToken(connection.refresh_token || "");
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: X_OAUTH_CLIENT_ID,
+  });
+  const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" };
+  if (X_OAUTH_CLIENT_SECRET) {
+    headers.Authorization = `Basic ${btoa(`${X_OAUTH_CLIENT_ID}:${X_OAUTH_CLIENT_SECRET}`)}`;
+  }
+  const token = recordValue(await requestProviderJson("https://api.x.com/2/oauth2/token", {
+    method: "POST",
+    headers,
+    body,
+  }, "x")) as TokenPayload;
+  const accessToken = readString(token.access_token, 5000);
+  if (!accessToken) {
+    throw new Error("X connection could not be refreshed. Connect it again.");
+  }
+  const nextRefreshToken = readString(token.refresh_token, 5000) || refreshToken;
+  const nextConnection = {
+    ...connection,
+    access_token: await encryptToken(accessToken),
+    refresh_token: await encryptToken(nextRefreshToken),
+    token_type: readString(token.token_type, 80) || connection.token_type,
+    scopes: readScopes(token.scope).length ? readScopes(token.scope) : connection.scopes,
+    token_expires_at: expiresAt(token.expires_in),
+  };
+  const { error } = await adminClient.from("social_connections").update({
+    access_token: nextConnection.access_token,
+    refresh_token: nextConnection.refresh_token,
+    token_type: nextConnection.token_type,
+    scopes: nextConnection.scopes,
+    token_expires_at: nextConnection.token_expires_at,
+  }).eq("id", connection.id);
+  if (error) {
+    console.error("[Social Publish] X refresh store failed:", error.message);
+    throw new Error("X connection refresh could not be saved. Connect it again.");
+  }
+  return nextConnection;
+}
+
+async function loadConnections(
+  adminClient: ReturnType<typeof createAdminClient>,
+  userId: string,
+  providers: SocialProvider[],
+  connectionIds: Partial<Record<SocialProvider, string>>
+) {
+  const { data, error } = await adminClient
+    .from("social_connections")
+    .select("id, provider, provider_account_id, provider_account_label, access_token, refresh_token, token_type, scopes, token_expires_at, metadata")
+    .eq("user_id", userId)
+    .in("provider", providers)
+    .order("updated_at", { ascending: false });
+  if (error) {
+    console.error("[Social Publish] Connection lookup failed:", error.message);
+    throw new Error("Connected Social accounts could not be loaded.");
+  }
+  const connections = new Map<SocialProvider, SocialConnection>();
+  (Array.isArray(data) ? data : []).forEach((row) => {
+    const provider = readProvider(row.provider);
+    const connectionId = readString(row.id, 300);
+    if (!provider) return;
+    if (connectionIds[provider] && connectionIds[provider] !== connectionId) return;
+    if (!connections.has(provider)) connections.set(provider, row as SocialConnection);
+  });
+  return connections;
+}
+
+async function authenticateCaller(request: Request) {
+  const authorization = request.headers.get("Authorization");
+  if (!authorization) return { user: null };
+  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: authorization } },
+  });
+  const { data, error } = await client.auth.getUser();
+  return { user: error ? null : data.user };
+}
+
+function createAdminClient() {
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+async function requestProviderJson(url: string, options: RequestInit, provider: SocialProvider) {
+  const { payload } = await requestProviderResponse(url, options, provider);
+  return payload;
+}
+
+async function requestProviderResponse(url: string, options: RequestInit, provider: SocialProvider) {
   const response = await fetch(url, options);
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(providerErrorMessage(payload, provider) || `Provider returned HTTP ${response.status}.`);
+    throw new Error(providerErrorMessage(payload, provider, response.status) || `Provider returned HTTP ${response.status}.`);
   }
   return { response, payload };
 }
 
 function readProviders(value: unknown) {
   if (!Array.isArray(value)) return [];
-  const known = new Set<SocialProvider>(["facebook", "instagram", "x", "linkedin"]);
-  return [...new Set(value.map((item) => readString(item, 40).toLowerCase()))]
-    .filter((item): item is SocialProvider => known.has(item as SocialProvider));
+  const providers = new Set<SocialProvider>();
+  value.forEach((item) => {
+    const provider = readProvider(item);
+    if (provider) providers.add(provider);
+  });
+  return [...providers];
+}
+
+function readConnectionIds(value: unknown) {
+  const record = recordValue(value);
+  const ids: Partial<Record<SocialProvider, string>> = {};
+  (["facebook", "instagram", "x", "linkedin"] as SocialProvider[]).forEach((provider) => {
+    const id = readString(record[provider], 300);
+    if (id) ids[provider] = id;
+  });
+  return ids;
+}
+
+function readProvider(value: unknown): SocialProvider | "" {
+  const provider = readString(value, 40).toLowerCase();
+  return provider === "facebook" || provider === "instagram" || provider === "x" || provider === "linkedin"
+    ? provider
+    : "";
+}
+
+function providerLabel(provider: SocialProvider) {
+  switch (provider) {
+    case "x": return "X";
+    case "linkedin": return "LinkedIn";
+    case "facebook": return "Facebook";
+    case "instagram": return "Instagram";
+  }
 }
 
 function joinPostText(text: string, linkUrl: string) {
   return [text, linkUrl].filter(Boolean).join("\n\n");
 }
 
+function metaGraphVersion() {
+  const version = META_GRAPH_API_VERSION.replace(/^v?/i, "").replace(/^\/+|\/+$/g, "");
+  return version ? `v${version}` : "v22.0";
+}
+
 function metaGraphUrl(path: string) {
-  const version = META_GRAPH_API_VERSION.replace(/^\/+|\/+$/g, "");
-  const versionPrefix = version ? `${version}/` : "";
-  return `https://graph.facebook.com/${versionPrefix}${path.replace(/^\/+/, "")}`;
-}
-
-function readXOAuth1Credentials(): XOAuth1Credentials | null {
-  const credentials = {
-    consumerKey: readString(Deno.env.get("X_API_KEY"), 4096),
-    consumerSecret: readString(Deno.env.get("X_API_KEY_SECRET"), 4096),
-    accessToken: readString(Deno.env.get("X_ACCESS_TOKEN"), 4096),
-    accessTokenSecret: readString(Deno.env.get("X_ACCESS_TOKEN_SECRET"), 4096),
-  };
-
-  return Object.values(credentials).every(Boolean) ? credentials : null;
-}
-
-async function xOAuth1Authorization(method: string, rawUrl: string, credentials: XOAuth1Credentials) {
-  const url = new URL(rawUrl);
-  const oauthParams = {
-    oauth_consumer_key: credentials.consumerKey,
-    oauth_nonce: crypto.randomUUID().replace(/-/g, ""),
-    oauth_signature_method: "HMAC-SHA1",
-    oauth_timestamp: `${Math.floor(Date.now() / 1000)}`,
-    oauth_token: credentials.accessToken,
-    oauth_version: "1.0",
-  };
-  const signatureParams = [
-    ...Object.entries(oauthParams),
-    ...url.searchParams.entries(),
-  ].map(([key, value]) => [oauthPercentEncode(key), oauthPercentEncode(value)] as const)
-    .sort(compareOAuthPairs);
-  const normalizedParams = signatureParams.map(([key, value]) => `${key}=${value}`).join("&");
-  const baseUrl = `${url.origin}${url.pathname}`;
-  const signatureBase = [
-    method.toUpperCase(),
-    oauthPercentEncode(baseUrl),
-    oauthPercentEncode(normalizedParams),
-  ].join("&");
-  const signingKey = [
-    oauthPercentEncode(credentials.consumerSecret),
-    oauthPercentEncode(credentials.accessTokenSecret),
-  ].join("&");
-  const oauthSignature = await signHmacSha1(signingKey, signatureBase);
-  const headerParams = Object.entries({
-    ...oauthParams,
-    oauth_signature: oauthSignature,
-  }).sort(compareOAuthPairs);
-
-  return `OAuth ${headerParams.map(([key, value]) => (
-    `${oauthPercentEncode(key)}="${oauthPercentEncode(value)}"`
-  )).join(", ")}`;
-}
-
-function compareOAuthPairs(left: readonly [string, string], right: readonly [string, string]) {
-  if (left[0] === right[0]) return left[1] < right[1] ? -1 : left[1] > right[1] ? 1 : 0;
-  return left[0] < right[0] ? -1 : 1;
-}
-
-function oauthPercentEncode(value: string) {
-  return encodeURIComponent(value).replace(/[!'()*]/g, (character) => (
-    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
-  ));
-}
-
-async function signHmacSha1(secret: string, value: string) {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-1" },
-    false,
-    ["sign"]
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(value));
-  return bytesToBase64(new Uint8Array(signature));
-}
-
-function bytesToBase64(bytes: Uint8Array) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
+  return `https://graph.facebook.com/${metaGraphVersion()}/${path.replace(/^\/+/, "")}`;
 }
 
 function normalizeHttpUrl(value: unknown) {
@@ -420,30 +428,76 @@ function normalizeHttpUrl(value: unknown) {
   }
 }
 
-function readString(value: unknown, maxLength = 1000) {
-  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+function readScopes(value: unknown) {
+  if (Array.isArray(value)) return value.map((scope) => readString(scope, 100)).filter(Boolean);
+  return readString(value, 2000).split(/\s+/).filter(Boolean);
 }
 
-function providerErrorMessage(payload: Record<string, unknown> | null, provider?: SocialProvider) {
-  if (!payload || typeof payload !== "object") return "";
-  const nestedError = payload.error as Record<string, unknown> | undefined;
-  const message = readString(nestedError?.message ?? payload.message ?? payload.title, 260);
-  const code = typeof nestedError?.code === "number" ? nestedError.code : 0;
-  if (provider === "facebook" && (code === 190 || message === "Got unexpected null")) {
-    return "Facebook rejected the Page access token. Set FACEBOOK_PAGE_ACCESS_TOKEN to a current Page access token with Page post access.";
-  }
-  if (provider === "x" && message === "Unsupported Authentication") {
-    return "X rejected app-only authentication. Use an OAuth 2.0 user access token or configure the X OAuth 1.0a user-context secrets.";
+function expiresAt(value: unknown) {
+  const expiresIn = Number(value);
+  return Number.isFinite(expiresIn) && expiresIn > 0
+    ? new Date(Date.now() + expiresIn * 1000).toISOString()
+    : null;
+}
+
+function recordValue(value: unknown): Record<string, any> {
+  return value && typeof value === "object" ? value as Record<string, any> : {};
+}
+
+function providerErrorMessage(payload: unknown, provider: SocialProvider, status: number) {
+  const record = recordValue(payload);
+  const nested = recordValue(record.error);
+  const message = readString(nested.message || record.detail || record.message || record.title, 260);
+  if ((provider === "x" || provider === "linkedin") && status === 401) {
+    return `${providerLabel(provider)} connection is no longer authorized. Connect it again.`;
   }
   return message;
+}
+
+async function encryptToken(token: string) {
+  const key = await tokenCryptoKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const bytes = new TextEncoder().encode(token);
+  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, bytes));
+  return `v1.${base64Url(iv)}.${base64Url(encrypted)}`;
+}
+
+async function decryptToken(token: string) {
+  const parts = token.split(".");
+  if (parts.length !== 3 || parts[0] !== "v1") {
+    throw new Error("Social connection token storage is invalid. Connect the provider again.");
+  }
+  const key = await tokenCryptoKey();
+  const iv = base64UrlBytes(parts[1]);
+  const encrypted = base64UrlBytes(parts[2]);
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encrypted);
+  return new TextDecoder().decode(decrypted);
+}
+
+async function tokenCryptoKey() {
+  const seed = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(SOCIAL_TOKEN_ENCRYPTION_KEY));
+  return crypto.subtle.importKey("raw", seed, "AES-GCM", false, ["encrypt", "decrypt"]);
+}
+
+function base64Url(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlBytes(value: string) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function readString(value: unknown, maxLength = 1000) {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
 function jsonResponse(payload: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json",
-    },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }

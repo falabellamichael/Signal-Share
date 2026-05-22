@@ -11,6 +11,7 @@ window.SIGNAL_SHARE_CONFIG = {
   webPushPublicKey: "",
   notificationFunctionName: "send-message-notification",
   spotifyPreviewFunctionName: "spotify-preview-metadata",
+  socialConnectFunctionName: "social-connect",
   socialPublishFunctionName: "social-publish",
   adminEmails: ["falabellamichael@gmail.com", "falabellasocials@gmail.com"],
   masterAdminEmails: ["falabellamichael@gmail.com"],

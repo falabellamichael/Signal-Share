@@ -175,6 +175,41 @@ create table if not exists public.post_likes (
   primary key (post_id, user_id)
 );
 
+create table if not exists public.social_connections (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  provider text not null check (provider in ('x', 'linkedin', 'facebook', 'instagram')),
+  provider_account_id text not null,
+  provider_account_label text,
+  access_token text not null,
+  refresh_token text,
+  token_type text,
+  scopes text[] not null default '{}',
+  token_expires_at timestamptz,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, provider, provider_account_id)
+);
+
+create table if not exists public.social_oauth_states (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  provider text not null check (provider in ('x', 'linkedin', 'facebook', 'instagram')),
+  state_token text not null unique,
+  code_verifier text,
+  return_to text,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '10 minutes'
+);
+
+alter table public.social_oauth_states
+drop constraint if exists social_oauth_states_provider_check;
+
+alter table public.social_oauth_states
+add constraint social_oauth_states_provider_check
+check (provider in ('x', 'linkedin', 'facebook', 'instagram'));
+
 alter table public.messages
 alter column body drop not null;
 
@@ -237,6 +272,12 @@ on public.direct_threads (user_one_id, updated_at desc);
 
 create index if not exists direct_threads_user_two_updated_idx
 on public.direct_threads (user_two_id, updated_at desc);
+
+create index if not exists social_connections_user_provider_idx
+on public.social_connections (user_id, provider, updated_at desc);
+
+create index if not exists social_oauth_states_expires_idx
+on public.social_oauth_states (expires_at);
 
 create index if not exists messages_thread_created_idx
 on public.messages (thread_id, created_at asc);
@@ -721,6 +762,8 @@ alter table public.user_blocks enable row level security;
 alter table public.user_bans enable row level security;
 alter table public.push_subscriptions enable row level security;
 alter table public.post_likes enable row level security;
+alter table public.social_connections enable row level security;
+alter table public.social_oauth_states enable row level security;
 
 grant usage on schema public to anon, authenticated;
 grant select on table public.posts to anon, authenticated;
@@ -1030,6 +1073,12 @@ execute function public.enforce_post_language_moderation();
 drop trigger if exists set_profiles_updated_at on public.profiles;
 create trigger set_profiles_updated_at
 before update on public.profiles
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_social_connections_updated_at on public.social_connections;
+create trigger set_social_connections_updated_at
+before update on public.social_connections
 for each row
 execute function public.set_updated_at();
 
