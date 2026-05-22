@@ -1127,7 +1127,10 @@ async function initialize() {
       state.userPosts = await loadPostsFromSupabase();
       state.userPosts = healPosts(state.userPosts);
       try {
-        state.siteSettings = await loadSiteSettingsFromSupabase();
+        const loadedSettings = await loadSiteSettingsFromSupabase();
+        if (loadedSettings) {
+          state.siteSettings = loadedSettings;
+        }
         applySiteSettings(state.siteSettings);
       } catch (settingsError) { console.error("Site settings could not be loaded", settingsError); }
       const { data: { session } } = await state.supabase.auth.getSession();

@@ -1908,15 +1908,54 @@ export function createAppUi(context) {
     activeOverlayTouchY = 0;
   }
 
-  function applySiteSettings(settings) { const root = document.documentElement; root.style.setProperty("--shell-max-width", `${settings.shellWidth}px`); root.style.setProperty("--section-gap", `${settings.sectionGap}px`); root.style.setProperty("--radius-xl", `${settings.surfaceRadius}px`); root.style.setProperty("--radius-lg", `${Math.max(18, settings.surfaceRadius - 8)}px`); root.style.setProperty("--radius-md", `${Math.max(14, settings.surfaceRadius - 14)}px`); root.style.setProperty("--feed-media-fit", settings.mediaFit); }
+  function applySiteSettings(settings) {
+    const root = document.documentElement;
+    const safeSettings = settings || DEFAULT_SITE_SETTINGS || {};
+    root.style.setProperty("--shell-max-width", `${safeSettings.shellWidth ?? 1200}px`);
+    root.style.setProperty("--section-gap", `${safeSettings.sectionGap ?? 24}px`);
+    root.style.setProperty("--radius-xl", `${safeSettings.surfaceRadius ?? 32}px`);
+    root.style.setProperty("--radius-lg", `${Math.max(18, (safeSettings.surfaceRadius ?? 32) - 8)}px`);
+    root.style.setProperty("--radius-md", `${Math.max(14, (safeSettings.surfaceRadius ?? 32) - 14)}px`);
+    root.style.setProperty("--feed-media-fit", safeSettings.mediaFit ?? "cover");
+  }
 
-  function handleAdminSettingsInput() { state.siteSettings = { shellWidth: clampNumber(elements.layoutWidthInput.value, 960, 1440, DEFAULT_SITE_SETTINGS.shellWidth), sectionGap: clampNumber(elements.layoutGapInput.value, 16, 40, DEFAULT_SITE_SETTINGS.sectionGap), surfaceRadius: clampNumber(elements.layoutRadiusInput.value, 22, 44, DEFAULT_SITE_SETTINGS.surfaceRadius), mediaFit: elements.mediaFitSelect.value === "contain" ? "contain" : "cover" }; applySiteSettings(state.siteSettings); updateAdminSettingsValues(); }
+  function handleAdminSettingsInput() {
+    state.siteSettings = {
+      shellWidth: clampNumber(elements.layoutWidthInput.value, 960, 1440, DEFAULT_SITE_SETTINGS.shellWidth),
+      sectionGap: clampNumber(elements.layoutGapInput.value, 16, 40, DEFAULT_SITE_SETTINGS.sectionGap),
+      surfaceRadius: clampNumber(elements.layoutRadiusInput.value, 22, 44, DEFAULT_SITE_SETTINGS.surfaceRadius),
+      mediaFit: elements.mediaFitSelect.value === "contain" ? "contain" : "cover"
+    };
+    applySiteSettings(state.siteSettings);
+    updateAdminSettingsValues();
+  }
 
-  function handleAdminSettingsReset() { state.siteSettings = { ...DEFAULT_SITE_SETTINGS }; applySiteSettings(state.siteSettings); renderAdminEditor(); elements.adminSettingsFeedback.textContent = "Defaults restored locally. Save to publish them."; elements.adminSettingsFeedback.classList.remove("is-error"); }
+  function handleAdminSettingsReset() {
+    state.siteSettings = { ...DEFAULT_SITE_SETTINGS };
+    applySiteSettings(state.siteSettings);
+    renderAdminEditor();
+    elements.adminSettingsFeedback.textContent = "Defaults restored locally. Save to publish them.";
+    elements.adminSettingsFeedback.classList.remove("is-error");
+  }
 
-  function updateAdminSettingsValues() { elements.layoutWidthValue.textContent = `${state.siteSettings.shellWidth}px`; elements.layoutGapValue.textContent = `${state.siteSettings.sectionGap}px`; elements.layoutRadiusValue.textContent = `${state.siteSettings.surfaceRadius}px`; }
+  function updateAdminSettingsValues() {
+    const settings = state.siteSettings || DEFAULT_SITE_SETTINGS || {};
+    elements.layoutWidthValue.textContent = `${settings.shellWidth ?? 1200}px`;
+    elements.layoutGapValue.textContent = `${settings.sectionGap ?? 24}px`;
+    elements.layoutRadiusValue.textContent = `${settings.surfaceRadius ?? 32}px`;
+  }
 
-  function renderAdminEditor() { const showAdminEditor = state.backendMode === "supabase" && isCurrentUserActivated() && isCurrentUserMasterAdmin(); elements.adminEditor.hidden = !showAdminEditor; if (!showAdminEditor) return; elements.layoutWidthInput.value = String(state.siteSettings.shellWidth); elements.layoutGapInput.value = String(state.siteSettings.sectionGap); elements.layoutRadiusInput.value = String(state.siteSettings.surfaceRadius); elements.mediaFitSelect.value = state.siteSettings.mediaFit; updateAdminSettingsValues(); }
+  function renderAdminEditor() {
+    const showAdminEditor = state.backendMode === "supabase" && isCurrentUserActivated() && isCurrentUserMasterAdmin();
+    elements.adminEditor.hidden = !showAdminEditor;
+    if (!showAdminEditor) return;
+    const settings = state.siteSettings || DEFAULT_SITE_SETTINGS || {};
+    elements.layoutWidthInput.value = String(settings.shellWidth ?? 1200);
+    elements.layoutGapInput.value = String(settings.sectionGap ?? 24);
+    elements.layoutRadiusInput.value = String(settings.surfaceRadius ?? 32);
+    elements.mediaFitSelect.value = settings.mediaFit ?? "cover";
+    updateAdminSettingsValues();
+  }
 
   function renderTagCloud() { const posts = getVisiblePosts(); const tagCounts = new Map(); posts.forEach((post) => { post.tags.forEach((tag) => tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1)); }); const tags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 8); elements.tagCloud.innerHTML = ""; tags.forEach(([tag, count]) => { const button = document.createElement("button"); button.type = "button"; button.className = "tag-chip"; button.dataset.tag = tag; button.textContent = `#${tag} ${count}`; if (state.search === tag.toLowerCase()) button.classList.add("is-active"); elements.tagCloud.appendChild(button); }); }
 
