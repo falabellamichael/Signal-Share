@@ -131,10 +131,10 @@ Deploy the function, keep `socialPublishFunctionName` in `config.js` pointed at 
 
 - Facebook Page posts: `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`, optional `META_GRAPH_API_VERSION`
 - Instagram image posts: `INSTAGRAM_USER_ID`, `INSTAGRAM_ACCESS_TOKEN`, optional `META_GRAPH_API_VERSION`
-- X posts: `X_USER_ACCESS_TOKEN`
+- X posts: either `X_USER_ACCESS_TOKEN` for an OAuth 2.0 user access token, or all four OAuth 1.0a user-context secrets: `X_API_KEY`, `X_API_KEY_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`
 - LinkedIn posts: `LINKEDIN_ACCESS_TOKEN`, `LINKEDIN_AUTHOR_URN`, `LINKEDIN_VERSION`
 
-Direct Social publishing is admin-only because those secrets post to connected provider accounts. Facebook, X, and LinkedIn accept draft text with an optional link URL. Instagram drafts can be saved as caption text, but direct Instagram publishing currently needs a public image URL in the Social fields.
+Direct Social publishing is admin-only because those secrets post to connected provider accounts. Facebook, X, and LinkedIn accept draft text with an optional link URL. Instagram drafts can be saved as caption text, but direct Instagram publishing currently needs a public image URL in the Social fields. For Facebook, use a current Page access token instead of an app token. For X, an app-only Bearer Token cannot create posts.
 
 ## Enable Messenger Push Notifications
 
