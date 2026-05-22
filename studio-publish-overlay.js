@@ -139,13 +139,13 @@
     social: {
       badge: "Social",
       title: "Social posting",
-      copy: "Prepare realistic platform share payloads without showing media-upload fields.",
-      detailsText: "Platform-specific share fields.",
+      copy: "Save Social drafts or publish through connected provider accounts.",
+      detailsText: "Post text, optional links, and provider-specific fields.",
       options: [
-        { id: "social-facebook", icon: "📘", name: "Facebook", note: "Share URL", button: "Open Facebook", hint: "Opens Facebook sharing for a target URL.", fields: [field("shareUrl", { required: true }), field("body", { label: "Post text", mode: "textarea", placeholder: "Optional text to copy before sharing", wide: true })] },
-        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Caption kit", button: "Copy Instagram Kit", hint: "Copies an Instagram-ready caption kit. Instagram web does not accept direct prefilled posting.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
-        { id: "social-x", icon: "✕", name: "X", note: "Post intent", button: "Open X Post", hint: "Opens an X post intent with text and URL.", fields: [field("xHandle", { label: "From handle", placeholder: "@yourhandle" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Post text", required: true, wide: true }), field("shareUrl")] },
-        { id: "social-linkedin", icon: "💼", name: "LinkedIn", note: "Link share", button: "Open LinkedIn", hint: "Opens LinkedIn sharing for a target URL.", fields: [field("linkedinFrom", { label: "Profile or company", placeholder: "Signal Share" }), field("shareUrl", { required: true }), field("body", { label: "Share note", mode: "textarea", placeholder: "Optional note to copy before sharing", wide: true })] }
+        { id: "social-facebook", icon: "📘", name: "Facebook", note: "Text or link", button: "Post to Facebook", hint: "Publishes to the connected Facebook Page without opening Facebook.", fields: [field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a Facebook post", wide: true })] },
+        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Caption + image", button: "Post to Instagram", hint: "Publishes through Instagram when the draft includes a public image URL.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("instagramImageUrl", { label: "Instagram image URL", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
+        { id: "social-x", icon: "✕", name: "X", note: "Text or link", button: "Post to X", hint: "Publishes to the connected X account without opening X.", fields: [field("xHandle", { label: "From handle", placeholder: "@yourhandle" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write an X post", required: true, wide: true }), field("shareUrl", { label: "Optional link URL" })] },
+        { id: "social-linkedin", icon: "💼", name: "LinkedIn", note: "Text or link", button: "Post to LinkedIn", hint: "Publishes to the connected LinkedIn author without opening LinkedIn.", fields: [field("linkedinFrom", { label: "Profile or company", placeholder: "Signal Share" }), field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a LinkedIn post", wide: true })] }
       ]
     },
     github: {
@@ -312,8 +312,8 @@
     if (!hint) return;
     hint.textContent = isSocialDraft
       ? options.length === 1
-        ? `Saves a ${options[0].name} draft without opening the provider.`
-        : `Saves drafts for ${options.map((option) => option.name).join(", ")} without opening providers.`
+        ? `Saves a ${options[0].name} draft without publishing it.`
+        : `Saves drafts for ${options.map((option) => option.name).join(", ")} without publishing them.`
       : options.length === 1
         ? options[0].hint
         : `Shared fields are organized for ${options.map((option) => option.name).join(", ")}.`;
@@ -331,26 +331,42 @@
     URL.revokeObjectURL(url);
   }
   function shareUrl(item) { return item.details.shareUrl || item.details.facebookUrl || item.externalUrl || `${location.origin}${location.pathname}`; }
-
-  async function runSocialOption(option, item) {
-    if (option.id === "social-facebook") {
-      await copyText(item.details.body || "");
-      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
-      return;
+  function socialPublishFunctionName() {
+    return `${window.SIGNAL_SHARE_CONFIG?.socialPublishFunctionName || "social-publish"}`.trim() || "social-publish";
+  }
+  function socialProviderId(option) {
+    return `${option?.id || ""}`.replace(/^social-/, "");
+  }
+  function socialPublishErrorMessage(error, data) {
+    return data?.error || error?.context?.error || error?.message || "Direct Social publishing failed.";
+  }
+  async function publishSocialOptions(options, item) {
+    const appState = window.state ?? window.__SIGNAL_SHARE_STATE__;
+    if (!appState?.supabase || appState.backendMode !== "supabase" || !appState.currentUser) {
+      throw new Error("Sign in before posting directly to connected Social providers.");
     }
 
-    if (option.id === "social-x") {
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent([item.details.xHandle, item.details.body].filter(Boolean).join("\n").slice(0, 260))}&url=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
-      return;
+    const { data, error } = await appState.supabase.functions.invoke(socialPublishFunctionName(), {
+      body: {
+        providers: options.map(socialProviderId).filter(Boolean),
+        text: item.details.body || "",
+        linkUrl: item.details.shareUrl || "",
+        instagramImageUrl: item.details.instagramImageUrl || "",
+        instagramHashtags: item.details.instagramHashtags || "",
+      },
+    });
+
+    if (error || data?.error) {
+      throw new Error(socialPublishErrorMessage(error, data));
     }
 
-    if (option.id === "social-linkedin") {
-      await copyText(item.details.body || "");
-      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
-      return;
+    const results = Array.isArray(data?.results) ? data.results : [];
+    const failed = results.filter((result) => !result?.ok);
+    if (failed.length) {
+      throw new Error(failed.map((result) => `${result.provider}: ${result.error || "publish failed"}`).join(" "));
     }
 
-    await copyText([item.details.instagramFrom && `From: ${item.details.instagramFrom}`, item.details.body, item.details.instagramHashtags].filter(Boolean).join("\n\n"));
+    return results;
   }
 
   async function runAction() {
@@ -362,6 +378,7 @@
     if (!validateFields()) return;
     const record = activity(family, selectedActivityOption(options), item);
     let completed = true;
+    let activitySaved = false;
 
     try {
       if (activeFamilyId === "local") {
@@ -376,8 +393,10 @@
         if (item.details.socialDeliveryMode === "draft") {
           toast(options.length === 1 ? "Social draft saved" : `${options.length} Social drafts saved`);
         } else {
-          for (const selectedOption of options) await runSocialOption(selectedOption, item);
-          toast(options.length === 1 ? "Social provider opened" : `${options.length} Social providers opened`);
+          saveActivity(record);
+          activitySaved = true;
+          await publishSocialOptions(options, item);
+          toast(options.length === 1 ? "Social draft posted" : `${options.length} Social drafts posted`);
         }
       } else if (activeFamilyId === "github") {
         const url = repoUrl(item.details.repoUrl);
@@ -448,7 +467,7 @@
         }
       } else completed = false;
 
-      if (completed) saveActivity(record);
+      if (completed && !activitySaved) saveActivity(record);
     } catch (error) {
       setFeedback(error?.message || "Something went wrong", true);
     }

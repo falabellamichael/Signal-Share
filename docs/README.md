@@ -121,6 +121,21 @@ After that:
 - brand-new visitors will see the real hosted feed instead of the seeded demo posts
 - authors can delete their own hosted posts, and configured admin accounts can delete any hosted post
 
+## Enable Direct Social Publishing
+
+The Publish overlay can save Social drafts locally without provider setup. Direct Social posting uses this Supabase Edge Function so the website and Android wrapper do not need to open provider browser or app surfaces:
+
+- `supabase/functions/social-publish/index.ts`
+
+Deploy the function, keep `socialPublishFunctionName` in `config.js` pointed at it, and set only the provider secrets you intend to use:
+
+- Facebook Page posts: `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`, optional `META_GRAPH_API_VERSION`
+- Instagram image posts: `INSTAGRAM_USER_ID`, `INSTAGRAM_ACCESS_TOKEN`, optional `META_GRAPH_API_VERSION`
+- X posts: `X_USER_ACCESS_TOKEN`
+- LinkedIn posts: `LINKEDIN_ACCESS_TOKEN`, `LINKEDIN_AUTHOR_URN`, `LINKEDIN_VERSION`
+
+Direct Social publishing is admin-only because those secrets post to connected provider accounts. Facebook, X, and LinkedIn accept draft text with an optional link URL. Instagram drafts can be saved as caption text, but direct Instagram publishing currently needs a public image URL in the Social fields.
+
 ## Enable Messenger Push Notifications
 
 Direct Messenger now supports two notification paths:

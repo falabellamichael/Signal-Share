@@ -47,14 +47,18 @@
 
     if (hasShareUrl) {
       fields.push(field("shareUrl", {
-        label: multiSelected ? "Shared share URL" : "Share URL",
-        required: selectedIds.has("social-facebook") || selectedIds.has("social-linkedin"),
+        label: multiSelected ? "Optional shared link URL" : "Optional link URL",
         wide: multiSelected,
       }));
     }
 
     if (selectedIds.has("social-instagram")) {
       fields.push(field("instagramFrom", { label: "Instagram account", placeholder: "@youraccount" }));
+      fields.push(field("instagramImageUrl", {
+        label: "Instagram image URL",
+        placeholder: "https://example.com/image.jpg",
+        type: "url",
+      }));
     }
 
     if (selectedIds.has("social-x")) {
