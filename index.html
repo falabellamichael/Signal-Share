@@ -548,195 +548,188 @@
             aria-modal="true"
             aria-labelledby="publishOverlayTitle"
           >
-            <button
-              class="settings-close studio-overlay-close"
-              type="button"
-              data-studio-overlay-close="publish"
-              aria-label="Close publish overlay"
-            >
-              Close
-            </button>
-
-            <div class="section-heading studio-overlay-head publish-studio-head">
-              <div>
-                <p class="eyebrow">Compose</p>
-                <h2 id="publishOverlayTitle">Publish a new post</h2>
+            <div class="publish-modal-top">
+              <div class="publish-profile">
+                <div class="publish-avatar" aria-hidden="true">SS</div>
+                <div>
+                  <strong id="publishOverlayTitle">Signal Share Publish</strong>
+                  <small id="publishSelectedBadge">Signal Share</small>
+                </div>
               </div>
-              <button
-                class="publish-dark-toggle"
-                id="publishDarkToggle"
-                type="button"
-                aria-pressed="false"
-              >
-                <span aria-hidden="true">Dark</span>
-                <strong>Publish overlay</strong>
-              </button>
+              <div class="publish-modal-tools">
+                <button
+                  class="publish-dark-toggle"
+                  id="publishDarkToggle"
+                  type="button"
+                  aria-pressed="false"
+                >
+                  <span aria-hidden="true">Dark</span>
+                  <strong>Publish overlay</strong>
+                </button>
+                <button
+                  class="settings-close studio-overlay-close publish-close-btn"
+                  type="button"
+                  data-studio-overlay-close="publish"
+                  aria-label="Close publish overlay"
+                >
+                  &times;
+                </button>
+              </div>
             </div>
 
-            <div class="publish-studio-layout">
-              <aside class="publish-studio-rail" aria-label="Publish destinations">
-                <p class="eyebrow">Destinations</p>
-                <div class="publish-family-grid" id="publishFamilyGrid">
-                  <button class="publish-family-button is-active" type="button" data-publish-family="signal">
-                    <span>Signal</span>
-                    <strong>Feed</strong>
-                  </button>
-                  <button class="publish-family-button" type="button" data-publish-family="local">
-                    <span>Local</span>
-                    <strong>Storage</strong>
-                  </button>
-                  <button class="publish-family-button" type="button" data-publish-family="social">
-                    <span>Social</span>
-                    <strong>Share</strong>
-                  </button>
-                  <button class="publish-family-button" type="button" data-publish-family="github">
-                    <span>GitHub</span>
-                    <strong>Build</strong>
-                  </button>
-                  <button class="publish-family-button" type="button" data-publish-family="cloud">
-                    <span>Cloud</span>
-                    <strong>Sync</strong>
-                  </button>
-                  <button class="publish-family-button" type="button" data-publish-family="email">
-                    <span>Email</span>
-                    <strong>Send</strong>
-                  </button>
-                </div>
-
-                <section class="publish-option-panel" aria-live="polite">
-                  <div>
-                    <p class="eyebrow">Options</p>
-                    <h3 id="publishDestinationTitle">Signal Share feed</h3>
-                    <p id="publishDestinationCopy">Create a post for the feed with the media source below.</p>
-                  </div>
-                  <p class="publish-option-note">Choose one or more options in this destination.</p>
-                  <div class="publish-option-grid" id="publishOptionGrid"></div>
-                </section>
-
-                <label class="publish-github-repo" id="publishGithubRepoField" hidden>
-                  GitHub repository
-                  <input
-                    id="publishGithubRepoInput"
-                    type="url"
-                    inputmode="url"
-                    autocomplete="url"
-                    placeholder="https://github.com/owner/repo"
-                  />
-                </label>
-              </aside>
-
-              <div class="publish-composer-pane">
-                <div class="publish-selected-card">
-                  <span id="publishSelectedBadge">Signal Share</span>
-                  <strong id="publishSelectedAction">Publish feed post</strong>
-                  <p id="publishSelectedHint">The Publish post button keeps the existing feed workflow.</p>
-                </div>
-
-                <form id="postForm" class="post-form">
-              <label>
-                Creator
-                <input
-                  id="creatorInput"
-                  name="creator"
-                  type="text"
-                  maxlength="40"
-                  placeholder="Your display name"
-                  required
-                />
-              </label>
-
-              <label>
-                Title
-                <input
-                  id="titleInput"
-                  name="title"
-                  type="text"
-                  maxlength="70"
-                  placeholder="Name the drop"
-                  required
-                />
-              </label>
-
-              <label class="publish-field-wide">
-                Caption
-                <textarea
-                  id="captionInput"
-                  name="caption"
-                  rows="4"
-                  maxlength="280"
-                  placeholder="Say what makes this worth opening."
-                  required
-                ></textarea>
-              </label>
-
-              <label>
-                Tags
-                <input
-                  id="tagsInput"
-                  name="tags"
-                  type="text"
-                  maxlength="80"
-                  placeholder="portrait, live set, backstage"
-                />
-              </label>
-
-              <label class="publish-field-wide">
-                Media Link
-                <input
-                  id="externalUrlInput"
-                  name="externalUrl"
-                  type="url"
-                  maxlength="300"
-                  placeholder="Paste a YouTube or Spotify link instead of uploading a file"
-                />
-              </label>
-
-              <p class="field-help" id="sourceHelp">
-                Use one source per post: upload a file, or paste a YouTube / Spotify link.
-              </p>
-
-              <div class="dropzone" id="dropzone" tabindex="0" role="button">
-                <input
-                  id="mediaInput"
-                  name="media"
-                  type="file"
-                  accept="image/*,video/*,audio/*"
-                  hidden
-                />
-                <div class="dropzone-graphic" aria-hidden="true">
-                  <span class="dropzone-tile dropzone-tile-primary"></span>
-                  <span class="dropzone-tile dropzone-tile-secondary"></span>
-                  <span class="dropzone-tile dropzone-tile-tertiary"></span>
-                </div>
-                <div class="dropzone-copy">
-                  <p class="dropzone-title">Drop media here</p>
-                  <p>Or click to choose an image, video, or audio file.</p>
-                  <span class="dropzone-note">Up to 50 GB per post</span>
-                </div>
-                <div class="preview-shell" id="previewShell" hidden></div>
+            <div class="publish-modal-body">
+              <div class="publish-context-banner">
+                <h2 id="publishDestinationTitle">Signal Share feed</h2>
+                <p id="publishDestinationCopy">Create a live or local feed post with the media source below.</p>
               </div>
 
-                  <div class="form-actions">
-                    <button class="button button-primary" type="submit">
-                      Publish post
-                    </button>
-                    <button
-                      class="button button-secondary"
-                      type="button"
-                      id="resetFormButton"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </form>
+              <div class="publish-section-label">
+                <span>Choose a destination</span>
+                <small>Pick the route first</small>
+              </div>
+              <div class="publish-family-grid" id="publishFamilyGrid" aria-label="Publish destinations">
+                <button class="publish-family-button is-active" type="button" data-publish-family="signal">
+                  <span class="publish-family-icon" aria-hidden="true">&#128227;</span>
+                  <strong>Signal Feed</strong>
+                  <small>Publish to the feed.</small>
+                </button>
+                <button class="publish-family-button" type="button" data-publish-family="local">
+                  <span class="publish-family-icon" aria-hidden="true">&#128190;</span>
+                  <strong>Local Storage</strong>
+                  <small>Save drafts and bundles.</small>
+                </button>
+                <button class="publish-family-button" type="button" data-publish-family="social">
+                  <span class="publish-family-icon" aria-hidden="true">&#128228;</span>
+                  <strong>Social</strong>
+                  <small>Share to social routes.</small>
+                </button>
+                <button class="publish-family-button" type="button" data-publish-family="github">
+                  <span class="publish-family-icon" aria-hidden="true">&#128451;</span>
+                  <strong>GitHub</strong>
+                  <small>Commit, issue, or PR.</small>
+                </button>
+                <button class="publish-family-button" type="button" data-publish-family="cloud">
+                  <span class="publish-family-icon" aria-hidden="true">&#9729;</span>
+                  <strong>Cloud Sync</strong>
+                  <small>Package and hand off.</small>
+                </button>
+                <button class="publish-family-button" type="button" data-publish-family="email">
+                  <span class="publish-family-icon" aria-hidden="true">&#128231;</span>
+                  <strong>Email</strong>
+                  <small>Compose delivery.</small>
+                </button>
+              </div>
 
-                <div class="publish-studio-actions">
-                  <button class="button button-primary" id="publishStudioActionButton" type="button">
-                    Publish to feed
-                  </button>
-                  <button class="button button-secondary" id="publishShareSheetButton" type="button">
-                    Share sheet
-                  </button>
+              <div class="publish-section-label">
+                <span>Choose an option</span>
+                <small id="publishSelectedAction">Feed post</small>
+              </div>
+              <div class="publish-option-grid" id="publishOptionGrid"></div>
+
+              <div class="publish-section-label">
+                <span>Details</span>
+                <small>Choose one or more options in this destination.</small>
+              </div>
+              <label class="publish-field publish-github-repo" id="publishGithubRepoField" hidden>
+                <span>GitHub repository</span>
+                <input
+                  id="publishGithubRepoInput"
+                  type="url"
+                  inputmode="url"
+                  autocomplete="url"
+                  placeholder="https://github.com/owner/repo"
+                />
+              </label>
+
+              <form id="postForm" class="post-form publish-details-form">
+                <div class="publish-field-grid">
+                  <label class="publish-field">
+                    <span>Creator</span>
+                    <input
+                      id="creatorInput"
+                      name="creator"
+                      type="text"
+                      maxlength="40"
+                      placeholder="Your display name"
+                      required
+                    />
+                  </label>
+
+                  <label class="publish-field">
+                    <span>Title</span>
+                    <input
+                      id="titleInput"
+                      name="title"
+                      type="text"
+                      maxlength="70"
+                      placeholder="Name the drop"
+                      required
+                    />
+                  </label>
+
+                  <label class="publish-field">
+                    <span>Tags</span>
+                    <input
+                      id="tagsInput"
+                      name="tags"
+                      type="text"
+                      maxlength="80"
+                      placeholder="portrait, live set, backstage"
+                    />
+                  </label>
+
+                  <label class="publish-field">
+                    <span>Media Link</span>
+                    <input
+                      id="externalUrlInput"
+                      name="externalUrl"
+                      type="url"
+                      maxlength="300"
+                      placeholder="Paste a YouTube or Spotify link instead of uploading a file"
+                    />
+                  </label>
+                </div>
+
+                <label class="publish-field publish-message-field">
+                  <span>Caption</span>
+                  <textarea
+                    id="captionInput"
+                    name="caption"
+                    rows="4"
+                    maxlength="280"
+                    placeholder="Say what makes this worth opening."
+                    required
+                  ></textarea>
+                </label>
+
+                <p class="field-help" id="sourceHelp">
+                  Use one source per post: upload a file, or paste a YouTube / Spotify link.
+                </p>
+
+                <div class="dropzone" id="dropzone" tabindex="0" role="button">
+                  <input
+                    id="mediaInput"
+                    name="media"
+                    type="file"
+                    accept="image/*,video/*,audio/*"
+                    hidden
+                  />
+                  <div class="dropzone-graphic" aria-hidden="true">
+                    <span class="dropzone-tile dropzone-tile-primary"></span>
+                    <span class="dropzone-tile dropzone-tile-secondary"></span>
+                    <span class="dropzone-tile dropzone-tile-tertiary"></span>
+                  </div>
+                  <div class="dropzone-copy">
+                    <p class="dropzone-title">Drop media here</p>
+                    <p>Or click to choose an image, video, or audio file.</p>
+                    <span class="dropzone-note">Up to 50 GB per post</span>
+                  </div>
+                  <div class="preview-shell" id="previewShell" hidden></div>
+                </div>
+
+                <div class="publish-hint-row">
+                  <span id="publishSelectedHint">This uses the current Signal Share publish and moderation flow.</span>
+                  <button class="publish-reset-btn" type="button" id="resetFormButton">Reset details</button>
                 </div>
 
                 <p
@@ -751,7 +744,16 @@
                   role="status"
                   aria-live="polite"
                 ></p>
-              </div>
+              </form>
+            </div>
+
+            <div class="publish-modal-actions">
+              <button class="button button-secondary" id="publishShareSheetButton" type="button">
+                Share sheet
+              </button>
+              <button class="button button-primary" id="publishStudioActionButton" type="button">
+                Publish to feed
+              </button>
             </div>
           </div>
         </section>

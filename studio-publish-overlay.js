@@ -30,7 +30,7 @@
       options: [
         {
           id: "signal-feed",
-          mark: "SS",
+          mark: "📣",
           label: "Feed post",
           hint: "Use the existing post pipeline.",
           actionLabel: "Publish to feed",
@@ -45,7 +45,7 @@
       options: [
         {
           id: "local-storage",
-          mark: "LS",
+          mark: "💾",
           label: "Local Storage",
           hint: "Save a browser draft.",
           actionLabel: "Save local draft",
@@ -53,7 +53,7 @@
         },
         {
           id: "browser-cache",
-          mark: "BC",
+          mark: "📦",
           label: "Browser Cache",
           hint: "Hold a session draft.",
           actionLabel: "Cache this draft",
@@ -61,7 +61,7 @@
         },
         {
           id: "export-bundle",
-          mark: "EX",
+          mark: "⬇️",
           label: "Export bundle",
           hint: "Download a JSON manifest.",
           actionLabel: "Download bundle",
@@ -76,7 +76,7 @@
       options: [
         {
           id: "social-facebook",
-          mark: "FB",
+          mark: "📘",
           label: "Facebook",
           hint: "Open the web share flow.",
           actionLabel: "Open Facebook",
@@ -84,7 +84,7 @@
         },
         {
           id: "social-instagram",
-          mark: "IG",
+          mark: "📸",
           label: "Instagram",
           hint: "Share file or copy the kit.",
           actionLabel: "Share for Instagram",
@@ -92,7 +92,7 @@
         },
         {
           id: "social-x",
-          mark: "X",
+          mark: "✕",
           label: "X",
           hint: "Open a post intent.",
           actionLabel: "Open X post",
@@ -100,7 +100,7 @@
         },
         {
           id: "social-linkedin",
-          mark: "IN",
+          mark: "💼",
           label: "LinkedIn",
           hint: "Open link sharing.",
           actionLabel: "Open LinkedIn",
@@ -115,7 +115,7 @@
       options: [
         {
           id: "github-commit",
-          mark: "GP",
+          mark: "📝",
           label: "Commit and Push",
           hint: "Prepare a commit bundle.",
           actionLabel: "Prepare commit bundle",
@@ -123,7 +123,7 @@
         },
         {
           id: "github-issue",
-          mark: "IS",
+          mark: "🐛",
           label: "Create Issue",
           hint: "Open a prefilled issue.",
           actionLabel: "Create GitHub issue",
@@ -131,7 +131,7 @@
         },
         {
           id: "github-pr",
-          mark: "PR",
+          mark: "🤝",
           label: "Pull Request",
           hint: "Open compare flow.",
           actionLabel: "Open pull request flow",
@@ -146,7 +146,7 @@
       options: [
         {
           id: "cloud-drive",
-          mark: "DR",
+          mark: "☁️",
           label: "Sync to Drive",
           hint: "Package and open Drive.",
           actionLabel: "Open Drive handoff",
@@ -154,7 +154,7 @@
         },
         {
           id: "cloud-upload",
-          mark: "UP",
+          mark: "⬆️",
           label: "Upload Files",
           hint: "Choose source media.",
           actionLabel: "Choose media file",
@@ -162,7 +162,7 @@
         },
         {
           id: "cloud-folder",
-          mark: "SH",
+          mark: "📤",
           label: "Share Folder",
           hint: "Use share sheet or copy.",
           actionLabel: "Share package",
@@ -177,7 +177,7 @@
       options: [
         {
           id: "email-send",
-          mark: "TO",
+          mark: "✉️",
           label: "Send Email",
           hint: "Open a new message.",
           actionLabel: "Compose email",
@@ -185,7 +185,7 @@
         },
         {
           id: "email-share",
-          mark: "SH",
+          mark: "📧",
           label: "Share via Email",
           hint: "Include the share URL.",
           actionLabel: "Email share link",
@@ -193,7 +193,7 @@
         },
         {
           id: "email-forward",
-          mark: "FW",
+          mark: "↪️",
           label: "Forward Message",
           hint: "Package as a forward.",
           actionLabel: "Forward by email",
@@ -607,18 +607,15 @@
       button.dataset.publishOption = option.id;
 
       const mark = document.createElement("span");
-      mark.className = "publish-option-mark";
+      mark.className = "publish-option-icon";
       mark.textContent = option.mark;
 
-      const text = document.createElement("span");
-      text.className = "publish-option-copy";
       const label = document.createElement("strong");
       label.textContent = option.label;
-      const hint = document.createElement("span");
+      const hint = document.createElement("small");
       hint.textContent = option.hint;
-      text.append(label, hint);
 
-      button.append(mark, text);
+      button.append(mark, label, hint);
       button.addEventListener("click", () => toggleOption(option.id));
       return button;
     }));
