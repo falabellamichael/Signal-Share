@@ -673,3 +673,198 @@ body[data-theme="contrast"] #compose .publish-family-button,
     width: 100%;
   }
 }
+
+/* Recent Drafts & Activity section */
+.publish-drafts-section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--publish-border);
+}
+
+.drafts-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  align-items: center;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+#compose .drafts-btn-small {
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--publish-border);
+  background: var(--publish-button-soft);
+  color: var(--publish-text);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#compose .drafts-btn-small:hover {
+  background: var(--publish-button-soft-hover);
+  border-color: var(--publish-border-strong);
+}
+
+#compose .drafts-btn-small.delete-selected {
+  color: #ef4444;
+  border-color: color-mix(in srgb, #ef4444 30%, var(--publish-border));
+  background: color-mix(in srgb, #ef4444 8%, transparent);
+}
+
+#compose .drafts-btn-small.delete-selected:hover {
+  background: color-mix(in srgb, #ef4444 15%, transparent);
+  border-color: #ef4444;
+}
+
+.drafts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.draft-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--publish-border);
+  border-radius: 16px;
+  background: var(--publish-field);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.draft-item:hover {
+  border-color: var(--publish-border-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+#compose.is-generic-dark .draft-item:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.draft-item.is-selected {
+  border-color: var(--publish-primary);
+  background: color-mix(in srgb, var(--publish-primary) 5%, var(--publish-field));
+}
+
+.draft-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.draft-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1px solid var(--publish-border);
+  cursor: pointer;
+  accent-color: var(--publish-primary);
+}
+
+.draft-icon-badge {
+  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: var(--publish-button-soft);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.draft-content-info {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.draft-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.draft-dest-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--publish-text);
+}
+
+.draft-time {
+  font-size: 11px;
+  color: var(--publish-muted);
+}
+
+.draft-snippet {
+  font-size: 13px;
+  color: var(--publish-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.draft-actions-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.draft-action-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--publish-border);
+  border-radius: 10px;
+  background: var(--publish-button-soft);
+  color: var(--publish-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 14px;
+}
+
+.draft-action-icon-btn:hover {
+  background: var(--publish-button-soft-hover);
+  border-color: var(--publish-border-strong);
+}
+
+.draft-action-icon-btn.load-btn:hover {
+  color: var(--publish-primary);
+  border-color: var(--publish-primary);
+}
+
+.draft-action-icon-btn.send-btn:hover {
+  color: #10b981;
+  border-color: #10b981;
+}
+
+.draft-action-icon-btn.delete-btn:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.drafts-empty-state {
+  padding: 24px;
+  text-align: center;
+  color: var(--publish-muted);
+  font-size: 14px;
+  border: 1px dashed var(--publish-border);
+  border-radius: 16px;
+  margin-top: 8px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

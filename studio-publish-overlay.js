@@ -351,9 +351,20 @@
     items.unshift(record);
     localStorage.setItem(ACTIVITY_KEY, JSON.stringify(items.slice(0, 12)));
     window.dispatchEvent(new CustomEvent("signal-share:publish-activity", { detail: record }));
+    if (typeof renderDrafts === "function") renderDrafts();
   }
   function activity(family, option, item) {
-    return { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), category: family.title, option: option.name, message: item.message, details: item.details, source: item.source || { kind: "workflow" }, createdAt: new Date().toISOString() };
+    return {
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      familyId: activeFamilyId,
+      optionIds: selectedOptions().map((o) => o.id),
+      category: family.title,
+      option: option.name,
+      message: item.message,
+      details: item.details,
+      source: item.source || { kind: "workflow" },
+      createdAt: new Date().toISOString()
+    };
   }
   function selectedActivityOption(options) {
     if (options.length === 1) return options[0];
@@ -622,6 +633,8 @@
         toast(isSession ? "Saved to session storage" : "Saved to local storage");
       } else if (activeFamilyId === "social") {
         if (item.details.socialDeliveryMode === "draft") {
+          saveActivity(record);
+          activitySaved = true;
           toast(options.length === 1 ? "Social draft saved" : `${options.length} Social drafts saved`);
         } else {
           saveActivity(record);
@@ -958,6 +971,494 @@
     syncDark(next);
     localStorage.setItem(DARK_KEY, next ? "true" : "false");
   });
+
+  // --- Drafts & Activity Manager ---
+  const draftsList = $("#draftsList");
+  const draftsCount = $("#draftsCount");
+  const draftsActionsRow = $("#draftsActionsRow");
+  const sendSelectedDraftsBtn = $("#sendSelectedDraftsBtn");
+  const deleteSelectedDraftsBtn = $("#deleteSelectedDraftsBtn");
+
+  function getFamilyIdFromCategory(category) {
+    const cat = String(category || "").toLowerCase();
+    if (cat.includes("feed") || cat.includes("signal")) return "signal";
+    if (cat.includes("local")) return "local";
+    if (cat.includes("social")) return "social";
+    if (cat.includes("github")) return "github";
+    if (cat.includes("cloud")) return "cloud";
+    if (cat.includes("email")) return "email";
+    return "signal";
+  }
+
+  function getOptionIdFromName(familyId, optionName) {
+    const opt = String(optionName || "").toLowerCase();
+    const family = families[familyId];
+    if (!family) return "";
+    const found = family.options.find(o => o.name.toLowerCase().includes(opt) || opt.includes(o.name.toLowerCase()));
+    return found ? found.id : family.options[0]?.id || "";
+  }
+
+  function getDraftIcon(draft) {
+    const optId = draft.optionIds?.[0] || "";
+    if (optId.includes("facebook")) return "📘";
+    if (optId.includes("instagram")) return "📸";
+    if (optId.includes("x")) return "✕";
+    if (optId.includes("linkedin")) return "💼";
+    if (optId.includes("commit")) return "📝";
+    if (optId.includes("issue")) return "🐛";
+    if (optId.includes("pullRequest")) return "🤝";
+    if (optId.includes("downloadBackup")) return "⬇️";
+    if (optId.includes("importJson")) return "⬆️";
+    if (optId.includes("share")) return "📤";
+    if (optId.includes("sendEmail")) return "✉️";
+    if (optId.includes("copyEmail")) return "📋";
+    if (optId.includes("forward")) return "↪️";
+    if (optId.includes("localStorage")) return "💾";
+    if (optId.includes("sessionStorage")) return "📦";
+    
+    const familyId = draft.familyId || getFamilyIdFromCategory(draft.category);
+    switch(familyId) {
+      case "signal": return "📣";
+      case "local": return "💾";
+      case "social": return "🌐";
+      case "github": return "💻";
+      case "cloud": return "☁️";
+      case "email": return "✉️";
+      default: return "📝";
+    }
+  }
+
+  function getDraftSnippet(draft) {
+    if (draft.message) return draft.message;
+    if (draft.details) {
+      return draft.details.body || draft.details.emailBody || draft.details.issueBody || draft.details.prBody || draft.details.commitMessage || "";
+    }
+    return "";
+  }
+
+  function timeAgo(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    if (seconds < 5) return "Just now";
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+  }
+
+  function updateSelectedActionsRow() {
+    if (!draftsActionsRow) return;
+    const checked = Array.from(draftsList.querySelectorAll(".draft-checkbox:checked"));
+    if (checked.length > 0) {
+      draftsActionsRow.style.display = "flex";
+    } else {
+      draftsActionsRow.style.display = "none";
+    }
+  }
+
+  function renderDrafts() {
+    if (!draftsList) return;
+    const items = activities();
+    
+    if (draftsCount) {
+      draftsCount.textContent = items.length === 1 ? "1 activity/draft" : `${items.length} activities/drafts`;
+    }
+
+    if (items.length === 0) {
+      draftsList.replaceChildren();
+      const emptyState = document.createElement("div");
+      emptyState.className = "drafts-empty-state";
+      emptyState.textContent = "No recent activity or drafts. Your saved workflows will appear here.";
+      draftsList.append(emptyState);
+      updateSelectedActionsRow();
+      return;
+    }
+
+    draftsList.replaceChildren(...items.map((draft) => {
+      const item = document.createElement("div");
+      item.className = "draft-item";
+      item.dataset.id = draft.id;
+
+      // Checkbox
+      const checkWrapper = document.createElement("div");
+      checkWrapper.className = "draft-checkbox-wrapper";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "draft-checkbox";
+      checkbox.dataset.id = draft.id;
+      checkbox.addEventListener("change", () => {
+        item.classList.toggle("is-selected", checkbox.checked);
+        updateSelectedActionsRow();
+      });
+      checkWrapper.append(checkbox);
+
+      // Icon
+      const icon = document.createElement("div");
+      icon.className = "draft-icon-badge";
+      icon.textContent = getDraftIcon(draft);
+
+      // Content info
+      const info = document.createElement("div");
+      info.className = "draft-content-info";
+      
+      const metaRow = document.createElement("div");
+      metaRow.className = "draft-meta-row";
+      
+      const badgeEl = document.createElement("span");
+      badgeEl.className = "draft-dest-badge";
+      badgeEl.textContent = draft.option || draft.category || "Workflow draft";
+      
+      const timeEl = document.createElement("span");
+      timeEl.className = "draft-time";
+      timeEl.textContent = timeAgo(draft.createdAt);
+      metaRow.append(badgeEl, timeEl);
+
+      const snippetEl = document.createElement("div");
+      snippetEl.className = "draft-snippet";
+      snippetEl.textContent = getDraftSnippet(draft);
+      info.append(metaRow, snippetEl);
+
+      // Actions
+      const actionsCell = document.createElement("div");
+      actionsCell.className = "draft-actions-cell";
+
+      const loadBtn = document.createElement("button");
+      loadBtn.className = "draft-action-icon-btn load-btn";
+      loadBtn.title = "Load into composer";
+      loadBtn.type = "button";
+      loadBtn.textContent = "✏️";
+      loadBtn.addEventListener("click", () => populateForm(draft));
+
+      const sendBtn = document.createElement("button");
+      sendBtn.className = "draft-action-icon-btn send-btn";
+      sendBtn.title = "Send to app as draft";
+      sendBtn.type = "button";
+      sendBtn.textContent = "⚡";
+      sendBtn.addEventListener("click", () => void runActionForDraft(draft));
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "draft-action-icon-btn delete-btn";
+      deleteBtn.title = "Delete draft";
+      deleteBtn.type = "button";
+      deleteBtn.textContent = "🗑️";
+      deleteBtn.addEventListener("click", () => deleteDraft(draft.id));
+
+      actionsCell.append(loadBtn, sendBtn, deleteBtn);
+      item.append(checkWrapper, icon, info, actionsCell);
+      return item;
+    }));
+
+    updateSelectedActionsRow();
+  }
+
+  function populateForm(draft) {
+    if (!draft) return;
+    
+    const familyId = draft.familyId || getFamilyIdFromCategory(draft.category);
+    if (families[familyId]) {
+      renderFamily(familyId);
+      
+      const optionIds = draft.optionIds || [getOptionIdFromName(familyId, draft.option)];
+      const selectedIds = new Set(optionIds.filter(Boolean));
+      if (selectedIds.size > 0) {
+        selectedByFamily.set(familyId, selectedIds);
+      }
+      syncSelectedOptions();
+    }
+    
+    const family = activeFamily();
+    if (family.usesPostComposer) {
+      if ($("#creatorInput")) $("#creatorInput").value = draft.creator || "";
+      if ($("#titleInput")) $("#titleInput").value = draft.title || "";
+      if ($("#captionInput")) $("#captionInput").value = draft.caption || "";
+      if ($("#tagsInput")) $("#tagsInput").value = draft.tags || "";
+      if ($("#externalUrlInput")) $("#externalUrlInput").value = draft.externalUrl || "";
+    }
+    
+    if (draft.details) {
+      const fields = selectedFields();
+      fields.forEach((config) => {
+        const value = draft.details[config.key] ?? "";
+        const input = document.getElementById(config.id);
+        if (input) {
+          input.value = value;
+        }
+        if (config.persist && config.storageKey) {
+          if (value) {
+            localStorage.setItem(config.storageKey, value);
+          } else {
+            localStorage.removeItem(config.storageKey);
+          }
+        }
+      });
+    }
+    
+    toast("Draft loaded into composer");
+  }
+
+  async function runActionForDraft(draftRecord) {
+    const familyId = draftRecord.familyId || getFamilyIdFromCategory(draftRecord.category);
+    const family = families[familyId];
+    if (!family) return;
+    
+    const optionIds = draftRecord.optionIds || [getOptionIdFromName(familyId, draftRecord.option)];
+    const options = family.options.filter(o => optionIds.includes(o.id));
+    if (options.length === 0) return;
+    const option = options[0];
+    
+    const item = {
+      creator: draftRecord.creator || "",
+      title: draftRecord.title || "",
+      caption: draftRecord.caption || "",
+      tags: draftRecord.tags || "",
+      externalUrl: draftRecord.externalUrl || "",
+      message: draftRecord.message || "",
+      details: draftRecord.details || {},
+      source: draftRecord.source || { kind: "link" }
+    };
+    
+    try {
+      if (familyId === "local") {
+        const isSession = option.id === "sessionStorage";
+        const key = isSession ? item.details.sessionKey : item.details.localKey;
+        const storage = isSession ? sessionStorage : localStorage;
+        const items = readJson(storage.getItem(key), []);
+        items.unshift(draftRecord);
+        storage.setItem(key, JSON.stringify(items.slice(0, 50)));
+        toast(isSession ? "Saved to session storage" : "Saved to local storage");
+      } else if (familyId === "social") {
+        const xOption = options.find((o) => socialProviderId(o) === "x");
+        const apiOptions = options.filter((o) => socialProviderId(o) !== "x");
+        
+        if (xOption) {
+          const text = encodeURIComponent(item.details.body || item.message || "");
+          const url = encodeURIComponent(item.details.shareUrl || "");
+          window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
+        }
+        
+        if (apiOptions.length > 0) {
+          await publishSocialOptions(apiOptions, item);
+        }
+        
+        toast(options.length === 1 ? "Social post completed" : `${options.length} Social posts completed`);
+      } else if (familyId === "github") {
+        const url = repoUrl(item.details.repoUrl);
+        if (!url) {
+          toast("Invalid GitHub repository URL in draft");
+          return;
+        }
+        const base = branch(item.details.baseBranch || "main", "main");
+        if (option.id === "commit") {
+          const rawHead = (item.details.branchName || "").trim();
+          const head = rawHead ? branch(rawHead) : "";
+          const remote = branch(item.details.remoteName || "origin", "origin");
+          const repoName = url.split("/").pop();
+          const files = item.details.filesToStage || ".";
+          const lines = [
+            `git clone ${url}.git`,
+            `cd ${repoName}`,
+            `git checkout ${base}`,
+            `git pull ${remote} ${base}`
+          ];
+
+          if (head && head !== base) {
+            lines.push(`git checkout -b ${head}`);
+          }
+
+          lines.push(
+            `# Copy your modified files to this directory now, then run:`,
+            `git add ${files}`,
+            `git commit -m ${quote(item.details.commitMessage)}`
+          );
+
+          if (head && head !== base) {
+            lines.push(`git push -u ${remote} ${head}`);
+          } else {
+            lines.push(`git push ${remote} ${base}`);
+          }
+
+          await copyText(lines.join("\n"));
+          toast("Git clone/commit/push command copied");
+        } else if (option.id === "issue") {
+          const params = new URLSearchParams({ title: item.details.issueTitle, body: item.details.issueBody });
+          if (item.details.issueLabels) params.set("labels", item.details.issueLabels);
+          if (item.details.issueAssignees) params.set("assignees", item.details.issueAssignees);
+          window.open(`${url}/issues/new?${params.toString()}`, "_blank", "noopener,noreferrer");
+          toast("GitHub issue page opened");
+        } else {
+          const head = branch(item.details.branchName || "feature/publish-workflow", "feature/publish-workflow");
+          const params = new URLSearchParams({ quick_pull: "1", title: item.details.prTitle, body: item.details.prBody });
+          if (item.details.prDraft === "draft") params.set("draft", "1");
+          window.open(`${url}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?${params.toString()}`, "_blank", "noopener,noreferrer");
+          toast("GitHub PR page opened");
+        }
+      } else if (familyId === "cloud") {
+        if (option.id === "downloadBackup") {
+          downloadJson({ exportedAt: new Date().toISOString(), label: item.details.backupLabel || "Signal Share workflow backup", currentItem: draftRecord, recentActivity: activities() }, item.details.backupFileName);
+          toast("JSON backup downloaded");
+        } else if (option.id === "importJson") {
+          const parsed = readJson(item.details.importJson, null);
+          if (!parsed) { toast("Invalid JSON payload in draft"); return; }
+          const imported = Array.isArray(parsed) ? parsed : parsed.recentActivity || parsed.items || [];
+          if (!Array.isArray(imported)) { toast("JSON must contain an activity array"); return; }
+          const existing = item.details.importMode === "append" ? activities() : [];
+          localStorage.setItem(ACTIVITY_KEY, JSON.stringify([...imported, ...existing].slice(0, 20)));
+          toast("Activity imported");
+          renderDrafts();
+        } else {
+          if (navigator.share) await navigator.share({ title: item.details.shareTitle || "Signal Share workflow", text: item.details.body, url: shareUrl(item) });
+          else await copyText([item.details.shareTitle, item.details.body, shareUrl(item)].filter(Boolean).join("\n\n"));
+          toast("Share payload prepared");
+        }
+      } else if (familyId === "email") {
+        const from = item.details.emailFrom || "";
+        const to = item.details.emailTo || "";
+        const subject = item.details.emailSubject || "Project update";
+        
+        let body = item.details.emailBody || "";
+        if (option.id === "forward") {
+          const forwardHeaders = [
+            "Forwarded message:",
+            item.details.originalFrom && `Original from: ${item.details.originalFrom}`
+          ].filter(Boolean);
+          body = [...forwardHeaders, "", item.details.emailBody || ""].join("\n");
+        }
+
+        if (option.id === "copyEmail") {
+          const headers = [
+            from && `From: ${from}`,
+            to && `To: ${to}`,
+            item.details.replyTo && `Reply-To: ${item.details.replyTo}`,
+            `Subject: ${subject}`
+          ].filter(Boolean);
+          await copyText([...headers, "", body].join("\n"));
+          toast("Email draft copied");
+        } else {
+          const isNative = typeof window.Capacitor !== "undefined" &&
+                           typeof window.Capacitor.getPlatform === "function" &&
+                           window.Capacitor.getPlatform() !== "web";
+          const isGmail = /@gmail\.com$/i.test(from.trim());
+
+          if (isGmail) {
+            const gmailParams = [
+              `view=cm`,
+              `tf=1`,
+              `to=${encodeURIComponent(to)}`,
+              `su=${encodeURIComponent(subject.replace(/\r?\n/g, "\r\n"))}`,
+              `body=${encodeURIComponent(body.replace(/\r?\n/g, "\r\n"))}`
+            ];
+            if (item.details.emailCc) gmailParams.push(`cc=${encodeURIComponent(item.details.emailCc)}`);
+            if (item.details.emailBcc) gmailParams.push(`bcc=${encodeURIComponent(item.details.emailBcc)}`);
+            
+            const composeUrl = `https://mail.google.com/mail/u/${encodeURIComponent(from.trim())}/?${gmailParams.join("&")}`;
+            const chooserUrl = `https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(from.trim())}&continue=${encodeURIComponent(composeUrl)}`;
+
+            if (isNative) {
+              if (window.Capacitor?.Plugins?.App?.openUrl) {
+                window.Capacitor.Plugins.App.openUrl({ url: chooserUrl });
+              } else {
+                window.open(chooserUrl, "_blank", "noopener,noreferrer");
+              }
+            } else {
+              window.open(chooserUrl, "_blank", "noopener,noreferrer");
+            }
+            toast("Gmail composer opened");
+          } else {
+            const emailBody = [from && `From: ${from}`, body].filter(Boolean).join("\n\n");
+            const queryParts = [
+              `subject=${encodeURIComponent(subject.replace(/\r?\n/g, "\r\n"))}`,
+              `body=${encodeURIComponent(emailBody.replace(/\r?\n/g, "\r\n"))}`
+            ];
+            if (item.details.emailCc) queryParts.push(`cc=${encodeURIComponent(item.details.emailCc)}`);
+            if (item.details.emailBcc) queryParts.push(`bcc=${encodeURIComponent(item.details.emailBcc)}`);
+            const mailtoUrl = `mailto:${encodeURIComponent(to)}?${queryParts.join("&")}`;
+
+            if (isNative) {
+              if (window.Capacitor?.Plugins?.App?.openUrl) {
+                window.Capacitor.Plugins.App.openUrl({ url: mailtoUrl });
+              } else {
+                location.href = mailtoUrl;
+              }
+            } else {
+              location.href = mailtoUrl;
+            }
+            toast("Email composer opened");
+          }
+        }
+      }
+    } catch (e) {
+      toast(e.message || "Failed to execute draft action");
+    }
+  }
+
+  function deleteDraft(id) {
+    const items = activities();
+    const nextItems = items.filter(d => d.id !== id);
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(nextItems));
+    toast("Draft deleted");
+    renderDrafts();
+  }
+
+  function deleteMultipleDrafts(ids) {
+    const items = activities();
+    const nextItems = items.filter(d => !ids.includes(d.id));
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(nextItems));
+    toast(`${ids.length} drafts deleted`);
+    renderDrafts();
+  }
+
+  async function executeMultipleDrafts(draftIds) {
+    const items = activities();
+    const selectedDrafts = items.filter(d => draftIds.includes(d.id));
+    if (selectedDrafts.length === 0) return;
+    
+    toast(`Sending ${selectedDrafts.length} drafts to their apps...`);
+    for (const draft of selectedDrafts) {
+      await runActionForDraft(draft);
+      await new Promise(r => setTimeout(r, 600));
+    }
+  }
+
+  // Event Listeners for batch actions
+  sendSelectedDraftsBtn?.addEventListener("click", () => {
+    const checked = Array.from(draftsList.querySelectorAll(".draft-checkbox:checked"))
+      .map(cb => cb.dataset.id);
+    if (checked.length > 0) {
+      void executeMultipleDrafts(checked);
+    }
+  });
+
+  deleteSelectedDraftsBtn?.addEventListener("click", () => {
+    const checked = Array.from(draftsList.querySelectorAll(".draft-checkbox:checked"))
+      .map(cb => cb.dataset.id);
+    if (checked.length > 0) {
+      deleteMultipleDrafts(checked);
+    }
+  });
+
+  // Observe overlay open state to sync drafts list
+  if (overlay) {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === "class" || mutation.attributeName === "hidden") {
+          const isOpen = overlay.classList.contains("is-open") && !overlay.hidden;
+          if (isOpen) {
+            renderDrafts();
+          }
+        }
+      });
+    });
+    observer.observe(overlay, { attributes: true, attributeFilter: ["class", "hidden"] });
+  }
+
+  // Render initial drafts list
+  renderDrafts();
 
   syncDark(localStorage.getItem(DARK_KEY) === "true");
   renderFamily(activeFamilyId);

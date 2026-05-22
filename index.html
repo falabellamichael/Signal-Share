@@ -745,6 +745,27 @@
                   aria-live="polite"
                 ></p>
               </form>
+
+              <!-- Recent Drafts & Activity Section -->
+              <div class="publish-drafts-section" id="publishDraftsSection">
+                <div class="publish-section-label">
+                  <span>Recent Drafts & Activity</span>
+                  <small id="draftsCount">0 drafts</small>
+                </div>
+                
+                <div class="drafts-actions-row" id="draftsActionsRow" style="display: none;">
+                  <button class="button button-secondary drafts-btn-small" type="button" id="sendSelectedDraftsBtn">
+                    <span>⚡ Send Selected</span>
+                  </button>
+                  <button class="button button-secondary drafts-btn-small delete-selected" type="button" id="deleteSelectedDraftsBtn">
+                    <span>🗑️ Delete Selected</span>
+                  </button>
+                </div>
+
+                <div class="drafts-list" id="draftsList">
+                  <!-- Draft list items injected dynamically -->
+                </div>
+              </div>
             </div>
 
             <div class="publish-modal-actions">
