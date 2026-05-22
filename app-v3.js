@@ -67,7 +67,7 @@ import {
   normalizeSiteSettings,
   normalizeDirectThread,
   normalizeMessage
-} from './api-v3.js?v=1.26';
+} from './api-v3.js';
 
 // User helper functions moved to admin-v3.js
 
