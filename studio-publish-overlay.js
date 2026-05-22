@@ -11,211 +11,222 @@
   const feedback = document.querySelector("#publishDestinationFeedback");
   const postForm = document.querySelector("#postForm");
   const mediaInput = document.querySelector("#mediaInput");
-  const githubRepoField = document.querySelector("#publishGithubRepoField");
-  const githubRepoInput = document.querySelector("#publishGithubRepoInput");
   const publishOverlay = document.querySelector("#compose");
   const darkToggle = document.querySelector("#publishDarkToggle");
-  const GITHUB_REPO_KEY = "signal-share-publish-github-repo";
+  const legacyGithubRepoField = document.querySelector("#publishGithubRepoField");
+
+  const ACTIVITY_KEY = "signal-share-publish-activity";
+  const LOCAL_ITEMS_KEY = "signal-share-publish-saved-items";
+  const SESSION_ITEMS_KEY = "signal-share-publish-session-items";
   const DARK_MODE_KEY = "signal-share-publish-generic-dark";
-  const DRAFT_KEY = "signal-share-publish-draft";
-  const CACHE_KEY = "signal-share-publish-session-draft";
 
   if (!familyGrid || !optionGrid || !actionButton || !postForm) return;
+
+  legacyGithubRepoField?.setAttribute("hidden", "");
+
+  const dynamicFields = document.createElement("div");
+  dynamicFields.className = "publish-field-grid publish-dynamic-fields";
+  dynamicFields.id = "publishDynamicFields";
+  postForm.before(dynamicFields);
 
   const families = {
     signal: {
       badge: "Signal Share",
       title: "Signal Share feed",
-      copy: "Create a live or local feed post with the media source below.",
+      copy: "Create a post for the feed with the media source below.",
+      fields: [],
       options: [
         {
           id: "signal-feed",
-          mark: "📣",
-          label: "Feed post",
-          hint: "Use the existing post pipeline.",
-          actionLabel: "Publish to feed",
-          selectedHint: "This uses the current Signal Share publish and moderation flow.",
+          icon: "📣",
+          name: "Publish Feed Post",
+          note: "Use the live feed flow",
+          button: "Publish post",
+          hint: "Submits the current creator, title, caption, media, and tags through the existing Signal Share publish pipeline.",
         },
       ],
     },
     local: {
-      badge: "Local",
-      title: "Local storage",
-      copy: "Keep a draft, cache a tab copy, or export a portable package.",
+      badge: "Local Storage",
+      title: "Local Storage",
+      copy: "Pick where the browser should store this publish message. Persistent local storage survives reloads; session storage lasts until the tab closes.",
+      fields: [],
       options: [
         {
-          id: "local-storage",
-          mark: "💾",
-          label: "Local Storage",
-          hint: "Save a browser draft.",
-          actionLabel: "Save local draft",
-          selectedHint: "Store form text and source metadata in this browser.",
+          id: "localStorage",
+          icon: "💾",
+          name: "Local Storage",
+          note: "Persists in this browser",
+          button: "Save Locally",
+          hint: "Saves the publish message to localStorage and logs it in Recent activity.",
         },
         {
-          id: "browser-cache",
-          mark: "📦",
-          label: "Browser Cache",
-          hint: "Hold a session draft.",
-          actionLabel: "Cache this draft",
-          selectedHint: "Keep a recovery copy until this browser tab session ends.",
-        },
-        {
-          id: "export-bundle",
-          mark: "⬇️",
-          label: "Export bundle",
-          hint: "Download a JSON manifest.",
-          actionLabel: "Download bundle",
-          selectedHint: "Export title, caption, tags, links, and media metadata.",
-        },
-      ],
-    },
-    social: {
-      badge: "Social",
-      title: "Social posting",
-      copy: "Share out through supported web flows or the device share sheet.",
-      options: [
-        {
-          id: "social-facebook",
-          mark: "📘",
-          label: "Facebook",
-          hint: "Open the web share flow.",
-          actionLabel: "Open Facebook",
-          selectedHint: "Facebook receives a share URL through its browser share flow.",
-        },
-        {
-          id: "social-instagram",
-          mark: "📸",
-          label: "Instagram",
-          hint: "Share file or copy the kit.",
-          actionLabel: "Share for Instagram",
-          selectedHint: "Use the device share sheet when available, otherwise copy the post kit.",
-        },
-        {
-          id: "social-x",
-          mark: "✕",
-          label: "X",
-          hint: "Open a post intent.",
-          actionLabel: "Open X post",
-          selectedHint: "Build a post intent from the caption and share URL.",
-        },
-        {
-          id: "social-linkedin",
-          mark: "💼",
-          label: "LinkedIn",
-          hint: "Open link sharing.",
-          actionLabel: "Open LinkedIn",
-          selectedHint: "Share the current post URL through LinkedIn.",
+          id: "sessionStorage",
+          icon: "📦",
+          name: "Session Storage",
+          note: "Clears when tab closes",
+          button: "Save Session",
+          hint: "Saves the publish message to sessionStorage for this tab only.",
         },
       ],
     },
     github: {
       badge: "GitHub",
-      title: "GitHub handoff",
-      copy: "Prepare repo-ready content, open issues, or start a pull request route.",
+      title: "GitHub",
+      copy: "Configure a repository URL, then generate GitHub actions. Issue and PR options open GitHub pages; commit copies a ready-to-run command.",
+      fields: [
+        {
+          id: "publishRepoUrlInput",
+          key: "repoUrl",
+          label: "GitHub repository URL",
+          placeholder: "https://github.com/owner/repo",
+          storageKey: "signal-share-publish.repoUrl",
+          type: "url",
+        },
+        {
+          id: "publishBranchNameInput",
+          key: "branchName",
+          label: "Branch name",
+          placeholder: "feature/context-actions",
+          storageKey: "signal-share-publish.branchName",
+          type: "text",
+        },
+      ],
       options: [
         {
-          id: "github-commit",
-          mark: "📝",
-          label: "Commit and Push",
-          hint: "Prepare a commit bundle.",
-          actionLabel: "Prepare commit bundle",
-          selectedHint: "Downloads a markdown payload and copies a commit message.",
+          id: "commit",
+          icon: "📝",
+          name: "Commit & Push",
+          note: "Copy a git command",
+          button: "Copy Git Command",
+          hint: "Copies a safe git command using your publish message as the commit message.",
         },
         {
-          id: "github-issue",
-          mark: "🐛",
-          label: "Create Issue",
-          hint: "Open a prefilled issue.",
-          actionLabel: "Create GitHub issue",
-          selectedHint: "Use the repository field to open a prefilled GitHub issue.",
+          id: "issue",
+          icon: "🐛",
+          name: "Create Issue",
+          note: "Open new issue page",
+          button: "Open Issue",
+          hint: "Opens the configured repo issue page with title and body prefilled.",
         },
         {
-          id: "github-pr",
-          mark: "🤝",
-          label: "Pull Request",
-          hint: "Open compare flow.",
-          actionLabel: "Open pull request flow",
-          selectedHint: "Use the repository field to start GitHub compare and PR work.",
+          id: "pullRequest",
+          icon: "🤝",
+          name: "Pull Request",
+          note: "Open compare page",
+          button: "Open PR",
+          hint: "Opens the configured repo compare page. Add branch details below.",
         },
       ],
     },
     cloud: {
-      badge: "Cloud",
-      title: "Cloud sync",
-      copy: "Export or hand off content for cloud storage and device sharing.",
+      badge: "Cloud Sync",
+      title: "Cloud Sync",
+      copy: "Browser-only pages cannot silently write to private cloud accounts, so these actions use real browser capabilities: download, import, and native share.",
+      fields: [],
       options: [
         {
-          id: "cloud-drive",
-          mark: "☁️",
-          label: "Sync to Drive",
-          hint: "Package and open Drive.",
-          actionLabel: "Open Drive handoff",
-          selectedHint: "Download a bundle, then continue in Google Drive.",
+          id: "downloadBackup",
+          icon: "⬇️",
+          name: "Download Backup",
+          note: "Create JSON file",
+          button: "Download JSON",
+          hint: "Downloads the current publish message and recent activity as a JSON file.",
         },
         {
-          id: "cloud-upload",
-          mark: "⬆️",
-          label: "Upload Files",
-          hint: "Choose source media.",
-          actionLabel: "Choose media file",
-          selectedHint: "Use the existing media picker for an upload source.",
+          id: "importJson",
+          icon: "⬆️",
+          name: "Import JSON",
+          note: "Load backup text",
+          button: "Import JSON",
+          hint: "Paste a JSON backup into the caption box to import activity entries.",
         },
         {
-          id: "cloud-folder",
-          mark: "📤",
-          label: "Share Folder",
-          hint: "Use share sheet or copy.",
-          actionLabel: "Share package",
-          selectedHint: "Share the post kit to a supported device or clipboard.",
+          id: "share",
+          icon: "📤",
+          name: "Share",
+          note: "Use native share",
+          button: "Share Now",
+          hint: "Uses the Web Share API when available, otherwise copies the publish message.",
         },
       ],
     },
     email: {
       badge: "Email",
-      title: "Email delivery",
-      copy: "Build email handoffs from the current post copy.",
+      title: "Email",
+      copy: "Enter recipient and subject details, then open your default mail app with the content filled in.",
+      fields: [
+        {
+          id: "publishEmailToInput",
+          key: "emailTo",
+          label: "Recipient email",
+          placeholder: "name@example.com",
+          storageKey: "signal-share-publish.emailTo",
+          type: "email",
+        },
+        {
+          id: "publishEmailSubjectInput",
+          key: "emailSubject",
+          label: "Subject",
+          placeholder: "Quick update",
+          storageKey: "signal-share-publish.emailSubject",
+          type: "text",
+        },
+      ],
       options: [
         {
-          id: "email-send",
-          mark: "✉️",
-          label: "Send Email",
-          hint: "Open a new message.",
-          actionLabel: "Compose email",
-          selectedHint: "Start a mail draft with the post title and copy.",
+          id: "sendEmail",
+          icon: "✉️",
+          name: "Send Email",
+          note: "Open mail app",
+          button: "Compose Email",
+          hint: "Opens a mailto draft with recipient, subject, and body.",
         },
         {
-          id: "email-share",
-          mark: "📧",
-          label: "Share via Email",
-          hint: "Include the share URL.",
-          actionLabel: "Email share link",
-          selectedHint: "Send the caption, source link, and page link.",
+          id: "copyEmail",
+          icon: "📋",
+          name: "Copy Email",
+          note: "Copy draft",
+          button: "Copy Draft",
+          hint: "Copies a clean email draft to your clipboard.",
         },
         {
-          id: "email-forward",
-          mark: "↪️",
-          label: "Forward Message",
-          hint: "Package as a forward.",
-          actionLabel: "Forward by email",
-          selectedHint: "Create a forward-style mail draft from this package.",
+          id: "forward",
+          icon: "↪️",
+          name: "Forward Message",
+          note: "Forward format",
+          button: "Compose Forward",
+          hint: "Opens a mailto draft formatted as a forwarded message.",
         },
       ],
     },
   };
 
-  let activeFamilyId = "signal";
-  const selectedOptionIdsByFamily = new Map(
-    Object.entries(families).map(([familyId, family]) => [familyId, new Set([family.options[0].id])]),
+  let activeFamilyId = families.signal ? "signal" : "local";
+  const selectedOptionByFamily = new Map(
+    Object.entries(families).map(([familyId, family]) => [familyId, family.options[0].id]),
   );
 
-  function getState() {
-    return window.state ?? window.__SIGNAL_SHARE_STATE__ ?? null;
+  function readJson(value, fallback) {
+    try {
+      return value ? JSON.parse(value) : fallback;
+    } catch {
+      return fallback;
+    }
   }
 
-  function showDestinationFeedback(message, isError = false) {
+  function writeFeedback(message, isError = false) {
     if (!feedback) return;
     feedback.textContent = message;
     feedback.classList.toggle("is-error", isError);
+  }
+
+  function showToast(message) {
+    if (window.SignalShareToast?.show) {
+      window.SignalShareToast.show(message);
+      return;
+    }
+    writeFeedback(message);
   }
 
   function syncPublishDarkMode(isDark) {
@@ -231,20 +242,43 @@
     return `${document.querySelector(selector)?.value || ""}`.trim();
   }
 
-  function getShareUrl(draft) {
-    return draft.externalUrl || `${window.location.origin}${window.location.pathname}`;
+  function getFieldValues(family) {
+    return family.fields.reduce((values, field) => {
+      const input = document.getElementById(field.id);
+      values[field.key] = input ? `${input.value || ""}`.trim() : "";
+      return values;
+    }, {});
+  }
+
+  function getState() {
+    return window.state ?? window.__SIGNAL_SHARE_STATE__ ?? null;
+  }
+
+  function getMessage() {
+    const titleValue = getValue("#titleInput");
+    const captionValue = getValue("#captionInput");
+    const tagsValue = getValue("#tagsInput");
+    const sourceValue = getValue("#externalUrlInput");
+    const parts = [];
+    if (titleValue) parts.push(titleValue);
+    if (captionValue) parts.push(captionValue);
+    if (tagsValue) parts.push(`Tags: ${tagsValue}`);
+    if (sourceValue) parts.push(`Source: ${sourceValue}`);
+    return parts.join("\n\n").trim();
   }
 
   function getDraft() {
-    const state = getState();
-    const selectedFile = state?.selectedFile ?? null;
-    const creator = getValue("#creatorInput") || window.getDefaultProfileName?.() || "";
+    const selectedFile = getState()?.selectedFile ?? null;
+    const family = families[activeFamilyId];
+    const message = getMessage();
     return {
-      creator,
+      creator: getValue("#creatorInput") || window.getDefaultProfileName?.() || "",
       title: getValue("#titleInput"),
       caption: getValue("#captionInput"),
       tags: getValue("#tagsInput"),
       externalUrl: getValue("#externalUrlInput"),
+      message,
+      details: getFieldValues(family),
       source: selectedFile
         ? {
             kind: "file",
@@ -256,373 +290,338 @@
             kind: "link",
           },
       file: selectedFile,
-      exportedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
     };
   }
 
-  function getDraftPayload(draft) {
-    const { file, ...payload } = draft;
-    return payload;
+  function getShareUrl(draft) {
+    return draft.externalUrl || `${window.location.origin}${window.location.pathname}`;
   }
 
-  function getPostKit(draft) {
-    const parts = [];
-    if (draft.title) parts.push(draft.title);
-    if (draft.caption) parts.push(draft.caption);
-    if (draft.creator) parts.push(`By ${draft.creator}`);
-    if (draft.tags) parts.push(`Tags: ${draft.tags}`);
-    if (draft.externalUrl) parts.push(`Source: ${draft.externalUrl}`);
-    parts.push(`Share: ${getShareUrl(draft)}`);
-    return parts.join("\n\n");
+  function getActivity() {
+    return readJson(localStorage.getItem(ACTIVITY_KEY), []);
   }
 
-  function requireDraftCopy(draft) {
-    if (draft.title || draft.caption || draft.externalUrl || draft.file) return true;
-    showDestinationFeedback("Add a title, caption, media file, or source link first.", true);
+  function saveActivity(activity) {
+    const items = getActivity();
+    items.unshift(activity);
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(items.slice(0, 12)));
+    window.dispatchEvent(new CustomEvent("signal-share:publish-activity", { detail: activity }));
+  }
+
+  function getActivityForExport() {
+    return getActivity();
+  }
+
+  function makeActivity(family, option, draft) {
+    return {
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      category: family.title,
+      option: option.name,
+      message: draft.message,
+      details: draft.details,
+      source: draft.source,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  function requireMessage(draft) {
+    if (draft.message || draft.file) return true;
+    writeFeedback("Write a title, caption, source link, or choose media first.", true);
+    document.querySelector("#captionInput")?.focus();
     return false;
   }
 
-  function slugify(value = "") {
-    return `${value || "signal-share-post"}`
+  function escapeShell(value) {
+    return String(value)
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\$/g, "\\$")
+      .replace(/`/g, "\\`");
+  }
+
+  function sanitizeBranchName(value) {
+    return String(value || "feature/context-actions")
       .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 56) || "signal-share-post";
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9._/-]/g, "")
+      .replace(/^\/+|\/+$/g, "") || "feature/context-actions";
   }
 
-  function downloadText(filename, text, type) {
-    const url = URL.createObjectURL(new Blob([text], { type }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  function normalizeGithubRepoUrl(value) {
+    const raw = String(value || "").trim();
+    const normalized = /^https?:\/\//i.test(raw) ? raw : `https://github.com/${raw}`;
+    const match = normalized.match(/^https:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+)\/?/i);
+    if (!match) return "";
+    return `https://github.com/${match[1]}/${match[2].replace(/\.git$/i, "")}`;
   }
 
-  function downloadJsonBundle(draft) {
-    downloadText(
-      `${slugify(draft.title)}.signal-share.json`,
-      `${JSON.stringify(getDraftPayload(draft), null, 2)}\n`,
-      "application/json",
-    );
-  }
-
-  function buildMarkdownBundle(draft) {
-    return [
-      "# Signal Share post",
-      "",
-      `Title: ${draft.title || "Untitled"}`,
-      `Creator: ${draft.creator || "Unknown"}`,
-      `Tags: ${draft.tags || "None"}`,
-      `Source: ${draft.externalUrl || draft.source.name || "Add media source"}`,
-      "",
-      "## Caption",
-      "",
-      draft.caption || "",
-      "",
-      "## Share kit",
-      "",
-      getPostKit(draft),
-      "",
-    ].join("\n");
+  function getGithubRepoOrWarn(details) {
+    const repoUrl = normalizeGithubRepoUrl(details.repoUrl);
+    if (repoUrl) return repoUrl;
+    writeFeedback("Enter a valid GitHub repository URL.", true);
+    document.getElementById("publishRepoUrlInput")?.focus();
+    return "";
   }
 
   async function copyText(value) {
-    if (!navigator.clipboard?.writeText) return false;
-    try {
+    if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(value);
       return true;
-    } catch {
-      return false;
     }
+    const temp = document.createElement("textarea");
+    temp.value = value;
+    temp.style.position = "fixed";
+    temp.style.left = "-9999px";
+    document.body.appendChild(temp);
+    temp.select();
+    const copied = document.execCommand("copy");
+    temp.remove();
+    return copied;
   }
 
-  function openExternal(url) {
-    window.open(url, "_blank", "noopener,noreferrer");
+  function downloadJson(payload, fileName) {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
 
-  function saveDraft(storage, key, draft, label) {
-    storage.setItem(key, JSON.stringify(getDraftPayload(draft)));
-    showDestinationFeedback(`${label} saved.`);
+  function persistAction(storage, key, activity, limit = 50) {
+    const items = readJson(storage.getItem(key), []);
+    items.unshift(activity);
+    storage.setItem(key, JSON.stringify(items.slice(0, limit)));
   }
 
-  function getGithubRepoParts() {
-    const raw = `${githubRepoInput?.value || ""}`.trim();
-    if (!raw) return null;
-    const normalized = /^https?:\/\//i.test(raw) ? raw : `https://github.com/${raw}`;
-    try {
-      const url = new URL(normalized);
-      if (!/(^|\.)github\.com$/i.test(url.hostname)) return null;
-      const [owner, repo] = url.pathname.split("/").filter(Boolean);
-      if (!owner || !repo) return null;
-      return { owner, repo: repo.replace(/\.git$/i, "") };
-    } catch {
-      return null;
-    }
-  }
-
-  function getGithubRepoOrWarn() {
-    const repo = getGithubRepoParts();
-    if (repo) return repo;
-    showDestinationFeedback("Enter a GitHub repository URL or owner/repo first.", true);
-    githubRepoInput?.focus();
-    return null;
-  }
-
-  async function shareNative(draft) {
-    if (!requireDraftCopy(draft)) return;
-    if (!navigator.share) {
-      const copied = await copyText(getPostKit(draft));
-      showDestinationFeedback(copied
-        ? "Device sharing is unavailable here. The post kit was copied instead."
-        : "Device sharing is unavailable in this browser.", !copied);
-      return;
-    }
-
-    const payload = {
-      title: draft.title || "Signal Share post",
-      text: getPostKit(draft),
-      url: getShareUrl(draft),
-    };
-
-    if (draft.file && navigator.canShare?.({ files: [draft.file] })) {
-      payload.files = [draft.file];
-    }
-
-    try {
-      await navigator.share(payload);
-      showDestinationFeedback("Share sheet opened.");
-    } catch (error) {
-      showDestinationFeedback(error?.name === "AbortError"
-        ? "Sharing was cancelled."
-        : "The share sheet could not open. Try a social or email option.", true);
-    }
-  }
-
-  function openMail(draft, mode) {
-    if (!requireDraftCopy(draft)) return;
-    const titles = {
-      "email-send": `Signal Share post: ${draft.title || "Untitled"}`,
-      "email-share": `Share this Signal Share post: ${draft.title || "Untitled"}`,
-      "email-forward": `Fwd: Signal Share package - ${draft.title || "Untitled"}`,
-    };
-    const body = [
-      mode === "email-forward" ? "Forwarded Signal Share package:" : "Signal Share package:",
-      "",
-      getPostKit(draft),
-    ].join("\n");
-    window.location.href = `mailto:?subject=${encodeURIComponent(titles[mode])}&body=${encodeURIComponent(body)}`;
-    showDestinationFeedback("Email draft opened.");
-  }
-
-  async function performGithubCommit(draft) {
-    if (!requireDraftCopy(draft)) return;
-    const filename = `${slugify(draft.title)}.signal-share.md`;
-    downloadText(filename, buildMarkdownBundle(draft), "text/markdown");
-    const copied = await copyText(`feat: publish ${draft.title || "Signal Share post"}`);
-    showDestinationFeedback(copied
-      ? "GitHub markdown bundle downloaded and a commit message was copied."
-      : "GitHub markdown bundle downloaded. Commit and push it from your repo.");
-  }
-
-  function openGithubIssue(draft) {
-    if (!requireDraftCopy(draft)) return;
-    const repo = getGithubRepoOrWarn();
-    if (!repo) return;
-    openExternal(
-      `https://github.com/${repo.owner}/${repo.repo}/issues/new?title=${encodeURIComponent(draft.title || "Signal Share post")}&body=${encodeURIComponent(buildMarkdownBundle(draft))}`,
-    );
-    showDestinationFeedback("GitHub issue composer opened.");
-  }
-
-  function openGithubPullRequest(draft) {
-    if (!requireDraftCopy(draft)) return;
-    const repo = getGithubRepoOrWarn();
-    if (!repo) return;
-    downloadText(`${slugify(draft.title)}.signal-share.md`, buildMarkdownBundle(draft), "text/markdown");
-    openExternal(`https://github.com/${repo.owner}/${repo.repo}/compare`);
-    showDestinationFeedback("GitHub compare flow opened and the markdown payload was downloaded.");
-  }
-
-  async function performSocialInstagram(draft) {
-    if (!requireDraftCopy(draft)) return;
+  async function shareNative(activity) {
     if (navigator.share) {
-      await shareNative(draft);
+      await navigator.share({
+        title: activity.message.split("\n")[0] || "Signal Share publish action",
+        text: activity.message,
+        url: activity.details?.externalUrl || undefined,
+      });
+      showToast("Shared successfully");
       return;
     }
-    const copied = await copyText(getPostKit(draft));
-    if (copied) {
-      openExternal("https://www.instagram.com/");
-      showDestinationFeedback("Instagram opened and the post kit was copied.");
-      return;
-    }
-    showDestinationFeedback("Instagram sharing needs the device share sheet or clipboard access.", true);
+    await copyText(activity.message);
+    showToast("Sharing unavailable; message copied");
   }
 
-  function performAction(optionId) {
+  async function runLocalAction(activity, optionId) {
+    const isSession = optionId === "sessionStorage";
+    persistAction(isSession ? sessionStorage : localStorage, isSession ? SESSION_ITEMS_KEY : LOCAL_ITEMS_KEY, activity);
+    showToast(isSession ? "Saved to session storage" : "Saved to local storage");
+  }
+
+  async function runGithubAction(activity, optionId) {
+    const repoUrl = getGithubRepoOrWarn(activity.details);
+    if (!repoUrl) return false;
+
+    const branchName = sanitizeBranchName(activity.details.branchName || "feature/context-actions");
+    if (optionId === "commit") {
+      const command = `git checkout -b ${branchName}\ngit add .\ngit commit -m "${escapeShell(activity.message.slice(0, 80))}"\ngit push -u origin ${branchName}`;
+      await copyText(command);
+      showToast("Git command copied");
+      return true;
+    }
+
+    if (optionId === "issue") {
+      const url = `${repoUrl}/issues/new?title=${encodeURIComponent(activity.message.slice(0, 90))}&body=${encodeURIComponent(activity.message)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+      showToast("GitHub issue page opened");
+      return true;
+    }
+
+    if (optionId === "pullRequest") {
+      const url = `${repoUrl}/compare/main...${encodeURIComponent(branchName)}?quick_pull=1&title=${encodeURIComponent(activity.message.slice(0, 90))}&body=${encodeURIComponent(activity.message)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+      showToast("GitHub PR page opened");
+      return true;
+    }
+    return false;
+  }
+
+  async function runCloudAction(activity, optionId) {
+    if (optionId === "downloadBackup") {
+      downloadJson({
+        exportedAt: new Date().toISOString(),
+        currentItem: activity,
+        recentActivity: getActivityForExport(),
+      }, `signal-share-actions-${new Date().toISOString().slice(0, 10)}.json`);
+      showToast("JSON backup downloaded");
+      return true;
+    }
+
+    if (optionId === "importJson") {
+      const parsed = readJson(activity.message, null);
+      if (!parsed) {
+        writeFeedback("Paste valid JSON into the caption box.", true);
+        return false;
+      }
+      const imported = Array.isArray(parsed) ? parsed : parsed.recentActivity || parsed.items || [];
+      if (!Array.isArray(imported)) {
+        writeFeedback("JSON must contain an activity array.", true);
+        return false;
+      }
+      localStorage.setItem(ACTIVITY_KEY, JSON.stringify(imported.slice(0, 20)));
+      showToast("Activity imported");
+      return true;
+    }
+
+    if (optionId === "share") {
+      await shareNative(activity);
+      return true;
+    }
+    return false;
+  }
+
+  async function runEmailAction(activity, optionId) {
+    const to = activity.details.emailTo || "";
+    const subject = activity.details.emailSubject || "Quick update";
+    const body = optionId === "forward"
+      ? `Forwarded message:\n\n${activity.message}`
+      : activity.message;
+
+    if (optionId === "copyEmail") {
+      await copyText(`To: ${to}\nSubject: ${subject}\n\n${body}`);
+      showToast("Email draft copied");
+      return true;
+    }
+
+    window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    showToast("Email composer opened");
+    return true;
+  }
+
+  async function runSelectedAction() {
+    const family = families[activeFamilyId];
+    const optionId = selectedOptionByFamily.get(activeFamilyId) || family.options[0].id;
+    const option = family.options.find((item) => item.id === optionId) || family.options[0];
     const draft = getDraft();
-    switch (optionId) {
-      case "signal-feed":
-        postForm.requestSubmit();
-        return;
-      case "local-storage":
-        saveDraft(localStorage, DRAFT_KEY, draft, "Local draft");
-        return;
-      case "browser-cache":
-        saveDraft(sessionStorage, CACHE_KEY, draft, "Session draft");
-        return;
-      case "export-bundle":
-        if (!requireDraftCopy(draft)) return;
-        downloadJsonBundle(draft);
-        showDestinationFeedback("JSON bundle downloaded.");
-        return;
-      case "github-commit":
-        void performGithubCommit(draft);
-        return;
-      case "github-issue":
-        openGithubIssue(draft);
-        return;
-      case "github-pr":
-        openGithubPullRequest(draft);
-        return;
-      case "cloud-drive":
-        if (!requireDraftCopy(draft)) return;
-        downloadJsonBundle(draft);
-        openExternal("https://drive.google.com/drive/my-drive");
-        showDestinationFeedback("Drive opened and a JSON package was downloaded.");
-        return;
-      case "cloud-upload":
-        mediaInput?.click();
-        showDestinationFeedback("Choose media for the upload source.");
-        return;
-      case "cloud-folder":
-        void shareNative(draft);
-        return;
-      case "email-send":
-      case "email-share":
-      case "email-forward":
-        openMail(draft, optionId);
-        return;
-      case "social-facebook":
-        if (!requireDraftCopy(draft)) return;
-        openExternal(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl(draft))}`);
-        showDestinationFeedback("Facebook share flow opened.");
-        return;
-      case "social-instagram":
-        void performSocialInstagram(draft);
-        return;
-      case "social-x":
-        if (!requireDraftCopy(draft)) return;
-        openExternal(`https://twitter.com/intent/tweet?text=${encodeURIComponent(draft.caption || draft.title || "Signal Share post")}&url=${encodeURIComponent(getShareUrl(draft))}`);
-        showDestinationFeedback("X post flow opened.");
-        return;
-      case "social-linkedin":
-        if (!requireDraftCopy(draft)) return;
-        openExternal(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(getShareUrl(draft))}`);
-        showDestinationFeedback("LinkedIn share flow opened.");
-        return;
-      default:
-        showDestinationFeedback("Choose a destination option first.", true);
+
+    if (activeFamilyId === "signal") {
+      postForm.requestSubmit();
+      return;
+    }
+
+    if (!requireMessage(draft)) return;
+
+    const activity = makeActivity(family, option, draft);
+    let completed = false;
+
+    try {
+      if (activeFamilyId === "local") {
+        await runLocalAction(activity, option.id);
+        completed = true;
+      } else if (activeFamilyId === "github") {
+        completed = await runGithubAction(activity, option.id);
+      } else if (activeFamilyId === "cloud") {
+        completed = await runCloudAction(activity, option.id);
+      } else if (activeFamilyId === "email") {
+        completed = await runEmailAction(activity, option.id);
+      }
+
+      if (completed) {
+        saveActivity(activity);
+      }
+    } catch (error) {
+      writeFeedback(error?.message || "Something went wrong", true);
     }
   }
 
-  function getSelectedOptions() {
-    const family = families[activeFamilyId];
-    const selectedIds = selectedOptionIdsByFamily.get(activeFamilyId) ?? new Set();
-    const options = family.options.filter((option) => selectedIds.has(option.id));
-    if (options.length > 0) return options;
+  function renderFields(family) {
+    dynamicFields.replaceChildren(...family.fields.map((field) => {
+      const label = document.createElement("label");
+      label.className = "publish-field";
+      label.setAttribute("for", field.id);
 
-    selectedOptionIdsByFamily.set(activeFamilyId, new Set([family.options[0].id]));
-    return [family.options[0]];
+      const text = document.createElement("span");
+      text.textContent = field.label;
+
+      const input = document.createElement("input");
+      input.id = field.id;
+      input.type = field.type || "text";
+      input.placeholder = field.placeholder || "";
+      input.value = localStorage.getItem(field.storageKey) || "";
+      input.dataset.storageKey = field.storageKey;
+      input.addEventListener("input", () => {
+        if (input.value) localStorage.setItem(field.storageKey, input.value);
+        else localStorage.removeItem(field.storageKey);
+      });
+
+      label.append(text, input);
+      return label;
+    }));
+    dynamicFields.hidden = family.fields.length === 0;
   }
 
-  function syncSelectedOptions() {
+  function selectOption(optionId) {
     const family = families[activeFamilyId];
-    const options = getSelectedOptions();
-    const selectedIds = new Set(options.map((option) => option.id));
+    const option = family.options.find((item) => item.id === optionId);
+    if (!option) return;
 
+    selectedOptionByFamily.set(activeFamilyId, optionId);
     optionGrid.querySelectorAll("[data-publish-option]").forEach((button) => {
-      const isSelected = selectedIds.has(button.dataset.publishOption);
+      const isSelected = button.dataset.publishOption === optionId;
       button.classList.toggle("is-selected", isSelected);
       button.setAttribute("aria-pressed", isSelected ? "true" : "false");
     });
 
     if (selectedBadge) selectedBadge.textContent = family.badge;
-    if (selectedAction) {
-      selectedAction.textContent = options.length === 1
-        ? options[0].label
-        : `${options.length} ${family.title.toLowerCase()} options`;
-    }
-    if (selectedHint) {
-      selectedHint.textContent = options.length === 1
-        ? options[0].selectedHint
-        : `Run ${options.map((option) => option.label).join(", ")} from this destination together.`;
-    }
-    actionButton.textContent = options.length === 1
-      ? options[0].actionLabel
-      : `Run ${options.length} ${family.badge} actions`;
-  }
-
-  function toggleOption(optionId) {
-    const family = families[activeFamilyId];
-    if (!family.options.some((option) => option.id === optionId)) return;
-
-    const selectedIds = selectedOptionIdsByFamily.get(activeFamilyId) ?? new Set();
-    if (selectedIds.has(optionId)) {
-      if (selectedIds.size === 1) {
-        showDestinationFeedback("Keep at least one option selected in this destination.", true);
-        return;
-      }
-      selectedIds.delete(optionId);
-    } else {
-      selectedIds.add(optionId);
-    }
-
-    selectedOptionIdsByFamily.set(activeFamilyId, selectedIds);
-    syncSelectedOptions();
-    showDestinationFeedback("");
-  }
-
-  function runSelectedActions() {
-    const options = getSelectedOptions();
-    options.forEach((option) => performAction(option.id));
+    if (selectedAction) selectedAction.textContent = option.name;
+    if (selectedHint) selectedHint.textContent = option.hint;
+    actionButton.textContent = option.button;
+    writeFeedback("");
   }
 
   function renderFamily(familyId) {
+    if (!families[familyId]) return;
     activeFamilyId = familyId;
     const family = families[familyId];
+
     if (title) title.textContent = family.title;
     if (copy) copy.textContent = family.copy;
-    if (githubRepoField) githubRepoField.hidden = familyId !== "github";
 
     familyGrid.querySelectorAll("[data-publish-family]").forEach((button) => {
+      const isKnown = Boolean(families[button.dataset.publishFamily]);
+      button.hidden = !isKnown;
       button.classList.toggle("is-active", button.dataset.publishFamily === familyId);
     });
 
+    renderFields(family);
     optionGrid.replaceChildren(...family.options.map((option) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "publish-option-tile";
       button.dataset.publishOption = option.id;
+      button.setAttribute("aria-pressed", "false");
 
-      const mark = document.createElement("span");
-      mark.className = "publish-option-icon";
-      mark.textContent = option.mark;
+      const icon = document.createElement("span");
+      icon.className = "publish-option-icon";
+      icon.textContent = option.icon;
 
       const label = document.createElement("strong");
-      label.textContent = option.label;
-      const hint = document.createElement("small");
-      hint.textContent = option.hint;
+      label.textContent = option.name;
 
-      button.append(mark, label, hint);
-      button.addEventListener("click", () => toggleOption(option.id));
+      const note = document.createElement("small");
+      note.textContent = option.note;
+
+      button.append(icon, label, note);
+      button.addEventListener("click", () => selectOption(option.id));
       return button;
     }));
 
-    syncSelectedOptions();
-    showDestinationFeedback("");
+    selectOption(selectedOptionByFamily.get(familyId) || family.options[0].id);
   }
+
+  familyGrid.querySelectorAll("[data-publish-family]").forEach((button) => {
+    if (!families[button.dataset.publishFamily]) button.hidden = true;
+  });
 
   familyGrid.addEventListener("click", (event) => {
     const target = event.target instanceof Element ? event.target : null;
@@ -631,28 +630,30 @@
     renderFamily(button.dataset.publishFamily);
   });
 
-  actionButton.addEventListener("click", runSelectedActions);
-  shareSheetButton?.addEventListener("click", () => void shareNative(getDraft()));
+  actionButton.addEventListener("click", () => void runSelectedAction());
+  shareSheetButton?.addEventListener("click", () => {
+    const draft = getDraft();
+    if (!requireMessage(draft)) return;
+    void shareNative(makeActivity(families[activeFamilyId], { name: "Share sheet" }, draft));
+  });
+
   darkToggle?.addEventListener("click", () => {
     const nextDarkMode = !publishOverlay?.classList.contains("is-generic-dark");
     syncPublishDarkMode(nextDarkMode);
     localStorage.setItem(DARK_MODE_KEY, nextDarkMode ? "true" : "false");
   });
 
-  if (githubRepoInput) {
-    githubRepoInput.value = `${localStorage.getItem(GITHUB_REPO_KEY) || ""}`.trim();
-    githubRepoInput.addEventListener("change", () => {
-      const value = `${githubRepoInput.value || ""}`.trim();
-      if (value) localStorage.setItem(GITHUB_REPO_KEY, value);
-      else localStorage.removeItem(GITHUB_REPO_KEY);
-    });
-  }
-
   syncPublishDarkMode(localStorage.getItem(DARK_MODE_KEY) === "true");
   renderFamily(activeFamilyId);
+
   window.SignalSharePublishStudio = {
     selectFamily: renderFamily,
-    performAction,
-    runSelectedActions,
+    selectOption,
+    runSelectedAction,
+    getActivity,
+    clearActivity: () => {
+      localStorage.removeItem(ACTIVITY_KEY);
+      showToast("Activity cleared");
+    },
   };
 })();
