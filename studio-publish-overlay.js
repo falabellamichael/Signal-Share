@@ -211,7 +211,7 @@
       copy: "Repository actions only. No feed title, tags, caption, media link, or dropzone.",
       detailsText: "Repository workflow fields.",
       options: [
-        { id: "commit", icon: "📝", name: "Commit & Push", note: "Clone, branch, commit, push", button: "Copy Git Command", hint: "Generates a command sequence from the repository URL and branch settings.", fields: [field("repoUrl", { required: true }), field("baseBranch", { value: "main", required: true }), field("branchName", { value: "feature/publish-workflow", required: true }), field("remoteName", { label: "Remote name", placeholder: "origin", value: "origin", required: true }), field("filesToStage", { value: ".", required: true }), field("commitMessage", { required: true, wide: true })] },
+        { id: "commit", icon: "📝", name: "Commit & Push", note: "Clone, branch, commit, push", button: "Copy Git Command", hint: "Generates a command sequence from the repository URL and branch settings.", fields: [field("repoUrl", { required: true }), field("baseBranch", { value: "main", required: true }), field("branchName", { label: "New branch (optional)", placeholder: "Leave empty to push to base branch", value: "" }), field("remoteName", { label: "Remote name", placeholder: "origin", value: "origin", required: true }), field("filesToStage", { value: ".", required: true }), field("commitMessage", { required: true, wide: true })] },
         { id: "issue", icon: "🐛", name: "Create Issue", note: "Prefilled issue", button: "Open Issue", hint: "Opens a GitHub issue with title, body, labels, and assignees.", fields: [field("repoUrl", { required: true }), field("issueTitle", { label: "Issue title", placeholder: "Describe the issue", required: true }), field("issueLabels", { label: "Labels", placeholder: "bug, publish" }), field("issueAssignees", { label: "Assignees", placeholder: "username1, username2" }), field("issueBody", { label: "Issue body", mode: "textarea", placeholder: "Steps, expected result, actual result, notes", required: true, wide: true })] },
         { id: "pullRequest", icon: "🤝", name: "Pull Request", note: "Compare route", button: "Open PR", hint: "Opens a GitHub compare route with base/head branches and PR content.", fields: [field("repoUrl", { required: true }), field("baseBranch", { value: "main", required: true }), field("branchName", { value: "feature/publish-workflow", required: true }), field("prTitle", { label: "PR title", placeholder: "Describe the change", required: true }), field("prDraft", { label: "PR mode", mode: "select", value: "ready", options: [["ready", "Ready for review"], ["draft", "Draft PR"]] }), field("prBody", { label: "PR body", mode: "textarea", placeholder: "Summary, test plan, screenshots, risks", required: true, wide: true })] }
       ]
@@ -324,7 +324,7 @@
   }
 
   const quote = (value) => `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`")}"`;
-  const branch = (value) => String(value || "feature/publish-workflow").trim().replace(/\s+/g, "-").replace(/[^a-zA-Z0-9._/-]/g, "").replace(/^\/+|\/+$/g, "") || "feature/publish-workflow";
+  const branch = (value, fallback = "") => String(value || "").trim().replace(/\s+/g, "-").replace(/[^a-zA-Z0-9._/-]/g, "").replace(/^\/+|\/+$/g, "") || fallback;
   const repoUrl = (value) => {
     const raw = String(value || "").trim();
     const normalized = /^https?:\/\//i.test(raw) ? raw : `https://github.com/${raw}`;
@@ -645,23 +645,36 @@
       } else if (activeFamilyId === "github") {
         const url = repoUrl(item.details.repoUrl);
         if (!url) { setFeedback("Enter a valid GitHub repository URL.", true); $("#publishTool-repoUrl")?.focus(); return; }
-        const base = branch(item.details.baseBranch || "main");
-        const head = branch(item.details.branchName || "feature/publish-workflow");
+        const base = branch(item.details.baseBranch || "main", "main");
         if (option.id === "commit") {
-          const remote = branch(item.details.remoteName || "origin");
+          const rawHead = (item.details.branchName || "").trim();
+          const head = rawHead ? branch(rawHead) : "";
+          const remote = branch(item.details.remoteName || "origin", "origin");
           const repoName = url.split("/").pop();
           const files = item.details.filesToStage || ".";
           const lines = [
             `git clone ${url}.git`,
             `cd ${repoName}`,
             `git checkout ${base}`,
-            `git pull ${remote} ${base}`,
-            `git checkout -b ${head}`,
-
-            `git add ${files}`,
-            `git commit -m ${quote(item.details.commitMessage)}`,
-            `git push -u ${remote} ${head}`
+            `git pull ${remote} ${base}`
           ];
+
+          if (head && head !== base) {
+            lines.push(`git checkout -b ${head}`);
+          }
+
+          lines.push(
+            `# Copy your modified files to this directory now, then run:`,
+            `git add ${files}`,
+            `git commit -m ${quote(item.details.commitMessage)}`
+          );
+
+          if (head && head !== base) {
+            lines.push(`git push -u ${remote} ${head}`);
+          } else {
+            lines.push(`git push ${remote} ${base}`);
+          }
+
           await copyText(lines.join("\n"));
           toast("Git clone/commit/push command copied");
         } else if (option.id === "issue") {
@@ -671,6 +684,7 @@
           window.open(`${url}/issues/new?${params.toString()}`, "_blank", "noopener,noreferrer");
           toast("GitHub issue page opened");
         } else {
+          const head = branch(item.details.branchName || "feature/publish-workflow", "feature/publish-workflow");
           const params = new URLSearchParams({ quick_pull: "1", title: item.details.prTitle, body: item.details.prBody });
           if (item.details.prDraft === "draft") params.set("draft", "1");
           window.open(`${url}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?${params.toString()}`, "_blank", "noopener,noreferrer");
