@@ -13,7 +13,10 @@
   const mediaInput = document.querySelector("#mediaInput");
   const githubRepoField = document.querySelector("#publishGithubRepoField");
   const githubRepoInput = document.querySelector("#publishGithubRepoInput");
+  const publishOverlay = document.querySelector("#compose");
+  const darkToggle = document.querySelector("#publishDarkToggle");
   const GITHUB_REPO_KEY = "signal-share-publish-github-repo";
+  const DARK_MODE_KEY = "signal-share-publish-generic-dark";
   const DRAFT_KEY = "signal-share-publish-draft";
   const CACHE_KEY = "signal-share-publish-session-draft";
 
@@ -213,6 +216,15 @@
     if (!feedback) return;
     feedback.textContent = message;
     feedback.classList.toggle("is-error", isError);
+  }
+
+  function syncPublishDarkMode(isDark) {
+    publishOverlay?.classList.toggle("is-generic-dark", isDark);
+    darkToggle?.setAttribute("aria-pressed", isDark ? "true" : "false");
+    darkToggle?.querySelector("span")?.replaceChildren(document.createTextNode(isDark ? "Theme" : "Dark"));
+    darkToggle?.querySelector("strong")?.replaceChildren(
+      document.createTextNode(isDark ? "Use current colors" : "Publish overlay"),
+    );
   }
 
   function getValue(selector) {
@@ -624,6 +636,11 @@
 
   actionButton.addEventListener("click", runSelectedActions);
   shareSheetButton?.addEventListener("click", () => void shareNative(getDraft()));
+  darkToggle?.addEventListener("click", () => {
+    const nextDarkMode = !publishOverlay?.classList.contains("is-generic-dark");
+    syncPublishDarkMode(nextDarkMode);
+    localStorage.setItem(DARK_MODE_KEY, nextDarkMode ? "true" : "false");
+  });
 
   if (githubRepoInput) {
     githubRepoInput.value = `${localStorage.getItem(GITHUB_REPO_KEY) || ""}`.trim();
@@ -634,6 +651,7 @@
     });
   }
 
+  syncPublishDarkMode(localStorage.getItem(DARK_MODE_KEY) === "true");
   renderFamily(activeFamilyId);
   window.SignalSharePublishStudio = {
     selectFamily: renderFamily,

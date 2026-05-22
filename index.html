@@ -557,9 +557,20 @@
               Close
             </button>
 
-            <div class="section-heading studio-overlay-head">
-              <p class="eyebrow">Compose</p>
-              <h2 id="publishOverlayTitle">Publish a new post</h2>
+            <div class="section-heading studio-overlay-head publish-studio-head">
+              <div>
+                <p class="eyebrow">Compose</p>
+                <h2 id="publishOverlayTitle">Publish a new post</h2>
+              </div>
+              <button
+                class="publish-dark-toggle"
+                id="publishDarkToggle"
+                type="button"
+                aria-pressed="false"
+              >
+                <span aria-hidden="true">Dark</span>
+                <strong>Publish overlay</strong>
+              </button>
             </div>
 
             <div class="publish-studio-layout">
@@ -646,7 +657,7 @@
                 />
               </label>
 
-              <label>
+              <label class="publish-field-wide">
                 Caption
                 <textarea
                   id="captionInput"
@@ -669,7 +680,7 @@
                 />
               </label>
 
-              <label>
+              <label class="publish-field-wide">
                 Media Link
                 <input
                   id="externalUrlInput"
