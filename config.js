@@ -1,6 +1,7 @@
 const isCapacitor = !!window.Capacitor;
 const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || isCapacitor;
-const redirectUrl = "https://falabellamichael.github.io/Signal-Share/";
+// Use the current origin for OAuth redirects so localhost testing redirects back to localhost
+const redirectUrl = window.location.origin + window.location.pathname;
 
 window.SIGNAL_SHARE_CONFIG = {
   supabaseUrl: "https://gswptxeikjmihdjxoiar.supabase.co",
