@@ -546,7 +546,12 @@
     const returnTo = window.SIGNAL_SHARE_CONFIG?.authRedirectUrl || location.href;
     const data = await socialConnectRequest({ action: "start", provider, returnTo });
     if (!data.authorizeUrl) throw new Error(`${providerName(provider)} connection could not be started.`);
-    location.href = data.authorizeUrl;
+    
+    const width = 600;
+    const height = 750;
+    const left = (window.innerWidth - width) / 2 + window.screenX;
+    const top = (window.innerHeight - height) / 2 + window.screenY;
+    window.open(data.authorizeUrl, "socialAuth", `width=${width},height=${height},top=${top},left=${left}`);
   }
   async function disconnectSocialProvider(provider) {
     const data = await socialConnectRequest({ action: "disconnect", provider });
@@ -562,6 +567,13 @@
     const status = url.searchParams.get("signal_social");
     const message = url.searchParams.get("signal_social_message");
     if (!status && !message) return;
+
+    if (window.opener && window.opener !== window) {
+      window.opener.postMessage({ type: "signal_social_result", status, message }, "*");
+      window.close();
+      return;
+    }
+
     const finalMessage = message || (status === "connected" ? "Social provider connected." : "Social connection failed.");
     setFeedback(finalMessage, status !== "connected");
     toast(finalMessage);
@@ -569,6 +581,24 @@
     url.searchParams.delete("signal_social_message");
     history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }
+
+  window.addEventListener("message", (event) => {
+    if (event.data?.type === "signal_social_result") {
+      const { status, message } = event.data;
+      const finalMessage = message || (status === "connected" ? "Social provider connected." : "Social connection failed.");
+      setFeedback(finalMessage, status !== "connected");
+      toast(finalMessage);
+      
+      // Refresh connection state
+      socialConnectRequest({ action: "status" }).then(data => {
+        socialConnectionState = {
+          configured: data.configured || socialConnectionState.configured,
+          connections: Array.isArray(data.connections) ? data.connections : [],
+        };
+        renderSocialConnections();
+      }).catch(console.error);
+    }
+  });
 
   async function runAction() {
     const family = activeFamily();
