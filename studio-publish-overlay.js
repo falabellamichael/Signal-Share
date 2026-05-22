@@ -136,7 +136,7 @@
     baseBranch: ["Base branch", "main", "text"],
     branchName: ["New branch", "feature/publish-workflow", "text"],
     commitMessage: ["Commit message", "feat: update publish workflow", "text"],
-    filesToStage: ["Files to stage", ".", "text"],
+    filesToStage: ["Files to stage", ". (use '.' to stage all files)", "text"],
     emailFrom: ["From email", "you@example.com", "email"],
     emailTo: ["To email", "name@example.com", "email"],
     emailSubject: ["Subject", "Project update", "text"],
