@@ -626,8 +626,21 @@
         } else {
           saveActivity(record);
           activitySaved = true;
-          await publishSocialOptions(options, item);
-          toast(options.length === 1 ? "Social draft posted" : `${options.length} Social drafts posted`);
+          
+          const xOption = options.find((o) => socialProviderId(o) === "x");
+          const apiOptions = options.filter((o) => socialProviderId(o) !== "x");
+          
+          if (xOption) {
+            const text = encodeURIComponent(item.details.body || "");
+            const url = encodeURIComponent(item.details.shareUrl || "");
+            window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
+          }
+          
+          if (apiOptions.length > 0) {
+            await publishSocialOptions(apiOptions, item);
+          }
+          
+          toast(options.length === 1 ? "Social post completed" : `${options.length} Social posts completed`);
         }
       } else if (activeFamilyId === "github") {
         const url = repoUrl(item.details.repoUrl);
