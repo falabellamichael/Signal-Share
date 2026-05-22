@@ -1,14 +1,16 @@
 #account .studio-account-dialog {
   width: min(920px, calc(100vw - 2 * var(--container-padding)));
   gap: 22px;
-  color: #f6fbff;
-  border-color: rgba(255, 255, 255, 0.18);
+  overflow-x: hidden;
+  color: var(--text);
+  border-color: var(--line);
   background:
-    linear-gradient(118deg, rgba(255, 255, 255, 0.2), transparent 24%),
-    linear-gradient(145deg, #07121f 0%, #112a42 48%, #42172f 100%);
+    linear-gradient(118deg, rgba(255, 255, 255, 0.28), transparent 24%),
+    linear-gradient(145deg, var(--surface-strong), var(--surface));
   box-shadow:
-    0 38px 120px rgba(2, 8, 18, 0.52),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    var(--shadow),
+    0 38px 120px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26);
   isolation: isolate;
 }
 
@@ -21,31 +23,32 @@
 }
 
 #account .studio-account-dialog::before {
-  inset: -12% -12% auto;
+  inset: 0 -12% auto;
   height: 58%;
   background:
     repeating-linear-gradient(
       120deg,
       transparent 0 32px,
-      rgba(255, 255, 255, 0.1) 32px 34px,
+      var(--line) 32px 34px,
       transparent 34px 82px
     );
-  opacity: 0.58;
+  opacity: 0.66;
   transform: rotate(-5deg);
 }
 
 #account .studio-account-dialog::after {
-  inset: auto -20% -34% 18%;
+  inset: auto -20% 0 18%;
   height: 58%;
-  background: linear-gradient(110deg, rgba(83, 237, 255, 0.18), rgba(255, 124, 162, 0.26));
+  background: linear-gradient(110deg, var(--accent), var(--accent-2), var(--accent-3));
   filter: blur(48px);
+  opacity: 0.18;
   transform: skewX(-18deg);
 }
 
 #account .studio-overlay-close {
-  color: #07121f;
-  border-color: rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  border-color: var(--line);
+  background: var(--surface);
 }
 
 .auth-shine-head {
@@ -53,12 +56,12 @@
 }
 
 .auth-shine-head .eyebrow {
-  color: #8ee9ff;
+  color: var(--accent);
 }
 
 .auth-shine-head h2 {
-  color: #fffafc;
-  font-size: clamp(2.6rem, 5vw, 4.7rem);
+  color: var(--text);
+  font-size: 4.3rem;
   text-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
 }
 
@@ -73,7 +76,7 @@
 .auth-shine-side,
 .auth-shine-card {
   min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
@@ -84,10 +87,10 @@
   align-content: start;
   gap: 14px;
   padding: clamp(18px, 3vw, 28px);
-  color: #eef8ff;
+  color: var(--text);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06)),
-    rgba(7, 18, 31, 0.42);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent),
+    linear-gradient(145deg, var(--surface), var(--surface-strong));
 }
 
 .auth-shine-kicker {
@@ -95,8 +98,8 @@
   margin: 0;
   padding: 7px 11px;
   border-radius: 999px;
-  color: #06131f;
-  background: linear-gradient(135deg, #8ee9ff, #ffc48e);
+  color: var(--accent-text, #fff);
+  background: linear-gradient(135deg, var(--accent), var(--accent-3));
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -104,14 +107,14 @@
 }
 
 .auth-shine-side > strong {
-  color: #fff;
+  color: var(--text);
   font-size: clamp(1.25rem, 2vw, 1.75rem);
   line-height: 1.14;
 }
 
 .auth-shine-side > p:not(.auth-shine-kicker) {
   margin: 0;
-  color: rgba(235, 246, 255, 0.8);
+  color: var(--muted);
   line-height: 1.62;
 }
 
@@ -120,31 +123,20 @@
   gap: 12px;
   margin-top: auto;
   padding: 18px;
-  border-color: rgba(255, 255, 255, 0.16);
-  color: #eef8ff;
+  border-color: var(--line);
+  color: var(--text);
   background:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04)),
-    rgba(4, 13, 24, 0.34);
+    linear-gradient(150deg, rgba(255, 255, 255, 0.2), transparent),
+    var(--surface);
 }
 
 #account .auth-state .status-pill {
-  color: #07121f;
-  background: rgba(255, 255, 255, 0.86);
-}
-
-#account .auth-state .status-pill.is-live {
-  color: #041b17;
-  background: #8affdf;
-}
-
-#account .auth-state .status-pill.is-warning {
-  color: #2c0b08;
-  background: #ffb590;
+  border: 1px solid var(--line);
 }
 
 #account .status-copy,
 #account .auth-hint {
-  color: rgba(235, 246, 255, 0.82);
+  color: var(--muted);
 }
 
 .auth-shine-card {
@@ -152,11 +144,13 @@
   display: grid;
   gap: 18px;
   padding: clamp(18px, 3vw, 30px);
-  color: #07121f;
+  color: var(--text);
   background:
-    linear-gradient(128deg, rgba(255, 255, 255, 0.96), rgba(240, 248, 255, 0.76)),
-    rgba(255, 255, 255, 0.84);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+    linear-gradient(128deg, rgba(255, 255, 255, 0.34), transparent 74%),
+    linear-gradient(145deg, var(--surface-strong), var(--surface));
+  box-shadow:
+    var(--shadow),
+    0 24px 70px rgba(0, 0, 0, 0.16);
 }
 
 #account .auth-form {
@@ -164,56 +158,44 @@
 }
 
 #account .auth-form label {
-  color: #07121f;
+  color: var(--text);
 }
 
 #account .auth-form input {
   width: 100%;
   min-height: 48px;
   padding: 13px 15px;
-  border: 1px solid rgba(7, 18, 31, 0.14);
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  color: #07121f;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 #account .auth-form input:focus-visible {
-  border-color: rgba(8, 143, 201, 0.54);
+  border-color: var(--accent);
   box-shadow:
-    0 0 0 4px rgba(75, 205, 255, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+    0 0 0 4px var(--line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 #account .auth-legal-note,
 #account .account-summary p,
 #account .activation-panel p {
-  color: #405369;
+  color: var(--muted);
 }
 
 #account .auth-legal-checkbox a {
-  color: #bf295d;
-}
-
-#account .button-primary {
-  color: #06131f;
-  background: linear-gradient(135deg, #8ee9ff, #ffb68d);
-  box-shadow: 0 16px 34px rgba(8, 23, 42, 0.24);
-}
-
-#account .button-secondary {
-  color: #07121f;
-  border-color: rgba(7, 18, 31, 0.12);
-  background: rgba(255, 255, 255, 0.84);
+  color: var(--accent);
 }
 
 #account .auth-account,
 #account .activation-panel {
-  color: #07121f;
-  border-color: rgba(7, 18, 31, 0.12);
+  color: var(--text);
+  border-color: var(--line);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(236, 247, 255, 0.66)),
-    rgba(255, 255, 255, 0.74);
+    linear-gradient(145deg, rgba(255, 255, 255, 0.24), transparent 72%),
+    var(--surface);
 }
 
 .auth-utility-row {
@@ -227,7 +209,7 @@
   min-height: 36px;
   padding: 0;
   border: 0;
-  color: #0a6a90;
+  color: var(--accent);
   background: transparent;
   font-weight: 700;
   text-decoration: underline;
@@ -236,16 +218,12 @@
 
 .auth-text-action:hover,
 .auth-text-action:focus-visible {
-  color: #bf295d;
+  color: var(--accent-2);
 }
 
 #account .auth-feedback {
   min-height: 24px;
-  color: #365067;
-}
-
-#account .auth-feedback.is-error {
-  color: #a3123e;
+  color: var(--muted);
 }
 
 .auth-session-sheet {
@@ -256,12 +234,12 @@
   align-content: start;
   gap: 18px;
   padding: clamp(20px, 3vw, 30px);
-  border: 1px solid rgba(255, 255, 255, 0.32);
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  color: #07121f;
+  color: var(--text);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(230, 244, 255, 0.92)),
-    #fff;
+    linear-gradient(145deg, rgba(255, 255, 255, 0.28), transparent 72%),
+    var(--surface-strong);
   box-shadow: 0 28px 92px rgba(0, 0, 0, 0.4);
   animation: auth-session-rise 240ms ease both;
 }
@@ -273,8 +251,8 @@
 }
 
 .auth-session-head h3 {
-  color: #07121f;
-  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  color: var(--text);
+  font-size: 2.35rem;
 }
 
 .auth-session-close {
@@ -283,10 +261,10 @@
   right: 16px;
   width: 42px;
   height: 42px;
-  border: 1px solid rgba(7, 18, 31, 0.14);
+  border: 1px solid var(--line);
   border-radius: 50%;
-  color: #07121f;
-  background: rgba(255, 255, 255, 0.88);
+  color: var(--text);
+  background: var(--surface);
   font-size: 0;
 }
 
@@ -322,9 +300,9 @@
   justify-content: space-between;
   gap: 14px;
   padding: 16px;
-  border: 1px solid rgba(7, 18, 31, 0.1);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.76);
+  background: var(--surface);
 }
 
 .auth-session-item div {
@@ -334,7 +312,7 @@
 }
 
 .auth-session-item span:not(.auth-session-pill) {
-  color: #405369;
+  color: var(--muted);
   line-height: 1.45;
 }
 
@@ -344,8 +322,8 @@
   align-items: center;
   padding: 0 12px;
   border-radius: 999px;
-  color: #03211c;
-  background: #8affdf;
+  color: var(--accent-text, #fff);
+  background: linear-gradient(135deg, var(--accent-2), var(--accent-3));
   font-size: 0.77rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -354,7 +332,7 @@
 
 .auth-session-note {
   margin: 0;
-  color: #405369;
+  color: var(--muted);
   line-height: 1.6;
 }
 
@@ -375,6 +353,10 @@
     width: 100%;
   }
 
+  .auth-shine-head h2 {
+    font-size: 3.25rem;
+  }
+
   .auth-shine-layout {
     grid-template-columns: 1fr;
   }
@@ -393,6 +375,14 @@
     gap: 18px;
   }
 
+  .auth-shine-head h2 {
+    font-size: 2.85rem;
+  }
+
+  .auth-session-head h3 {
+    font-size: 2rem;
+  }
+
   .auth-session-sheet {
     inset: 10px;
     overflow: auto;
@@ -406,4 +396,15 @@
   .auth-session-item .button {
     width: 100%;
   }
+}
+
+body[data-theme="contrast"] #account .studio-account-dialog,
+body[data-theme="contrast"] .auth-shine-card,
+body[data-theme="contrast"] .auth-shine-side,
+body[data-theme="contrast"] .auth-session-sheet {
+  box-shadow: none;
+}
+
+body[data-theme="contrast"] #account .studio-account-dialog::after {
+  opacity: 0.1;
 }
