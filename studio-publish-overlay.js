@@ -17,6 +17,7 @@
   const detailsLabel = Array.from(document.querySelectorAll("#compose .publish-section-label"))
     .find((node) => node.textContent?.toLowerCase().includes("details"));
   const detailsHint = detailsLabel?.querySelector("small");
+  const fieldOrganizer = window.SignalSharePublishFieldOrganizer;
 
   if (!familyGrid || !optionGrid || !actionButton || !form) return;
 
@@ -183,11 +184,20 @@
   };
 
   let activeFamilyId = "signal";
-  const selectedByFamily = new Map(Object.entries(families).map(([familyId, family]) => [familyId, family.options[0].id]));
+  const selectedByFamily = new Map(Object.entries(families).map(([familyId, family]) => [familyId, new Set([family.options[0].id])]));
   const readJson = (value, fallback) => { try { return value ? JSON.parse(value) : fallback; } catch { return fallback; } };
   const getValue = (selector) => `${$(selector)?.value || ""}`.trim();
   const activeFamily = () => families[activeFamilyId];
-  const activeOption = () => activeFamily().options.find((option) => option.id === selectedByFamily.get(activeFamilyId)) || activeFamily().options[0];
+  const selectedOptions = () => {
+    const family = activeFamily();
+    const selectedIds = selectedByFamily.get(activeFamilyId) || new Set();
+    const options = family.options.filter((option) => selectedIds.has(option.id));
+    if (options.length) return options;
+    const fallback = family.options[0];
+    selectedByFamily.set(activeFamilyId, new Set([fallback.id]));
+    return [fallback];
+  };
+  const activeOption = () => selectedOptions()[0];
   const setFeedback = (message, isError = false) => { if (feedback) { feedback.textContent = message; feedback.classList.toggle("is-error", isError); } };
   const toast = (message) => window.SignalShareToast?.show ? window.SignalShareToast.show(message) : setFeedback(message);
 
@@ -198,8 +208,14 @@
     darkToggle?.querySelector("strong")?.replaceChildren(document.createTextNode(isDark ? "Use current colors" : "Publish overlay"));
   }
 
+  function selectedFields() {
+    const options = selectedOptions();
+    if (fieldOrganizer?.getFields) return fieldOrganizer.getFields(activeFamilyId, options, field);
+    return options.flatMap((option) => option.fields || []);
+  }
+
   function fieldValues() {
-    return (activeOption().fields || []).reduce((values, config) => {
+    return selectedFields().reduce((values, config) => {
       const input = document.getElementById(config.id);
       values[config.key] = input ? `${input.value || ""}`.trim() : "";
       return values;
@@ -230,7 +246,6 @@
 
   function workflowDraft() {
     const details = fieldValues();
-    const optionId = activeOption().id;
     const message = details.body || details.emailBody || details.issueBody || details.prBody || details.commitMessage || details.backupLabel || details.localLabel || details.sessionLabel || "";
     return { message, details, createdAt: new Date().toISOString() };
   }
@@ -241,7 +256,7 @@
 
   function validateFields() {
     const details = fieldValues();
-    const missing = (activeOption().fields || []).find((config) => config.required && !details[config.key]);
+    const missing = selectedFields().find((config) => config.required && !details[config.key]);
     if (!missing) return true;
     setFeedback(`${missing.label} is required.`, true);
     document.getElementById(missing.id)?.focus();
@@ -280,6 +295,10 @@
   function activity(family, option, item) {
     return { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), category: family.title, option: option.name, message: item.message, details: item.details, source: item.source || { kind: "workflow" }, createdAt: new Date().toISOString() };
   }
+  function selectedActivityOption(options) {
+    if (options.length === 1) return options[0];
+    return { name: options.map((option) => option.name).join(", ") };
+  }
   function downloadJson(payload, fileName) {
     const name = `${fileName || "signal-share-actions.json"}`.trim();
     const finalName = name.toLowerCase().endsWith(".json") ? name : `${name}.json`;
@@ -294,13 +313,35 @@
   }
   function shareUrl(item) { return item.details.shareUrl || item.details.facebookUrl || item.externalUrl || `${location.origin}${location.pathname}`; }
 
+  async function runSocialOption(option, item) {
+    if (option.id === "social-facebook") {
+      await copyText(item.details.body || "");
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (option.id === "social-x") {
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent([item.details.xHandle, item.details.body].filter(Boolean).join("\n").slice(0, 260))}&url=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (option.id === "social-linkedin") {
+      await copyText(item.details.body || "");
+      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    await copyText([item.details.instagramFrom && `From: ${item.details.instagramFrom}`, item.details.body, item.details.instagramHashtags].filter(Boolean).join("\n\n"));
+  }
+
   async function runAction() {
     const family = activeFamily();
-    const option = activeOption();
+    const options = selectedOptions();
+    const option = options[0];
     const item = draft();
     if (family.usesPostComposer) { form.requestSubmit(); return; }
     if (!validateFields()) return;
-    const record = activity(family, option, item);
+    const record = activity(family, selectedActivityOption(options), item);
     let completed = true;
 
     try {
@@ -313,18 +354,8 @@
         storage.setItem(key, JSON.stringify(items.slice(0, 50)));
         toast(isSession ? "Saved to session storage" : "Saved to local storage");
       } else if (activeFamilyId === "social") {
-        if (option.id === "social-facebook") {
-          await copyText(item.details.body || "");
-          window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
-        } else if (option.id === "social-x") {
-          window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent([item.details.xHandle, item.details.body].filter(Boolean).join("\n").slice(0, 260))}&url=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
-        } else if (option.id === "social-linkedin") {
-          await copyText(item.details.body || "");
-          window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
-        } else {
-          await copyText([item.details.instagramFrom && `From: ${item.details.instagramFrom}`, item.details.body, item.details.instagramHashtags].filter(Boolean).join("\n\n"));
-        }
-        toast("Social payload prepared");
+        for (const selectedOption of options) await runSocialOption(selectedOption, item);
+        toast(options.length === 1 ? "Social payload prepared" : `${options.length} social payloads prepared`);
       } else if (activeFamilyId === "github") {
         const url = repoUrl(item.details.repoUrl);
         if (!url) { setFeedback("Enter a valid GitHub repository URL.", true); $("#publishTool-repoUrl")?.focus(); return; }
@@ -425,8 +456,7 @@
     return input;
   }
 
-  function renderFields(option) {
-    const fields = option.fields || [];
+  function renderFields(fields) {
     dynamicFields.replaceChildren(...fields.map((config) => {
       const label = document.createElement("label");
       label.className = `publish-field${config.wide ? " is-wide" : ""}`;
@@ -449,23 +479,54 @@
     dynamicFields.hidden = fields.length === 0;
   }
 
-  function selectOption(optionId) {
+  function syncSelectedOptions() {
     const family = activeFamily();
-    const option = family.options.find((item) => item.id === optionId);
-    if (!option) return;
-    selectedByFamily.set(activeFamilyId, optionId);
+    const options = selectedOptions();
+    const selectedIds = new Set(options.map((option) => option.id));
     optionGrid.querySelectorAll("[data-publish-option]").forEach((button) => {
-      const active = button.dataset.publishOption === optionId;
+      const active = selectedIds.has(button.dataset.publishOption);
       button.classList.toggle("is-selected", active);
       button.setAttribute("aria-pressed", active ? "true" : "false");
     });
     if (badge) badge.textContent = family.badge;
-    if (selectedAction) selectedAction.textContent = option.name;
-    if (hint) hint.textContent = option.hint;
-    if (detailsHint) detailsHint.textContent = family.detailsText || "Action-specific fields.";
-    actionButton.textContent = option.button;
+    if (selectedAction) selectedAction.textContent = options.length === 1 ? options[0].name : `${options.length} ${family.badge} options`;
+    if (hint) {
+      hint.textContent = options.length === 1
+        ? options[0].hint
+        : `Shared fields are organized for ${options.map((option) => option.name).join(", ")}.`;
+    }
+    if (detailsHint) {
+      detailsHint.textContent = fieldOrganizer?.getDetailsText?.(activeFamilyId, options, family.detailsText)
+        || family.detailsText
+        || "Action-specific fields.";
+    }
+    actionButton.textContent = options.length === 1 ? options[0].button : `Run ${options.length} ${family.badge} actions`;
     form.classList.toggle("is-tool-mode", !family.usesPostComposer);
-    renderFields(option);
+    renderFields(selectedFields());
+  }
+
+  function selectOption(optionId) {
+    const family = activeFamily();
+    if (!family.options.some((item) => item.id === optionId)) return;
+    const selectedIds = selectedByFamily.get(activeFamilyId) || new Set();
+
+    if (activeFamilyId === "social") {
+      if (selectedIds.has(optionId)) {
+        if (selectedIds.size === 1) {
+          setFeedback("Keep at least one social option selected.", true);
+          return;
+        }
+        selectedIds.delete(optionId);
+      } else {
+        selectedIds.add(optionId);
+      }
+    } else {
+      selectedIds.clear();
+      selectedIds.add(optionId);
+    }
+
+    selectedByFamily.set(activeFamilyId, selectedIds);
+    syncSelectedOptions();
     setFeedback("");
   }
 
@@ -497,7 +558,7 @@
       button.addEventListener("click", () => selectOption(option.id));
       return button;
     }));
-    selectOption(selectedByFamily.get(familyId) || family.options[0].id);
+    syncSelectedOptions();
   }
 
   familyGrid.querySelectorAll("[data-publish-family]").forEach((button) => { if (!families[button.dataset.publishFamily]) button.hidden = true; });
