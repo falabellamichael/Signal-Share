@@ -421,7 +421,7 @@ function xAuthorizeUrl(state: string, redirectUri: string, codeChallenge: string
     code_challenge_method: "S256",
   });
   // X's OAuth servers require %20-encoded spaces in scope, not + from URLSearchParams
-  return `https://twitter.com/i/oauth2/authorize?${params.toString().replace(/\+/g, "%20")}`;
+  return `https://x.com/i/oauth2/authorize?${params.toString().replace(/\+/g, "%20")}`;
 }
 
 function providerAuthorizeUrl(
