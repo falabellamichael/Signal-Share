@@ -1,6 +1,6 @@
-import { createAppUi as createCoreAppUi } from "./app-v3-ui-core.js?v=1.7";
-import { normalizeUiSiteSettings } from "./app-v3-ui-settings.js?v=1.0";
-import { createUiElementRegistry } from "./app-v3-ui-elements.js?v=1.0";
+import { createAppUi as createCoreAppUi } from "./app-v3-ui-core.js";
+import { normalizeUiSiteSettings } from "./app-v3-ui-settings.js";
+import { createUiElementRegistry } from "./app-v3-ui-elements.js";
 
 export function createAppUi(context = {}) {
   const normalizedContext = {

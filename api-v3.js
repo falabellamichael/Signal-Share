@@ -185,7 +185,7 @@ export async function loadProfilesFromSupabase() {
 
 export async function loadOwnProfileFromSupabase() {
   try {
-    if (!apiContext.state.currentUser) return null;
+    if (!apiContext.state?.currentUser) return null;
     const client = getSupabaseClientOrThrow();
     const data = await runSupabaseQuery(
       client.from("profiles").select("*").eq("id", apiContext.state.currentUser.id).maybeSingle(),
@@ -214,7 +214,7 @@ export async function loadUserBansFromSupabase() {
 
 export async function loadCurrentUserBanFromSupabase() {
   try {
-    if (!apiContext.state.supabase || !apiContext.state.currentUser) return null;
+    if (!apiContext.state?.supabase || !apiContext.state?.currentUser) return null;
     const client = getSupabaseClientOrThrow();
     const data = await runSupabaseQuery(
       client.from("user_bans").select("*").eq("banned_id", apiContext.state.currentUser.id).maybeSingle(),
@@ -296,7 +296,7 @@ export async function syncCurrentProfileToSupabase(displayNameOverride = "") {
 
 export async function loadDirectThreadsFromSupabase() {
   try {
-    if (!apiContext.state.currentUser) return [];
+    if (!apiContext.state?.currentUser) return [];
     const userId = apiContext.state.currentUser.id;
     const data = await runSupabaseQuery(
       getSupabaseClientOrThrow()
