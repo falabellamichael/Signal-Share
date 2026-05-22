@@ -232,6 +232,7 @@
 
 .publish-family-button {
   --publish-family-accent: var(--publish-primary);
+  --publish-family-wash: var(--publish-primary);
   min-width: 0;
   min-height: 170px;
   position: relative;
@@ -258,21 +259,22 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: var(--publish-family-accent);
+  background: var(--publish-family-wash);
   opacity: 0.1;
 }
 
-.publish-family-button[data-publish-family="local"] {
-  --publish-family-accent: var(--accent-3);
-}
-
+.publish-family-button[data-publish-family="signal"],
+.publish-family-button[data-publish-family="local"],
 .publish-family-button[data-publish-family="social"],
-.publish-family-button[data-publish-family="cloud"] {
-  --publish-family-accent: var(--publish-primary-2);
+.publish-family-button[data-publish-family="email"] {
+  --publish-family-accent: var(--publish-primary);
+  --publish-family-wash: var(--publish-primary);
 }
 
-.publish-family-button[data-publish-family="github"] {
+.publish-family-button[data-publish-family="github"],
+.publish-family-button[data-publish-family="cloud"] {
   --publish-family-accent: var(--publish-text);
+  --publish-family-wash: var(--publish-text);
 }
 
 .publish-family-icon {
@@ -327,10 +329,6 @@
 
 .publish-family-button.is-active {
   border-color: color-mix(in srgb, var(--publish-primary) 58%, var(--publish-border));
-}
-
-.publish-family-button.is-active::before {
-  opacity: 0.18;
 }
 
 .publish-option-grid {
