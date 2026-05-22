@@ -1,658 +1,531 @@
 (() => {
-  const familyGrid = document.querySelector("#publishFamilyGrid");
-  const optionGrid = document.querySelector("#publishOptionGrid");
-  const title = document.querySelector("#publishDestinationTitle");
-  const copy = document.querySelector("#publishDestinationCopy");
-  const selectedBadge = document.querySelector("#publishSelectedBadge");
-  const selectedAction = document.querySelector("#publishSelectedAction");
-  const selectedHint = document.querySelector("#publishSelectedHint");
-  const actionButton = document.querySelector("#publishStudioActionButton");
-  const shareSheetButton = document.querySelector("#publishShareSheetButton");
-  const feedback = document.querySelector("#publishDestinationFeedback");
-  const postForm = document.querySelector("#postForm");
-  const mediaInput = document.querySelector("#mediaInput");
-  const githubRepoField = document.querySelector("#publishGithubRepoField");
-  const githubRepoInput = document.querySelector("#publishGithubRepoInput");
-  const publishOverlay = document.querySelector("#compose");
-  const darkToggle = document.querySelector("#publishDarkToggle");
-  const GITHUB_REPO_KEY = "signal-share-publish-github-repo";
-  const DARK_MODE_KEY = "signal-share-publish-generic-dark";
-  const DRAFT_KEY = "signal-share-publish-draft";
-  const CACHE_KEY = "signal-share-publish-session-draft";
+  const $ = (selector) => document.querySelector(selector);
+  const familyGrid = $("#publishFamilyGrid");
+  const optionGrid = $("#publishOptionGrid");
+  const title = $("#publishDestinationTitle");
+  const copy = $("#publishDestinationCopy");
+  const badge = $("#publishSelectedBadge");
+  const selectedAction = $("#publishSelectedAction");
+  const hint = $("#publishSelectedHint");
+  const actionButton = $("#publishStudioActionButton");
+  const shareButton = $("#publishShareSheetButton");
+  const feedback = $("#publishDestinationFeedback");
+  const form = $("#postForm");
+  const overlay = $("#compose");
+  const darkToggle = $("#publishDarkToggle");
+  const legacyRepo = $("#publishGithubRepoField");
+  const detailsLabel = Array.from(document.querySelectorAll("#compose .publish-section-label"))
+    .find((node) => node.textContent?.toLowerCase().includes("details"));
+  const detailsHint = detailsLabel?.querySelector("small");
 
-  if (!familyGrid || !optionGrid || !actionButton || !postForm) return;
+  if (!familyGrid || !optionGrid || !actionButton || !form) return;
+
+  const ACTIVITY_KEY = "signal-share-publish-activity";
+  const DARK_KEY = "signal-share-publish-generic-dark";
+  legacyRepo?.setAttribute("hidden", "");
+
+  const workflowStyle = document.createElement("style");
+  workflowStyle.textContent = `
+    #compose .publish-details-form.is-tool-mode > .publish-field-grid,
+    #compose .publish-details-form.is-tool-mode > .publish-message-field,
+    #compose .publish-details-form.is-tool-mode > .field-help,
+    #compose .publish-details-form.is-tool-mode > .dropzone {
+      display: none !important;
+    }
+    #compose .publish-dynamic-fields[hidden] {
+      display: none !important;
+    }
+    #compose .publish-dynamic-fields {
+      margin-bottom: 12px;
+    }
+    #compose .publish-dynamic-fields .publish-field.is-wide {
+      grid-column: 1 / -1;
+    }
+    #compose .publish-field select,
+    #compose .publish-field textarea {
+      width: 100%;
+      padding: 13px 14px;
+      border: 1px solid var(--publish-border);
+      border-radius: 16px;
+      color: var(--publish-text);
+      background: var(--publish-field);
+      font: inherit;
+      font-size: 1rem;
+      font-weight: 400;
+      outline: none;
+      transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+    }
+    #compose .publish-field textarea {
+      min-height: 132px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+    #compose .publish-field select:focus,
+    #compose .publish-field textarea:focus {
+      border-color: color-mix(in srgb, var(--publish-primary) 68%, var(--publish-border));
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--publish-primary) 13%, transparent);
+    }
+  `;
+  document.head.append(workflowStyle);
+
+  const dynamicFields = document.createElement("div");
+  dynamicFields.className = "publish-field-grid publish-dynamic-fields";
+  dynamicFields.id = "publishDynamicFields";
+  form.before(dynamicFields);
+
+  const presets = {
+    repoUrl: ["Repository URL", "https://github.com/owner/repo", "url"],
+    baseBranch: ["Base branch", "main", "text"],
+    branchName: ["New branch", "feature/publish-workflow", "text"],
+    commitMessage: ["Commit message", "feat: update publish workflow", "text"],
+    filesToStage: ["Files to stage", ".", "text"],
+    emailFrom: ["From email", "you@example.com", "email"],
+    emailTo: ["To email", "name@example.com", "email"],
+    emailSubject: ["Subject", "Project update", "text"],
+    body: ["Message body", "Write the message body here", "text"],
+    shareUrl: ["Share URL", "https://example.com/page", "url"]
+  };
+
+  function field(key, config = {}) {
+    const preset = presets[key] || [key, "", "text"];
+    const finalKey = config.key || key;
+    return {
+      id: `publishTool-${finalKey}`,
+      key: finalKey,
+      label: config.label || preset[0],
+      placeholder: config.placeholder ?? preset[1],
+      type: config.type || preset[2],
+      mode: config.mode || "input",
+      options: config.options || [],
+      value: config.value || "",
+      required: Boolean(config.required),
+      wide: Boolean(config.wide || config.mode === "textarea"),
+      persist: config.persist !== false,
+      storageKey: config.storageKey || `signal-share-publish.${finalKey}`
+    };
+  }
 
   const families = {
     signal: {
       badge: "Signal Share",
       title: "Signal Share feed",
-      copy: "Create a live or local feed post with the media source below.",
-      options: [
-        {
-          id: "signal-feed",
-          mark: "📣",
-          label: "Feed post",
-          hint: "Use the existing post pipeline.",
-          actionLabel: "Publish to feed",
-          selectedHint: "This uses the current Signal Share publish and moderation flow.",
-        },
-      ],
+      copy: "Create a media post for the Signal Share feed.",
+      detailsText: "Feed metadata plus post composer.",
+      usesPostComposer: true,
+      options: [{
+        id: "signal-feed",
+        icon: "📣",
+        name: "Publish Feed Post",
+        note: "Media post",
+        button: "Publish post",
+        hint: "Uses the existing creator, title, caption, media, and tags feed pipeline.",
+        fields: [
+          field("audience", { label: "Audience", mode: "select", value: "public", options: [["public", "Public feed"], ["followers", "Followers"], ["private", "Private draft"]] }),
+          field("publishNote", { label: "Internal note", placeholder: "Optional note for moderation or routing" })
+        ]
+      }]
     },
     local: {
-      badge: "Local",
-      title: "Local storage",
-      copy: "Keep a draft, cache a tab copy, or export a portable package.",
+      badge: "Local Storage",
+      title: "Local Storage",
+      copy: "Save a workflow payload in this browser. No media-post fields are required.",
+      detailsText: "Storage-specific fields.",
       options: [
-        {
-          id: "local-storage",
-          mark: "💾",
-          label: "Local Storage",
-          hint: "Save a browser draft.",
-          actionLabel: "Save local draft",
-          selectedHint: "Store form text and source metadata in this browser.",
-        },
-        {
-          id: "browser-cache",
-          mark: "📦",
-          label: "Browser Cache",
-          hint: "Hold a session draft.",
-          actionLabel: "Cache this draft",
-          selectedHint: "Keep a recovery copy until this browser tab session ends.",
-        },
-        {
-          id: "export-bundle",
-          mark: "⬇️",
-          label: "Export bundle",
-          hint: "Download a JSON manifest.",
-          actionLabel: "Download bundle",
-          selectedHint: "Export title, caption, tags, links, and media metadata.",
-        },
-      ],
+        { id: "localStorage", icon: "💾", name: "Local Storage", note: "Persistent key", button: "Save Locally", hint: "Persists a named JSON payload in localStorage.", fields: [field("localKey", { label: "Storage key", value: "signal-share-publish-saved-items", required: true }), field("localLabel", { label: "Save label", placeholder: "Publish workflow draft" }), field("body", { label: "Payload notes", mode: "textarea", placeholder: "What should this local save represent?", wide: true })] },
+        { id: "sessionStorage", icon: "📦", name: "Session Storage", note: "Temporary key", button: "Save Session", hint: "Persists a named JSON payload for the current tab session.", fields: [field("sessionKey", { label: "Session key", value: "signal-share-publish-session-items", required: true }), field("sessionLabel", { label: "Session label", placeholder: "Temporary workflow draft" }), field("body", { label: "Session notes", mode: "textarea", placeholder: "What should this session save represent?", wide: true })] }
+      ]
     },
     social: {
       badge: "Social",
       title: "Social posting",
-      copy: "Share out through supported web flows or the device share sheet.",
+      copy: "Prepare realistic platform share payloads without showing media-upload fields.",
+      detailsText: "Platform-specific share fields.",
       options: [
-        {
-          id: "social-facebook",
-          mark: "📘",
-          label: "Facebook",
-          hint: "Open the web share flow.",
-          actionLabel: "Open Facebook",
-          selectedHint: "Facebook receives a share URL through its browser share flow.",
-        },
-        {
-          id: "social-instagram",
-          mark: "📸",
-          label: "Instagram",
-          hint: "Share file or copy the kit.",
-          actionLabel: "Share for Instagram",
-          selectedHint: "Use the device share sheet when available, otherwise copy the post kit.",
-        },
-        {
-          id: "social-x",
-          mark: "✕",
-          label: "X",
-          hint: "Open a post intent.",
-          actionLabel: "Open X post",
-          selectedHint: "Build a post intent from the caption and share URL.",
-        },
-        {
-          id: "social-linkedin",
-          mark: "💼",
-          label: "LinkedIn",
-          hint: "Open link sharing.",
-          actionLabel: "Open LinkedIn",
-          selectedHint: "Share the current post URL through LinkedIn.",
-        },
-      ],
+        { id: "social-facebook", icon: "📘", name: "Facebook", note: "Share URL", button: "Open Facebook", hint: "Opens Facebook sharing for a target URL.", fields: [field("shareUrl", { required: true }), field("body", { label: "Post text", mode: "textarea", placeholder: "Optional text to copy before sharing", wide: true })] },
+        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Caption kit", button: "Copy Instagram Kit", hint: "Copies an Instagram-ready caption kit. Instagram web does not accept direct prefilled posting.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
+        { id: "social-x", icon: "✕", name: "X", note: "Post intent", button: "Open X Post", hint: "Opens an X post intent with text and URL.", fields: [field("xHandle", { label: "From handle", placeholder: "@yourhandle" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Post text", required: true, wide: true }), field("shareUrl")] },
+        { id: "social-linkedin", icon: "💼", name: "LinkedIn", note: "Link share", button: "Open LinkedIn", hint: "Opens LinkedIn sharing for a target URL.", fields: [field("linkedinFrom", { label: "Profile or company", placeholder: "Signal Share" }), field("shareUrl", { required: true }), field("body", { label: "Share note", mode: "textarea", placeholder: "Optional note to copy before sharing", wide: true })] }
+      ]
     },
     github: {
       badge: "GitHub",
-      title: "GitHub handoff",
-      copy: "Prepare repo-ready content, open issues, or start a pull request route.",
+      title: "GitHub",
+      copy: "Repository actions only. No feed title, tags, caption, media link, or dropzone.",
+      detailsText: "Repository workflow fields.",
       options: [
-        {
-          id: "github-commit",
-          mark: "📝",
-          label: "Commit and Push",
-          hint: "Prepare a commit bundle.",
-          actionLabel: "Prepare commit bundle",
-          selectedHint: "Downloads a markdown payload and copies a commit message.",
-        },
-        {
-          id: "github-issue",
-          mark: "🐛",
-          label: "Create Issue",
-          hint: "Open a prefilled issue.",
-          actionLabel: "Create GitHub issue",
-          selectedHint: "Use the repository field to open a prefilled GitHub issue.",
-        },
-        {
-          id: "github-pr",
-          mark: "🤝",
-          label: "Pull Request",
-          hint: "Open compare flow.",
-          actionLabel: "Open pull request flow",
-          selectedHint: "Use the repository field to start GitHub compare and PR work.",
-        },
-      ],
+        { id: "commit", icon: "📝", name: "Commit & Push", note: "Clone, branch, commit, push", button: "Copy Git Command", hint: "Generates a command sequence from the repository URL and branch settings.", fields: [field("repoUrl", { required: true }), field("baseBranch", { value: "main", required: true }), field("branchName", { value: "feature/publish-workflow", required: true }), field("remoteName", { label: "Remote name", placeholder: "origin", value: "origin", required: true }), field("filesToStage", { value: ".", required: true }), field("commitMessage", { required: true, wide: true })] },
+        { id: "issue", icon: "🐛", name: "Create Issue", note: "Prefilled issue", button: "Open Issue", hint: "Opens a GitHub issue with title, body, labels, and assignees.", fields: [field("repoUrl", { required: true }), field("issueTitle", { label: "Issue title", placeholder: "Describe the issue", required: true }), field("issueLabels", { label: "Labels", placeholder: "bug, publish" }), field("issueAssignees", { label: "Assignees", placeholder: "username1, username2" }), field("issueBody", { label: "Issue body", mode: "textarea", placeholder: "Steps, expected result, actual result, notes", required: true, wide: true })] },
+        { id: "pullRequest", icon: "🤝", name: "Pull Request", note: "Compare route", button: "Open PR", hint: "Opens a GitHub compare route with base/head branches and PR content.", fields: [field("repoUrl", { required: true }), field("baseBranch", { value: "main", required: true }), field("branchName", { value: "feature/publish-workflow", required: true }), field("prTitle", { label: "PR title", placeholder: "Describe the change", required: true }), field("prDraft", { label: "PR mode", mode: "select", value: "ready", options: [["ready", "Ready for review"], ["draft", "Draft PR"]] }), field("prBody", { label: "PR body", mode: "textarea", placeholder: "Summary, test plan, screenshots, risks", required: true, wide: true })] }
+      ]
     },
     cloud: {
-      badge: "Cloud",
-      title: "Cloud sync",
-      copy: "Export or hand off content for cloud storage and device sharing.",
+      badge: "Cloud Sync",
+      title: "Cloud Sync",
+      copy: "Export, import, or share workflow payloads with realistic fields.",
+      detailsText: "Cloud handoff fields.",
       options: [
-        {
-          id: "cloud-drive",
-          mark: "☁️",
-          label: "Sync to Drive",
-          hint: "Package and open Drive.",
-          actionLabel: "Open Drive handoff",
-          selectedHint: "Download a bundle, then continue in Google Drive.",
-        },
-        {
-          id: "cloud-upload",
-          mark: "⬆️",
-          label: "Upload Files",
-          hint: "Choose source media.",
-          actionLabel: "Choose media file",
-          selectedHint: "Use the existing media picker for an upload source.",
-        },
-        {
-          id: "cloud-folder",
-          mark: "📤",
-          label: "Share Folder",
-          hint: "Use share sheet or copy.",
-          actionLabel: "Share package",
-          selectedHint: "Share the post kit to a supported device or clipboard.",
-        },
-      ],
+        { id: "downloadBackup", icon: "⬇️", name: "Download Backup", note: "JSON export", button: "Download JSON", hint: "Downloads a named JSON backup.", fields: [field("backupFileName", { label: "Backup file name", value: `signal-share-actions-${new Date().toISOString().slice(0, 10)}.json`, required: true }), field("backupLabel", { label: "Backup label", placeholder: "Publish overlay backup" }), field("body", { label: "Backup notes", mode: "textarea", placeholder: "Optional backup notes", wide: true })] },
+        { id: "importJson", icon: "⬆️", name: "Import JSON", note: "JSON import", button: "Import JSON", hint: "Imports from the JSON field below.", fields: [field("importJson", { label: "JSON backup payload", placeholder: "Paste exported JSON here", mode: "textarea", persist: false, required: true, wide: true }), field("importMode", { label: "Import mode", mode: "select", value: "replace", options: [["replace", "Replace activity"], ["append", "Append activity"]] })] },
+        { id: "share", icon: "📤", name: "Share", note: "Native share", button: "Share Now", hint: "Uses the native share sheet with title, text, and URL.", fields: [field("shareTitle", { label: "Share title", placeholder: "Signal Share workflow" }), field("shareUrl"), field("body", { label: "Share text", mode: "textarea", placeholder: "Text to share", required: true, wide: true })] }
+      ]
     },
     email: {
       badge: "Email",
-      title: "Email delivery",
-      copy: "Build email handoffs from the current post copy.",
+      title: "Email",
+      copy: "Email actions use email fields only. No media-post fields.",
+      detailsText: "Email routing and body fields.",
       options: [
-        {
-          id: "email-send",
-          mark: "✉️",
-          label: "Send Email",
-          hint: "Open a new message.",
-          actionLabel: "Compose email",
-          selectedHint: "Start a mail draft with the post title and copy.",
-        },
-        {
-          id: "email-share",
-          mark: "📧",
-          label: "Share via Email",
-          hint: "Include the share URL.",
-          actionLabel: "Email share link",
-          selectedHint: "Send the caption, source link, and page link.",
-        },
-        {
-          id: "email-forward",
-          mark: "↪️",
-          label: "Forward Message",
-          hint: "Package as a forward.",
-          actionLabel: "Forward by email",
-          selectedHint: "Create a forward-style mail draft from this package.",
-        },
-      ],
-    },
+        { id: "sendEmail", icon: "✉️", name: "Send Email", note: "Compose email", button: "Compose Email", hint: "Composes with From, To, CC, BCC, subject, and body.", fields: [field("emailFrom", { required: true }), field("emailTo", { required: true }), field("emailCc", { label: "CC email", placeholder: "cc@example.com", type: "email" }), field("emailBcc", { label: "BCC email", placeholder: "bcc@example.com", type: "email" }), field("emailSubject", { required: true, wide: true }), field("emailBody", { label: "Email body", mode: "textarea", placeholder: "Write the email body", required: true, wide: true })] },
+        { id: "copyEmail", icon: "📋", name: "Copy Email", note: "Copy draft", button: "Copy Draft", hint: "Copies a complete email draft with From, To, Reply-To, subject, and body.", fields: [field("emailFrom", { required: true }), field("emailTo", { required: true }), field("replyTo", { label: "Reply-To email", placeholder: "reply@example.com", type: "email" }), field("emailSubject", { required: true, wide: true }), field("emailBody", { label: "Email body", mode: "textarea", placeholder: "Write the email body", required: true, wide: true })] },
+        { id: "forward", icon: "↪️", name: "Forward Message", note: "Forward format", button: "Compose Forward", hint: "Creates a forwarded-message draft with From, Forward To, Original From, subject, and body.", fields: [field("emailFrom", { required: true }), field("emailTo", { label: "Forward to", required: true }), field("originalFrom", { label: "Original from", placeholder: "original@example.com", type: "email" }), field("emailSubject", { placeholder: "Fwd: Project update", required: true, wide: true }), field("emailBody", { label: "Forwarded message body", mode: "textarea", placeholder: "Message being forwarded", required: true, wide: true })] }
+      ]
+    }
   };
 
   let activeFamilyId = "signal";
-  const selectedOptionIdsByFamily = new Map(
-    Object.entries(families).map(([familyId, family]) => [familyId, new Set([family.options[0].id])]),
-  );
+  const selectedByFamily = new Map(Object.entries(families).map(([familyId, family]) => [familyId, family.options[0].id]));
+  const readJson = (value, fallback) => { try { return value ? JSON.parse(value) : fallback; } catch { return fallback; } };
+  const getValue = (selector) => `${$(selector)?.value || ""}`.trim();
+  const activeFamily = () => families[activeFamilyId];
+  const activeOption = () => activeFamily().options.find((option) => option.id === selectedByFamily.get(activeFamilyId)) || activeFamily().options[0];
+  const setFeedback = (message, isError = false) => { if (feedback) { feedback.textContent = message; feedback.classList.toggle("is-error", isError); } };
+  const toast = (message) => window.SignalShareToast?.show ? window.SignalShareToast.show(message) : setFeedback(message);
 
-  function getState() {
-    return window.state ?? window.__SIGNAL_SHARE_STATE__ ?? null;
-  }
-
-  function showDestinationFeedback(message, isError = false) {
-    if (!feedback) return;
-    feedback.textContent = message;
-    feedback.classList.toggle("is-error", isError);
-  }
-
-  function syncPublishDarkMode(isDark) {
-    publishOverlay?.classList.toggle("is-generic-dark", isDark);
+  function syncDark(isDark) {
+    overlay?.classList.toggle("is-generic-dark", isDark);
     darkToggle?.setAttribute("aria-pressed", isDark ? "true" : "false");
     darkToggle?.querySelector("span")?.replaceChildren(document.createTextNode(isDark ? "Theme" : "Dark"));
-    darkToggle?.querySelector("strong")?.replaceChildren(
-      document.createTextNode(isDark ? "Use current colors" : "Publish overlay"),
-    );
+    darkToggle?.querySelector("strong")?.replaceChildren(document.createTextNode(isDark ? "Use current colors" : "Publish overlay"));
   }
 
-  function getValue(selector) {
-    return `${document.querySelector(selector)?.value || ""}`.trim();
+  function fieldValues() {
+    return (activeOption().fields || []).reduce((values, config) => {
+      const input = document.getElementById(config.id);
+      values[config.key] = input ? `${input.value || ""}`.trim() : "";
+      return values;
+    }, {});
   }
 
-  function getShareUrl(draft) {
-    return draft.externalUrl || `${window.location.origin}${window.location.pathname}`;
-  }
-
-  function getDraft() {
-    const state = getState();
-    const selectedFile = state?.selectedFile ?? null;
-    const creator = getValue("#creatorInput") || window.getDefaultProfileName?.() || "";
+  function signalDraft() {
+    const selectedFile = (window.state ?? window.__SIGNAL_SHARE_STATE__)?.selectedFile ?? null;
+    const message = [
+      getValue("#titleInput"),
+      getValue("#captionInput"),
+      getValue("#tagsInput") ? `Tags: ${getValue("#tagsInput")}` : "",
+      getValue("#externalUrlInput") ? `Source: ${getValue("#externalUrlInput")}` : ""
+    ].filter(Boolean).join("\n\n").trim();
     return {
-      creator,
+      creator: getValue("#creatorInput") || window.getDefaultProfileName?.() || "",
       title: getValue("#titleInput"),
       caption: getValue("#captionInput"),
       tags: getValue("#tagsInput"),
       externalUrl: getValue("#externalUrlInput"),
-      source: selectedFile
-        ? {
-            kind: "file",
-            name: selectedFile.name,
-            type: selectedFile.type,
-            size: selectedFile.size,
-          }
-        : {
-            kind: "link",
-          },
+      message,
+      details: fieldValues(),
+      source: selectedFile ? { kind: "file", name: selectedFile.name, type: selectedFile.type, size: selectedFile.size } : { kind: "link" },
       file: selectedFile,
-      exportedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString()
     };
   }
 
-  function getDraftPayload(draft) {
-    const { file, ...payload } = draft;
-    return payload;
+  function workflowDraft() {
+    const details = fieldValues();
+    const optionId = activeOption().id;
+    const message = details.body || details.emailBody || details.issueBody || details.prBody || details.commitMessage || details.backupLabel || details.localLabel || details.sessionLabel || "";
+    return { message, details, createdAt: new Date().toISOString() };
   }
 
-  function getPostKit(draft) {
-    const parts = [];
-    if (draft.title) parts.push(draft.title);
-    if (draft.caption) parts.push(draft.caption);
-    if (draft.creator) parts.push(`By ${draft.creator}`);
-    if (draft.tags) parts.push(`Tags: ${draft.tags}`);
-    if (draft.externalUrl) parts.push(`Source: ${draft.externalUrl}`);
-    parts.push(`Share: ${getShareUrl(draft)}`);
-    return parts.join("\n\n");
+  function draft() {
+    return activeFamily()?.usesPostComposer ? signalDraft() : workflowDraft();
   }
 
-  function requireDraftCopy(draft) {
-    if (draft.title || draft.caption || draft.externalUrl || draft.file) return true;
-    showDestinationFeedback("Add a title, caption, media file, or source link first.", true);
+  function validateFields() {
+    const details = fieldValues();
+    const missing = (activeOption().fields || []).find((config) => config.required && !details[config.key]);
+    if (!missing) return true;
+    setFeedback(`${missing.label} is required.`, true);
+    document.getElementById(missing.id)?.focus();
     return false;
   }
 
-  function slugify(value = "") {
-    return `${value || "signal-share-post"}`
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 56) || "signal-share-post";
-  }
-
-  function downloadText(filename, text, type) {
-    const url = URL.createObjectURL(new Blob([text], { type }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
-  }
-
-  function downloadJsonBundle(draft) {
-    downloadText(
-      `${slugify(draft.title)}.signal-share.json`,
-      `${JSON.stringify(getDraftPayload(draft), null, 2)}\n`,
-      "application/json",
-    );
-  }
-
-  function buildMarkdownBundle(draft) {
-    return [
-      "# Signal Share post",
-      "",
-      `Title: ${draft.title || "Untitled"}`,
-      `Creator: ${draft.creator || "Unknown"}`,
-      `Tags: ${draft.tags || "None"}`,
-      `Source: ${draft.externalUrl || draft.source.name || "Add media source"}`,
-      "",
-      "## Caption",
-      "",
-      draft.caption || "",
-      "",
-      "## Share kit",
-      "",
-      getPostKit(draft),
-      "",
-    ].join("\n");
-  }
+  const quote = (value) => `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`")}"`;
+  const branch = (value) => String(value || "feature/publish-workflow").trim().replace(/\s+/g, "-").replace(/[^a-zA-Z0-9._/-]/g, "").replace(/^\/+|\/+$/g, "") || "feature/publish-workflow";
+  const repoUrl = (value) => {
+    const raw = String(value || "").trim();
+    const normalized = /^https?:\/\//i.test(raw) ? raw : `https://github.com/${raw}`;
+    const match = normalized.match(/^https:\/\/github\.com\/([^/\s]+)\/([^/\s#?]+)\/?/i);
+    return match ? `https://github.com/${match[1]}/${match[2].replace(/\.git$/i, "")}` : "";
+  };
 
   async function copyText(value) {
-    if (!navigator.clipboard?.writeText) return false;
-    try {
-      await navigator.clipboard.writeText(value);
-      return true;
-    } catch {
-      return false;
-    }
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(value); return true; }
+    const temp = document.createElement("textarea");
+    temp.value = value;
+    temp.style.position = "fixed";
+    temp.style.left = "-9999px";
+    document.body.appendChild(temp);
+    temp.select();
+    const copied = document.execCommand("copy");
+    temp.remove();
+    return copied;
   }
 
-  function openExternal(url) {
-    window.open(url, "_blank", "noopener,noreferrer");
+  function activities() { return readJson(localStorage.getItem(ACTIVITY_KEY), []); }
+  function saveActivity(record) {
+    const items = activities();
+    items.unshift(record);
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(items.slice(0, 12)));
+    window.dispatchEvent(new CustomEvent("signal-share:publish-activity", { detail: record }));
   }
-
-  function saveDraft(storage, key, draft, label) {
-    storage.setItem(key, JSON.stringify(getDraftPayload(draft)));
-    showDestinationFeedback(`${label} saved.`);
+  function activity(family, option, item) {
+    return { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), category: family.title, option: option.name, message: item.message, details: item.details, source: item.source || { kind: "workflow" }, createdAt: new Date().toISOString() };
   }
-
-  function getGithubRepoParts() {
-    const raw = `${githubRepoInput?.value || ""}`.trim();
-    if (!raw) return null;
-    const normalized = /^https?:\/\//i.test(raw) ? raw : `https://github.com/${raw}`;
-    try {
-      const url = new URL(normalized);
-      if (!/(^|\.)github\.com$/i.test(url.hostname)) return null;
-      const [owner, repo] = url.pathname.split("/").filter(Boolean);
-      if (!owner || !repo) return null;
-      return { owner, repo: repo.replace(/\.git$/i, "") };
-    } catch {
-      return null;
-    }
+  function downloadJson(payload, fileName) {
+    const name = `${fileName || "signal-share-actions.json"}`.trim();
+    const finalName = name.toLowerCase().endsWith(".json") ? name : `${name}.json`;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = finalName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
+  function shareUrl(item) { return item.details.shareUrl || item.details.facebookUrl || item.externalUrl || `${location.origin}${location.pathname}`; }
 
-  function getGithubRepoOrWarn() {
-    const repo = getGithubRepoParts();
-    if (repo) return repo;
-    showDestinationFeedback("Enter a GitHub repository URL or owner/repo first.", true);
-    githubRepoInput?.focus();
-    return null;
-  }
-
-  async function shareNative(draft) {
-    if (!requireDraftCopy(draft)) return;
-    if (!navigator.share) {
-      const copied = await copyText(getPostKit(draft));
-      showDestinationFeedback(copied
-        ? "Device sharing is unavailable here. The post kit was copied instead."
-        : "Device sharing is unavailable in this browser.", !copied);
-      return;
-    }
-
-    const payload = {
-      title: draft.title || "Signal Share post",
-      text: getPostKit(draft),
-      url: getShareUrl(draft),
-    };
-
-    if (draft.file && navigator.canShare?.({ files: [draft.file] })) {
-      payload.files = [draft.file];
-    }
+  async function runAction() {
+    const family = activeFamily();
+    const option = activeOption();
+    const item = draft();
+    if (family.usesPostComposer) { form.requestSubmit(); return; }
+    if (!validateFields()) return;
+    const record = activity(family, option, item);
+    let completed = true;
 
     try {
-      await navigator.share(payload);
-      showDestinationFeedback("Share sheet opened.");
+      if (activeFamilyId === "local") {
+        const isSession = option.id === "sessionStorage";
+        const key = isSession ? item.details.sessionKey : item.details.localKey;
+        const storage = isSession ? sessionStorage : localStorage;
+        const items = readJson(storage.getItem(key), []);
+        items.unshift(record);
+        storage.setItem(key, JSON.stringify(items.slice(0, 50)));
+        toast(isSession ? "Saved to session storage" : "Saved to local storage");
+      } else if (activeFamilyId === "social") {
+        if (option.id === "social-facebook") {
+          await copyText(item.details.body || "");
+          window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
+        } else if (option.id === "social-x") {
+          window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent([item.details.xHandle, item.details.body].filter(Boolean).join("\n").slice(0, 260))}&url=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
+        } else if (option.id === "social-linkedin") {
+          await copyText(item.details.body || "");
+          window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl(item))}`, "_blank", "noopener,noreferrer");
+        } else {
+          await copyText([item.details.instagramFrom && `From: ${item.details.instagramFrom}`, item.details.body, item.details.instagramHashtags].filter(Boolean).join("\n\n"));
+        }
+        toast("Social payload prepared");
+      } else if (activeFamilyId === "github") {
+        const url = repoUrl(item.details.repoUrl);
+        if (!url) { setFeedback("Enter a valid GitHub repository URL.", true); $("#publishTool-repoUrl")?.focus(); return; }
+        const base = branch(item.details.baseBranch || "main");
+        const head = branch(item.details.branchName || "feature/publish-workflow");
+        if (option.id === "commit") {
+          const remote = branch(item.details.remoteName || "origin");
+          const repoName = url.split("/").pop();
+          const files = item.details.filesToStage || ".";
+          const lines = [
+            `git clone ${url}.git`,
+            `cd ${repoName}`,
+            `git checkout ${base}`,
+            `git pull ${remote} ${base}`,
+            `git checkout -b ${head}`,
+            `git add ${files}`,
+            `git commit -m ${quote(item.details.commitMessage)}`,
+            `git push -u ${remote} ${head}`
+          ];
+          await copyText(lines.join("\n"));
+          toast("Git clone/commit/push command copied");
+        } else if (option.id === "issue") {
+          const params = new URLSearchParams({ title: item.details.issueTitle, body: item.details.issueBody });
+          if (item.details.issueLabels) params.set("labels", item.details.issueLabels);
+          if (item.details.issueAssignees) params.set("assignees", item.details.issueAssignees);
+          window.open(`${url}/issues/new?${params.toString()}`, "_blank", "noopener,noreferrer");
+          toast("GitHub issue page opened");
+        } else {
+          const params = new URLSearchParams({ quick_pull: "1", title: item.details.prTitle, body: item.details.prBody });
+          if (item.details.prDraft === "draft") params.set("draft", "1");
+          window.open(`${url}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?${params.toString()}`, "_blank", "noopener,noreferrer");
+          toast("GitHub PR page opened");
+        }
+      } else if (activeFamilyId === "cloud") {
+        if (option.id === "downloadBackup") {
+          downloadJson({ exportedAt: new Date().toISOString(), label: item.details.backupLabel || "Signal Share workflow backup", currentItem: record, recentActivity: activities() }, item.details.backupFileName);
+          toast("JSON backup downloaded");
+        } else if (option.id === "importJson") {
+          const parsed = readJson(item.details.importJson, null);
+          if (!parsed) { setFeedback("Paste valid JSON into the import field.", true); return; }
+          const imported = Array.isArray(parsed) ? parsed : parsed.recentActivity || parsed.items || [];
+          if (!Array.isArray(imported)) { setFeedback("JSON must contain an activity array.", true); return; }
+          const existing = item.details.importMode === "append" ? activities() : [];
+          localStorage.setItem(ACTIVITY_KEY, JSON.stringify([...imported, ...existing].slice(0, 20)));
+          toast("Activity imported");
+        } else {
+          if (navigator.share) await navigator.share({ title: item.details.shareTitle || "Signal Share workflow", text: item.details.body, url: shareUrl(item) });
+          else await copyText([item.details.shareTitle, item.details.body, shareUrl(item)].filter(Boolean).join("\n\n"));
+          toast("Share payload prepared");
+        }
+      } else if (activeFamilyId === "email") {
+        const from = item.details.emailFrom || "";
+        const to = item.details.emailTo || "";
+        const subject = item.details.emailSubject || "Project update";
+        const body = option.id === "forward"
+          ? ["Forwarded message:", item.details.originalFrom && `Original from: ${item.details.originalFrom}`, "", item.details.emailBody].filter(Boolean).join("\n")
+          : item.details.emailBody;
+        if (option.id === "copyEmail") {
+          await copyText([from && `From: ${from}`, to && `To: ${to}`, item.details.replyTo && `Reply-To: ${item.details.replyTo}`, `Subject: ${subject}`, "", body].filter((line) => line !== false).join("\n"));
+          toast("Email draft copied");
+        } else {
+          const params = new URLSearchParams({ subject, body: [from && `From: ${from}`, body].filter(Boolean).join("\n\n") });
+          if (item.details.emailCc) params.set("cc", item.details.emailCc);
+          if (item.details.emailBcc) params.set("bcc", item.details.emailBcc);
+          location.href = `mailto:${encodeURIComponent(to)}?${params.toString()}`;
+          toast("Email composer opened");
+        }
+      } else completed = false;
+
+      if (completed) saveActivity(record);
     } catch (error) {
-      showDestinationFeedback(error?.name === "AbortError"
-        ? "Sharing was cancelled."
-        : "The share sheet could not open. Try a social or email option.", true);
+      setFeedback(error?.message || "Something went wrong", true);
     }
   }
 
-  function openMail(draft, mode) {
-    if (!requireDraftCopy(draft)) return;
-    const titles = {
-      "email-send": `Signal Share post: ${draft.title || "Untitled"}`,
-      "email-share": `Share this Signal Share post: ${draft.title || "Untitled"}`,
-      "email-forward": `Fwd: Signal Share package - ${draft.title || "Untitled"}`,
-    };
-    const body = [
-      mode === "email-forward" ? "Forwarded Signal Share package:" : "Signal Share package:",
-      "",
-      getPostKit(draft),
-    ].join("\n");
-    window.location.href = `mailto:?subject=${encodeURIComponent(titles[mode])}&body=${encodeURIComponent(body)}`;
-    showDestinationFeedback("Email draft opened.");
-  }
-
-  async function performGithubCommit(draft) {
-    if (!requireDraftCopy(draft)) return;
-    const filename = `${slugify(draft.title)}.signal-share.md`;
-    downloadText(filename, buildMarkdownBundle(draft), "text/markdown");
-    const copied = await copyText(`feat: publish ${draft.title || "Signal Share post"}`);
-    showDestinationFeedback(copied
-      ? "GitHub markdown bundle downloaded and a commit message was copied."
-      : "GitHub markdown bundle downloaded. Commit and push it from your repo.");
-  }
-
-  function openGithubIssue(draft) {
-    if (!requireDraftCopy(draft)) return;
-    const repo = getGithubRepoOrWarn();
-    if (!repo) return;
-    openExternal(
-      `https://github.com/${repo.owner}/${repo.repo}/issues/new?title=${encodeURIComponent(draft.title || "Signal Share post")}&body=${encodeURIComponent(buildMarkdownBundle(draft))}`,
-    );
-    showDestinationFeedback("GitHub issue composer opened.");
-  }
-
-  function openGithubPullRequest(draft) {
-    if (!requireDraftCopy(draft)) return;
-    const repo = getGithubRepoOrWarn();
-    if (!repo) return;
-    downloadText(`${slugify(draft.title)}.signal-share.md`, buildMarkdownBundle(draft), "text/markdown");
-    openExternal(`https://github.com/${repo.owner}/${repo.repo}/compare`);
-    showDestinationFeedback("GitHub compare flow opened and the markdown payload was downloaded.");
-  }
-
-  async function performSocialInstagram(draft) {
-    if (!requireDraftCopy(draft)) return;
-    if (navigator.share) {
-      await shareNative(draft);
-      return;
+  function createControl(config) {
+    if (config.mode === "textarea") {
+      const textarea = document.createElement("textarea");
+      textarea.rows = 4;
+      textarea.value = config.persist ? localStorage.getItem(config.storageKey) || config.value || "" : "";
+      return textarea;
     }
-    const copied = await copyText(getPostKit(draft));
-    if (copied) {
-      openExternal("https://www.instagram.com/");
-      showDestinationFeedback("Instagram opened and the post kit was copied.");
-      return;
+    if (config.mode === "select") {
+      const select = document.createElement("select");
+      const current = localStorage.getItem(config.storageKey) || config.value || config.options[0]?.[0] || "";
+      config.options.forEach(([value, label]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        option.selected = value === current;
+        select.append(option);
+      });
+      return select;
     }
-    showDestinationFeedback("Instagram sharing needs the device share sheet or clipboard access.", true);
+    const input = document.createElement("input");
+    input.type = config.type || "text";
+    input.value = localStorage.getItem(config.storageKey) || config.value || "";
+    return input;
   }
 
-  function performAction(optionId) {
-    const draft = getDraft();
-    switch (optionId) {
-      case "signal-feed":
-        postForm.requestSubmit();
-        return;
-      case "local-storage":
-        saveDraft(localStorage, DRAFT_KEY, draft, "Local draft");
-        return;
-      case "browser-cache":
-        saveDraft(sessionStorage, CACHE_KEY, draft, "Session draft");
-        return;
-      case "export-bundle":
-        if (!requireDraftCopy(draft)) return;
-        downloadJsonBundle(draft);
-        showDestinationFeedback("JSON bundle downloaded.");
-        return;
-      case "github-commit":
-        void performGithubCommit(draft);
-        return;
-      case "github-issue":
-        openGithubIssue(draft);
-        return;
-      case "github-pr":
-        openGithubPullRequest(draft);
-        return;
-      case "cloud-drive":
-        if (!requireDraftCopy(draft)) return;
-        downloadJsonBundle(draft);
-        openExternal("https://drive.google.com/drive/my-drive");
-        showDestinationFeedback("Drive opened and a JSON package was downloaded.");
-        return;
-      case "cloud-upload":
-        mediaInput?.click();
-        showDestinationFeedback("Choose media for the upload source.");
-        return;
-      case "cloud-folder":
-        void shareNative(draft);
-        return;
-      case "email-send":
-      case "email-share":
-      case "email-forward":
-        openMail(draft, optionId);
-        return;
-      case "social-facebook":
-        if (!requireDraftCopy(draft)) return;
-        openExternal(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl(draft))}`);
-        showDestinationFeedback("Facebook share flow opened.");
-        return;
-      case "social-instagram":
-        void performSocialInstagram(draft);
-        return;
-      case "social-x":
-        if (!requireDraftCopy(draft)) return;
-        openExternal(`https://twitter.com/intent/tweet?text=${encodeURIComponent(draft.caption || draft.title || "Signal Share post")}&url=${encodeURIComponent(getShareUrl(draft))}`);
-        showDestinationFeedback("X post flow opened.");
-        return;
-      case "social-linkedin":
-        if (!requireDraftCopy(draft)) return;
-        openExternal(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(getShareUrl(draft))}`);
-        showDestinationFeedback("LinkedIn share flow opened.");
-        return;
-      default:
-        showDestinationFeedback("Choose a destination option first.", true);
-    }
+  function renderFields(option) {
+    const fields = option.fields || [];
+    dynamicFields.replaceChildren(...fields.map((config) => {
+      const label = document.createElement("label");
+      label.className = `publish-field${config.wide ? " is-wide" : ""}`;
+      label.setAttribute("for", config.id);
+      const text = document.createElement("span");
+      text.textContent = config.required ? `${config.label} *` : config.label;
+      const input = createControl(config);
+      input.id = config.id;
+      input.name = config.key;
+      input.placeholder = config.placeholder || "";
+      const persist = () => {
+        if (!config.persist) return;
+        input.value ? localStorage.setItem(config.storageKey, input.value) : localStorage.removeItem(config.storageKey);
+      };
+      input.addEventListener("input", persist);
+      input.addEventListener("change", persist);
+      label.append(text, input);
+      return label;
+    }));
+    dynamicFields.hidden = fields.length === 0;
   }
 
-  function getSelectedOptions() {
-    const family = families[activeFamilyId];
-    const selectedIds = selectedOptionIdsByFamily.get(activeFamilyId) ?? new Set();
-    const options = family.options.filter((option) => selectedIds.has(option.id));
-    if (options.length > 0) return options;
-
-    selectedOptionIdsByFamily.set(activeFamilyId, new Set([family.options[0].id]));
-    return [family.options[0]];
-  }
-
-  function syncSelectedOptions() {
-    const family = families[activeFamilyId];
-    const options = getSelectedOptions();
-    const selectedIds = new Set(options.map((option) => option.id));
-
+  function selectOption(optionId) {
+    const family = activeFamily();
+    const option = family.options.find((item) => item.id === optionId);
+    if (!option) return;
+    selectedByFamily.set(activeFamilyId, optionId);
     optionGrid.querySelectorAll("[data-publish-option]").forEach((button) => {
-      const isSelected = selectedIds.has(button.dataset.publishOption);
-      button.classList.toggle("is-selected", isSelected);
-      button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+      const active = button.dataset.publishOption === optionId;
+      button.classList.toggle("is-selected", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
     });
-
-    if (selectedBadge) selectedBadge.textContent = family.badge;
-    if (selectedAction) {
-      selectedAction.textContent = options.length === 1
-        ? options[0].label
-        : `${options.length} ${family.title.toLowerCase()} options`;
-    }
-    if (selectedHint) {
-      selectedHint.textContent = options.length === 1
-        ? options[0].selectedHint
-        : `Run ${options.map((option) => option.label).join(", ")} from this destination together.`;
-    }
-    actionButton.textContent = options.length === 1
-      ? options[0].actionLabel
-      : `Run ${options.length} ${family.badge} actions`;
-  }
-
-  function toggleOption(optionId) {
-    const family = families[activeFamilyId];
-    if (!family.options.some((option) => option.id === optionId)) return;
-
-    const selectedIds = selectedOptionIdsByFamily.get(activeFamilyId) ?? new Set();
-    if (selectedIds.has(optionId)) {
-      if (selectedIds.size === 1) {
-        showDestinationFeedback("Keep at least one option selected in this destination.", true);
-        return;
-      }
-      selectedIds.delete(optionId);
-    } else {
-      selectedIds.add(optionId);
-    }
-
-    selectedOptionIdsByFamily.set(activeFamilyId, selectedIds);
-    syncSelectedOptions();
-    showDestinationFeedback("");
-  }
-
-  function runSelectedActions() {
-    const options = getSelectedOptions();
-    options.forEach((option) => performAction(option.id));
+    if (badge) badge.textContent = family.badge;
+    if (selectedAction) selectedAction.textContent = option.name;
+    if (hint) hint.textContent = option.hint;
+    if (detailsHint) detailsHint.textContent = family.detailsText || "Action-specific fields.";
+    actionButton.textContent = option.button;
+    form.classList.toggle("is-tool-mode", !family.usesPostComposer);
+    renderFields(option);
+    setFeedback("");
   }
 
   function renderFamily(familyId) {
+    if (!families[familyId]) return;
     activeFamilyId = familyId;
-    const family = families[familyId];
+    const family = activeFamily();
     if (title) title.textContent = family.title;
     if (copy) copy.textContent = family.copy;
-    if (githubRepoField) githubRepoField.hidden = familyId !== "github";
-
     familyGrid.querySelectorAll("[data-publish-family]").forEach((button) => {
+      const known = Boolean(families[button.dataset.publishFamily]);
+      button.hidden = !known;
       button.classList.toggle("is-active", button.dataset.publishFamily === familyId);
     });
-
     optionGrid.replaceChildren(...family.options.map((option) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "publish-option-tile";
       button.dataset.publishOption = option.id;
-
-      const mark = document.createElement("span");
-      mark.className = "publish-option-icon";
-      mark.textContent = option.mark;
-
-      const label = document.createElement("strong");
-      label.textContent = option.label;
-      const hint = document.createElement("small");
-      hint.textContent = option.hint;
-
-      button.append(mark, label, hint);
-      button.addEventListener("click", () => toggleOption(option.id));
+      button.setAttribute("aria-pressed", "false");
+      const icon = document.createElement("span");
+      icon.className = "publish-option-icon";
+      icon.textContent = option.icon;
+      const name = document.createElement("strong");
+      name.textContent = option.name;
+      const note = document.createElement("small");
+      note.textContent = option.note;
+      button.append(icon, name, note);
+      button.addEventListener("click", () => selectOption(option.id));
       return button;
     }));
-
-    syncSelectedOptions();
-    showDestinationFeedback("");
+    selectOption(selectedByFamily.get(familyId) || family.options[0].id);
   }
 
+  familyGrid.querySelectorAll("[data-publish-family]").forEach((button) => { if (!families[button.dataset.publishFamily]) button.hidden = true; });
   familyGrid.addEventListener("click", (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    const button = target?.closest("[data-publish-family]");
-    if (!button || !families[button.dataset.publishFamily]) return;
-    renderFamily(button.dataset.publishFamily);
+    const button = event.target instanceof Element ? event.target.closest("[data-publish-family]") : null;
+    if (button && families[button.dataset.publishFamily]) renderFamily(button.dataset.publishFamily);
   });
-
-  actionButton.addEventListener("click", runSelectedActions);
-  shareSheetButton?.addEventListener("click", () => void shareNative(getDraft()));
+  actionButton.addEventListener("click", () => void runAction());
+  shareButton?.addEventListener("click", () => {
+    const item = draft();
+    if (!validateFields()) return;
+    void (navigator.share
+      ? navigator.share({ title: item.details.shareTitle || activeOption().name, text: item.message, url: shareUrl(item) })
+      : copyText([item.message, shareUrl(item)].filter(Boolean).join("\n\n")));
+  });
   darkToggle?.addEventListener("click", () => {
-    const nextDarkMode = !publishOverlay?.classList.contains("is-generic-dark");
-    syncPublishDarkMode(nextDarkMode);
-    localStorage.setItem(DARK_MODE_KEY, nextDarkMode ? "true" : "false");
+    const next = !overlay?.classList.contains("is-generic-dark");
+    syncDark(next);
+    localStorage.setItem(DARK_KEY, next ? "true" : "false");
   });
 
-  if (githubRepoInput) {
-    githubRepoInput.value = `${localStorage.getItem(GITHUB_REPO_KEY) || ""}`.trim();
-    githubRepoInput.addEventListener("change", () => {
-      const value = `${githubRepoInput.value || ""}`.trim();
-      if (value) localStorage.setItem(GITHUB_REPO_KEY, value);
-      else localStorage.removeItem(GITHUB_REPO_KEY);
-    });
-  }
-
-  syncPublishDarkMode(localStorage.getItem(DARK_MODE_KEY) === "true");
+  syncDark(localStorage.getItem(DARK_KEY) === "true");
   renderFamily(activeFamilyId);
   window.SignalSharePublishStudio = {
     selectFamily: renderFamily,
-    performAction,
-    runSelectedActions,
+    selectOption,
+    runSelectedAction: runAction,
+    getActivity: activities,
+    clearActivity: () => { localStorage.removeItem(ACTIVITY_KEY); toast("Activity cleared"); }
   };
 })();
