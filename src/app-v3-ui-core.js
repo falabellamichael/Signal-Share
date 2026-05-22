@@ -621,6 +621,17 @@ export function createAppUi(context) {
       }
     });
     elements.miniNextButton.addEventListener("click", () => heroMediaPlayerController.handleNext({ target: "mini" }));
+
+    // Main Hero Stage Controls - These were MISSING event listeners!
+    if (elements.heroPlayerPlayPauseButton) {
+      elements.heroPlayerPlayPauseButton.addEventListener("click", () => heroMediaPlayerController.handlePlayPause(null, { target: "hero-stage" }));
+    }
+    if (elements.heroPlayerPrevButton) {
+      elements.heroPlayerPrevButton.addEventListener("click", () => heroMediaPlayerController.handlePrevious({ target: "hero-stage" }));
+    }
+    if (elements.heroPlayerNextButton) {
+      elements.heroPlayerNextButton.addEventListener("click", () => heroMediaPlayerController.handleNext({ target: "hero-stage" }));
+    }
     elements.miniPlayerStage.addEventListener("click", handleMiniPlayerStageClick);
     elements.miniPlayerVolumeSlider.addEventListener("input", (event) => heroMediaPlayerController.handleVolumeInput(event));
     elements.heroPlayerOpenMiniButton?.addEventListener("click", () => {
