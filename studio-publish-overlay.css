@@ -1,35 +1,31 @@
 #compose .studio-publish-dialog {
   width: min(1180px, calc(100vw - 2 * var(--container-padding)));
   gap: 20px;
-  color: var(--text);
-  border-color: rgba(15, 23, 32, 0.14);
+  color: #f7fafc;
+  border-color: rgba(255, 255, 255, 0.18);
   background:
-    radial-gradient(circle at top left, rgba(238, 108, 77, 0.18), transparent 28%),
-    var(--surface-strong);
+    linear-gradient(126deg, rgba(255, 255, 255, 0.16), transparent 22%),
+    linear-gradient(145deg, #081019 0%, #102131 52%, #17374c 100%);
   box-shadow:
-    0 34px 96px rgba(15, 23, 32, 0.18);
+    0 38px 120px rgba(2, 7, 14, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 #compose .studio-overlay-close {
-  color: var(--text);
-  border-color: rgba(15, 23, 32, 0.4);
-  background: rgba(255, 255, 255, 0.96);
+  color: #081019;
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.92);
 }
 
 #compose .studio-overlay-head .eyebrow {
-  color: var(--accent);
+  color: #90e7ff;
 }
 
 #compose .studio-overlay-head h2 {
   max-width: none;
   color: #fff;
-  font-size: clamp(1.8rem, 4vw, 3.2rem);
-  text-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
-}
-
-/* Midnight theme - white text on dark background */
-body[data-theme="midnight"] #compose .studio-overlay-head h2 {
-  color: #fff;
+  font-size: clamp(2.45rem, 4vw, 4.4rem);
+  text-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
 }
 
 .publish-studio-layout {
@@ -39,35 +35,23 @@ body[data-theme="midnight"] #compose .studio-overlay-head h2 {
   gap: clamp(16px, 2.4vw, 26px);
 }
 
+.publish-studio-rail,
+.publish-composer-pane {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
 .publish-studio-rail {
   display: grid;
   align-content: start;
   gap: 16px;
   padding: clamp(16px, 2.5vw, 24px);
-}
-
-/* Midnight theme - dark rail */
-body[data-theme="midnight"] .publish-studio-rail {
-  background: linear-gradient(150deg, rgba(75, 89, 100, 0.3), transparent 60%),
-    rgba(8, 14, 22, 0.96);
-}
-
-/* Light theme - white rail */
-body:not([data-theme="midnight"]) .publish-studio-rail {
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.14), transparent 58%),
-    var(--surface-strong);
-}
-
-.publish-composer-pane {
-  display: grid;
-  align-content: start;
-  gap: 16px;
-  padding: clamp(16px, 2.5vw, 26px);
-  color: #081019;
   background:
-    linear-gradient(132deg, rgba(255, 255, 255, 0.98), rgba(239, 247, 252, 0.82)),
-    rgba(255, 255, 255, 0.86);
-  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.22);
+    linear-gradient(150deg, rgba(255, 255, 255, 0.16), transparent 54%),
+    rgba(5, 14, 23, 0.48);
 }
 
 .publish-family-grid {
@@ -83,7 +67,11 @@ body:not([data-theme="midnight"]) .publish-studio-rail {
   align-content: center;
   gap: 5px;
   padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-md);
+  color: rgba(242, 249, 255, 0.86);
+  background: rgba(255, 255, 255, 0.08);
+  text-align: left;
   transition:
     background 180ms ease,
     border-color 180ms ease,
@@ -91,7 +79,7 @@ body:not([data-theme="midnight"]) .publish-studio-rail {
 }
 
 .publish-family-button span {
-  color: #fff;
+  color: #90e7ff;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -99,37 +87,19 @@ body:not([data-theme="midnight"]) .publish-studio-rail {
 }
 
 .publish-family-button strong {
-  color: var(--accent);
+  color: #fff;
   font-size: 1rem;
   line-height: 1.12;
 }
 
-#compose .publish-family-button:hover,
-#compose .publish-family-button:focus-visible,
-#compose .publish-family-button.is-active {
-  border-color: var(--accent);
-}
-
-/* Midnight theme - dark background with white text */
-body[data-theme="midnight"] #compose .publish-family-button {
-  background: rgba(8, 14, 22, 0.96);
-  border-color: var(--line);
-  color: #fff;
-}
-
-body[data-theme="midnight"] #compose .publish-family-button span {
-  color: #fff;
-}
-
-/* Light theme - white background with dark text */
-body:not([data-theme="midnight"]) #compose .publish-family-button {
-  background: var(--surface-strong);
-  border-color: rgba(15, 23, 32, 0.16);
-  color: #0c151d;
-}
-
-body:not([data-theme="midnight"]) #compose .publish-family-button span {
-  color: var(--accent);
+.publish-family-button:hover,
+.publish-family-button:focus-visible,
+.publish-family-button.is-active {
+  border-color: rgba(144, 231, 255, 0.56);
+  background:
+    linear-gradient(135deg, rgba(144, 231, 255, 0.22), rgba(255, 184, 116, 0.12)),
+    rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
 }
 
 .publish-option-panel {
@@ -137,7 +107,10 @@ body:not([data-theme="midnight"]) #compose .publish-family-button span {
   display: grid;
   gap: 14px;
   padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-md);
+  color: rgba(242, 249, 255, 0.86);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .publish-option-panel > div:first-child {
@@ -153,28 +126,9 @@ body:not([data-theme="midnight"]) #compose .publish-family-button span {
 
 .publish-option-panel p:not(.eyebrow) {
   margin: 0;
-  color: rgba(65, 74, 90, 0.8);
+  color: rgba(242, 249, 255, 0.72);
   line-height: 1.55;
 }
-
-/* Midnight theme - dark background with white text */
-body[data-theme="midnight"] .publish-option-panel {
-  background: rgba(8, 14, 22, 0.78);
-  border-color: var(--line);
-  color: #fff;
-}
-
-.publish-option-panel h3 {
-  color: #fff;
-}
-
-/* Light theme - white background with dark text */
-body:not([data-theme="midnight"]) .publish-option-panel {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(15, 23, 32, 0.12);
-  color: #0c151d;
-}
-
 
 .publish-option-note {
   padding: 11px 12px;
@@ -196,7 +150,15 @@ body:not([data-theme="midnight"]) .publish-option-panel {
   gap: 12px;
   align-items: center;
   padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-sm);
+  color: #fff;
+  background: rgba(6, 16, 27, 0.52);
+  text-align: left;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
 }
 
 .publish-option-tile::after {
@@ -204,35 +166,26 @@ body:not([data-theme="midnight"]) .publish-option-panel {
   width: 19px;
   height: 19px;
   justify-self: end;
-  border: 1px solid rgba(65, 74, 90, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 6px;
-  background: var(--surface-dark);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .publish-option-tile:hover,
 .publish-option-tile:focus-visible,
 .publish-option-tile.is-selected {
-  border-color: var(--accent);
+  border-color: rgba(255, 184, 116, 0.62);
+  background:
+    linear-gradient(135deg, rgba(255, 184, 116, 0.18), rgba(144, 231, 255, 0.12)),
+    rgba(6, 16, 27, 0.72);
   transform: translateY(-1px);
-}
-
-/* Midnight theme - dark background with white text */
-body[data-theme="midnight"] .publish-option-tile {
-  background: rgba(8, 14, 22, 0.78);
-  border-color: var(--line);
-  color: #fff;
-}
-
-/* Light theme - white background with dark text */
-body:not([data-theme="midnight"]) .publish-option-tile {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(15, 23, 32, 0.1);
-  color: #0c151d;
 }
 
 .publish-option-tile.is-selected::after {
   border-color: transparent;
-  background: linear-gradient(135deg, #ee6c4d, #2a9d8f);
+  background:
+    linear-gradient(135deg, transparent 0 38%, #06101a 38% 48%, transparent 48%) 4px 6px / 11px 9px no-repeat,
+    linear-gradient(135deg, #90e7ff, #ffb874);
 }
 
 .publish-option-mark {
@@ -241,8 +194,8 @@ body:not([data-theme="midnight"]) .publish-option-tile {
   display: grid;
   place-items: center;
   border-radius: 13px;
-  color: #fff;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #06101a;
+  background: linear-gradient(135deg, #90e7ff, #ffb874);
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.05em;
@@ -260,7 +213,7 @@ body:not([data-theme="midnight"]) .publish-option-tile {
 }
 
 .publish-option-copy span {
-  color: rgba(65, 74, 90, 0.7);
+  color: rgba(242, 249, 255, 0.68);
   font-size: 0.84rem;
   line-height: 1.35;
 }
@@ -268,24 +221,19 @@ body:not([data-theme="midnight"]) .publish-option-tile {
 .publish-github-repo {
   display: grid;
   gap: 8px;
-  color: #fff;
+  color: rgba(242, 249, 255, 0.84);
   font-size: 0.92rem;
   font-weight: 600;
-}
-
-/* Midnight theme - dark repo info */
-body[data-theme="midnight"] .publish-github-repo {
-  color: rgba(185, 198, 215, 0.9);
 }
 
 .publish-github-repo input {
   width: 100%;
   min-height: 48px;
   padding: 13px 14px;
-  border: 1px solid rgba(15, 23, 32, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-sm);
   color: #fff;
-  background: rgba(15, 23, 32, 0.78);
+  background: rgba(4, 11, 19, 0.58);
 }
 
 .publish-composer-pane {
@@ -305,7 +253,11 @@ body[data-theme="midnight"] .publish-github-repo {
   display: grid;
   gap: 7px;
   padding: 16px;
+  border: 1px solid rgba(8, 16, 25, 0.1);
   border-radius: var(--radius-md);
+  background:
+    linear-gradient(140deg, rgba(144, 231, 255, 0.22), rgba(255, 184, 116, 0.18)),
+    rgba(255, 255, 255, 0.7);
 }
 
 .publish-selected-card span {
@@ -315,7 +267,7 @@ body[data-theme="midnight"] .publish-github-repo {
   align-items: center;
   padding: 0 10px;
   border-radius: 999px;
-  color: #fff;
+  color: #06101a;
   background: rgba(255, 255, 255, 0.74);
   font-size: 0.74rem;
   font-weight: 800;
@@ -324,90 +276,58 @@ body[data-theme="midnight"] .publish-github-repo {
 }
 
 .publish-selected-card strong {
-  color: #fff;
+  color: #081019;
   font-size: clamp(1.15rem, 2vw, 1.45rem);
   line-height: 1.16;
 }
 
-/* Midnight theme - dark background with white text */
-body[data-theme="midnight"] .publish-selected-card {
-  background: linear-gradient(135deg, rgba(8, 14, 22, 0.9), rgba(17, 26, 36, 0.9)), var(--surface-strong);
+.publish-selected-card p {
+  margin: 0;
+  color: #43566a;
+  line-height: 1.52;
 }
-
-body[data-theme="midnight"] .publish-selected-card p {
-  color: #fff;
-}
-
-/* Light theme - white background with dark text */
-body:not([data-theme="midnight"]) .publish-selected-card {
-  background: linear-gradient(140deg, rgba(238, 108, 77, 0.16), rgba(42, 157, 143, 0.12)),
-    var(--surface-strong);
-}
-
-body:not([data-theme="midnight"]) .publish-selected-card p {
-  color: rgba(65, 74, 90, 0.8);
-}
-
 
 #compose .post-form label {
-  color: #fff;
+  color: #081019;
 }
 
 #compose .post-form input,
 #compose .post-form textarea {
-  border-color: rgba(15, 23, 32, 0.14);
-  color: #fff;
-  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(8, 16, 25, 0.14);
+  color: #081019;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 #compose .post-form input:focus-visible,
 #compose .post-form textarea:focus-visible,
 #compose .publish-github-repo input:focus-visible {
-  border-color: var(--accent);
+  border-color: rgba(8, 143, 201, 0.54);
   box-shadow: 0 0 0 4px rgba(75, 205, 255, 0.18);
 }
 
 #compose .field-help,
 #compose .dropzone-copy p,
 #compose .form-feedback {
-  color: rgba(65, 74, 90, 0.8);
+  color: #43566a;
 }
 
 #compose .dropzone {
-  border-color: rgba(15, 23, 32, 0.16);
+  border-color: rgba(8, 16, 25, 0.16);
   background:
-    linear-gradient(145deg, rgba(238, 108, 77, 0.14), rgba(42, 157, 143, 0.14)),
-    var(--surface-strong);
+    linear-gradient(145deg, rgba(144, 231, 255, 0.16), rgba(255, 184, 116, 0.16)),
+    rgba(255, 255, 255, 0.62);
 }
 
 #compose .button-primary {
-  color: #fff;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 16px 34px rgba(15, 23, 32, 0.2);
+  color: #06101a;
+  background: linear-gradient(135deg, #90e7ff, #ffb874);
+  box-shadow: 0 16px 34px rgba(8, 23, 42, 0.2);
 }
 
 #compose .button-secondary {
-  color: #fff;
-  border-color: rgba(15, 23, 32, 0.12);
-  background: rgba(15, 23, 32, 0.78);
-}
-
-/* Midnight theme - dark input backgrounds with white text */
-body[data-theme="midnight"] #compose .post-form textarea {
-  color: var(--text);
-  background: rgba(8, 14, 22, 0.96);
-}
-
-body[data-theme="midnight"] #compose .dropzone {
-  border-color: var(--line);
-  background: linear-gradient(135deg, rgba(75, 205, 255, 0.14), rgba(125, 211, 252, 0.1)),
-    rgba(8, 14, 22, 0.92);
-}
-
-/* Light theme - white input backgrounds with dark text */
-body:not([data-theme="midnight"]) #compose .post-form textarea {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.96);
+  color: #081019;
+  border-color: rgba(8, 16, 25, 0.12);
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .publish-studio-actions {
@@ -445,221 +365,4 @@ body:not([data-theme="midnight"]) #compose .post-form textarea {
   .publish-studio-actions .button {
     width: 100%;
   }
-}
-
-/* Theme Overrides for Publish Overlay */
-
-body[data-theme="midnight"] #compose .studio-publish-dialog {
-  background:
-    radial-gradient(circle at top left, rgba(125, 211, 252, 0.12), transparent 32%),
-    var(--surface-strong);
-}
-
-body[data-theme="midnight"] #compose .publish-family-button {
-  background: rgba(8, 14, 22, 0.96);
-  border-color: rgba(164, 184, 201, 0.16);
-}
-
-body[data-theme="midnight"] #compose .publish-family-button span {
-  color: var(--accent);
-}
-
-body[data-theme="midnight"] #compose .publish-family-button.is-active {
-  border-color: var(--accent);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(75, 205, 255, 0.12)),
-    rgba(8, 14, 22, 0.96);
-}
-
-body[data-theme="midnight"] #compose .publish-option-tile {
-  background: rgba(8, 14, 22, 0.78);
-  border-color: var(--line);
-}
-
-body[data-theme="midnight"] #compose .publish-github-repo input {
-  background: rgba(8, 14, 22, 0.96);
-}
-
-body[data-theme="midnight"] #compose .post-form textarea {
-  color: var(--text);
-}
-
-body[data-theme="contrast"] #compose .studio-publish-dialog {
-  border-color: rgba(255, 255, 255, 0.4) !important;
-  background: rgba(0, 0, 0, 0.96) !important;
-  box-shadow: none !important;
-}
-
-body[data-theme="contrast"] #compose .publish-family-button {
-  background: rgba(255, 255, 255, 0.8) !important;
-  border-color: rgba(255, 255, 255, 0.3) !important;
-}
-
-body[data-theme="contrast"] #compose .publish-family-button span {
-  color: var(--accent-text) !important;
-}
-
-body[data-theme="contrast"] #compose .publish-option-tile {
-  background: rgba(255, 255, 255, 0.96) !important;
-  border-color: rgba(255, 255, 255, 0.3) !important;
-}
-
-body[data-theme="contrast"] #compose .publish-github-repo input {
-  background: rgba(255, 255, 255, 0.96) !important;
-}
-
-body[data-theme="contrast"] #compose .post-form textarea {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.98) !important;
-}
-
-body[data-theme="ember"] #compose .studio-publish-dialog {
-  border-color: rgba(255, 120, 82, 0.24);
-  background:
-    radial-gradient(circle at top left, rgba(255, 68, 56, 0.14), transparent 30%),
-    var(--surface-strong);
-}
-
-body[data-theme="ember"] #compose .publish-family-button {
-  background: rgba(31, 7, 5, 0.96);
-  border-color: rgba(255, 120, 82, 0.18);
-}
-
-body[data-theme="ember"] #compose .publish-family-button span {
-  color: var(--accent);
-}
-
-body[data-theme="ember"] #compose .publish-family-button.is-active {
-  border-color: var(--accent);
-  background: linear-gradient(135deg, rgba(255, 68, 56, 0.14), rgba(255, 138, 61, 0.08)),
-    rgba(31, 7, 5, 0.96);
-}
-
-body[data-theme="ember"] #compose .publish-option-tile {
-  background: rgba(31, 7, 5, 0.82);
-  border-color: var(--line);
-}
-
-body[data-theme="ember"] #compose .publish-github-repo input {
-  background: rgba(28, 4, 3, 0.92);
-}
-
-body[data-theme="ember"] #compose .post-form textarea {
-  color: var(--text);
-}
-
-/* Ember theme - dark repo info */
-body[data-theme="ember"] .publish-github-repo {
-  color: rgba(205, 187, 163, 0.9);
-}
-
-/* Responsive */
-@media (max-width: 560px) {
-  #compose .publish-family-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  #compose .publish-studio-actions .button {
-    width: 100%;
-  }
-}
-
-/* Theme Overrides for Publish Overlay */
-
-body[data-theme="midnight"] #compose .studio-publish-dialog {
-  background:
-    radial-gradient(circle at top left, rgba(125, 211, 252, 0.12), transparent 32%),
-    var(--surface-strong);
-}
-
-body[data-theme="midnight"] #compose .publish-family-button {
-  background: rgba(8, 14, 22, 0.96);
-  border-color: var(--line);
-  color: #fff;
-}
-
-body[data-theme="midnight"] #compose .publish-family-button span {
-  color: #fff;
-}
-
-/* Light theme - white background with dark text */
-body:not([data-theme="midnight"]) #compose .publish-family-button {
-  background: var(--surface-strong);
-  border-color: rgba(15, 23, 32, 0.16);
-  color: #0c151d;
-}
-
-body:not([data-theme="midnight"]) #compose .publish-family-button span {
-  color: var(--accent);
-}
-
-body[data-theme="midnight"] #compose .publish-option-panel {
-  background: rgba(8, 14, 22, 0.78);
-  border-color: var(--line);
-  color: #fff;
-}
-
-body[data-theme="midnight"] #compose .publish-option-tile {
-  background: rgba(8, 14, 22, 0.78);
-  border-color: var(--line);
-  color: #fff;
-}
-
-/* Light theme - white backgrounds with dark text */
-body:not([data-theme="midnight"]) #compose .publish-option-panel {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(15, 23, 32, 0.12);
-  color: #0c151d;
-}
-
-body:not([data-theme="midnight"]) #compose .publish-option-tile {
-  background: rgba(255, 255, 255, 0.96);
-  border-color: rgba(15, 23, 32, 0.1);
-  color: #0c151d;
-}
-
-body[data-theme="midnight"] #compose .publish-github-repo {
-  color: rgba(185, 198, 215, 0.9);
-}
-
-/* Light theme - white repo info */
-body:not([data-theme="midnight"]) #compose .publish-github-repo {
-  color: #fff;
-}
-
-body[data-theme="midnight"] #compose .post-form textarea {
-  color: var(--text);
-  background: rgba(8, 14, 22, 0.96);
-}
-
-body:not([data-theme="midnight"]) #compose .post-form textarea {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.96);
-}
-
-/* Ember theme - dark backgrounds with white text */
-body[data-theme="ember"] #compose .publish-family-button {
-  background: rgba(31, 7, 5, 0.96);
-  border-color: rgba(255, 120, 82, 0.18);
-  color: #fff;
-}
-
-body[data-theme="ember"] #compose .publish-family-button span {
-  color: #fff;
-}
-
-body[data-theme="ember"] #compose .publish-option-panel {
-  background: rgba(31, 7, 5, 0.82);
-  border-color: var(--line);
-  color: #fff;
-}
-
-body[data-theme="ember"] #compose .publish-option-tile {
-  background: rgba(31, 7, 5, 0.82);
-  border-color: var(--line);
-  color: #fff;
-}
-
-/* Ember - orange repo info */
-body[data-theme="ember"] #compose .publish-github-repo {
-  color: rgba(247, 239, 216, 0.95);
 }
