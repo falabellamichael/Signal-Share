@@ -465,7 +465,12 @@ function metaAuthorizeUrl(provider: "facebook" | "instagram", state: string, red
 function callbackUrl(url: URL) {
   // Force HTTPS in production because Supabase load balancer forwards as HTTP
   const protocol = url.hostname.endsWith(".supabase.co") ? "https:" : url.protocol;
-  return `${protocol}//${url.host}${url.pathname}`;
+  let pathname = url.pathname;
+  // Supabase proxy strips /functions/v1 from the internal path, so we must restore it
+  if (url.hostname.endsWith(".supabase.co") && !pathname.startsWith("/functions/v1/")) {
+    pathname = `/functions/v1${pathname.startsWith("/") ? "" : "/"}${pathname}`;
+  }
+  return `${protocol}//${url.host}${pathname}`;
 }
 
 function providerIsConfigured(provider: ConnectProvider) {
