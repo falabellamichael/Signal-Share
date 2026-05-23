@@ -1147,12 +1147,9 @@
             input.placeholder = "Uploading attachment...";
 
             const tempId = crypto.randomUUID();
-            const isInstagram = detectedKind === "image" && selectedOptions().some((option) => (option?.id || "").includes("instagram"));
-            const needsJpegImage = detectedKind === "image" && selectedOptions().some((option) => (
-              ["social-instagram", "social-linkedin"].includes(option?.id || "")
-            ));
+            const needsJpegImage = detectedKind === "image"; // Always use JPEG for social publish to avoid Twitter WebP issues
             const res = await appState.uploadFileToSupabase(tempId, file, null, {
-              enforceInstagramRatio: isInstagram,
+              enforceInstagramRatio: detectedKind === "image",
               outputType: needsJpegImage ? "image/jpeg" : "image/webp",
             });
 
