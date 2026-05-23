@@ -1706,7 +1706,7 @@
     <script src="bridge-fetch-hardening.js?v=1.1"></script>
     <script src="local-llm-connectivity.js?v=1.0"></script>
     <script src="messenger-realtime.js?v=1.5"></script>
-    <script src="companion-ai-core.js?v=1.5"></script>
+    <script src="companion-ai-core.js?v=1.6"></script>
     <script src="arcade-commands/manager.js?v=1.2"></script>
     <script src="arcade-commands/edit.js?v=1.4"></script>
     <script src="arcade-commands/fix.js?v=1.3"></script>
@@ -1719,7 +1719,7 @@
     <script src="arcade-workshop-manager.js?v=1.0"></script>
     <script src="amd-optimizations.js?v=1.0"></script>
     <script src="arcade-chat-context.js?v=1.1"></script>
-    <script src="arcade-chat.js?v=1.53" defer></script>
+    <script src="arcade-chat.js?v=1.54" defer></script>
     <script type="module" src="app-v3.js?v=1.38"></script>
     <script src="./studio-overlays.js?v=1.0" defer></script>
     <script src="./studio-auth-overlay.js?v=1.0" defer></script>
@@ -1874,7 +1874,7 @@
                 <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px; background: rgba(103, 193, 245, 0.08); border: 1px solid rgba(103, 193, 245, 0.2); border-radius: 8px;">
                     <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.65);">LM Studio MCP Tools</label>
                     <p style="margin: 0; font-size: 0.72rem; line-height: 1.4; color: rgba(255,255,255,0.6);">
-                        Choose tools from this PC user's LM Studio. Filesystem tools may read or change any allowed folders.
+                        Select a server, then authorize one exact tool per request with <code>/mcp read_file</code>. Without that directive, no MCP tool is provided to the model.
                     </p>
                     <div id="sidebar-lm-studio-mcp-tools" style="min-height: 36px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 6px; font-size: 0.75rem; color: rgba(255,255,255,0.55);">
                         Open Security Dashboard to load tools.

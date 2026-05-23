@@ -600,7 +600,7 @@ window.refreshLmStudioMcpTools = async function () {
                         .map((input) => input.value);
                     storeSelectedLmStudioMcpTools(checkedIds);
                     setLmStudioMcpStatus(
-                        checkedIds.length > 0 ? 'Selected tools will be available on new AI messages.' : 'No LM Studio tools selected.',
+                        checkedIds.length > 0 ? 'Selected servers are usable only with /mcp <exact_tool_name> in your message.' : 'No LM Studio MCP servers selected.',
                         checkedIds.length > 0 ? '#75b022' : 'rgba(255,255,255,0.55)'
                     );
                 });
@@ -614,7 +614,7 @@ window.refreshLmStudioMcpTools = async function () {
 
         setLmStudioMcpStatus(
             payload.ready
-                ? 'Only enable tools you trust; file tools may read or change files.'
+                ? 'Tool access is per request: start a message with /mcp read_file to allow only read_file.'
                 : 'Add a private LM Studio API token to the backend before selected tools can run.',
             payload.ready ? '#ffb86c' : '#ffb86c'
         );

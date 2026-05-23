@@ -286,7 +286,7 @@ The bridge is compatible with any OpenAI-standard local server:
 
 #### Optional: Use LM Studio MCP Tools
 
-Signal Share can use MCP tools configured by the current PC user in LM Studio while keeping its existing allowlisted bridge actions available. The bridge reads only MCP server labels from that user's LM Studio `mcp.json`; a browser user must explicitly select a discovered tool in the Companion Security Dashboard before an AI message can request it.
+Signal Share can use MCP tools configured by the current PC user in LM Studio while keeping its existing allowlisted bridge actions available. The bridge reads only MCP server labels from that user's LM Studio `mcp.json`; selecting a server does not grant its tools to ordinary chat messages.
 Normal local chat continues to use the OpenAI-compatible endpoint; messages with a selected MCP tool use LM Studio REST API v1 `POST /api/v1/chat`, which is the LM Studio endpoint that supports installed MCP plugins.
 
 1. In LM Studio 0.4.0 or newer, enable API authentication and enable **Allow calling servers from mcp.json** in Developer server settings.
@@ -300,7 +300,15 @@ Normal local chat continues to use the OpenAI-compatible endpoint; messages with
    # SIGNAL_SHARE_LM_STUDIO_MCP_CONTEXT_LENGTH=8000
    ```
 
-5. Restart the Signal Share bridge, open the Companion **Security** dashboard, and select the LM Studio tools this browser user may use. The tool panel reports when the private LM Studio token is still required.
+5. Restart the Signal Share bridge, open the Companion **Security** dashboard, and select the LM Studio server this browser user may use. The tool panel reports when the private LM Studio token is still required.
+6. Authorize exactly one MCP tool for a request by beginning the message with its exact tool name:
+
+   ```text
+   /mcp read_file
+   Read ./backend/server.js and summarize the chat route.
+   ```
+
+   The backend sends `allowed_tools: ["read_file"]` for that request only. A selected server receives no MCP-enabled request unless the message contains an explicit `/mcp <tool_name>` directive. To authorize a write-capable tool, the message must explicitly name that write tool.
 
 The filesystem MCP example is not a web search tool; web search requires a separate MCP server that provides web access. Do not store the LM Studio API token in frontend files, browser local storage, or source control. Signal Share's existing strict application and media tools continue to use their current bridge allowlists.
 

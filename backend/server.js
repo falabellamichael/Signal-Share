@@ -53,6 +53,17 @@ function normalizeLmStudioMcpSelection(value) {
     .slice(0, LM_STUDIO_MAX_MCP_SELECTIONS);
 }
 
+function normalizeLmStudioMcpToolName(value = "") {
+  const toolName = `${value || ""}`.trim();
+  return /^[a-z][a-z0-9._:/-]{0,119}$/i.test(toolName) ? toolName : "";
+}
+
+function extractExplicitLmStudioMcpTools(message = "") {
+  const directive = `${message || ""}`.match(/(?:^|\r?\n)\s*\/mcp\s+([a-z][a-z0-9._:/-]{0,119})(?=\s|$)/i);
+  const toolName = normalizeLmStudioMcpToolName(directive?.[1]);
+  return toolName ? [toolName] : [];
+}
+
 async function readLmStudioMcpCatalog() {
   try {
     const raw = await readFile(LM_STUDIO_MCP_CONFIG_PATH, "utf8");
@@ -76,14 +87,15 @@ async function readLmStudioMcpCatalog() {
   }
 }
 
-async function resolveLmStudioMcpIntegrations(requestedPluginIds = []) {
+async function resolveLmStudioMcpIntegrations(requestedPluginIds = [], allowedTools = []) {
   const selectedIds = normalizeLmStudioMcpSelection(requestedPluginIds);
-  if (selectedIds.length === 0) return [];
+  const explicitTools = allowedTools.map(normalizeLmStudioMcpToolName).filter(Boolean).slice(0, 1);
+  if (selectedIds.length === 0 || explicitTools.length === 0) return [];
   const catalog = await readLmStudioMcpCatalog();
   const installedIds = new Set(catalog.plugins.map((plugin) => plugin.id));
   return selectedIds
     .filter((id) => installedIds.has(id))
-    .map((id) => ({ type: "plugin", id }));
+    .map((id) => ({ type: "plugin", id, allowed_tools: explicitTools }));
 }
 
 function getLmStudioRequestHeaders() {
@@ -136,6 +148,7 @@ function sanitizeHistoryForConversation(history, conversationId = "") {
 function buildMessages({ message = "", history = [], pageContext = "", customInstructions = "", conversationId = "" } = {}) {
   const messages = [];
   messages.push({ role: "system", content: `You are a helpful assistant for Signal Share — a social platform.` });
+  messages.push({ role: "system", content: "Never emit [LIST_FILES], [READ_FILE], or [WRITE_FILE] action tags. File MCP tools are available only when explicitly authorized for the current user request." });
   if (`${customInstructions || ""}`.trim()) {
     messages.push({ role: "system", content: `${customInstructions}`.trim() });
   }
@@ -733,18 +746,22 @@ async function handleChatRoute(req, res) {
       return res.status(400).json({ ok: false, error: "No message provided." });
     }
     const requestedLmStudioMcpTools = normalizeLmStudioMcpSelection(lmStudioMcpTools);
+    const explicitlyAllowedLmStudioMcpTools = extractExplicitLmStudioMcpTools(message);
     if (Array.isArray(lmStudioMcpTools) && lmStudioMcpTools.length > 0 && requestedLmStudioMcpTools.length === 0) {
       return res.status(400).json({ ok: false, error: "The LM Studio MCP tool selection is invalid." });
     }
     let lmStudioMcpIntegrations = [];
-    if (requestedLmStudioMcpTools.length > 0) {
+    if (explicitlyAllowedLmStudioMcpTools.length > 0 && requestedLmStudioMcpTools.length === 0) {
+      return res.status(400).json({ ok: false, error: "Select an LM Studio MCP server in Security before using /mcp <tool_name>." });
+    }
+    if (requestedLmStudioMcpTools.length > 0 && explicitlyAllowedLmStudioMcpTools.length > 0) {
       if (!hasAuthorizedBridgeCredential(req)) {
         return res.status(403).json({ ok: false, error: "LM Studio MCP tools require a configured bridge secret or local LLM token." });
       }
       if (!LM_STUDIO_API_TOKEN) {
         return res.status(503).json({ ok: false, error: "LM Studio MCP tools require a private LM Studio API token in the backend configuration." });
       }
-      lmStudioMcpIntegrations = await resolveLmStudioMcpIntegrations(requestedLmStudioMcpTools);
+      lmStudioMcpIntegrations = await resolveLmStudioMcpIntegrations(requestedLmStudioMcpTools, explicitlyAllowedLmStudioMcpTools);
       if (lmStudioMcpIntegrations.length !== requestedLmStudioMcpTools.length) {
         return res.status(400).json({ ok: false, error: "One or more selected LM Studio MCP tools are no longer installed for this user." });
       }

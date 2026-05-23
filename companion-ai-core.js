@@ -3,7 +3,7 @@
  * Shared capability logic for both companions (main page + mini-games).
  */
 (function initSignalShareAiCore(global) {
-    const CORE_VERSION = "1.2";
+    const CORE_VERSION = "1.3";
     const DEFAULT_MAX_HISTORY_MESSAGES = 12; // Reduced from 18
     const DEFAULT_MAX_MESSAGE_CHARS = 800;  // Reduced from 900
     const DEFAULT_MAX_PAGE_TEXT_CHARS = 500; // Reduced from 600
@@ -42,9 +42,6 @@
         SCREENSHOT: "[SCREENSHOT]",
         LIST_TABS: "[LIST_TABS]",
         LIST_APPS: "[LIST_APPS]",
-        LIST_FILES: "[LIST_FILES: path]",
-        READ_FILE: "[READ_FILE: path]",
-        WRITE_FILE: "[WRITE_FILE: { \"path\": \"...\", \"content\": \"...\" }]",
         LAUNCH: "[LAUNCH: app_id]",
         CLOSE: "[CLOSE: app_id]"
     });
@@ -420,6 +417,7 @@
             hardRules: [
                 "Never claim an action executed unless a tag/action is emitted.",
                 "Never output secrets or private credentials.",
+                "Never emit [LIST_FILES], [READ_FILE], or [WRITE_FILE] tags; local file tools require an explicit /mcp <tool_name> request.",
                 "Use [COMPOSE:<text>] only when the user explicitly asks to draft/prefill a DM or message.",
                 "Never use [COMPOSE:<text>] for coding requests, debugging, or general Q&A.",
                 "For Arcade Library/Workshop publishing, use [PUBLISH:{...}] with target:\"workshop\" and include code/files payload when possible.",
