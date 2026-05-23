@@ -920,7 +920,8 @@
             input.placeholder = "Uploading image...";
 
             const tempId = crypto.randomUUID();
-            const res = await appState.uploadFileToSupabase(tempId, file);
+            const isInstagram = selectedOptions().some(o => (o?.id || "").includes("instagram"));
+            const res = await appState.uploadFileToSupabase(tempId, file, null, { enforceInstagramRatio: isInstagram });
 
             input.value = res.mediaUrl;
             input.placeholder = config.placeholder || "";

@@ -416,7 +416,7 @@ export async function publishPostToSupabase(post, onProgress) {
   if (error) throw error; return normalizeSupabasePost(data);
 }
 
-export async function compressImageFile(file, maxWidth = 1920, quality = 0.8) {
+export async function compressImageFile(file, maxWidth = 1920, quality = 0.8, options = {}) {
   if (!file.type.startsWith("image/") || file.type === "image/gif" || file.type === "image/svg+xml") return file;
   return new Promise((resolve) => {
     const img = new Image();
@@ -424,6 +424,21 @@ export async function compressImageFile(file, maxWidth = 1920, quality = 0.8) {
     img.onload = () => {
       URL.revokeObjectURL(url);
       let { width, height } = img;
+      
+      let sx = 0, sy = 0, sWidth = width, sHeight = height;
+      if (options.enforceInstagramRatio) {
+        const ratio = width / height;
+        if (ratio < 0.8) {
+          sHeight = width / 0.8;
+          sy = (height - sHeight) / 2;
+          height = sHeight;
+        } else if (ratio > 1.91) {
+          sWidth = height * 1.91;
+          sx = (width - sWidth) / 2;
+          width = sWidth;
+        }
+      }
+
       if (width > maxWidth || height > maxWidth) {
         if (width > height) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
         else { width = Math.round((width * maxWidth) / height); height = maxWidth; }
@@ -431,7 +446,7 @@ export async function compressImageFile(file, maxWidth = 1920, quality = 0.8) {
       const canvas = document.createElement("canvas");
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, width, height);
+      ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, width, height);
       canvas.toBlob((blob) => {
         if (!blob) return resolve(file);
         const extension = file.name.split('.').pop();
@@ -444,8 +459,8 @@ export async function compressImageFile(file, maxWidth = 1920, quality = 0.8) {
   });
 }
 
-export async function uploadFileToSupabase(postId, file, onProgress) {
-  const compressedFile = await compressImageFile(file);
+export async function uploadFileToSupabase(postId, file, onProgress, options = {}) {
+  const compressedFile = await compressImageFile(file, 1920, 0.8, options);
   const safeName = compressedFile.name.toLowerCase().replace(/[^a-z0-9.\-_]+/g, "-"); 
   const ownerPath = apiContext.state.currentUser?.id ? `${apiContext.state.currentUser.id}/` : ""; 
   const filePath = `${ownerPath}${postId}/${safeName}`;
