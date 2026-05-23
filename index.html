@@ -1719,8 +1719,8 @@
     <script src="arcade-workshop-manager.js?v=1.0"></script>
     <script src="amd-optimizations.js?v=1.0"></script>
     <script src="arcade-chat-context.js?v=1.1"></script>
-    <script src="arcade-chat.js?v=1.52" defer></script>
-    <script type="module" src="app-v3.js?v=1.37"></script>
+    <script src="arcade-chat.js?v=1.53" defer></script>
+    <script type="module" src="app-v3.js?v=1.38"></script>
     <script src="./studio-overlays.js?v=1.0" defer></script>
     <script src="./studio-auth-overlay.js?v=1.0" defer></script>
     <script src="./studio-publish-fields.js?v=1.0" defer></script>
@@ -1869,6 +1869,18 @@
                 <div style="display: flex; flex-direction: column; gap: 6px;">
                     <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Local LLM Token</label>
                     <input type="password" id="sidebar-local-llm-token" placeholder="Optional LAN auth token" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px; background: rgba(103, 193, 245, 0.08); border: 1px solid rgba(103, 193, 245, 0.2); border-radius: 8px;">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.65);">LM Studio MCP Tools</label>
+                    <p style="margin: 0; font-size: 0.72rem; line-height: 1.4; color: rgba(255,255,255,0.6);">
+                        Choose tools from this PC user's LM Studio. Filesystem tools may read or change any allowed folders.
+                    </p>
+                    <div id="sidebar-lm-studio-mcp-tools" style="min-height: 36px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 6px; font-size: 0.75rem; color: rgba(255,255,255,0.55);">
+                        Open Security Dashboard to load tools.
+                    </div>
+                    <button type="button" onclick="refreshLmStudioMcpTools()" style="padding: 8px; background: transparent; border: 1px solid #333; border-radius: 6px; color: #67c1f5; font-size: 0.7rem; font-weight: 700; cursor: pointer;">Refresh LM Studio Tools</button>
+                    <div id="sidebar-lm-studio-mcp-status" aria-live="polite" style="font-size: 0.7rem; line-height: 1.4; color: rgba(255,255,255,0.55);"></div>
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 6px;">

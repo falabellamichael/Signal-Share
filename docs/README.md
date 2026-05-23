@@ -284,6 +284,26 @@ The bridge is compatible with any OpenAI-standard local server:
 - **LM Studio / LocalAI**: Start the local server on port `1234` or `8080`.
 - In the Arcade Companion UI, select your model from the dropdown (e.g., Qwen 3.5, Gemma 4, or DeepSeek R1).
 
+#### Optional: Use LM Studio MCP Tools
+
+Signal Share can use MCP tools configured by the current PC user in LM Studio while keeping its existing allowlisted bridge actions available. The bridge reads only MCP server labels from that user's LM Studio `mcp.json`; a browser user must explicitly select a discovered tool in the Companion Security Dashboard before an AI message can request it.
+Normal local chat continues to use the OpenAI-compatible endpoint; messages with a selected MCP tool use LM Studio REST API v1 `POST /api/v1/chat`, which is the LM Studio endpoint that supports installed MCP plugins.
+
+1. In LM Studio 0.4.0 or newer, enable API authentication and enable **Allow calling servers from mcp.json** in Developer server settings.
+2. Add only MCP tools you trust to LM Studio's `mcp.json`. Filesystem MCP servers may read or modify every folder they are allowed to access.
+3. Keep a `SIGNAL_SHARE_BRIDGE_SECRET` or `SIGNAL_SHARE_LOCAL_LLM_TOKEN` configured in `backend/.env`; LM Studio MCP discovery and execution require a matching bridge credential from the browser.
+4. Add the private LM Studio API token to `backend/.env`:
+
+   ```env
+   SIGNAL_SHARE_LM_STUDIO_API_TOKEN=your_lm_studio_api_token
+   # Optional context length for MCP requests:
+   # SIGNAL_SHARE_LM_STUDIO_MCP_CONTEXT_LENGTH=8000
+   ```
+
+5. Restart the Signal Share bridge, open the Companion **Security** dashboard, and select the LM Studio tools this browser user may use. The tool panel reports when the private LM Studio token is still required.
+
+The filesystem MCP example is not a web search tool; web search requires a separate MCP server that provides web access. Do not store the LM Studio API token in frontend files, browser local storage, or source control. Signal Share's existing strict application and media tools continue to use their current bridge allowlists.
+
 #### 4. Dashboard Management
 Monitor your security status in real-time:
 - Open the **Arcade Companion Sidebar**.

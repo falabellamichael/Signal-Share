@@ -416,6 +416,9 @@ async function callLocalAI({
       customInstructions,
       attachment,
       history: Array.isArray(history) ? history : [],
+      lmStudioMcpTools: typeof window.getSelectedLmStudioMcpTools === "function"
+        ? window.getSelectedLmStudioMcpTools()
+        : [],
       pageContext: pageContext || "Signal Share"
     });
     const candidateChatPaths = ["/api/local-llm/chat", "/api/llm/chat"];

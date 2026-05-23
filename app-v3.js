@@ -17,7 +17,7 @@ import {
   appendAiThreadFromLocalHistory,
   handleAiOpenOrCreateThread,
   handleAiThreadMessageSubmit
-} from "./app-v3-ai.js?v=1.2";
+} from "./app-v3-ai.js?v=1.3";
 import {
   DEFAULT_BLOCKED_TERMS,
   POST_MODERATION_ERROR,

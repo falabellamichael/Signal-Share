@@ -6,6 +6,7 @@
 let BRIDGE_BASE_URL = "";
 const BRIDGE_LAST_WORKING_BASE_KEY = "ss_bridge_last_working_base";
 const CHAT_MODEL_PREFERENCE_KEY = 'arcade-chat-model';
+const LM_STUDIO_MCP_SELECTION_KEY = 'ss_lm_studio_mcp_tools';
 const ARCADE_CHAT_SIDEBAR_WIDTH_KEY = 'arcade-chat-sidebar-width';
 const STEAM_SHELL_LEFT_NAV_WIDTH = 240;
 const STEAM_SHELL_DIVIDER_WIDTH = 6;
@@ -515,6 +516,114 @@ function setupChatModelSelect() {
     void hydrateChatModelSelect();
 }
 
+function normalizeLmStudioMcpPluginId(value = '') {
+    const id = `${value || ''}`.trim();
+    return /^mcp\/[a-z0-9][a-z0-9._/-]{0,119}$/i.test(id) ? id : '';
+}
+
+function getSelectedLmStudioMcpTools() {
+    try {
+        const stored = JSON.parse(localStorage.getItem(LM_STUDIO_MCP_SELECTION_KEY) || '[]');
+        if (!Array.isArray(stored)) return [];
+        return [...new Set(stored.map(normalizeLmStudioMcpPluginId).filter(Boolean))].slice(0, 16);
+    } catch (_error) {
+        return [];
+    }
+}
+
+function storeSelectedLmStudioMcpTools(pluginIds = []) {
+    const normalized = [...new Set(pluginIds.map(normalizeLmStudioMcpPluginId).filter(Boolean))].slice(0, 16);
+    localStorage.setItem(LM_STUDIO_MCP_SELECTION_KEY, JSON.stringify(normalized));
+}
+
+function setLmStudioMcpStatus(text = '', color = 'rgba(255,255,255,0.55)') {
+    const status = document.getElementById('sidebar-lm-studio-mcp-status');
+    if (!status) return;
+    status.textContent = text;
+    status.style.color = color;
+}
+
+window.refreshLmStudioMcpTools = async function () {
+    const toolsList = document.getElementById('sidebar-lm-studio-mcp-tools');
+    if (!toolsList) return;
+
+    toolsList.replaceChildren();
+    const loading = document.createElement('span');
+    loading.textContent = 'Reading LM Studio tools...';
+    toolsList.appendChild(loading);
+    setLmStudioMcpStatus('');
+
+    try {
+        const response = await bridgeFetch('/api/local-llm/mcp-tools', {
+            method: 'GET',
+            timeoutMs: 4000,
+            suppressNetworkErrors: true
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.ok) {
+            toolsList.textContent = 'Tools unavailable until bridge credentials are saved.';
+            setLmStudioMcpStatus(payload?.error || 'Could not read LM Studio tools.', '#ffb86c');
+            return;
+        }
+
+        const plugins = Array.isArray(payload.plugins) ? payload.plugins : [];
+        const selected = new Set(getSelectedLmStudioMcpTools());
+        const availableIds = new Set(plugins.map((plugin) => normalizeLmStudioMcpPluginId(plugin?.id)).filter(Boolean));
+        const retainedSelections = [...selected].filter((id) => availableIds.has(id));
+        if (retainedSelections.length !== selected.size) {
+            storeSelectedLmStudioMcpTools(retainedSelections);
+        }
+
+        toolsList.replaceChildren();
+        if (plugins.length === 0) {
+            toolsList.textContent = 'No MCP servers are configured in this user\'s LM Studio.';
+        } else {
+            for (const [index, plugin] of plugins.entries()) {
+                const pluginId = normalizeLmStudioMcpPluginId(plugin?.id);
+                if (!pluginId) continue;
+
+                const row = document.createElement('label');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.gap = '8px';
+                row.style.padding = '6px 0';
+                row.style.fontSize = '0.78rem';
+                row.style.color = '#eee';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `sidebar-lm-studio-mcp-${index}`;
+                checkbox.value = pluginId;
+                checkbox.checked = selected.has(pluginId);
+                checkbox.addEventListener('change', () => {
+                    const checkedIds = Array.from(toolsList.querySelectorAll('input[type="checkbox"]:checked'))
+                        .map((input) => input.value);
+                    storeSelectedLmStudioMcpTools(checkedIds);
+                    setLmStudioMcpStatus(
+                        checkedIds.length > 0 ? 'Selected tools will be available on new AI messages.' : 'No LM Studio tools selected.',
+                        checkedIds.length > 0 ? '#75b022' : 'rgba(255,255,255,0.55)'
+                    );
+                });
+
+                const name = document.createElement('span');
+                name.textContent = `${plugin?.label || pluginId} (${pluginId})`;
+                row.append(checkbox, name);
+                toolsList.appendChild(row);
+            }
+        }
+
+        setLmStudioMcpStatus(
+            payload.ready
+                ? 'Only enable tools you trust; file tools may read or change files.'
+                : 'Add a private LM Studio API token to the backend before selected tools can run.',
+            payload.ready ? '#ffb86c' : '#ffb86c'
+        );
+    } catch (_error) {
+        toolsList.textContent = 'Unable to reach the bridge for LM Studio tools.';
+        setLmStudioMcpStatus('Check the bridge connection and credentials.', '#ffb86c');
+    }
+};
+
 function resolveChatRequestModel(selectedValue = "auto") {
     const normalizedSelected = `${selectedValue || ""}`.trim();
     if (normalizedSelected && normalizedSelected.toLowerCase() !== "auto") {
@@ -710,6 +819,7 @@ async function retryPublishWithAI(userPrompt = '', customRetryPrompt = '', signa
         attachment: null,
         history: [],
         conversationId: activeConversationId,
+        lmStudioMcpTools: getSelectedLmStudioMcpTools(),
         pageContext: retryContext
     });
 
@@ -757,6 +867,7 @@ async function retryWorkshopEditWithEditorContext(userPrompt = '', richContext =
         attachment: null,
         history: [],
         conversationId: activeConversationId,
+        lmStudioMcpTools: getSelectedLmStudioMcpTools(),
         pageContext: retryContext.slice(0, 10000)
     });
 
@@ -920,6 +1031,7 @@ async function retryWorkshopRewriteWithEditorContext(userPrompt = '', richContex
                 attachment: null,
                 history: [],
                 conversationId: activeConversationId,
+                lmStudioMcpTools: getSelectedLmStudioMcpTools(),
                 pageContext: retryContext.slice(0, 24000)
             })
         });
@@ -1088,6 +1200,7 @@ if (typeof window !== "undefined") {
     window.bridgeFetch = bridgeFetch;
     window.resolveChatRequestModel = resolveChatRequestModel;
     window.isBridgeFeatureEnabled = isBridgeFeatureEnabled;
+    window.getSelectedLmStudioMcpTools = getSelectedLmStudioMcpTools;
 }
 
 async function getDesktopBridgeSnapshot({ suppressNetworkErrors = false } = {}) {
@@ -1401,6 +1514,8 @@ window.toggleChatSecurity = function () {
                 || `${localStorage.getItem('signal-share-bridge-url') || ''}`.trim();
         }
         if (localLlmTokenInput) localLlmTokenInput.value = getLocalLlmToken();
+
+        void window.refreshLmStudioMcpTools?.();
 
         // Refresh IP bans
         refreshBannedIps();
@@ -2800,6 +2915,7 @@ window.sendChatMessage = async function (promptOverride = '') {
                         attachment,
                         history: compactHistory,
                         conversationId: activeConversationId,
+                        lmStudioMcpTools: getSelectedLmStudioMcpTools(),
                         pageContext: compactPageContext
                     })
                 }

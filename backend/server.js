@@ -1,4 +1,6 @@
 import express from "express";
+import { readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { fork } from "node:child_process";
@@ -24,9 +26,75 @@ const LOCAL_LLM_TOKEN = process.env.SIGNAL_SHARE_LOCAL_LLM_TOKEN || "";
 const OLLAMA_BASE_URL = process.env.SIGNAL_SHARE_OLLAMA_BASE_URL || process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
 const DEFAULT_OLLAMA_MODEL = process.env.SIGNAL_SHARE_OLLAMA_MODEL || process.env.OLLAMA_MODEL || "llama3.1";
 const LM_STUDIO_BASE_URL = process.env.SIGNAL_SHARE_LM_STUDIO_BASE_URL || process.env.LM_STUDIO_BASE_URL || process.env.LMSTUDIO_BASE_URL || "http://127.0.0.1:1234";
+const LM_STUDIO_API_TOKEN = `${process.env.SIGNAL_SHARE_LM_STUDIO_API_TOKEN || process.env.LM_STUDIO_API_TOKEN || ""}`.trim();
+const LM_STUDIO_MCP_CONFIG_PATH = path.join(os.homedir(), ".lmstudio", "mcp.json");
+const LM_STUDIO_MCP_CONTEXT_LENGTH = parseBoundedInteger(process.env.SIGNAL_SHARE_LM_STUDIO_MCP_CONTEXT_LENGTH, 8000, 1024, 131072);
+const LM_STUDIO_MAX_MCP_SELECTIONS = 16;
 const AI_TEMPERATURE = Number.isFinite(Number(process.env.SIGNAL_SHARE_AI_TEMPERATURE))
   ? Number(process.env.SIGNAL_SHARE_AI_TEMPERATURE)
   : 0.7;
+
+function parseBoundedInteger(value, fallback, minimum, maximum) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return fallback;
+  return Math.max(minimum, Math.min(maximum, parsed));
+}
+
+function normalizeLmStudioPluginId(value = "") {
+  const id = `${value || ""}`.trim();
+  return /^mcp\/[a-z0-9][a-z0-9._/-]{0,119}$/i.test(id) ? id : "";
+}
+
+function normalizeLmStudioMcpSelection(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .map((entry) => normalizeLmStudioPluginId(typeof entry === "string" ? entry : entry?.id))
+    .filter(Boolean))]
+    .slice(0, LM_STUDIO_MAX_MCP_SELECTIONS);
+}
+
+async function readLmStudioMcpCatalog() {
+  try {
+    const raw = await readFile(LM_STUDIO_MCP_CONFIG_PATH, "utf8");
+    const config = JSON.parse(raw);
+    const servers = config?.mcpServers && typeof config.mcpServers === "object" && !Array.isArray(config.mcpServers)
+      ? config.mcpServers
+      : {};
+    const plugins = Object.keys(servers)
+      .map((label) => {
+        const id = normalizeLmStudioPluginId(`mcp/${label}`);
+        return id ? { id, label } : null;
+      })
+      .filter(Boolean)
+      .slice(0, LM_STUDIO_MAX_MCP_SELECTIONS);
+    return { installed: true, plugins };
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return { installed: false, plugins: [] };
+    }
+    throw new Error("Unable to read the local LM Studio MCP configuration.");
+  }
+}
+
+async function resolveLmStudioMcpIntegrations(requestedPluginIds = []) {
+  const selectedIds = normalizeLmStudioMcpSelection(requestedPluginIds);
+  if (selectedIds.length === 0) return [];
+  const catalog = await readLmStudioMcpCatalog();
+  const installedIds = new Set(catalog.plugins.map((plugin) => plugin.id));
+  return selectedIds
+    .filter((id) => installedIds.has(id))
+    .map((id) => ({ type: "plugin", id }));
+}
+
+function getLmStudioRequestHeaders() {
+  return LM_STUDIO_API_TOKEN
+    ? { Authorization: `Bearer ${LM_STUDIO_API_TOKEN}` }
+    : {};
+}
+
+function isLmStudioMcpReady(integrations = []) {
+  return integrations.length > 0 && Boolean(LM_STUDIO_API_TOKEN);
+}
 
 function normalizeBaseUrl(value = "") {
   const raw = `${value || ""}`.trim();
@@ -101,11 +169,20 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 180000) {
   }
 }
 
-async function getProviderCandidates(model = "auto") {
+async function getProviderCandidates(model = "auto", { lmStudioMcpIntegrations = [] } = {}) {
   const candidates = [];
   const lmStudioBase = normalizeBaseUrl(LM_STUDIO_BASE_URL);
   const lmStudioModels = await getLmStudioModelIds();
   if (lmStudioBase && lmStudioModels.length > 0) {
+    if (isLmStudioMcpReady(lmStudioMcpIntegrations)) {
+      candidates.push({
+        id: "lm-studio-mcp",
+        type: "lm-studio-mcp",
+        model: model === "auto" ? lmStudioModels[0] : model,
+        providerLabel: "LM Studio MCP provider"
+      });
+      return candidates;
+    }
     candidates.push({
       id: "lm-studio",
       type: "openai-compatible",
@@ -129,7 +206,10 @@ async function getLmStudioModelIds() {
   const base = normalizeBaseUrl(LM_STUDIO_BASE_URL);
   if (!base) return [];
   try {
-    const response = await fetchWithTimeout(`${base}/v1/models`, { method: "GET" }, 1500);
+    const response = await fetchWithTimeout(`${base}/v1/models`, {
+      method: "GET",
+      headers: getLmStudioRequestHeaders()
+    }, 1500);
     if (!response.ok) return [];
     const data = await response.json().catch(() => null);
     const models = Array.isArray(data?.data) ? data.data : [];
@@ -165,7 +245,10 @@ async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperat
 
   const response = await fetchWithTimeout(chatUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...getLmStudioRequestHeaders()
+    },
     body: JSON.stringify({
       model: selectedModel,
       messages,
@@ -187,6 +270,89 @@ async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperat
       .join("");
   }
   return typeof data?.choices?.[0]?.text === "string" ? data.choices[0].text : "";
+}
+
+function buildLmStudioMcpSystemPrompt(messages = []) {
+  const systemPrompt = messages
+    .filter((entry) => entry?.role === "system" && typeof entry.content === "string")
+    .map((entry) => entry.content.trim())
+    .filter(Boolean)
+    .join("\n\n");
+  const priorTurns = messages
+    .filter((entry) => entry?.role !== "system" && typeof entry.content === "string")
+    .slice(0, -1)
+    .map((entry) => `${entry.role === "assistant" ? "Assistant" : "User"}: ${entry.content.trim()}`)
+    .filter((entry) => !entry.endsWith(": "));
+
+  if (priorTurns.length === 0) return systemPrompt;
+  return [
+    systemPrompt,
+    "Recent conversation transcript for continuity only:",
+    "<conversation_history>",
+    priorTurns.join("\n"),
+    "</conversation_history>"
+  ].filter(Boolean).join("\n\n");
+}
+
+function getLastUserMessage(messages = []) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const entry = messages[index];
+    if (entry?.role === "user" && typeof entry.content === "string" && entry.content.trim()) {
+      return entry.content.trim();
+    }
+  }
+  return "Continue";
+}
+
+function extractLmStudioMcpReply(data) {
+  if (!Array.isArray(data?.output)) return "";
+  for (let index = data.output.length - 1; index >= 0; index -= 1) {
+    const item = data.output[index];
+    if (item?.type === "message" && typeof item.content === "string" && item.content.trim()) {
+      return item.content.trim();
+    }
+  }
+  return "";
+}
+
+async function callLmStudioMcpProvider({ messages, model, temperature, integrations = [] }) {
+  const base = normalizeBaseUrl(LM_STUDIO_BASE_URL);
+  const selectedModel = `${model || ""}`.trim();
+  if (!base || !selectedModel) {
+    throw new Error("LM Studio MCP chat model is unavailable.");
+  }
+  if (!isLmStudioMcpReady(integrations)) {
+    throw new Error("LM Studio MCP tools require a user selection and an API token.");
+  }
+
+  const response = await fetchWithTimeout(`${base}/api/v1/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getLmStudioRequestHeaders()
+    },
+    body: JSON.stringify({
+      model: selectedModel,
+      input: getLastUserMessage(messages),
+      system_prompt: buildLmStudioMcpSystemPrompt(messages),
+      integrations,
+      context_length: LM_STUDIO_MCP_CONTEXT_LENGTH,
+      temperature: Math.max(0, Math.min(1, Number(temperature) || 0)),
+      store: false,
+      stream: false
+    })
+  });
+  const raw = await response.text();
+  if (!response.ok) {
+    throw new Error(`LM Studio MCP provider returned HTTP ${response.status}: ${raw.slice(0, 240)}`);
+  }
+
+  const data = JSON.parse(raw);
+  const reply = extractLmStudioMcpReply(data);
+  if (!reply) {
+    throw new Error("LM Studio MCP provider returned no final assistant message.");
+  }
+  return reply;
 }
 
 async function callOllamaProvider({ messages, model, temperature }) {
@@ -223,9 +389,12 @@ async function callOllamaProvider({ messages, model, temperature }) {
   return data?.message?.content || data?.response || "";
 }
 
-async function getChatResponse({ message, history, pageContext, customInstructions, conversationId, model } = {}) {
+async function getChatResponse({ message, history, pageContext, customInstructions, conversationId, model, lmStudioMcpIntegrations = [] } = {}) {
   const messages = buildMessages({ message, history, pageContext, customInstructions, conversationId });
-  const providers = await getProviderCandidates(model);
+  const providers = await getProviderCandidates(model, { lmStudioMcpIntegrations });
+  if (lmStudioMcpIntegrations.length > 0 && !providers.some((provider) => provider.type === "lm-studio-mcp")) {
+    throw new Error("Selected LM Studio MCP tools require a running LM Studio server with an available chat model.");
+  }
   if (providers.length === 0) {
     throw new Error("No local chat provider is available. Start LM Studio Local Server or Ollama and load a chat model.");
   }
@@ -233,8 +402,15 @@ async function getChatResponse({ message, history, pageContext, customInstructio
   const providerErrors = [];
   for (const provider of providers) {
     try {
-      const reply = provider.type === "openai-compatible"
-        ? await callOpenAiCompatibleProvider({
+      const reply = provider.type === "lm-studio-mcp"
+        ? await callLmStudioMcpProvider({
+            messages,
+            model: provider.model,
+            temperature: AI_TEMPERATURE,
+            integrations: lmStudioMcpIntegrations
+          })
+        : provider.type === "openai-compatible"
+          ? await callOpenAiCompatibleProvider({
             chatUrl: provider.chatUrl,
             messages,
             model: provider.model,
@@ -257,13 +433,17 @@ async function getChatResponse({ message, history, pageContext, customInstructio
 
 const STRICT_TOOL_POLICY = `STRICT TOOL USAGE: Only respond when explicitly requested with /publish or matching intent. Otherwise, respond conversationally.`;
 
+function hasAuthorizedBridgeCredential(req) {
+  const bridgeSecret = req.headers["x-bridge-secret"] || req.headers["X-Bridge-Secret"] || "";
+  const localToken = req.headers["x-local-llm-token"] || req.headers["X-Local-LLM-Token"] || "";
+  return Boolean((BRIDGE_SECRET && bridgeSecret === BRIDGE_SECRET) || (LOCAL_LLM_TOKEN && localToken === LOCAL_LLM_TOKEN));
+}
+
 function isAuthorized(req) {
   const isLoopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
   if (isLoopback) return true;
   if (!BRIDGE_SECRET && !LOCAL_LLM_TOKEN) return true;
-  const bridgeSecret = req.headers["x-bridge-secret"] || req.headers["X-Bridge-Secret"] || "";
-  const localToken = req.headers["x-local-llm-token"] || req.headers["X-Local-LLM-Token"] || "";
-  return Boolean((BRIDGE_SECRET && bridgeSecret === BRIDGE_SECRET) || (LOCAL_LLM_TOKEN && localToken === LOCAL_LLM_TOKEN));
+  return hasAuthorizedBridgeCredential(req);
 }
 
 app.use(express.json({ limit: "50mb" }));
@@ -547,10 +727,27 @@ app.use((req, res, next) => {
 async function handleChatRoute(req, res) {
   try {
     if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized bridge request." });
-    const { message, history, pageContext, attachment, model, customInstructions } = req.body || {};
+    const { message, history, pageContext, attachment, model, customInstructions, lmStudioMcpTools } = req.body || {};
     const conversationId = normalizeConversationId(req.body?.conversationId || req.body?.chatId || "");
     if (!message && (!Array.isArray(history) || history.length === 0)) {
       return res.status(400).json({ ok: false, error: "No message provided." });
+    }
+    const requestedLmStudioMcpTools = normalizeLmStudioMcpSelection(lmStudioMcpTools);
+    if (Array.isArray(lmStudioMcpTools) && lmStudioMcpTools.length > 0 && requestedLmStudioMcpTools.length === 0) {
+      return res.status(400).json({ ok: false, error: "The LM Studio MCP tool selection is invalid." });
+    }
+    let lmStudioMcpIntegrations = [];
+    if (requestedLmStudioMcpTools.length > 0) {
+      if (!hasAuthorizedBridgeCredential(req)) {
+        return res.status(403).json({ ok: false, error: "LM Studio MCP tools require a configured bridge secret or local LLM token." });
+      }
+      if (!LM_STUDIO_API_TOKEN) {
+        return res.status(503).json({ ok: false, error: "LM Studio MCP tools require a private LM Studio API token in the backend configuration." });
+      }
+      lmStudioMcpIntegrations = await resolveLmStudioMcpIntegrations(requestedLmStudioMcpTools);
+      if (lmStudioMcpIntegrations.length !== requestedLmStudioMcpTools.length) {
+        return res.status(400).json({ ok: false, error: "One or more selected LM Studio MCP tools are no longer installed for this user." });
+      }
     }
 
     // Check for media actions first
@@ -573,7 +770,8 @@ async function handleChatRoute(req, res) {
           pageContext,
           customInstructions,
           conversationId,
-          model
+          model,
+          lmStudioMcpIntegrations
         });
         return res.json({ ok: true, reply });
       } catch (chatError) {
@@ -619,6 +817,25 @@ app.get("/api/local-llm/models", async (req, res) => {
   }
 });
 
+app.get("/api/local-llm/mcp-tools", async (req, res) => {
+  if (!hasAuthorizedBridgeCredential(req)) {
+    return res.status(403).json({ ok: false, error: "LM Studio MCP discovery requires a configured bridge secret or local LLM token." });
+  }
+  try {
+    const catalog = await readLmStudioMcpCatalog();
+    return res.json({
+      ok: true,
+      source: "lm-studio-user-config",
+      installed: catalog.installed,
+      plugins: catalog.plugins,
+      ready: Boolean(LM_STUDIO_API_TOKEN)
+    });
+  } catch (error) {
+    console.error("[Bridge] /api/local-llm/mcp-tools error:", error.message);
+    return res.status(500).json({ ok: false, error: "Failed to read local LM Studio MCP tools." });
+  }
+});
+
 app.get("/api/local-llm/health", (req, res) => {
   if (!isAuthorized(req)) {
     return res.status(401).json({ ok: false, error: "Unauthorized local LLM request." });
@@ -626,6 +843,11 @@ app.get("/api/local-llm/health", (req, res) => {
   return res.json({
     ok: true,
     authMode: LOCAL_LLM_TOKEN ? "token-or-bridge-secret" : "bridge-secret-or-loopback",
+    lmStudioMcp: {
+      selectionMode: "local-user",
+      apiTokenConfigured: Boolean(LM_STUDIO_API_TOKEN),
+      bridgeCredentialRequired: true
+    },
     checkedAt: new Date().toISOString()
   });
 });
@@ -641,6 +863,11 @@ app.use((req, res) => {
 const globalServer = app.listen(port, () => {
   console.log(`[Bridge] Signal Share backend listening on port ${port} (IPv4 and IPv6)`);
   console.log(`[Bridge] AI endpoint: ${OLLAMA_BASE_URL}`);
+  if (LM_STUDIO_API_TOKEN && (BRIDGE_SECRET || LOCAL_LLM_TOKEN)) {
+    console.log("[Bridge] LM Studio MCP access is ready for authenticated user selections.");
+  } else if (LM_STUDIO_API_TOKEN) {
+    console.warn("[Bridge] LM Studio MCP access requires SIGNAL_SHARE_BRIDGE_SECRET or SIGNAL_SHARE_LOCAL_LLM_TOKEN before tools can be selected.");
+  }
 });
 
 // Keepalive for Node.js event loop
