@@ -598,7 +598,13 @@ body[data-theme="contrast"] #compose .publish-destination-feedback.is-error,
   box-shadow: none;
 }
 
-#compose.is-generic-dark .publish-modal-actions {
+body[data-theme="midnight"] #compose .publish-modal-actions,
+body[data-theme="contrast"] #compose .publish-modal-actions,
+body[data-theme="ember"] #compose .publish-modal-actions {
+  background: var(--publish-panel-strong);
+}
+
+body #compose.is-generic-dark .publish-modal-actions {
   background: #181818;
 }
 
@@ -963,4 +969,3 @@ body[data-theme="contrast"] #compose .publish-family-button,
   background: color-mix(in srgb, var(--publish-primary) 10%, transparent);
   color: color-mix(in srgb, var(--publish-primary) 85%, #fff);
 }
-
