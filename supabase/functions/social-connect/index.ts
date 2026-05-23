@@ -283,7 +283,12 @@ function safeReturnTo(value: unknown, requestOrigin: string | null) {
   if (!raw) return "";
   try {
     const url = new URL(raw);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+    if (url.protocol !== "http:" && url.protocol !== "https:" && url.protocol !== "capacitor:") return "";
+    
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      return url.toString();
+    }
+
     const allowed = new Set(SOCIAL_ALLOWED_RETURN_ORIGINS);
     const origin = normalizeOrigin(requestOrigin);
     if (origin) allowed.add(origin);
@@ -303,7 +308,7 @@ function readOriginList(value: unknown) {
 function normalizeOrigin(value: unknown) {
   try {
     const url = new URL(readString(value, 2048));
-    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : "";
+    return url.protocol === "http:" || url.protocol === "https:" || url.protocol === "capacitor:" ? url.origin : "";
   } catch (_error) {
     return "";
   }

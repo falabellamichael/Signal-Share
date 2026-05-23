@@ -250,6 +250,8 @@ let pendingNotificationThreadId = "";
 let messengerLifecycleListenersAttached = false;
 let messengerCatchUpPromise = null;
 let lastMessengerCatchUpAt = 0;
+let feedCatchUpPromise = null;
+let lastFeedCatchUpAt = 0;
 let nativeBackHandlerAttached = false;
 let permissionBootstrapBound = false;
 let localNetworkPermissionProbePromise = null;
@@ -978,6 +980,31 @@ async function safelyInitializeNativePushNotifications() {
   try { await initializeNativePushNotifications(); } catch (error) { console.error("Native push listeners could not be initialized", error); }
 }
 
+async function catchUpFeedState({ force = false } = {}) {
+  if (state.backendMode !== "supabase" || !state.supabase) return;
+  if (feedCatchUpPromise) { await feedCatchUpPromise; return; }
+  const now = Date.now();
+  if (!force && now - lastFeedCatchUpAt < 5000) return;
+  lastFeedCatchUpAt = now;
+  feedCatchUpPromise = (async () => {
+    try {
+      const newPosts = await loadPostsFromSupabase();
+      state.userPosts = healPosts(newPosts);
+      render();
+    } catch (error) {
+      console.error("Feed catch-up failed:", error);
+    }
+  })();
+  try { await feedCatchUpPromise; } finally { feedCatchUpPromise = null; }
+}
+
+async function catchUpAllStates({ force = false } = {}) {
+  await Promise.allSettled([
+    catchUpMessengerState({ force }),
+    catchUpFeedState({ force })
+  ]);
+}
+
 async function catchUpMessengerState({ force = false } = {}) {
   if (!isMessagingEnabled(state)) return;
   if (messengerCatchUpPromise) { await messengerCatchUpPromise; return; }
@@ -1000,15 +1027,15 @@ async function initializeMessengerLifecycleSync() {
   if (!window.__SIGNAL_SHARE_GLOBAL_LISTENERS__) {
     window.__SIGNAL_SHARE_GLOBAL_LISTENERS__ = true;
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) void catchUpMessengerState();
+      if (!document.hidden) void catchUpAllStates();
     });
   }
-  window.addEventListener("focus", () => void catchUpMessengerState());
+  window.addEventListener("focus", () => void catchUpAllStates());
   const app = getNativeAppPlugin();
   if (isNativeCapacitorApp() && app?.addListener) {
     try {
-      await app.addListener("appStateChange", (stateChange) => { if (stateChange?.isActive) void catchUpMessengerState(); });
-      await app.addListener("resume", () => void catchUpMessengerState());
+      await app.addListener("appStateChange", (stateChange) => { if (stateChange?.isActive) void catchUpAllStates(); });
+      await app.addListener("resume", () => void catchUpAllStates());
       await app.addListener("appUrlOpen", (event) => { void handleIncomingAppUrl(event?.url ?? "").catch((error) => console.error("Incoming app URL could not be handled", error)); });
       if (typeof app.getLaunchUrl === "function") {
         const launchUrl = await app.getLaunchUrl();

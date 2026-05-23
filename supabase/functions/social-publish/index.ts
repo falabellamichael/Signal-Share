@@ -200,6 +200,40 @@ async function publishInstagram(
   ));
   const creationId = readString(container.id, 300);
   if (!creationId) throw new Error("Instagram did not return a media container id.");
+
+  // Poll container status until it is FINISHED before publishing
+  let status = "IN_PROGRESS";
+  let attempts = 0;
+  const maxAttempts = 15; // 15 attempts * 3 seconds = 45 seconds max wait
+  while (status === "IN_PROGRESS" && attempts < maxAttempts) {
+    attempts++;
+    // Wait 3 seconds between polls
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    try {
+      const statusData = recordValue(await requestProviderJson(
+        metaGraphUrl(`${encodeURIComponent(creationId)}?fields=status_code&access_token=${accessToken}`),
+        { method: "GET" },
+        provider
+      ));
+      status = readString(statusData.status_code, 40).toUpperCase();
+      if (status === "FINISHED") {
+        break;
+      }
+      if (status === "ERROR") {
+        throw new Error("Instagram media container processing failed.");
+      }
+    } catch (e) {
+      console.error(`Instagram container status check attempt ${attempts} failed:`, e);
+      if (e instanceof Error && e.message.includes("failed")) {
+        throw e;
+      }
+    }
+  }
+
+  if (status !== "FINISHED") {
+    throw new Error(`Instagram media container is still processing (status: ${status}). Please try again shortly.`);
+  }
+
   const published = recordValue(await requestProviderJson(
     metaGraphUrl(`${encodeURIComponent(connection.provider_account_id)}/media_publish`),
     {
