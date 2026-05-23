@@ -157,6 +157,7 @@
       options: config.options || [],
       value: config.value || "",
       required: Boolean(config.required),
+
       wide: Boolean(config.wide || config.mode === "textarea"),
       persist: config.persist !== false,
       storageKey: config.storageKey || `signal-share-publish.${finalKey}`
@@ -200,7 +201,7 @@
       detailsText: "Post text, optional links, and provider-specific fields.",
       options: [
         { id: "social-facebook", icon: "📘", name: "Facebook", note: "Page connection", button: "Post to Facebook", hint: "Direct posting needs a connected Facebook Page.", fields: [field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a Facebook post", wide: true })] },
-        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Media connection", button: "Post to Instagram", hint: "Direct publishing needs a connected Instagram account and image media.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("instagramImageFile", { label: "Instagram image file", type: "file" }), field("instagramImageUrl", { label: "Instagram image URL (Optional if file selected)", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
+        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Media connection", button: "Post to Instagram", hint: "Direct publishing needs a connected Instagram account and image media.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("instagramImageUrl", { label: "Instagram image URL", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
         { id: "social-x", icon: "✕", name: "X", note: "Connect account", button: "Post to X", hint: "Posts with your connected X account without a provider handoff.", fields: [field("xHandle", { label: "From handle", placeholder: "@yourhandle" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write an X post", required: true, wide: true }), field("shareUrl", { label: "Optional link URL" })] },
         { id: "social-linkedin", icon: "💼", name: "LinkedIn", note: "Connect member", button: "Post to LinkedIn", hint: "Posts with your connected LinkedIn member without a provider handoff.", fields: [field("linkedinFrom", { label: "Profile or company", placeholder: "Signal Share" }), field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a LinkedIn post", wide: true })] }
       ]
@@ -327,11 +328,9 @@
     const isInstagram = selectedOptions().some(o => socialProviderId(o) === "instagram");
     if (isInstagram) {
       const urlVal = (details.instagramImageUrl || "").trim();
-      const fileInput = document.getElementById("publishTool-instagramImageFile");
-      const hasFile = fileInput && fileInput.files && fileInput.files[0];
-      if (!urlVal && !hasFile) {
-        setFeedback("Instagram direct publishing requires either a public image URL or an uploaded image file.", true);
-        fileInput?.focus();
+      if (!urlVal) {
+        setFeedback("Instagram direct publishing requires an image URL. Click the 📎 icon to select and upload an image.", true);
+        document.getElementById("publishTool-instagramImageUrl")?.focus();
         return false;
       }
     }
@@ -441,27 +440,12 @@
       throw new Error("Sign in before posting directly to connected Social providers.");
     }
 
-    let instagramImageUrl = item.details.instagramImageUrl || "";
-    const isInstagram = options.some((o) => socialProviderId(o) === "instagram");
-    if (isInstagram) {
-      const fileInput = document.getElementById("publishTool-instagramImageFile");
-      if (fileInput && fileInput.files && fileInput.files[0]) {
-        if (typeof appState.uploadFileToSupabase !== "function") {
-          throw new Error("Supabase file upload helper is not available. Please verify the client initialization.");
-        }
-        toast("Uploading Instagram image...");
-        const tempId = crypto.randomUUID();
-        const uploadResult = await appState.uploadFileToSupabase(tempId, fileInput.files[0]);
-        instagramImageUrl = uploadResult.mediaUrl;
-      }
-    }
-
     const { data, error } = await appState.supabase.functions.invoke(socialPublishFunctionName(), {
       body: {
         providers: options.map(socialProviderId).filter(Boolean),
         text: item.details.body || "",
         linkUrl: item.details.shareUrl || "",
-        instagramImageUrl: instagramImageUrl,
+        instagramImageUrl: item.details.instagramImageUrl || "",
         instagramHashtags: item.details.instagramHashtags || "",
         connectionIds: options.reduce((ids, option) => {
           const provider = socialProviderId(option);
@@ -854,11 +838,7 @@
     }
     const input = document.createElement("input");
     input.type = config.type || "text";
-    if (config.type !== "file") {
-      input.value = localStorage.getItem(config.storageKey) || config.value || "";
-    } else {
-      input.accept = "image/*";
-    }
+    input.value = localStorage.getItem(config.storageKey) || config.value || "";
     return input;
   }
 
@@ -874,7 +854,7 @@
       input.name = config.key;
       input.placeholder = config.placeholder || "";
       const persist = () => {
-        if (!config.persist || input.type === "file") return;
+        if (!config.persist) return;
         input.value ? localStorage.setItem(config.storageKey, input.value) : localStorage.removeItem(config.storageKey);
       };
       const syncField = () => {
@@ -883,7 +863,67 @@
       };
       input.addEventListener("input", syncField);
       input.addEventListener("change", syncField);
-      label.append(text, input);
+
+      let controlContainer = input;
+      if (config.key === "instagramImageUrl") {
+        const wrapper = document.createElement("div");
+        wrapper.className = "publish-url-upload-wrapper";
+
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "image/*";
+        fileInput.style.display = "none";
+
+        const uploadBtn = document.createElement("button");
+        uploadBtn.type = "button";
+        uploadBtn.className = "publish-upload-btn";
+        uploadBtn.innerHTML = "📎";
+        uploadBtn.title = "Upload image file";
+
+        uploadBtn.addEventListener("click", () => fileInput.click());
+
+        fileInput.addEventListener("change", async () => {
+          if (!fileInput.files || !fileInput.files[0]) return;
+          const file = fileInput.files[0];
+          const appState = window.state ?? window.__SIGNAL_SHARE_STATE__;
+          if (!appState?.supabase || !appState.currentUser) {
+            toast("Sign in to upload images.");
+            return;
+          }
+          if (typeof appState.uploadFileToSupabase !== "function") {
+            toast("Upload helper not available.");
+            return;
+          }
+
+          try {
+            uploadBtn.innerHTML = "⏳";
+            uploadBtn.disabled = true;
+            input.disabled = true;
+            input.placeholder = "Uploading image...";
+
+            const tempId = crypto.randomUUID();
+            const res = await appState.uploadFileToSupabase(tempId, file);
+
+            input.value = res.mediaUrl;
+            input.placeholder = config.placeholder || "";
+            input.dispatchEvent(new Event("input"));
+            input.dispatchEvent(new Event("change"));
+            toast("Image uploaded successfully!");
+          } catch (err) {
+            console.error(err);
+            toast("Upload failed: " + (err.message || err));
+          } finally {
+            uploadBtn.innerHTML = "📎";
+            uploadBtn.disabled = false;
+            input.disabled = false;
+          }
+        });
+
+        wrapper.append(input, fileInput, uploadBtn);
+        controlContainer = wrapper;
+      }
+
+      label.append(text, controlContainer);
       return label;
     }));
     dynamicFields.hidden = fields.length === 0;

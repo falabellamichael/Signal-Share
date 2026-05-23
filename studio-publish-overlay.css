@@ -868,43 +868,50 @@ body[data-theme="contrast"] #compose .publish-family-button,
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Premium styling for file inputs in the publish overlay */
-#compose .publish-field input[type="file"] {
-  padding: 8px 10px;
-  cursor: pointer;
+/* Premium styling for paperclip upload integration next to URL inputs */
+.publish-url-upload-wrapper {
+  position: relative;
   display: flex;
   align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 
-#compose .publish-field input[type="file"]::file-selector-button {
-  padding: 6px 14px;
+.publish-url-upload-wrapper input {
+  flex-grow: 1;
+}
+
+.publish-upload-btn {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border: 1px solid var(--publish-border);
-  border-radius: 10px;
-  background: var(--publish-button-soft);
+  border-radius: 16px;
   color: var(--publish-text);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
+  background: var(--publish-button-soft);
+  font-size: 18px;
   cursor: pointer;
-  margin-right: 12px;
   transition: background 160ms ease, border-color 160ms ease, transform 100ms ease;
 }
 
-#compose .publish-field input[type="file"]::file-selector-button:hover {
+.publish-upload-btn:hover {
   background: var(--publish-button-soft-hover);
   border-color: var(--publish-border-strong);
 }
 
-#compose .publish-field input[type="file"]::file-selector-button:active {
-  transform: scale(0.97);
+.publish-upload-btn:active {
+  transform: scale(0.95);
 }
 
-#compose.is-generic-dark .publish-field input[type="file"]::file-selector-button {
+#compose.is-generic-dark .publish-upload-btn {
   border-color: rgba(245, 245, 245, 0.15);
   background: rgba(245, 245, 245, 0.08);
 }
 
-#compose.is-generic-dark .publish-field input[type="file"]::file-selector-button:hover {
+#compose.is-generic-dark .publish-upload-btn:hover {
   background: rgba(245, 245, 245, 0.15);
   border-color: rgba(245, 245, 245, 0.3);
 }
