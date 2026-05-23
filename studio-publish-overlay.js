@@ -956,6 +956,7 @@
     input.className = "publish-media-kind-input";
     input.tabIndex = -1;
     input.setAttribute("aria-hidden", "true");
+    input.inert = true;
     const allowed = new Set(config.options.map(([kind]) => kind));
     const groups = [
       { key: "visual", icon: "\u{1F5BC}", label: "Image options", kinds: ["image", "gif"] },
