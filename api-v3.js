@@ -447,8 +447,8 @@ export async function compressImageFile(file, maxWidth = 1920, quality = 0.8, op
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, width, height);
-      const outputType = options.outputType === "image/jpeg" ? "image/jpeg" : "image/webp";
-      const outputExtension = outputType === "image/jpeg" ? ".jpg" : ".webp";
+      const outputType = options.outputType === "image/webp" ? "image/webp" : "image/jpeg";
+      const outputExtension = outputType === "image/webp" ? ".webp" : ".jpg";
       canvas.toBlob((blob) => {
         if (!blob) return resolve(file);
         const extension = file.name.split('.').pop();

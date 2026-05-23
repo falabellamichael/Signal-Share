@@ -760,9 +760,7 @@ function resolvedMediaMimeType(media: SocialMedia, remoteMimeType: string) {
 function assertRemoteMediaFormat(provider: "x" | "linkedin", media: SocialMedia, remote: RemoteMedia) {
   const mimeType = resolvedMediaMimeType(media, remote.mimeType);
   if (media.kind === "image") {
-    const accepted = provider === "linkedin"
-      ? ["image/jpeg", "image/png"]
-      : ["image/jpeg", "image/png", "image/webp"];
+    const accepted = ["image/jpeg", "image/png"];
     if (!accepted.includes(mimeType)) {
       throw new Error(`${providerLabel(provider)} does not accept ${mimeType || "that image format"} for this image post.`);
     }
