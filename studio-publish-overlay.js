@@ -660,7 +660,9 @@
           const apiOptions = options.filter((o) => socialProviderId(o) !== "x");
           
           if (xOption) {
-            const text = encodeURIComponent(item.details.body || "");
+            const imgUrl = (item.details.imageUrl || item.details.instagramImageUrl || "").trim();
+            const bodyText = item.details.body || "";
+            const text = encodeURIComponent([bodyText, imgUrl].filter(Boolean).join("\n\n"));
             const url = encodeURIComponent(item.details.shareUrl || "");
             window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
           }
@@ -1379,7 +1381,9 @@
         const apiOptions = options.filter((o) => socialProviderId(o) !== "x");
         
         if (xOption) {
-          const text = encodeURIComponent(item.details.body || item.message || "");
+          const imgUrl = (item.details.imageUrl || item.details.instagramImageUrl || "").trim();
+          const bodyText = item.details.body || item.message || "";
+          const text = encodeURIComponent([bodyText, imgUrl].filter(Boolean).join("\n\n"));
           const url = encodeURIComponent(item.details.shareUrl || "");
           window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
         }
