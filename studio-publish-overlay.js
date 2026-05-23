@@ -131,6 +131,21 @@
   socialConnectionsPanel.hidden = true;
   form.before(socialConnectionsPanel, dynamicFields);
 
+  const xNotice = document.createElement("div");
+  xNotice.className = "social-connection-panel publish-x-notice";
+  xNotice.style.display = "none";
+  xNotice.style.marginTop = "8px";
+  xNotice.innerHTML = `
+    <div style="display: flex; gap: 12px; align-items: flex-start;">
+      <span style="font-size: 1.25rem; line-height: 1.2;">ℹ️</span>
+      <div>
+        <strong style="display: block; margin-bottom: 2px; color: var(--publish-text);">X (Twitter) Intent Handoff</strong>
+        <span style="color: var(--publish-muted); font-size: 0.9rem; line-height: 1.4; display: block;">Direct API publishing is not active for X. Posting will save your draft and open the official X web composer to complete your post manually.</span>
+      </div>
+    </div>
+  `;
+  optionGrid.after(xNotice);
+
   const presets = {
     repoUrl: ["Repository URL", "https://github.com/owner/repo", "url"],
     baseBranch: ["Base branch", "main", "text"],
@@ -660,9 +675,7 @@
           const apiOptions = options.filter((o) => socialProviderId(o) !== "x");
           
           if (xOption) {
-            const imgUrl = (item.details.imageUrl || item.details.instagramImageUrl || "").trim();
-            const bodyText = item.details.body || "";
-            const text = encodeURIComponent([bodyText, imgUrl].filter(Boolean).join("\n\n"));
+            const text = encodeURIComponent(item.details.body || "");
             const url = encodeURIComponent(item.details.shareUrl || "");
             window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
           }
@@ -953,6 +966,11 @@
     renderFields(selectedFields());
     syncActionButtonLabel();
     renderSocialConnections();
+
+    if (xNotice) {
+      const isXSelected = selectedIds.has("social-x");
+      xNotice.style.display = (activeFamilyId === "social" && isXSelected) ? "block" : "none";
+    }
   }
 
   function selectOption(optionId) {
@@ -1381,9 +1399,7 @@
         const apiOptions = options.filter((o) => socialProviderId(o) !== "x");
         
         if (xOption) {
-          const imgUrl = (item.details.imageUrl || item.details.instagramImageUrl || "").trim();
-          const bodyText = item.details.body || item.message || "";
-          const text = encodeURIComponent([bodyText, imgUrl].filter(Boolean).join("\n\n"));
+          const text = encodeURIComponent(item.details.body || item.message || "");
           const url = encodeURIComponent(item.details.shareUrl || "");
           window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
         }
