@@ -18,6 +18,7 @@
     .find((node) => node.textContent?.toLowerCase().includes("details"));
   const detailsHint = detailsLabel?.querySelector("small");
   const fieldOrganizer = window.SignalSharePublishFieldOrganizer;
+  const clearAllDraftsBtn = $("#clearAllDraftsBtn");
 
   if (!familyGrid || !optionGrid || !actionButton || !form) return;
 
@@ -1166,6 +1167,10 @@
       draftsCount.textContent = items.length === 1 ? "1 activity/draft" : `${items.length} activities/drafts`;
     }
 
+    if (clearAllDraftsBtn) {
+      clearAllDraftsBtn.style.display = items.length > 0 ? "inline-block" : "none";
+    }
+
     if (items.length === 0) {
       draftsList.replaceChildren();
       const emptyState = document.createElement("div");
@@ -1601,6 +1606,14 @@
       .map(cb => cb.dataset.id);
     if (checked.length > 0) {
       deleteMultipleDrafts(checked);
+    }
+  });
+
+  clearAllDraftsBtn?.addEventListener("click", () => {
+    if (confirm("Are you sure you want to delete all drafts?")) {
+      localStorage.removeItem(ACTIVITY_KEY);
+      toast("All drafts cleared");
+      renderDrafts();
     }
   });
 

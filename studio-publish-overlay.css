@@ -725,6 +725,23 @@ body[data-theme="contrast"] #compose .publish-family-button,
   flex-direction: column;
   gap: 10px;
   margin-top: 8px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.drafts-list::-webkit-scrollbar {
+  width: 6px;
+}
+.drafts-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.drafts-list::-webkit-scrollbar-thumb {
+  background: var(--publish-border);
+  border-radius: 3px;
+}
+.drafts-list::-webkit-scrollbar-thumb:hover {
+  background: var(--publish-border-strong);
 }
 
 .draft-item {
@@ -927,5 +944,23 @@ body[data-theme="contrast"] #compose .publish-family-button,
 .draft-dest-badge.is-link:hover {
   color: var(--publish-primary-2);
   border-bottom-color: var(--publish-primary-2);
+}
+
+.publish-clear-all-btn {
+  background: none;
+  border: none;
+  color: var(--publish-primary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.publish-clear-all-btn:hover {
+  background: color-mix(in srgb, var(--publish-primary) 10%, transparent);
+  color: color-mix(in srgb, var(--publish-primary) 85%, #fff);
 }
 
