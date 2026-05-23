@@ -285,21 +285,25 @@ async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperat
   return typeof data?.choices?.[0]?.text === "string" ? data.choices[0].text : "";
 }
 
-function buildLmStudioMcpSystemPrompt(messages = []) {
+function buildLmStudioMcpSystemPrompt(messages = [], integrations = []) {
   const systemPrompt = messages
     .filter((entry) => entry?.role === "system" && typeof entry.content === "string")
     .map((entry) => entry.content.trim())
     .filter(Boolean)
     .join("\n\n");
+  const websiteFilesGuidance = integrations.some((integration) => integration?.id === "mcp/website-files")
+    ? "For the mcp/website-files filesystem tool only, safe project-relative paths in the user request have already been resolved for tool use. Do not mention absolute local paths unless the user explicitly asks for them."
+    : "";
   const priorTurns = messages
     .filter((entry) => entry?.role !== "system" && typeof entry.content === "string")
     .slice(0, -1)
     .map((entry) => `${entry.role === "assistant" ? "Assistant" : "User"}: ${entry.content.trim()}`)
     .filter((entry) => !entry.endsWith(": "));
 
-  if (priorTurns.length === 0) return systemPrompt;
+  if (priorTurns.length === 0) return [systemPrompt, websiteFilesGuidance].filter(Boolean).join("\n\n");
   return [
     systemPrompt,
+    websiteFilesGuidance,
     "Recent conversation transcript for continuity only:",
     "<conversation_history>",
     priorTurns.join("\n"),
@@ -315,6 +319,18 @@ function getLastUserMessage(messages = []) {
     }
   }
   return "Continue";
+}
+
+function resolveWebsiteFilesMcpInput(input = "", integrations = []) {
+  const text = `${input || ""}`;
+  if (!integrations.some((integration) => integration?.id === "mcp/website-files")) return text;
+
+  return text.replace(/(^|[\s("'`])(\.\/[^\s)"'`,;:!?]+)/g, (match, prefix, reference) => {
+    const resolvedPath = path.resolve(projectRoot, reference.slice(2));
+    const relativePath = path.relative(projectRoot, resolvedPath);
+    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) return match;
+    return `${prefix}${resolvedPath}`;
+  });
 }
 
 function extractLmStudioMcpReply(data) {
@@ -346,8 +362,8 @@ async function callLmStudioMcpProvider({ messages, model, temperature, integrati
     },
     body: JSON.stringify({
       model: selectedModel,
-      input: getLastUserMessage(messages),
-      system_prompt: buildLmStudioMcpSystemPrompt(messages),
+      input: resolveWebsiteFilesMcpInput(getLastUserMessage(messages), integrations),
+      system_prompt: buildLmStudioMcpSystemPrompt(messages, integrations),
       integrations,
       context_length: LM_STUDIO_MCP_CONTEXT_LENGTH,
       temperature: Math.max(0, Math.min(1, Number(temperature) || 0)),
