@@ -1187,6 +1187,30 @@
       const badgeEl = document.createElement("span");
       badgeEl.className = "draft-dest-badge";
       badgeEl.textContent = draft.option || draft.category || "Workflow draft";
+
+      const optionName = String(draft.option || "").toLowerCase();
+      if (optionName === "facebook" || optionName === "instagram") {
+        badgeEl.classList.add("is-link");
+        badgeEl.title = `Go to ${draft.option} page`;
+        badgeEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const provider = optionName;
+          const connection = socialConnectionState.connections.find(c => c.provider === provider);
+          if (connection) {
+            let url = "";
+            if (provider === "facebook") {
+              url = `https://facebook.com/${connection.provider_account_id}`;
+            } else if (provider === "instagram") {
+              const username = connection.metadata?.username || connection.provider_account_label?.replace("@", "") || "";
+              url = username ? `https://instagram.com/${username}` : "https://instagram.com";
+            }
+            if (url) window.open(url, "_blank");
+          } else {
+            const fallbackUrl = provider === "facebook" ? "https://facebook.com" : "https://instagram.com";
+            window.open(fallbackUrl, "_blank");
+          }
+        });
+      }
       
       const timeEl = document.createElement("span");
       timeEl.className = "draft-time";
@@ -1524,6 +1548,7 @@
           const isOpen = overlay.classList.contains("is-open") && !overlay.hidden;
           if (isOpen) {
             renderDrafts();
+            void refreshSocialConnections().catch(console.error);
           }
         }
       });
@@ -1533,6 +1558,7 @@
 
   // Render initial drafts list
   renderDrafts();
+  void refreshSocialConnections().catch(console.error);
 
   syncDark(localStorage.getItem(DARK_KEY) === "true");
   renderFamily(activeFamilyId);

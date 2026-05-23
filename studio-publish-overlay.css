@@ -916,3 +916,16 @@ body[data-theme="contrast"] #compose .publish-family-button,
   border-color: rgba(245, 245, 245, 0.3);
 }
 
+.draft-dest-badge.is-link {
+  color: var(--publish-primary);
+  text-decoration: none;
+  cursor: pointer;
+  border-bottom: 1px dashed var(--publish-primary);
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.draft-dest-badge.is-link:hover {
+  color: var(--publish-primary-2);
+  border-bottom-color: var(--publish-primary-2);
+}
+
