@@ -378,6 +378,7 @@ if (!window[globalStateKey]) {
 }
 const state = window[globalStateKey];
 window.state = state; // Also expose as window.state for backward compatibility and cross-module access
+state.uploadFileToSupabase = uploadFileToSupabase;
 
 setApiContext({
   state,

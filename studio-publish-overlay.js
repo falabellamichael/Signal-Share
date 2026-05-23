@@ -200,7 +200,7 @@
       detailsText: "Post text, optional links, and provider-specific fields.",
       options: [
         { id: "social-facebook", icon: "📘", name: "Facebook", note: "Page connection", button: "Post to Facebook", hint: "Direct posting needs a connected Facebook Page.", fields: [field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a Facebook post", wide: true })] },
-        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Media connection", button: "Post to Instagram", hint: "Direct publishing needs a connected Instagram account and image media.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("instagramImageUrl", { label: "Instagram image URL", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
+        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Media connection", button: "Post to Instagram", hint: "Direct publishing needs a connected Instagram account and image media.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("instagramImageFile", { label: "Instagram image file", type: "file" }), field("instagramImageUrl", { label: "Instagram image URL (Optional if file selected)", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
         { id: "social-x", icon: "✕", name: "X", note: "Connect account", button: "Post to X", hint: "Posts with your connected X account without a provider handoff.", fields: [field("xHandle", { label: "From handle", placeholder: "@yourhandle" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write an X post", required: true, wide: true }), field("shareUrl", { label: "Optional link URL" })] },
         { id: "social-linkedin", icon: "💼", name: "LinkedIn", note: "Connect member", button: "Post to LinkedIn", hint: "Posts with your connected LinkedIn member without a provider handoff.", fields: [field("linkedinFrom", { label: "Profile or company", placeholder: "Signal Share" }), field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a LinkedIn post", wide: true })] }
       ]
@@ -317,10 +317,25 @@
   function validateFields() {
     const details = fieldValues();
     const missing = selectedFields().find((config) => config.required && !details[config.key]);
-    if (!missing) return true;
-    setFeedback(`${missing.label} is required.`, true);
-    document.getElementById(missing.id)?.focus();
-    return false;
+    if (missing) {
+      setFeedback(`${missing.label} is required.`, true);
+      document.getElementById(missing.id)?.focus();
+      return false;
+    }
+
+    // Custom validation for Instagram:
+    const isInstagram = selectedOptions().some(o => socialProviderId(o) === "instagram");
+    if (isInstagram) {
+      const urlVal = (details.instagramImageUrl || "").trim();
+      const fileInput = document.getElementById("publishTool-instagramImageFile");
+      const hasFile = fileInput && fileInput.files && fileInput.files[0];
+      if (!urlVal && !hasFile) {
+        setFeedback("Instagram direct publishing requires either a public image URL or an uploaded image file.", true);
+        fileInput?.focus();
+        return false;
+      }
+    }
+    return true;
   }
 
   const quote = (value) => `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\$/g, "\\$").replace(/`/g, "\\`")}"`;
@@ -426,12 +441,27 @@
       throw new Error("Sign in before posting directly to connected Social providers.");
     }
 
+    let instagramImageUrl = item.details.instagramImageUrl || "";
+    const isInstagram = options.some((o) => socialProviderId(o) === "instagram");
+    if (isInstagram) {
+      const fileInput = document.getElementById("publishTool-instagramImageFile");
+      if (fileInput && fileInput.files && fileInput.files[0]) {
+        if (typeof appState.uploadFileToSupabase !== "function") {
+          throw new Error("Supabase file upload helper is not available. Please verify the client initialization.");
+        }
+        toast("Uploading Instagram image...");
+        const tempId = crypto.randomUUID();
+        const uploadResult = await appState.uploadFileToSupabase(tempId, fileInput.files[0]);
+        instagramImageUrl = uploadResult.mediaUrl;
+      }
+    }
+
     const { data, error } = await appState.supabase.functions.invoke(socialPublishFunctionName(), {
       body: {
         providers: options.map(socialProviderId).filter(Boolean),
         text: item.details.body || "",
         linkUrl: item.details.shareUrl || "",
-        instagramImageUrl: item.details.instagramImageUrl || "",
+        instagramImageUrl: instagramImageUrl,
         instagramHashtags: item.details.instagramHashtags || "",
         connectionIds: options.reduce((ids, option) => {
           const provider = socialProviderId(option);
@@ -824,7 +854,11 @@
     }
     const input = document.createElement("input");
     input.type = config.type || "text";
-    input.value = localStorage.getItem(config.storageKey) || config.value || "";
+    if (config.type !== "file") {
+      input.value = localStorage.getItem(config.storageKey) || config.value || "";
+    } else {
+      input.accept = "image/*";
+    }
     return input;
   }
 
@@ -840,7 +874,7 @@
       input.name = config.key;
       input.placeholder = config.placeholder || "";
       const persist = () => {
-        if (!config.persist) return;
+        if (!config.persist || input.type === "file") return;
         input.value ? localStorage.setItem(config.storageKey, input.value) : localStorage.removeItem(config.storageKey);
       };
       const syncField = () => {

@@ -26,8 +26,8 @@ function metaGraphUrl(path: string) {
 
 export function metaAuthorizeUrl(provider: "facebook" | "instagram", state: string, redirectUri: string) {
   const scope = provider === "facebook"
-    ? "pages_show_list,pages_read_engagement,pages_manage_posts"
-    : "pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish";
+    ? "pages_show_list,pages_read_engagement,pages_manage_posts,business_management"
+    : "pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,business_management";
   const params = new URLSearchParams({
     client_id: META_OAUTH_APP_ID,
     redirect_uri: redirectUri,
@@ -62,6 +62,8 @@ export async function connectMeta(
   });
   const pages = Array.isArray(accountsPayload.data) ? accountsPayload.data.map(recordValue) : [];
   const connections: ConnectedAccount[] = [];
+  const debugInfo: string[] = [];
+  
   pages.forEach((page) => {
     const pageId = readString(page.id, 300);
     const pageName = readString(page.name, 300);
@@ -84,6 +86,9 @@ export async function connectMeta(
     const instagram = recordValue(page.instagram_business_account);
     const instagramId = readString(instagram.id, 300);
     const username = readString(instagram.username, 300);
+    
+    debugInfo.push(`${pageName} (linked IG ID: ${instagramId || "none"})`);
+    
     if (!instagramId) return;
     connections.push({
       provider,
@@ -98,9 +103,12 @@ export async function connectMeta(
     });
   });
   if (!connections.length) {
-    throw new Error(provider === "facebook"
-      ? "Meta did not return a Facebook Page that can be connected."
-      : "Meta did not return an Instagram account that can be connected.");
+    if (provider === "facebook") {
+      throw new Error("Meta did not return any Facebook Page that can be connected. Make sure you have at least one Page and selected it during login.");
+    } else {
+      const pageList = debugInfo.length ? debugInfo.join(", ") : "none";
+      throw new Error(`Meta did not return an Instagram account. Pages found: ${pageList}. Make sure your Instagram account is Professional (Business/Creator) and linked to a Facebook Page, and you selected BOTH during the login prompts.`);
+    }
   }
   return connections;
 }

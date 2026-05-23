@@ -868,3 +868,44 @@ body[data-theme="contrast"] #compose .publish-family-button,
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Premium styling for file inputs in the publish overlay */
+#compose .publish-field input[type="file"] {
+  padding: 8px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+#compose .publish-field input[type="file"]::file-selector-button {
+  padding: 6px 14px;
+  border: 1px solid var(--publish-border);
+  border-radius: 10px;
+  background: var(--publish-button-soft);
+  color: var(--publish-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-right: 12px;
+  transition: background 160ms ease, border-color 160ms ease, transform 100ms ease;
+}
+
+#compose .publish-field input[type="file"]::file-selector-button:hover {
+  background: var(--publish-button-soft-hover);
+  border-color: var(--publish-border-strong);
+}
+
+#compose .publish-field input[type="file"]::file-selector-button:active {
+  transform: scale(0.97);
+}
+
+#compose.is-generic-dark .publish-field input[type="file"]::file-selector-button {
+  border-color: rgba(245, 245, 245, 0.15);
+  background: rgba(245, 245, 245, 0.08);
+}
+
+#compose.is-generic-dark .publish-field input[type="file"]::file-selector-button:hover {
+  background: rgba(245, 245, 245, 0.15);
+  border-color: rgba(245, 245, 245, 0.3);
+}
+
