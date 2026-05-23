@@ -558,7 +558,7 @@ body[data-theme="contrast"] #compose .publish-destination-feedback.is-error,
   gap: 12px;
   padding: 16px 22px 22px;
   border-top: 1px solid var(--publish-border);
-  background: #fff;
+  background: var(--publish-panel-strong);
 }
 
 #compose .publish-modal-actions .button {
@@ -596,12 +596,6 @@ body[data-theme="contrast"] #compose .publish-destination-feedback.is-error,
   border-color: transparent !important;
   background: linear-gradient(135deg, #d4d4d4, #737373) !important;
   box-shadow: none;
-}
-
-body[data-theme="midnight"] #compose .publish-modal-actions,
-body[data-theme="contrast"] #compose .publish-modal-actions,
-body[data-theme="ember"] #compose .publish-modal-actions {
-  background: var(--publish-panel-strong);
 }
 
 body #compose.is-generic-dark .publish-modal-actions {
