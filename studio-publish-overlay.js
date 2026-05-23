@@ -1184,38 +1184,77 @@
       const metaRow = document.createElement("div");
       metaRow.className = "draft-meta-row";
       
-      const badgeEl = document.createElement("span");
-      badgeEl.className = "draft-dest-badge";
-      badgeEl.textContent = draft.option || draft.category || "Workflow draft";
-
-      const optionName = String(draft.option || "").toLowerCase();
-      if (optionName === "facebook" || optionName === "instagram") {
-        badgeEl.classList.add("is-link");
-        badgeEl.title = `Go to ${draft.option} page`;
-        badgeEl.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const provider = optionName;
-          const connection = socialConnectionState.connections.find(c => c.provider === provider);
-          if (connection) {
-            let url = "";
-            if (provider === "facebook") {
-              url = `https://facebook.com/${connection.provider_account_id}`;
-            } else if (provider === "instagram") {
-              const username = connection.metadata?.username || connection.provider_account_label?.replace("@", "") || "";
-              url = username ? `https://instagram.com/${username}` : "https://instagram.com";
-            }
-            if (url) window.open(url, "_blank");
-          } else {
-            const fallbackUrl = provider === "facebook" ? "https://facebook.com" : "https://instagram.com";
-            window.open(fallbackUrl, "_blank");
-          }
-        });
+      const familyId = draft.familyId || getFamilyIdFromCategory(draft.category);
+      let optIds = [];
+      if (Array.isArray(draft.optionIds) && draft.optionIds.length > 0) {
+        optIds = draft.optionIds;
+      } else {
+        const optionStr = String(draft.option || "").toLowerCase();
+        if (optionStr.includes("facebook")) optIds.push("social-facebook");
+        if (optionStr.includes("instagram")) optIds.push("social-instagram");
+        if (optionStr.includes("x") || optionStr.includes("twitter")) optIds.push("social-x");
+        if (optionStr.includes("linkedin")) optIds.push("social-linkedin");
+        if (optIds.length === 0) {
+          const matchedId = getOptionIdFromName(familyId, draft.option);
+          if (matchedId) optIds.push(matchedId);
+        }
       }
-      
+
+      const badgeContainer = document.createElement("span");
+      badgeContainer.className = "draft-badges-container";
+      badgeContainer.style.display = "inline-flex";
+      badgeContainer.style.gap = "6px";
+      badgeContainer.style.alignItems = "center";
+
+      optIds.forEach((optId, idx) => {
+        if (!optId) return;
+        const provider = optId.replace(/^social-/, "");
+        const labelText = provider === "facebook" ? "Facebook" : provider === "instagram" ? "Instagram" : provider === "x" ? "X" : provider === "linkedin" ? "LinkedIn" : draft.option || draft.category || "Draft";
+        
+        const badge = document.createElement("span");
+        badge.className = "draft-dest-badge";
+        badge.textContent = labelText;
+
+        if (provider === "facebook" || provider === "instagram") {
+          badge.classList.add("is-link");
+          badge.title = `Go to ${labelText} page`;
+          badge.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const connection = socialConnectionState.connections.find(c => c.provider === provider);
+            if (connection) {
+              let url = "";
+              if (provider === "facebook") {
+                url = `https://facebook.com/${connection.provider_account_id}`;
+              } else if (provider === "instagram") {
+                const username = connection.metadata?.username || connection.provider_account_label?.replace("@", "") || "";
+                url = username ? `https://instagram.com/${username}` : "https://instagram.com";
+              }
+              if (url) window.open(url, "_blank");
+            } else {
+              const fallbackUrl = provider === "facebook" ? "https://facebook.com" : "https://instagram.com";
+              window.open(fallbackUrl, "_blank");
+            }
+          });
+        }
+
+        badgeContainer.append(badge);
+        
+        if (idx < optIds.length - 1 && !badge.classList.contains("is-link")) {
+          badgeContainer.append(document.createTextNode(", "));
+        }
+      });
+
+      if (badgeContainer.children.length === 0) {
+        const fallbackBadge = document.createElement("span");
+        fallbackBadge.className = "draft-dest-badge";
+        fallbackBadge.textContent = draft.option || draft.category || "Workflow draft";
+        badgeContainer.append(fallbackBadge);
+      }
+
       const timeEl = document.createElement("span");
       timeEl.className = "draft-time";
       timeEl.textContent = timeAgo(draft.createdAt);
-      metaRow.append(badgeEl, timeEl);
+      metaRow.append(badgeContainer, timeEl);
 
       const snippetEl = document.createElement("div");
       snippetEl.className = "draft-snippet";
