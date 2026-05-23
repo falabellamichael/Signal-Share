@@ -1,15 +1,22 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 type SocialProvider = "facebook" | "instagram" | "x" | "linkedin";
+type SocialMediaKind = "image" | "gif" | "video" | "document";
 
 type SocialPublishPayload = {
   providers?: unknown;
   connectionIds?: unknown;
   text?: unknown;
   linkUrl?: unknown;
+  mediaUrl?: unknown;
+  mediaKind?: unknown;
+  mediaMimeType?: unknown;
+  mediaTitle?: unknown;
+  mediaAltText?: unknown;
   imageUrl?: unknown;
   instagramImageUrl?: unknown;
   instagramHashtags?: unknown;
+  instagramShareToFeed?: unknown;
 };
 
 type ProviderResult = {
@@ -40,6 +47,19 @@ type TokenPayload = {
   scope?: unknown;
 };
 
+type SocialMedia = {
+  url: string;
+  kind: SocialMediaKind;
+  mimeType: string;
+  title: string;
+  altText: string;
+};
+
+type RemoteMedia = {
+  bytes: Uint8Array;
+  mimeType: string;
+};
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -53,6 +73,8 @@ const SOCIAL_TOKEN_ENCRYPTION_KEY = Deno.env.get("SOCIAL_TOKEN_ENCRYPTION_KEY") 
 const X_OAUTH_CLIENT_ID = readString(Deno.env.get("X_OAUTH_CLIENT_ID"), 500);
 const X_OAUTH_CLIENT_SECRET = readString(Deno.env.get("X_OAUTH_CLIENT_SECRET"), 2000);
 const META_GRAPH_API_VERSION = readString(Deno.env.get("META_GRAPH_API_VERSION"), 32);
+const LINKEDIN_API_VERSION = readString(Deno.env.get("LINKEDIN_API_VERSION"), 16) || "202603";
+const MAX_REMOTE_MEDIA_BYTES = 100 * 1024 * 1024;
 
 Deno.serve(async (request) => {
   try {
@@ -84,18 +106,33 @@ Deno.serve(async (request) => {
     if (readString(payload.linkUrl) && !linkUrl) {
       return jsonResponse({ error: "Optional link URL must use http or https." }, 400);
     }
-    const imageUrl = normalizeHttpUrl(payload.imageUrl || payload.instagramImageUrl);
-    if (readString(payload.imageUrl || payload.instagramImageUrl) && !imageUrl) {
-      return jsonResponse({ error: "Optional image URL must use http or https." }, 400);
+    const mediaInputUrl = payload.mediaUrl || payload.imageUrl || payload.instagramImageUrl;
+    const mediaUrl = normalizeHttpUrl(mediaInputUrl);
+    if (readString(mediaInputUrl) && !mediaUrl) {
+      return jsonResponse({ error: "Optional media URL must use http or https." }, 400);
     }
+    const mediaKind = readMediaKind(payload.mediaKind) || (mediaUrl ? "image" : "");
+    if (mediaKind && !mediaUrl) {
+      return jsonResponse({ error: "A media URL is required for the selected attachment type." }, 400);
+    }
+    const media: SocialMedia | null = mediaUrl && mediaKind
+      ? {
+        url: mediaUrl,
+        kind: mediaKind,
+        mimeType: readString(payload.mediaMimeType, 120).toLowerCase(),
+        title: readString(payload.mediaTitle, 300),
+        altText: readString(payload.mediaAltText, 1000),
+      }
+      : null;
 
     const adminClient = createAdminClient();
     const connections = await loadConnections(adminClient, auth.user.id, providers, readConnectionIds(payload.connectionIds));
     const draft = {
       text: readString(payload.text, 6000),
       linkUrl,
-      imageUrl,
+      media,
       instagramHashtags: readString(payload.instagramHashtags, 500),
+      instagramShareToFeed: payload.instagramShareToFeed !== false,
     };
     const results: ProviderResult[] = [];
     for (const provider of providers) {
@@ -115,8 +152,9 @@ async function publishProvider(
   draft: {
     text: string;
     linkUrl: string;
-    imageUrl: string;
+    media: SocialMedia | null;
     instagramHashtags: string;
+    instagramShareToFeed: boolean;
   }
 ): Promise<ProviderResult> {
   try {
@@ -129,15 +167,15 @@ async function publishProvider(
     }
     const readyConnection = await connectionForPublish(adminClient, connection);
     if (provider === "facebook") {
-      return publishFacebook(readyConnection, draft.text, draft.linkUrl, draft.imageUrl);
+      return publishFacebook(readyConnection, draft.text, draft.linkUrl, draft.media);
     }
     if (provider === "instagram") {
-      return publishInstagram(readyConnection, draft.text, draft.instagramHashtags, draft.imageUrl);
+      return publishInstagram(readyConnection, draft.text, draft.instagramHashtags, draft.media, draft.instagramShareToFeed);
     }
     if (provider === "x") {
-      return publishX(readyConnection, draft.text, draft.linkUrl, draft.imageUrl);
+      return publishX(readyConnection, draft.text, draft.linkUrl, draft.media);
     }
-    return publishLinkedIn(readyConnection, draft.text, draft.linkUrl, draft.imageUrl);
+    return publishLinkedIn(readyConnection, draft.text, draft.linkUrl, draft.media);
   } catch (error) {
     return {
       provider,
@@ -151,15 +189,29 @@ async function publishFacebook(
   connection: SocialConnection,
   text: string,
   linkUrl: string,
-  imageUrl?: string
+  media: SocialMedia | null
 ): Promise<ProviderResult> {
   const provider: SocialProvider = "facebook";
-  if (!text && !linkUrl && !imageUrl) {
-    return { provider, ok: false, error: "Facebook needs post text, a link, or an image." };
+  if (media?.kind === "document") {
+    return { provider, ok: false, error: "Facebook direct publishing does not accept document attachments." };
+  }
+  if (!text && !linkUrl && !media) {
+    return { provider, ok: false, error: "Facebook needs post text, a link, an image, a GIF, or a video." };
   }
   const accessToken = await decryptToken(connection.access_token);
-  if (imageUrl) {
-    const body = new URLSearchParams({ access_token: accessToken, url: imageUrl });
+  if (media?.kind === "video") {
+    const body = new URLSearchParams({ access_token: accessToken, file_url: media.url });
+    const description = [text, linkUrl].filter(Boolean).join("\n\n");
+    if (description) body.set("description", description);
+    if (media.title) body.set("title", media.title);
+    const payload = await requestProviderJson(metaGraphVideoUrl(`${encodeURIComponent(connection.provider_account_id)}/videos`), {
+      method: "POST",
+      body,
+    }, provider);
+    return { provider, ok: true, id: readString(recordValue(payload).id, 300) };
+  }
+  if (media) {
+    const body = new URLSearchParams({ access_token: accessToken, url: media.url });
     const caption = [text, linkUrl].filter(Boolean).join("\n\n");
     if (caption) body.set("caption", caption);
     const payload = await requestProviderJson(metaGraphUrl(`${encodeURIComponent(connection.provider_account_id)}/photos`), {
@@ -183,15 +235,23 @@ async function publishInstagram(
   connection: SocialConnection,
   text: string,
   hashtags: string,
-  imageUrl: string
+  media: SocialMedia | null,
+  shareToFeed: boolean
 ): Promise<ProviderResult> {
   const provider: SocialProvider = "instagram";
-  if (!imageUrl) {
-    return { provider, ok: false, error: "Instagram direct publishing needs a public image URL." };
+  if (!media || !["image", "video"].includes(media.kind)) {
+    return { provider, ok: false, error: "Instagram direct publishing needs a public image or video URL. Video is published as a reel." };
   }
   const accessToken = await decryptToken(connection.access_token);
   const caption = [text, hashtags].filter(Boolean).join("\n\n");
-  const creationBody = new URLSearchParams({ access_token: accessToken, image_url: imageUrl });
+  const creationBody = new URLSearchParams({ access_token: accessToken });
+  if (media.kind === "video") {
+    creationBody.set("media_type", "REELS");
+    creationBody.set("video_url", media.url);
+    creationBody.set("share_to_feed", shareToFeed ? "true" : "false");
+  } else {
+    creationBody.set("image_url", media.url);
+  }
   if (caption) creationBody.set("caption", caption);
   const container = recordValue(await requestProviderJson(
     metaGraphUrl(`${encodeURIComponent(connection.provider_account_id)}/media`),
@@ -249,21 +309,28 @@ async function publishX(
   connection: SocialConnection,
   text: string,
   linkUrl: string,
-  imageUrl?: string
+  media: SocialMedia | null
 ): Promise<ProviderResult> {
   const provider: SocialProvider = "x";
-  const postText = joinPostText(text, linkUrl, imageUrl);
-  if (!postText) {
-    return { provider, ok: false, error: "X needs post text, a link, or an image." };
+  if (media?.kind === "document") {
+    return { provider, ok: false, error: "X direct publishing does not accept document attachments." };
+  }
+  const postText = joinPostText(text, linkUrl);
+  if (!postText && !media) {
+    return { provider, ok: false, error: "X needs post text, a link, an image, a GIF, or a video." };
   }
   const accessToken = await decryptToken(connection.access_token);
+  const mediaId = media ? await uploadXMedia(accessToken, media) : "";
+  const body: Record<string, unknown> = {};
+  if (postText) body.text = postText;
+  if (mediaId) body.media = { media_ids: [mediaId] };
   const payload = await requestProviderJson("https://api.x.com/2/tweets", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ text: postText }),
+    body: JSON.stringify(body),
   }, provider);
   return { provider, ok: true, id: readString(recordValue(payload).data?.id, 300) };
 }
@@ -272,54 +339,199 @@ async function publishLinkedIn(
   connection: SocialConnection,
   text: string,
   linkUrl: string,
-  imageUrl?: string
+  media: SocialMedia | null
 ): Promise<ProviderResult> {
   const provider: SocialProvider = "linkedin";
   const commentary = joinPostText(text, linkUrl);
-  if (!commentary && !imageUrl) {
-    return { provider, ok: false, error: "LinkedIn needs post text, a link, or an image." };
+  if (!commentary && !media) {
+    return { provider, ok: false, error: "LinkedIn needs post text, a link, or an attachment." };
   }
   const accessToken = await decryptToken(connection.access_token);
   const metadata = recordValue(connection.metadata);
   const author = readString(metadata.authorUrn, 300) || `urn:li:person:${connection.provider_account_id}`;
-  
-  const shareContent: Record<string, any> = {
-    shareCommentary: { text: commentary },
-    shareMediaCategory: imageUrl ? "IMAGE" : "NONE",
+  const post: Record<string, unknown> = {
+    author,
+    commentary,
+    visibility: "PUBLIC",
+    distribution: {
+      feedDistribution: "MAIN_FEED",
+      targetEntities: [],
+      thirdPartyDistributionChannels: [],
+    },
+    lifecycleState: "PUBLISHED",
+    isReshareDisabledByAuthor: false,
   };
-
-  if (imageUrl) {
-    shareContent.media = [
-      {
-        status: "READY",
-        originalUrl: imageUrl,
-        title: { text: text ? text.slice(0, 100) : "Shared Image" },
-      }
-    ];
+  if (media) {
+    const assetId = await uploadLinkedInMedia(accessToken, author, media);
+    const mediaContent: Record<string, string> = { id: assetId };
+    if (media.title) mediaContent.title = media.title;
+    if (media.altText && (media.kind === "image" || media.kind === "gif")) {
+      mediaContent.altText = media.altText;
+    }
+    post.content = { media: mediaContent };
   }
 
-  const { response, payload } = await requestProviderResponse("https://api.linkedin.com/v2/ugcPosts", {
+  const { response, payload } = await requestProviderResponse("https://api.linkedin.com/rest/posts", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      "X-Restli-Protocol-Version": "2.0.0",
-    },
-    body: JSON.stringify({
-      author,
-      lifecycleState: "PUBLISHED",
-      specificContent: {
-        "com.linkedin.ugc.ShareContent": shareContent,
-      },
-      visibility: {
-        "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
-      },
-    }),
+    headers: linkedinHeaders(accessToken),
+    body: JSON.stringify(post),
   }, provider);
   return {
     provider,
     ok: true,
     id: readString(response.headers.get("x-restli-id"), 300) || readString(recordValue(payload).id, 300),
+  };
+}
+
+async function uploadXMedia(accessToken: string, media: SocialMedia) {
+  const remote = await downloadRemoteMedia(media);
+  assertRemoteMediaFormat("x", media, remote);
+  const mimeType = resolvedMediaMimeType(media, remote.mimeType);
+  const category = media.kind === "gif" ? "tweet_gif" : media.kind === "video" ? "tweet_video" : "tweet_image";
+  const initialized = recordValue(await requestProviderJson("https://api.x.com/2/media/upload/initialize", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      media_category: category,
+      media_type: mimeType,
+      total_bytes: remote.bytes.byteLength,
+      shared: false,
+    }),
+  }, "x"));
+  const mediaId = readString(recordValue(initialized.data).id, 300);
+  if (!mediaId) throw new Error("X did not return a media upload id.");
+
+  const chunkSize = 4 * 1024 * 1024;
+  for (let offset = 0, segment = 0; offset < remote.bytes.byteLength; offset += chunkSize, segment += 1) {
+    const chunk = remote.bytes.slice(offset, Math.min(remote.bytes.byteLength, offset + chunkSize));
+    const formData = new FormData();
+    formData.append("media", new Blob([new Uint8Array(chunk)], { type: mimeType }), media.title || `social-upload-${segment}`);
+    formData.append("segment_index", `${segment}`);
+    await requestProviderJson(`https://api.x.com/2/media/upload/${encodeURIComponent(mediaId)}/append`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: formData,
+    }, "x");
+  }
+
+  const finalized = await requestProviderJson(`https://api.x.com/2/media/upload/${encodeURIComponent(mediaId)}/finalize`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  }, "x");
+  await awaitXMediaProcessing(accessToken, mediaId, finalized);
+  return mediaId;
+}
+
+async function awaitXMediaProcessing(accessToken: string, mediaId: string, initialPayload: unknown) {
+  let data = recordValue(recordValue(initialPayload).data);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const processing = recordValue(data.processing_info);
+    const state = readString(processing.state, 40).toLowerCase();
+    if (!state || state === "succeeded") return;
+    if (state === "failed") throw new Error("X could not process the uploaded media.");
+    const waitSeconds = Math.max(1, Math.min(10, Number(processing.check_after_secs) || 1));
+    await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000));
+    const payload = await requestProviderJson(`https://api.x.com/2/media/upload?media_id=${encodeURIComponent(mediaId)}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }, "x");
+    data = recordValue(recordValue(payload).data);
+  }
+  throw new Error("X media is still processing. Try publishing again shortly.");
+}
+
+async function uploadLinkedInMedia(accessToken: string, author: string, media: SocialMedia) {
+  const remote = await downloadRemoteMedia(media);
+  assertRemoteMediaFormat("linkedin", media, remote);
+  if (media.kind === "video") {
+    return uploadLinkedInVideo(accessToken, author, media, remote);
+  }
+  const endpoint = media.kind === "document" ? "documents" : "images";
+  const key = media.kind === "document" ? "document" : "image";
+  const initialized = recordValue(await requestProviderJson(`https://api.linkedin.com/rest/${endpoint}?action=initializeUpload`, {
+    method: "POST",
+    headers: linkedinHeaders(accessToken),
+    body: JSON.stringify({ initializeUploadRequest: { owner: author } }),
+  }, "linkedin"));
+  const value = recordValue(initialized.value);
+  const uploadUrl = readString(value.uploadUrl, 4000);
+  const assetId = readString(value[key], 400);
+  if (!uploadUrl || !assetId) throw new Error(`LinkedIn did not initialize the ${media.kind} upload.`);
+  await uploadLinkedInPart(uploadUrl, accessToken, remote.bytes, resolvedMediaMimeType(media, remote.mimeType));
+  return assetId;
+}
+
+async function uploadLinkedInVideo(accessToken: string, author: string, media: SocialMedia, remote: RemoteMedia) {
+  const initialized = recordValue(await requestProviderJson("https://api.linkedin.com/rest/videos?action=initializeUpload", {
+    method: "POST",
+    headers: linkedinHeaders(accessToken),
+    body: JSON.stringify({
+      initializeUploadRequest: {
+        owner: author,
+        fileSizeBytes: remote.bytes.byteLength,
+        uploadCaptions: false,
+        uploadThumbnail: false,
+      },
+    }),
+  }, "linkedin"));
+  const value = recordValue(initialized.value);
+  const video = readString(value.video, 400);
+  const uploadToken = readString(value.uploadToken, 2000);
+  const instructions = Array.isArray(value.uploadInstructions) ? value.uploadInstructions.map(recordValue) : [];
+  if (!video || !instructions.length) throw new Error("LinkedIn did not initialize the video upload.");
+  const uploadedPartIds: string[] = [];
+  for (const instruction of instructions) {
+    const uploadUrl = readString(instruction.uploadUrl, 4000);
+    const firstByte = Number(instruction.firstByte);
+    const lastByte = Number(instruction.lastByte);
+    if (!uploadUrl || !Number.isInteger(firstByte) || !Number.isInteger(lastByte) || firstByte < 0 || lastByte < firstByte) {
+      throw new Error("LinkedIn returned invalid video upload instructions.");
+    }
+    const response = await uploadLinkedInPart(
+      uploadUrl,
+      accessToken,
+      remote.bytes.slice(firstByte, Math.min(remote.bytes.byteLength, lastByte + 1)),
+      resolvedMediaMimeType(media, remote.mimeType)
+    );
+    const partId = readString(response.headers.get("etag"), 2000).replace(/^"|"$/g, "");
+    if (!partId) throw new Error("LinkedIn did not return a video part identifier.");
+    uploadedPartIds.push(partId);
+  }
+  await requestProviderJson("https://api.linkedin.com/rest/videos?action=finalizeUpload", {
+    method: "POST",
+    headers: linkedinHeaders(accessToken),
+    body: JSON.stringify({ finalizeUploadRequest: { video, uploadToken, uploadedPartIds } }),
+  }, "linkedin");
+  return video;
+}
+
+async function uploadLinkedInPart(
+  uploadUrl: string,
+  accessToken: string,
+  bytes: Uint8Array,
+  mimeType: string
+) {
+  const response = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": mimeType || "application/octet-stream",
+    },
+    body: new Blob([new Uint8Array(bytes)], { type: mimeType || "application/octet-stream" }),
+  });
+  if (!response.ok) throw new Error(`LinkedIn media upload returned HTTP ${response.status}.`);
+  return response;
+}
+
+function linkedinHeaders(accessToken: string) {
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+    "X-Restli-Protocol-Version": "2.0.0",
+    "Linkedin-Version": LINKEDIN_API_VERSION,
   };
 }
 
@@ -480,6 +692,102 @@ function joinPostText(text: string, linkUrl: string, imageUrl?: string) {
   return [text, linkUrl, imageUrl].filter(Boolean).join("\n\n");
 }
 
+async function downloadRemoteMedia(media: SocialMedia): Promise<RemoteMedia> {
+  const sourceUrl = new URL(media.url);
+  assertFetchableMediaUrl(sourceUrl);
+  const response = await fetch(sourceUrl, { redirect: "follow" });
+  if (!response.ok) {
+    throw new Error(`The public media URL returned HTTP ${response.status}.`);
+  }
+  assertFetchableMediaUrl(new URL(response.url));
+  const declaredLength = Number(response.headers.get("content-length") || 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_REMOTE_MEDIA_BYTES) {
+    throw new Error("Remote media uploads through Socials must be 100 MB or smaller.");
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength > MAX_REMOTE_MEDIA_BYTES) {
+    throw new Error("Remote media uploads through Socials must be 100 MB or smaller.");
+  }
+  const mimeType = readString(response.headers.get("content-type"), 120).split(";")[0].toLowerCase();
+  return { bytes, mimeType };
+}
+
+function assertFetchableMediaUrl(url: URL) {
+  if (url.protocol !== "https:" || isPrivateMediaHostname(url.hostname)) {
+    throw new Error("X and LinkedIn attachment URLs must be public HTTPS URLs.");
+  }
+}
+
+function isPrivateMediaHostname(hostname: string) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (
+    host === "localhost"
+    || host.endsWith(".localhost")
+    || host.endsWith(".local")
+    || host === "::1"
+    || host.startsWith("fe80:")
+    || (host.includes(":") && (host.startsWith("fc") || host.startsWith("fd")))
+    || host === "metadata.google.internal"
+  ) {
+    return true;
+  }
+  const parts = host.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  return parts[0] === 0
+    || parts[0] === 10
+    || parts[0] === 127
+    || (parts[0] === 169 && parts[1] === 254)
+    || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31)
+    || (parts[0] === 192 && parts[1] === 168);
+}
+
+function resolvedMediaMimeType(media: SocialMedia, remoteMimeType: string) {
+  if (remoteMimeType && remoteMimeType !== "application/octet-stream") return remoteMimeType;
+  if (media.mimeType) return media.mimeType;
+  if (media.kind === "gif") return "image/gif";
+  if (media.kind === "video") return "video/mp4";
+  if (media.kind === "document") {
+    const title = `${media.title} ${media.url}`.toLowerCase();
+    if (title.includes(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    if (title.includes(".pptx")) return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    if (title.includes(".doc")) return "application/msword";
+    if (title.includes(".ppt")) return "application/vnd.ms-powerpoint";
+    return "application/pdf";
+  }
+  return "image/jpeg";
+}
+
+function assertRemoteMediaFormat(provider: "x" | "linkedin", media: SocialMedia, remote: RemoteMedia) {
+  const mimeType = resolvedMediaMimeType(media, remote.mimeType);
+  if (media.kind === "image") {
+    const accepted = provider === "linkedin"
+      ? ["image/jpeg", "image/png"]
+      : ["image/jpeg", "image/png", "image/webp"];
+    if (!accepted.includes(mimeType)) {
+      throw new Error(`${providerLabel(provider)} does not accept ${mimeType || "that image format"} for this image post.`);
+    }
+    return;
+  }
+  if (media.kind === "gif" && mimeType !== "image/gif") {
+    throw new Error(`${providerLabel(provider)} requires a GIF attachment to use the image/gif format.`);
+  }
+  if (media.kind === "video" && !mimeType.startsWith("video/")) {
+    throw new Error(`${providerLabel(provider)} requires a video attachment URL for a video post.`);
+  }
+  if (media.kind === "document" && provider === "linkedin") {
+    const supported = new Set([
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ]);
+    if (!supported.has(mimeType)) {
+      throw new Error("LinkedIn documents must be PDF, DOC, DOCX, PPT, or PPTX files.");
+    }
+  }
+}
+
 function metaGraphVersion() {
   const version = META_GRAPH_API_VERSION.replace(/^v?/i, "").replace(/^\/+|\/+$/g, "");
   return version ? `v${version}` : "v22.0";
@@ -487,6 +795,10 @@ function metaGraphVersion() {
 
 function metaGraphUrl(path: string) {
   return `https://graph.facebook.com/${metaGraphVersion()}/${path.replace(/^\/+/, "")}`;
+}
+
+function metaGraphVideoUrl(path: string) {
+  return `https://graph-video.facebook.com/${metaGraphVersion()}/${path.replace(/^\/+/, "")}`;
 }
 
 function normalizeHttpUrl(value: unknown) {
@@ -498,6 +810,11 @@ function normalizeHttpUrl(value: unknown) {
   } catch (_error) {
     return "";
   }
+}
+
+function readMediaKind(value: unknown): SocialMediaKind | "" {
+  const kind = readString(value, 40).toLowerCase();
+  return kind === "image" || kind === "gif" || kind === "video" || kind === "document" ? kind : "";
 }
 
 function readScopes(value: unknown) {

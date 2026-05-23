@@ -140,8 +140,8 @@
     <div style="display: flex; gap: 12px; align-items: flex-start;">
       <span style="font-size: 1.25rem; line-height: 1.2;">ℹ️</span>
       <div>
-        <strong style="display: block; margin-bottom: 2px; color: var(--publish-text);">X (Twitter) Intent Handoff</strong>
-        <span style="color: var(--publish-muted); font-size: 0.9rem; line-height: 1.4; display: block;">Direct API publishing is not active for X. Posting will save your draft and open the official X web composer to complete your post manually.</span>
+        <strong style="display: block; margin-bottom: 2px; color: var(--publish-text);">X media permission</strong>
+        <span style="color: var(--publish-muted); font-size: 0.9rem; line-height: 1.4; display: block;">Image, GIF, and video posting uses X media upload. Reconnect an older X account once if it does not yet include the media.write permission.</span>
       </div>
     </div>
   `;
@@ -214,12 +214,12 @@
       badge: "Social",
       title: "Social posting",
       copy: "Save Social drafts or post directly with connected accounts.",
-      detailsText: "Post text, optional links, and provider-specific fields.",
+      detailsText: "Post text, media attachments, and provider-specific fields.",
       options: [
-        { id: "social-facebook", icon: "📘", name: "Facebook", note: "Page connection", button: "Post to Facebook", hint: "Direct posting needs a connected Facebook Page.", fields: [field("shareUrl", { label: "Optional link URL" }), field("imageUrl", { label: "Optional image URL", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a Facebook post", wide: true })] },
-        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Media connection", button: "Post to Instagram", hint: "Direct publishing needs a connected Instagram account and image media.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("imageUrl", { label: "Image URL", placeholder: "https://example.com/image.jpg", type: "url", required: true }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
-        { id: "social-x", icon: "✕", name: "X", note: "Connect account", button: "Post to X", hint: "Posts with your connected X account without a provider handoff.", fields: [field("xHandle", { label: "From handle", placeholder: "@yourhandle" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write an X post", required: true, wide: true }), field("shareUrl", { label: "Optional link URL" }), field("imageUrl", { label: "Optional image URL", placeholder: "https://example.com/image.jpg", type: "url" })] },
-        { id: "social-linkedin", icon: "💼", name: "LinkedIn", note: "Connect member", button: "Post to LinkedIn", hint: "Posts with your connected LinkedIn member without a provider handoff.", fields: [field("linkedinFrom", { label: "Profile or company", placeholder: "Signal Share" }), field("shareUrl", { label: "Optional link URL" }), field("imageUrl", { label: "Optional image URL", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a LinkedIn post", wide: true })] }
+        { id: "social-facebook", icon: "📘", name: "Facebook", note: "Page connection", button: "Post to Facebook", hint: "Supports Page text, links, images, GIFs, and video.", fields: [field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a Facebook post", wide: true })] },
+        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Media connection", button: "Post to Instagram", hint: "Supports an image post or a video reel from a public media URL.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
+        { id: "social-x", icon: "✕", name: "X", note: "Connect account", button: "Post to X", hint: "Supports text, links, images, GIFs, and video with a connected account.", fields: [field("xHandle", { label: "From handle", placeholder: "@yourhandle" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write an X post", required: true, wide: true }), field("shareUrl", { label: "Optional link URL" })] },
+        { id: "social-linkedin", icon: "💼", name: "LinkedIn", note: "Connect member", button: "Post to LinkedIn", hint: "Supports text, links, images, GIFs, video, and document posts.", fields: [field("linkedinFrom", { label: "Profile or company", placeholder: "Signal Share" }), field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a LinkedIn post", wide: true })] }
       ]
     },
     github: {
@@ -340,14 +340,31 @@
       return false;
     }
 
-    // Custom validation for Instagram:
-    const isInstagram = selectedOptions().some(o => socialProviderId(o) === "instagram");
-    if (isInstagram) {
-      const urlVal = (details.imageUrl || details.instagramImageUrl || "").trim();
-      if (!urlVal) {
-        setFeedback("Instagram direct publishing requires an image URL. Click the 📎 icon to select and upload an image.", true);
-        const focusEl = document.getElementById("publishTool-imageUrl") || document.getElementById("publishTool-instagramImageUrl");
-        focusEl?.focus();
+    if (activeFamilyId === "social") {
+      const mediaKind = details.mediaKind || (details.imageUrl || details.instagramImageUrl ? "image" : "");
+      const mediaUrl = details.mediaUrl || details.imageUrl || details.instagramImageUrl || "";
+      const supportedKinds = new Set(
+        (selectedFields().find((config) => config.key === "mediaKind")?.options || []).map(([value]) => value)
+      );
+      if (mediaUrl && !mediaKind) {
+        setFeedback("Choose an attachment type for the media URL.", true);
+        focusMediaTypeToolbar();
+        return false;
+      }
+      if (mediaKind && !mediaUrl) {
+        setFeedback("Add a public media URL or upload a file for the selected attachment type.", true);
+        document.getElementById("publishTool-mediaUrl")?.focus();
+        return false;
+      }
+      if (mediaKind && !supportedKinds.has(mediaKind)) {
+        setFeedback("That attachment type is not supported by every selected Social destination.", true);
+        focusMediaTypeToolbar();
+        return false;
+      }
+      const isInstagram = selectedOptions().some((option) => socialProviderId(option) === "instagram");
+      if (isInstagram && (!mediaUrl || !["image", "video"].includes(mediaKind))) {
+        setFeedback("Instagram direct publishing needs an image or video attachment. Video is published as a reel.", true);
+        document.getElementById("publishTool-mediaUrl")?.focus();
         return false;
       }
     }
@@ -462,9 +479,14 @@
         providers: options.map(socialProviderId).filter(Boolean),
         text: item.details.body || "",
         linkUrl: item.details.shareUrl || "",
+        mediaUrl: item.details.mediaUrl || item.details.imageUrl || item.details.instagramImageUrl || "",
+        mediaKind: item.details.mediaKind || (item.details.imageUrl || item.details.instagramImageUrl ? "image" : ""),
+        mediaMimeType: item.details.mediaMimeType || "",
+        mediaTitle: item.details.mediaTitle || "",
+        mediaAltText: item.details.mediaAltText || "",
         imageUrl: item.details.imageUrl || item.details.instagramImageUrl || "",
-        instagramImageUrl: item.details.imageUrl || item.details.instagramImageUrl || "",
         instagramHashtags: item.details.instagramHashtags || "",
+        instagramShareToFeed: item.details.instagramShareToFeed !== "false",
         connectionIds: options.reduce((ids, option) => {
           const provider = socialProviderId(option);
           const connection = socialConnection(provider);
@@ -671,19 +693,8 @@
         } else {
           saveActivity(record);
           activitySaved = true;
-          
-          const xOption = options.find((o) => socialProviderId(o) === "x");
-          const apiOptions = options.filter((o) => socialProviderId(o) !== "x");
-          
-          if (xOption) {
-            const text = encodeURIComponent(item.details.body || "");
-            const url = encodeURIComponent(item.details.shareUrl || "");
-            window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
-          }
-          
-          if (apiOptions.length > 0) {
-            await publishSocialOptions(apiOptions, item);
-          }
+
+          await publishSocialOptions(options, item);
           
           toast(options.length === 1 ? "Social post completed" : `${options.length} Social posts completed`);
         }
@@ -835,23 +846,213 @@
     }
   }
 
+  const SOCIAL_MEDIA_KIND_DETAILS = {
+    image: {
+      label: "Image",
+      accept: "image/jpeg,image/png,image/webp",
+      placeholder: "https://example.com/photo.jpg",
+    },
+    gif: {
+      label: "GIF",
+      accept: "image/gif",
+      placeholder: "https://example.com/animation.gif",
+    },
+    video: {
+      label: "Video",
+      accept: "video/mp4,video/webm,video/quicktime",
+      placeholder: "https://example.com/video.mp4",
+    },
+    document: {
+      label: "Document",
+      accept: ".pdf,.doc,.docx,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      placeholder: "https://example.com/document.pdf",
+    },
+  };
+
+  function allowedSocialMediaKinds() {
+    const fieldConfig = selectedFields().find((config) => config.key === "mediaKind");
+    return new Set((fieldConfig?.options || []).map(([value]) => value));
+  }
+
+  function socialMediaKindForFile(file) {
+    const type = `${file?.type || ""}`.toLowerCase();
+    const name = `${file?.name || ""}`.toLowerCase();
+    if (type === "image/gif" || name.endsWith(".gif")) return "gif";
+    if (type.startsWith("image/")) return "image";
+    if (type.startsWith("video/")) return "video";
+    if (
+      type === "application/pdf"
+      || /(?:^|\.)(?:pdf|doc|docx|ppt|pptx)$/.test(name.split("/").pop() || "")
+      || type.includes("msword")
+      || type.includes("officedocument")
+      || type.includes("ms-powerpoint")
+    ) {
+      return "document";
+    }
+    return "";
+  }
+
+  function socialMediaMaxBytes(kind) {
+    const providers = new Set(selectedOptions().map(socialProviderId));
+    if (kind === "image" && providers.has("x")) return 5 * 1024 * 1024;
+    if (kind === "gif") return 15 * 1024 * 1024;
+    if (kind === "video") return 15 * 1024 * 1024;
+    if (kind === "document") return 100 * 1024 * 1024;
+    return 50 * 1024 * 1024;
+  }
+
+  function socialMediaAccept(kind) {
+    if (kind !== "image") return SOCIAL_MEDIA_KIND_DETAILS[kind]?.accept || "";
+    const providers = new Set(selectedOptions().map(socialProviderId));
+    return providers.has("instagram") || providers.has("linkedin")
+      ? "image/jpeg,image/png"
+      : SOCIAL_MEDIA_KIND_DETAILS.image.accept;
+  }
+
+  function formatUploadLimit(bytes) {
+    return `${Math.round(bytes / (1024 * 1024))} MB`;
+  }
+
+  function closeSocialMediaMenus(exceptMenu = null) {
+    dynamicFields.querySelectorAll(".publish-media-menu").forEach((menu) => {
+      if (menu !== exceptMenu) menu.hidden = true;
+    });
+    dynamicFields.querySelectorAll(".publish-media-tool").forEach((button) => {
+      const controls = button.getAttribute("aria-controls");
+      const menu = controls ? document.getElementById(controls) : null;
+      button.setAttribute("aria-expanded", menu && !menu.hidden ? "true" : "false");
+    });
+  }
+
+  function focusMediaTypeToolbar() {
+    dynamicFields.querySelector(".publish-media-tool:not(:disabled)")?.focus();
+  }
+
+  function syncSocialMediaControls() {
+    const kindInput = document.getElementById("publishTool-mediaKind");
+    const kind = kindInput?.value || "";
+    const details = SOCIAL_MEDIA_KIND_DETAILS[kind];
+    dynamicFields.querySelectorAll("[data-media-kind]").forEach((button) => {
+      button.classList.toggle("is-selected", button.dataset.mediaKind === kind);
+    });
+    const urlInput = document.getElementById("publishTool-mediaUrl");
+    if (urlInput && details) urlInput.placeholder = details.placeholder;
+    const fileInput = dynamicFields.querySelector("[data-social-media-file]");
+    if (fileInput) {
+      const kinds = kind ? [kind] : [...allowedSocialMediaKinds()];
+      fileInput.accept = kinds.map(socialMediaAccept).filter(Boolean).join(",");
+    }
+    const status = dynamicFields.querySelector(".publish-media-selection");
+    if (status) status.textContent = details ? `${details.label} selected` : "No attachment selected";
+  }
+
+  function createMediaToolbar(input, config) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "publish-media-toolbar";
+    const bar = document.createElement("div");
+    bar.className = "publish-media-tools";
+    bar.setAttribute("role", "group");
+    bar.setAttribute("aria-label", "Select attachment type");
+    input.className = "publish-media-kind-input";
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    const allowed = new Set(config.options.map(([kind]) => kind));
+    const groups = [
+      { key: "visual", icon: "\u{1F5BC}", label: "Image options", kinds: ["image", "gif"] },
+      { key: "video", icon: "\u25B6", label: "Video options", kinds: ["video"] },
+      { key: "file", icon: "\u{1F4CE}", label: "File options", kinds: ["document", ""] },
+    ];
+
+    groups.forEach((group, index) => {
+      const holder = document.createElement("div");
+      holder.className = "publish-media-tool-wrap";
+      const menuId = `${config.id}-menu-${index}`;
+      const button = document.createElement("button");
+      button.className = "publish-media-tool";
+      button.type = "button";
+      button.textContent = group.icon;
+      button.setAttribute("aria-label", group.label);
+      button.setAttribute("aria-controls", menuId);
+      button.setAttribute("aria-expanded", "false");
+      button.setAttribute("aria-haspopup", "menu");
+      const menu = document.createElement("div");
+      menu.className = "publish-media-menu";
+      menu.id = menuId;
+      menu.hidden = true;
+      menu.setAttribute("role", "menu");
+      const availableKinds = group.kinds.filter((kind) => kind === "" || allowed.has(kind));
+
+      availableKinds.forEach((kind) => {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = "publish-media-option";
+        option.dataset.mediaKind = kind;
+        option.setAttribute("role", "menuitem");
+        option.textContent = kind ? SOCIAL_MEDIA_KIND_DETAILS[kind].label : "Remove attachment";
+        option.addEventListener("click", () => {
+          input.value = kind;
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          if (!kind) {
+            const urlInput = document.getElementById("publishTool-mediaUrl");
+            const mimeInput = document.getElementById("publishTool-mediaMimeType");
+            if (urlInput) urlInput.value = "";
+            if (mimeInput) mimeInput.value = "";
+          }
+          closeSocialMediaMenus();
+          syncSocialMediaControls();
+        });
+        menu.append(option);
+      });
+
+      button.disabled = !availableKinds.length;
+      button.addEventListener("click", () => {
+        const shouldOpen = menu.hidden;
+        closeSocialMediaMenus(shouldOpen ? menu : null);
+        menu.hidden = !shouldOpen;
+        button.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+      });
+      holder.append(button, menu);
+      bar.append(holder);
+    });
+
+    const status = document.createElement("small");
+    status.className = "publish-media-selection";
+    wrapper.append(input, bar, status);
+    return wrapper;
+  }
+
   function createControl(config) {
+    if (config.mode === "hidden") {
+      const hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.value = config.value || "";
+      return hidden;
+    }
     if (config.mode === "textarea") {
       const textarea = document.createElement("textarea");
       textarea.rows = 4;
       textarea.value = config.persist ? localStorage.getItem(config.storageKey) || config.value || "" : "";
       return textarea;
     }
-    if (config.mode === "select") {
+    if (config.mode === "select" || config.mode === "media-toolbar") {
       const select = document.createElement("select");
       const current = localStorage.getItem(config.storageKey) || config.value || config.options[0]?.[0] || "";
+      if (config.mode === "media-toolbar" && !config.required) {
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "No attachment";
+        select.append(empty);
+      }
       config.options.forEach(([value, label]) => {
         const option = document.createElement("option");
         option.value = value;
-        option.textContent = label;
+        option.textContent = SOCIAL_MEDIA_KIND_DETAILS[value]?.label || label;
         option.selected = value === current;
         select.append(option);
       });
+      if (![...select.options].some((option) => option.value === current)) {
+        select.value = config.required ? config.options[0]?.[0] || "" : "";
+      }
       return select;
     }
     const input = document.createElement("input");
@@ -862,11 +1063,6 @@
 
   function renderFields(fields) {
     dynamicFields.replaceChildren(...fields.map((config) => {
-      const label = document.createElement("label");
-      label.className = `publish-field${config.wide ? " is-wide" : ""}`;
-      label.setAttribute("for", config.id);
-      const text = document.createElement("span");
-      text.textContent = config.required ? `${config.label} *` : config.label;
       const input = createControl(config);
       input.id = config.id;
       input.name = config.key;
@@ -878,34 +1074,64 @@
       const syncField = () => {
         persist();
         if (config.key === "socialDeliveryMode") syncActionButtonLabel();
+        if (config.key === "mediaKind") syncSocialMediaControls();
       };
       input.addEventListener("input", syncField);
       input.addEventListener("change", syncField);
 
+      if (config.mode === "hidden") return input;
+
+      const label = document.createElement("label");
+      label.className = `publish-field${config.wide ? " is-wide" : ""}`;
+      label.setAttribute("for", config.id);
+      const text = document.createElement("span");
+      text.textContent = config.required ? `${config.label} *` : config.label;
       let controlContainer = input;
-      if (config.key === "imageUrl" || config.key === "instagramImageUrl") {
+      if (config.mode === "media-toolbar") {
+        controlContainer = createMediaToolbar(input, config);
+      }
+      if (config.key === "mediaUrl" || config.key === "imageUrl" || config.key === "instagramImageUrl") {
         const wrapper = document.createElement("div");
         wrapper.className = "publish-url-upload-wrapper";
 
         const fileInput = document.createElement("input");
         fileInput.type = "file";
-        fileInput.accept = "image/*";
+        fileInput.dataset.socialMediaFile = "true";
         fileInput.style.display = "none";
 
         const uploadBtn = document.createElement("button");
         uploadBtn.type = "button";
         uploadBtn.className = "publish-upload-btn";
-        uploadBtn.innerHTML = "📎";
-        uploadBtn.title = "Upload image file";
+        uploadBtn.textContent = "\u{1F4E4}";
+        uploadBtn.title = "Upload selected attachment";
+        uploadBtn.setAttribute("aria-label", "Upload selected attachment");
 
         uploadBtn.addEventListener("click", () => fileInput.click());
 
         fileInput.addEventListener("change", async () => {
           if (!fileInput.files || !fileInput.files[0]) return;
           const file = fileInput.files[0];
+          const mediaKindInput = document.getElementById("publishTool-mediaKind");
+          const detectedKind = socialMediaKindForFile(file);
+          const selectedKind = mediaKindInput?.value || detectedKind;
+          if (!detectedKind || !allowedSocialMediaKinds().has(detectedKind) || (selectedKind && selectedKind !== detectedKind)) {
+            setFeedback("Choose an attachment type supported by every selected destination, then select a matching file.", true);
+            fileInput.value = "";
+            return;
+          }
+          const maxBytes = socialMediaMaxBytes(detectedKind);
+          if (file.size > maxBytes) {
+            setFeedback(`${SOCIAL_MEDIA_KIND_DETAILS[detectedKind].label} uploads must be ${formatUploadLimit(maxBytes)} or smaller for the selected destinations.`, true);
+            fileInput.value = "";
+            return;
+          }
+          if (mediaKindInput && !mediaKindInput.value) {
+            mediaKindInput.value = detectedKind;
+            mediaKindInput.dispatchEvent(new Event("change", { bubbles: true }));
+          }
           const appState = window.state ?? window.__SIGNAL_SHARE_STATE__;
           if (!appState?.supabase || !appState.currentUser) {
-            toast("Sign in to upload images.");
+            toast("Sign in to upload attachments.");
             return;
           }
           if (typeof appState.uploadFileToSupabase !== "function") {
@@ -914,25 +1140,36 @@
           }
 
           try {
-            uploadBtn.innerHTML = "⏳";
+            uploadBtn.textContent = "...";
             uploadBtn.disabled = true;
             input.disabled = true;
-            input.placeholder = "Uploading image...";
+            input.placeholder = "Uploading attachment...";
 
             const tempId = crypto.randomUUID();
-            const isInstagram = selectedOptions().some(o => (o?.id || "").includes("instagram"));
-            const res = await appState.uploadFileToSupabase(tempId, file, null, { enforceInstagramRatio: isInstagram });
+            const isInstagram = detectedKind === "image" && selectedOptions().some((option) => (option?.id || "").includes("instagram"));
+            const needsJpegImage = detectedKind === "image" && selectedOptions().some((option) => (
+              ["social-instagram", "social-linkedin"].includes(option?.id || "")
+            ));
+            const res = await appState.uploadFileToSupabase(tempId, file, null, {
+              enforceInstagramRatio: isInstagram,
+              outputType: needsJpegImage ? "image/jpeg" : "image/webp",
+            });
 
             input.value = res.mediaUrl;
+            const mimeInput = document.getElementById("publishTool-mediaMimeType");
+            if (mimeInput) mimeInput.value = res.fileType || file.type;
+            const titleInput = document.getElementById("publishTool-mediaTitle");
+            if (titleInput && !titleInput.value) titleInput.value = res.fileName || file.name;
             input.placeholder = config.placeholder || "";
             input.dispatchEvent(new Event("input"));
             input.dispatchEvent(new Event("change"));
-            toast("Image uploaded successfully!");
+            syncSocialMediaControls();
+            toast("Attachment uploaded successfully.");
           } catch (err) {
             console.error(err);
             toast("Upload failed: " + (err.message || err));
           } finally {
-            uploadBtn.innerHTML = "📎";
+            uploadBtn.textContent = "\u{1F4E4}";
             uploadBtn.disabled = false;
             input.disabled = false;
           }
@@ -946,6 +1183,19 @@
       return label;
     }));
     dynamicFields.hidden = fields.length === 0;
+    syncSocialMediaControls();
+  }
+
+  function clearUnsupportedStoredMedia(fields) {
+    if (activeFamilyId !== "social") return;
+    const mediaKinds = new Set(
+      (fields.find((config) => config.key === "mediaKind")?.options || []).map(([kind]) => kind)
+    );
+    const storedKind = localStorage.getItem("signal-share-publish.mediaKind") || "";
+    if (!storedKind || mediaKinds.has(storedKind)) return;
+    ["mediaKind", "mediaUrl", "mediaMimeType", "mediaTitle", "mediaAltText"].forEach((key) => {
+      localStorage.removeItem(`signal-share-publish.${key}`);
+    });
   }
 
   function syncSelectedOptions() {
@@ -965,7 +1215,9 @@
         || "Action-specific fields.";
     }
     form.classList.toggle("is-tool-mode", !family.usesPostComposer);
-    renderFields(selectedFields());
+    const fields = selectedFields();
+    clearUnsupportedStoredMedia(fields);
+    renderFields(fields);
     syncActionButtonLabel();
     renderSocialConnections();
 
@@ -1068,6 +1320,14 @@
     const next = !overlay?.classList.contains("is-generic-dark");
     syncDark(next);
     localStorage.setItem(DARK_KEY, next ? "true" : "false");
+  });
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element) || !event.target.closest(".publish-media-tool-wrap")) {
+      closeSocialMediaMenus();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeSocialMediaMenus();
   });
 
   // --- Drafts & Activity Manager ---
@@ -1350,8 +1610,12 @@
       const fields = selectedFields();
       fields.forEach((config) => {
         let value = draft.details[config.key] ?? "";
-        if (config.key === "imageUrl" && !value) {
+        if (config.key === "mediaUrl" && !value) {
           value = draft.details["instagramImageUrl"] ?? "";
+          value ||= draft.details["imageUrl"] ?? "";
+        }
+        if (config.key === "mediaKind" && !value && (draft.details.imageUrl || draft.details.instagramImageUrl)) {
+          value = "image";
         }
         const input = document.getElementById(config.id);
         if (input) {
@@ -1365,6 +1629,7 @@
           }
         }
       });
+      syncSocialMediaControls();
     }
     
     toast("Draft loaded into composer");
@@ -1401,18 +1666,7 @@
         storage.setItem(key, JSON.stringify(items.slice(0, 50)));
         toast(isSession ? "Saved to session storage" : "Saved to local storage");
       } else if (familyId === "social") {
-        const xOption = options.find((o) => socialProviderId(o) === "x");
-        const apiOptions = options.filter((o) => socialProviderId(o) !== "x");
-        
-        if (xOption) {
-          const text = encodeURIComponent(item.details.body || item.message || "");
-          const url = encodeURIComponent(item.details.shareUrl || "");
-          window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
-        }
-        
-        if (apiOptions.length > 0) {
-          await publishSocialOptions(apiOptions, item);
-        }
+        await publishSocialOptions(options, item);
         
         toast(options.length === 1 ? "Social post completed" : `${options.length} Social posts completed`);
       } else if (familyId === "github") {

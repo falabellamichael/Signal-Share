@@ -29,16 +29,29 @@
     return fields;
   }
 
+  const socialMediaSupport = {
+    "social-facebook": ["image", "gif", "video"],
+    "social-instagram": ["image", "video"],
+    "social-x": ["image", "gif", "video"],
+    "social-linkedin": ["image", "gif", "video", "document"],
+  };
+
+  function sharedSocialMediaKinds(selectedIds) {
+    const selected = [...selectedIds];
+    if (!selected.length) return [];
+    return socialMediaSupport[selected[0]].filter((kind) => (
+      selected.every((id) => socialMediaSupport[id]?.includes(kind))
+    ));
+  }
+
   function buildSocialFields(options, field) {
     const selectedIds = new Set(options.map((option) => option.id));
     const multiSelected = options.length > 1;
     const hasShareUrl = selectedIds.has("social-facebook")
       || selectedIds.has("social-x")
       || selectedIds.has("social-linkedin");
-    const hasImageUrl = selectedIds.has("social-facebook")
-      || selectedIds.has("social-instagram")
-      || selectedIds.has("social-x")
-      || selectedIds.has("social-linkedin");
+    const mediaKinds = sharedSocialMediaKinds(selectedIds);
+    const requiresMedia = selectedIds.has("social-instagram");
     const textRequired = selectedIds.has("social-instagram") || selectedIds.has("social-x");
     const fields = [];
 
@@ -56,18 +69,33 @@
       }));
     }
 
-    if (hasImageUrl) {
-      const isInstagram = selectedIds.has("social-instagram");
-      fields.push(field("imageUrl", {
-        label: isInstagram ? "Image URL" : (multiSelected ? "Optional shared image URL" : "Optional image URL"),
-        placeholder: "https://example.com/image.jpg",
-        type: "url",
-        required: isInstagram,
+    if (mediaKinds.length) {
+      fields.push(field("mediaKind", {
+        label: requiresMedia ? "Attachment type" : "Optional attachment",
+        mode: "media-toolbar",
+        value: requiresMedia ? "image" : "",
+        options: mediaKinds.map((kind) => [kind, kind]),
+        required: requiresMedia,
+        wide: true,
       }));
+      fields.push(field("mediaUrl", {
+        label: requiresMedia ? "Public media URL" : (multiSelected ? "Optional shared media URL" : "Optional media URL"),
+        placeholder: "https://example.com/media-file",
+        type: "url",
+        required: requiresMedia,
+        wide: true,
+      }));
+      fields.push(field("mediaMimeType", { mode: "hidden", persist: false }));
     }
 
     if (selectedIds.has("social-instagram")) {
       fields.push(field("instagramFrom", { label: "Instagram account", placeholder: "@youraccount" }));
+      fields.push(field("instagramShareToFeed", {
+        label: "Reel visibility",
+        mode: "select",
+        value: "true",
+        options: [["true", "Share reels to feed"], ["false", "Reels tab only"]],
+      }));
     }
 
     if (selectedIds.has("social-x")) {
@@ -76,6 +104,8 @@
 
     if (selectedIds.has("social-linkedin")) {
       fields.push(field("linkedinFrom", { label: "LinkedIn profile or company", placeholder: "Signal Share" }));
+      fields.push(field("mediaTitle", { label: "LinkedIn media title", placeholder: "Optional attachment title" }));
+      fields.push(field("mediaAltText", { label: "LinkedIn image alt text", placeholder: "Describe an image for accessibility" }));
     }
 
     fields.push(field("body", {

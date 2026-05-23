@@ -886,6 +886,106 @@ body[data-theme="contrast"] #compose .publish-family-button,
 }
 
 /* Premium styling for paperclip upload integration next to URL inputs */
+.publish-media-toolbar {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.publish-media-kind-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.publish-media-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.publish-media-tool-wrap {
+  position: relative;
+}
+
+.publish-media-tool {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--publish-border);
+  border-radius: 16px;
+  color: var(--publish-text);
+  background: var(--publish-button-soft);
+  font: inherit;
+  font-size: 19px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.publish-media-tool:hover,
+.publish-media-tool:focus-visible,
+.publish-media-option:hover,
+.publish-media-option:focus-visible {
+  border-color: var(--publish-border-strong);
+  background: var(--publish-button-soft-hover);
+  outline: none;
+}
+
+.publish-media-tool:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.publish-media-option.is-selected,
+.publish-media-tool:has(+ .publish-media-menu .publish-media-option.is-selected) {
+  color: var(--publish-primary);
+  border-color: color-mix(in srgb, var(--publish-primary) 52%, var(--publish-border));
+}
+
+.publish-media-menu {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  z-index: 4;
+  min-width: 172px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--publish-border);
+  border-radius: 14px;
+  background: var(--publish-panel-strong);
+  box-shadow: var(--publish-shadow-soft);
+}
+
+.publish-media-menu[hidden] {
+  display: none;
+}
+
+.publish-media-option {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--publish-text);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.publish-media-selection {
+  color: var(--publish-muted);
+  font-weight: 500;
+}
+
 .publish-url-upload-wrapper {
   position: relative;
   display: flex;

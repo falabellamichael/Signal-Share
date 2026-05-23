@@ -21,7 +21,7 @@ export function xAuthorizeUrl(state: string, redirectUri: string, codeChallenge:
     response_type: "code",
     client_id: X_OAUTH_CLIENT_ID,
     redirect_uri: redirectUri,
-    scope: "tweet.read tweet.write users.read offline.access",
+    scope: "tweet.read tweet.write users.read media.write offline.access",
     state,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",

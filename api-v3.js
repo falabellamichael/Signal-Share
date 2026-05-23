@@ -447,12 +447,14 @@ export async function compressImageFile(file, maxWidth = 1920, quality = 0.8, op
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, width, height);
+      const outputType = options.outputType === "image/jpeg" ? "image/jpeg" : "image/webp";
+      const outputExtension = outputType === "image/jpeg" ? ".jpg" : ".webp";
       canvas.toBlob((blob) => {
         if (!blob) return resolve(file);
         const extension = file.name.split('.').pop();
-        const newName = file.name.replace(new RegExp(`\\.${extension}$`, 'i'), '.webp');
-        resolve(new File([blob], newName, { type: "image/webp" }));
-      }, "image/webp", quality);
+        const newName = file.name.replace(new RegExp(`\\.${extension}$`, 'i'), outputExtension);
+        resolve(new File([blob], newName, { type: outputType }));
+      }, outputType, outputType === "image/jpeg" ? Math.max(quality, 0.88) : quality);
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
     img.src = url;
@@ -470,13 +472,14 @@ export async function uploadFileToSupabase(postId, file, onProgress, options = {
   const isMedia = compressedFile.type.startsWith("video/") || compressedFile.type.startsWith("audio/");
   
   if (isLargeFile || isMedia) {
-    return resumableUploadFile(filePath, compressedFile, onProgress);
+    const result = await resumableUploadFile(filePath, compressedFile, onProgress);
+    return { ...result, fileType: compressedFile.type, fileName: compressedFile.name, fileSize: compressedFile.size };
   }
 
   const { error } = await apiContext.state.supabase.storage.from(apiContext.APP_CONFIG.storageBucket).upload(filePath, compressedFile, { cacheControl: "31536000", upsert: false, contentType: compressedFile.type });
   if (error) throw error; 
   const { data } = apiContext.state.supabase.storage.from(apiContext.APP_CONFIG.storageBucket).getPublicUrl(filePath); 
-  return { filePath, mediaUrl: data.publicUrl };
+  return { filePath, mediaUrl: data.publicUrl, fileType: compressedFile.type, fileName: compressedFile.name, fileSize: compressedFile.size };
 }
 
 export async function resumableUploadFile(filePath, file, onProgress) {

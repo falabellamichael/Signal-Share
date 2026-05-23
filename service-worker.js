@@ -1,4 +1,4 @@
-const CACHE_NAME = "signal-share-shell-v151";
+const CACHE_NAME = "signal-share-shell-v152";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -15,9 +15,9 @@ const APP_SHELL = [
   "./app-v3-ui-settings.js",
   "./app-v3-ui-elements.js",
   "./bridge-fetch-hardening.js",
-  "./studio-publish-overlay.css?v=1.4",
-  "./studio-publish-fields.js?v=1.0",
-  "./studio-publish-overlay.js?v=1.2",
+  "./studio-publish-overlay.css?v=1.5",
+  "./studio-publish-fields.js?v=1.1",
+  "./studio-publish-overlay.js?v=1.3",
   "./terms.html",
   "./privacy.html",
   "./site.webmanifest",
