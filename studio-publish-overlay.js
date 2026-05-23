@@ -200,10 +200,10 @@
       copy: "Save Social drafts or post directly with connected accounts.",
       detailsText: "Post text, optional links, and provider-specific fields.",
       options: [
-        { id: "social-facebook", icon: "📘", name: "Facebook", note: "Page connection", button: "Post to Facebook", hint: "Direct posting needs a connected Facebook Page.", fields: [field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a Facebook post", wide: true })] },
-        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Media connection", button: "Post to Instagram", hint: "Direct publishing needs a connected Instagram account and image media.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("instagramImageUrl", { label: "Instagram image URL", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
-        { id: "social-x", icon: "✕", name: "X", note: "Connect account", button: "Post to X", hint: "Posts with your connected X account without a provider handoff.", fields: [field("xHandle", { label: "From handle", placeholder: "@yourhandle" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write an X post", required: true, wide: true }), field("shareUrl", { label: "Optional link URL" })] },
-        { id: "social-linkedin", icon: "💼", name: "LinkedIn", note: "Connect member", button: "Post to LinkedIn", hint: "Posts with your connected LinkedIn member without a provider handoff.", fields: [field("linkedinFrom", { label: "Profile or company", placeholder: "Signal Share" }), field("shareUrl", { label: "Optional link URL" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a LinkedIn post", wide: true })] }
+        { id: "social-facebook", icon: "📘", name: "Facebook", note: "Page connection", button: "Post to Facebook", hint: "Direct posting needs a connected Facebook Page.", fields: [field("shareUrl", { label: "Optional link URL" }), field("imageUrl", { label: "Optional image URL", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a Facebook post", wide: true })] },
+        { id: "social-instagram", icon: "📸", name: "Instagram", note: "Media connection", button: "Post to Instagram", hint: "Direct publishing needs a connected Instagram account and image media.", fields: [field("instagramFrom", { label: "From account", placeholder: "@youraccount" }), field("imageUrl", { label: "Image URL", placeholder: "https://example.com/image.jpg", type: "url", required: true }), field("body", { label: "Caption", mode: "textarea", placeholder: "Instagram caption", required: true, wide: true }), field("instagramHashtags", { label: "Hashtags", placeholder: "#signalshare #media" })] },
+        { id: "social-x", icon: "✕", name: "X", note: "Connect account", button: "Post to X", hint: "Posts with your connected X account without a provider handoff.", fields: [field("xHandle", { label: "From handle", placeholder: "@yourhandle" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write an X post", required: true, wide: true }), field("shareUrl", { label: "Optional link URL" }), field("imageUrl", { label: "Optional image URL", placeholder: "https://example.com/image.jpg", type: "url" })] },
+        { id: "social-linkedin", icon: "💼", name: "LinkedIn", note: "Connect member", button: "Post to LinkedIn", hint: "Posts with your connected LinkedIn member without a provider handoff.", fields: [field("linkedinFrom", { label: "Profile or company", placeholder: "Signal Share" }), field("shareUrl", { label: "Optional link URL" }), field("imageUrl", { label: "Optional image URL", placeholder: "https://example.com/image.jpg", type: "url" }), field("body", { label: "Post text", mode: "textarea", placeholder: "Write a LinkedIn post", wide: true })] }
       ]
     },
     github: {
@@ -327,10 +327,11 @@
     // Custom validation for Instagram:
     const isInstagram = selectedOptions().some(o => socialProviderId(o) === "instagram");
     if (isInstagram) {
-      const urlVal = (details.instagramImageUrl || "").trim();
+      const urlVal = (details.imageUrl || details.instagramImageUrl || "").trim();
       if (!urlVal) {
         setFeedback("Instagram direct publishing requires an image URL. Click the 📎 icon to select and upload an image.", true);
-        document.getElementById("publishTool-instagramImageUrl")?.focus();
+        const focusEl = document.getElementById("publishTool-imageUrl") || document.getElementById("publishTool-instagramImageUrl");
+        focusEl?.focus();
         return false;
       }
     }
@@ -445,7 +446,8 @@
         providers: options.map(socialProviderId).filter(Boolean),
         text: item.details.body || "",
         linkUrl: item.details.shareUrl || "",
-        instagramImageUrl: item.details.instagramImageUrl || "",
+        imageUrl: item.details.imageUrl || item.details.instagramImageUrl || "",
+        instagramImageUrl: item.details.imageUrl || item.details.instagramImageUrl || "",
         instagramHashtags: item.details.instagramHashtags || "",
         connectionIds: options.reduce((ids, option) => {
           const provider = socialProviderId(option);
@@ -865,7 +867,7 @@
       input.addEventListener("change", syncField);
 
       let controlContainer = input;
-      if (config.key === "instagramImageUrl") {
+      if (config.key === "imageUrl" || config.key === "instagramImageUrl") {
         const wrapper = document.createElement("div");
         wrapper.className = "publish-url-upload-wrapper";
 
@@ -1321,7 +1323,10 @@
     if (draft.details) {
       const fields = selectedFields();
       fields.forEach((config) => {
-        const value = draft.details[config.key] ?? "";
+        let value = draft.details[config.key] ?? "";
+        if (config.key === "imageUrl" && !value) {
+          value = draft.details["instagramImageUrl"] ?? "";
+        }
         const input = document.getElementById(config.id);
         if (input) {
           input.value = value;

@@ -35,6 +35,10 @@
     const hasShareUrl = selectedIds.has("social-facebook")
       || selectedIds.has("social-x")
       || selectedIds.has("social-linkedin");
+    const hasImageUrl = selectedIds.has("social-facebook")
+      || selectedIds.has("social-instagram")
+      || selectedIds.has("social-x")
+      || selectedIds.has("social-linkedin");
     const textRequired = selectedIds.has("social-instagram") || selectedIds.has("social-x");
     const fields = [];
 
@@ -52,13 +56,18 @@
       }));
     }
 
-    if (selectedIds.has("social-instagram")) {
-      fields.push(field("instagramFrom", { label: "Instagram account", placeholder: "@youraccount" }));
-      fields.push(field("instagramImageUrl", {
-        label: "Instagram image URL",
+    if (hasImageUrl) {
+      const isInstagram = selectedIds.has("social-instagram");
+      fields.push(field("imageUrl", {
+        label: isInstagram ? "Image URL" : (multiSelected ? "Optional shared image URL" : "Optional image URL"),
         placeholder: "https://example.com/image.jpg",
         type: "url",
+        required: isInstagram,
       }));
+    }
+
+    if (selectedIds.has("social-instagram")) {
+      fields.push(field("instagramFrom", { label: "Instagram account", placeholder: "@youraccount" }));
     }
 
     if (selectedIds.has("social-x")) {

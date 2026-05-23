@@ -7,6 +7,7 @@ type SocialPublishPayload = {
   connectionIds?: unknown;
   text?: unknown;
   linkUrl?: unknown;
+  imageUrl?: unknown;
   instagramImageUrl?: unknown;
   instagramHashtags?: unknown;
 };
@@ -83,9 +84,9 @@ Deno.serve(async (request) => {
     if (readString(payload.linkUrl) && !linkUrl) {
       return jsonResponse({ error: "Optional link URL must use http or https." }, 400);
     }
-    const instagramImageUrl = normalizeHttpUrl(payload.instagramImageUrl);
-    if (readString(payload.instagramImageUrl) && !instagramImageUrl) {
-      return jsonResponse({ error: "Instagram image URL must use http or https." }, 400);
+    const imageUrl = normalizeHttpUrl(payload.imageUrl || payload.instagramImageUrl);
+    if (readString(payload.imageUrl || payload.instagramImageUrl) && !imageUrl) {
+      return jsonResponse({ error: "Optional image URL must use http or https." }, 400);
     }
 
     const adminClient = createAdminClient();
@@ -93,7 +94,7 @@ Deno.serve(async (request) => {
     const draft = {
       text: readString(payload.text, 6000),
       linkUrl,
-      instagramImageUrl,
+      imageUrl,
       instagramHashtags: readString(payload.instagramHashtags, 500),
     };
     const results: ProviderResult[] = [];
@@ -114,7 +115,7 @@ async function publishProvider(
   draft: {
     text: string;
     linkUrl: string;
-    instagramImageUrl: string;
+    imageUrl: string;
     instagramHashtags: string;
   }
 ): Promise<ProviderResult> {
@@ -128,15 +129,15 @@ async function publishProvider(
     }
     const readyConnection = await connectionForPublish(adminClient, connection);
     if (provider === "facebook") {
-      return publishFacebook(readyConnection, draft.text, draft.linkUrl);
+      return publishFacebook(readyConnection, draft.text, draft.linkUrl, draft.imageUrl);
     }
     if (provider === "instagram") {
-      return publishInstagram(readyConnection, draft.text, draft.instagramHashtags, draft.instagramImageUrl);
+      return publishInstagram(readyConnection, draft.text, draft.instagramHashtags, draft.imageUrl);
     }
     if (provider === "x") {
-      return publishX(readyConnection, draft.text, draft.linkUrl);
+      return publishX(readyConnection, draft.text, draft.linkUrl, draft.imageUrl);
     }
-    return publishLinkedIn(readyConnection, draft.text, draft.linkUrl);
+    return publishLinkedIn(readyConnection, draft.text, draft.linkUrl, draft.imageUrl);
   } catch (error) {
     return {
       provider,
@@ -149,20 +150,33 @@ async function publishProvider(
 async function publishFacebook(
   connection: SocialConnection,
   text: string,
-  linkUrl: string
+  linkUrl: string,
+  imageUrl?: string
 ): Promise<ProviderResult> {
   const provider: SocialProvider = "facebook";
-  if (!text && !linkUrl) {
-    return { provider, ok: false, error: "Facebook needs post text or an optional link URL." };
+  if (!text && !linkUrl && !imageUrl) {
+    return { provider, ok: false, error: "Facebook needs post text, a link, or an image." };
   }
-  const body = new URLSearchParams({ access_token: await decryptToken(connection.access_token) });
-  if (text) body.set("message", text);
-  if (linkUrl) body.set("link", linkUrl);
-  const payload = await requestProviderJson(metaGraphUrl(`${encodeURIComponent(connection.provider_account_id)}/feed`), {
-    method: "POST",
-    body,
-  }, provider);
-  return { provider, ok: true, id: readString(recordValue(payload).id, 300) };
+  const accessToken = await decryptToken(connection.access_token);
+  if (imageUrl) {
+    const body = new URLSearchParams({ access_token: accessToken, url: imageUrl });
+    const caption = [text, linkUrl].filter(Boolean).join("\n\n");
+    if (caption) body.set("caption", caption);
+    const payload = await requestProviderJson(metaGraphUrl(`${encodeURIComponent(connection.provider_account_id)}/photos`), {
+      method: "POST",
+      body,
+    }, provider);
+    return { provider, ok: true, id: readString(recordValue(payload).id, 300) };
+  } else {
+    const body = new URLSearchParams({ access_token: accessToken });
+    if (text) body.set("message", text);
+    if (linkUrl) body.set("link", linkUrl);
+    const payload = await requestProviderJson(metaGraphUrl(`${encodeURIComponent(connection.provider_account_id)}/feed`), {
+      method: "POST",
+      body,
+    }, provider);
+    return { provider, ok: true, id: readString(recordValue(payload).id, 300) };
+  }
 }
 
 async function publishInstagram(
@@ -197,11 +211,16 @@ async function publishInstagram(
   return { provider, ok: true, id: readString(published.id, 300) };
 }
 
-async function publishX(connection: SocialConnection, text: string, linkUrl: string): Promise<ProviderResult> {
+async function publishX(
+  connection: SocialConnection,
+  text: string,
+  linkUrl: string,
+  imageUrl?: string
+): Promise<ProviderResult> {
   const provider: SocialProvider = "x";
-  const postText = joinPostText(text, linkUrl);
+  const postText = joinPostText(text, linkUrl, imageUrl);
   if (!postText) {
-    return { provider, ok: false, error: "X needs post text or an optional link URL." };
+    return { provider, ok: false, error: "X needs post text, a link, or an image." };
   }
   const accessToken = await decryptToken(connection.access_token);
   const payload = await requestProviderJson("https://api.x.com/2/tweets", {
@@ -218,16 +237,33 @@ async function publishX(connection: SocialConnection, text: string, linkUrl: str
 async function publishLinkedIn(
   connection: SocialConnection,
   text: string,
-  linkUrl: string
+  linkUrl: string,
+  imageUrl?: string
 ): Promise<ProviderResult> {
   const provider: SocialProvider = "linkedin";
   const commentary = joinPostText(text, linkUrl);
-  if (!commentary) {
-    return { provider, ok: false, error: "LinkedIn needs post text or an optional link URL." };
+  if (!commentary && !imageUrl) {
+    return { provider, ok: false, error: "LinkedIn needs post text, a link, or an image." };
   }
   const accessToken = await decryptToken(connection.access_token);
   const metadata = recordValue(connection.metadata);
   const author = readString(metadata.authorUrn, 300) || `urn:li:person:${connection.provider_account_id}`;
+  
+  const shareContent: Record<string, any> = {
+    shareCommentary: { text: commentary },
+    shareMediaCategory: imageUrl ? "IMAGE" : "NONE",
+  };
+
+  if (imageUrl) {
+    shareContent.media = [
+      {
+        status: "READY",
+        originalUrl: imageUrl,
+        title: { text: text ? text.slice(0, 100) : "Shared Image" },
+      }
+    ];
+  }
+
   const { response, payload } = await requestProviderResponse("https://api.linkedin.com/v2/ugcPosts", {
     method: "POST",
     headers: {
@@ -239,10 +275,7 @@ async function publishLinkedIn(
       author,
       lifecycleState: "PUBLISHED",
       specificContent: {
-        "com.linkedin.ugc.ShareContent": {
-          shareCommentary: { text: commentary },
-          shareMediaCategory: "NONE",
-        },
+        "com.linkedin.ugc.ShareContent": shareContent,
       },
       visibility: {
         "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
@@ -409,8 +442,8 @@ function providerLabel(provider: SocialProvider) {
   }
 }
 
-function joinPostText(text: string, linkUrl: string) {
-  return [text, linkUrl].filter(Boolean).join("\n\n");
+function joinPostText(text: string, linkUrl: string, imageUrl?: string) {
+  return [text, linkUrl, imageUrl].filter(Boolean).join("\n\n");
 }
 
 function metaGraphVersion() {
