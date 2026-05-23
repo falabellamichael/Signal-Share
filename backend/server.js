@@ -863,7 +863,8 @@ app.get("/api/local-llm/health", (req, res) => {
     lmStudioMcp: {
       selectionMode: "local-user",
       apiTokenConfigured: Boolean(LM_STUDIO_API_TOKEN),
-      bridgeCredentialRequired: true
+      bridgeCredentialRequired: true,
+      explicitToolDirectiveRequired: true
     },
     checkedAt: new Date().toISOString()
   });
