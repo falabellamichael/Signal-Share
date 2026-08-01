@@ -7,18 +7,21 @@ import {
   readScopes, 
   expiresAt 
 } from "../shared.ts";
+import type { LinkedInOAuthConfig } from "../../_shared/social-oauth-config.ts";
 
-const LINKEDIN_OAUTH_CLIENT_ID = readString(Deno.env.get("LINKEDIN_OAUTH_CLIENT_ID"), 500);
-const LINKEDIN_OAUTH_CLIENT_SECRET = readString(Deno.env.get("LINKEDIN_OAUTH_CLIENT_SECRET"), 2000);
-
-export function linkedinIsConfigured() {
-  return Boolean(LINKEDIN_OAUTH_CLIENT_ID && LINKEDIN_OAUTH_CLIENT_SECRET);
+export function linkedinIsConfigured(config: LinkedInOAuthConfig) {
+  return Boolean(config.clientId && config.clientSecret);
 }
 
-export function linkedinAuthorizeUrl(state: string, redirectUri: string, codeChallenge: string) {
+export function linkedinAuthorizeUrl(
+  config: LinkedInOAuthConfig,
+  state: string,
+  redirectUri: string,
+  codeChallenge: string
+) {
   const params = new URLSearchParams({
     response_type: "code",
-    client_id: LINKEDIN_OAUTH_CLIENT_ID,
+    client_id: config.clientId,
     redirect_uri: redirectUri,
     scope: "openid profile w_member_social",
     state,
@@ -28,10 +31,15 @@ export function linkedinAuthorizeUrl(state: string, redirectUri: string, codeCha
   return `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
 }
 
-export async function connectLinkedIn(code: string, codeVerifier: string, redirectUri: string): Promise<ConnectedAccount> {
+export async function connectLinkedIn(
+  config: LinkedInOAuthConfig,
+  code: string,
+  codeVerifier: string,
+  redirectUri: string
+): Promise<ConnectedAccount> {
   const token = await exchangeToken("https://www.linkedin.com/oauth/v2/accessToken", {
-    clientId: LINKEDIN_OAUTH_CLIENT_ID,
-    clientSecret: LINKEDIN_OAUTH_CLIENT_SECRET,
+    clientId: config.clientId,
+    clientSecret: config.clientSecret,
     code,
     codeVerifier,
     redirectUri,

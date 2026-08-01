@@ -256,9 +256,19 @@
 
   let activeFamilyId = "signal";
   const selectedByFamily = new Map(Object.entries(families).map(([familyId, family]) => [familyId, new Set([family.options[0].id])]));
-  let socialConnectionState = { configured: {}, connections: [] };
+  let socialConnectionState = {
+    configured: {},
+    connections: [],
+    canManageOAuth: false,
+    oauthSettings: null,
+    statusKnown: false,
+    statusError: "",
+  };
   const selectedSocialConnectionIds = {};
   let socialConnectionsLoading = false;
+  let socialConnectionsRefreshId = 0;
+  let socialAuthIdentity = currentSocialUserId();
+  let socialOAuthSettingsBusy = false;
   let socialOAuthPopup = null;
   let socialOAuthProvider = "";
   let socialOAuthPopupWatcher = null;
@@ -524,6 +534,8 @@
     if (socialConnectionsLoading) return "Checking connection.";
     const appState = window.state ?? window.__SIGNAL_SHARE_STATE__;
     if (!appState?.currentUser) return "Sign in to connect.";
+    if (socialConnectionState.statusError) return "Configuration unavailable.";
+    if (!socialConnectionState.statusKnown) return "Configuration not checked.";
     const connection = socialConnection(provider);
     if (connection) return connection.label || "Connected";
     if (!socialConnectionState.configured?.[provider]) return "Waiting for OAuth keys.";
@@ -532,6 +544,41 @@
   function renderSettingsOAuthReadiness() {
     const status = document.getElementById("publishingOAuthStatus");
     if (!status) return;
+    const appState = window.state ?? window.__SIGNAL_SHARE_STATE__;
+    const signedIn = Boolean(appState?.currentUser);
+    const badge = status.closest(".settings-publishing-card")?.querySelector(".settings-status-badge");
+    const setBadge = (label, { waiting = false, error = false } = {}) => {
+      if (!badge) return;
+      badge.textContent = label;
+      badge.classList.toggle("is-waiting", waiting);
+      badge.classList.toggle("is-error", error);
+    };
+
+    if (!signedIn) {
+      status.textContent = "Sign in to check provider configuration.";
+      setBadge("Sign in to check");
+      renderPublishingOAuthManager();
+      return;
+    }
+    if (socialConnectionsLoading) {
+      status.textContent = "Checking the server for OAuth provider configuration…";
+      setBadge("Checking readiness", { waiting: true });
+      renderPublishingOAuthManager();
+      return;
+    }
+    if (socialConnectionState.statusError) {
+      status.textContent = "OAuth provider configuration could not be verified. Try again from this page.";
+      setBadge("Check failed", { error: true });
+      renderPublishingOAuthManager();
+      return;
+    }
+    if (!socialConnectionState.statusKnown) {
+      status.textContent = "OAuth provider configuration has not been checked yet.";
+      setBadge("Not checked", { waiting: true });
+      renderPublishingOAuthManager();
+      return;
+    }
+
     const providers = ["x", "linkedin", "facebook", "instagram"];
     const ready = providers.filter((provider) => Boolean(socialConnectionState.configured?.[provider]));
     const waiting = providers.filter((provider) => !socialConnectionState.configured?.[provider]);
@@ -541,11 +588,90 @@
       : ready.length > 0
         ? `${names(ready)} ready. Waiting for OAuth keys: ${names(waiting)}.`
         : `Waiting for OAuth keys: ${names(waiting)}.`;
-    const badge = status.closest(".settings-publishing-card")?.querySelector(".settings-status-badge");
-    if (badge) {
-      badge.textContent = waiting.length === 0 ? "OAuth configured" : "OAuth keys pending";
-      badge.classList.toggle("is-waiting", waiting.length > 0);
+    setBadge(waiting.length === 0 ? "OAuth configured" : "OAuth keys pending", { waiting: waiting.length > 0 });
+    renderPublishingOAuthManager();
+  }
+  function renderPublishingOAuthManager() {
+    const panel = document.getElementById("publishingOAuthAdminPanel");
+    const accessNote = document.getElementById("publishingOAuthAccessNote");
+    if (!panel || !accessNote) return;
+
+    const appState = window.state ?? window.__SIGNAL_SHARE_STATE__;
+    const signedIn = Boolean(appState?.currentUser);
+    const canManage = signedIn && Boolean(socialConnectionState.canManageOAuth);
+    const settings = socialConnectionState.oauthSettings;
+    panel.hidden = !canManage;
+    panel.setAttribute("aria-busy", socialOAuthSettingsBusy ? "true" : "false");
+    accessNote.hidden = canManage;
+    accessNote.textContent = !signedIn
+      ? "Sign in with a Signal Share administrator account to manage publishing OAuth keys."
+      : socialConnectionsLoading
+        ? "Checking administrator access and publishing OAuth readiness…"
+        : socialConnectionState.statusError
+          ? "Publishing OAuth readiness could not be verified. Reopen this page to try again."
+          : "This account can view publishing readiness, but only Signal Share administrators can change OAuth keys.";
+    if (!canManage) {
+      clearPublishingOAuthDrafts();
+      return;
     }
+
+    const settingsAvailable = Boolean(settings?.settingsAvailable);
+    const callback = document.getElementById("publishingOAuthCallbackUrl");
+    if (callback) callback.textContent = settings?.callbackUrl || "Secure callback unavailable";
+    const vaultBadge = document.getElementById("publishingOAuthVaultBadge");
+    if (vaultBadge) {
+      vaultBadge.textContent = settingsAvailable ? "Supabase Vault ready" : "Migration required";
+      vaultBadge.classList.toggle("is-waiting", !settingsAvailable);
+    }
+
+    ["x", "linkedin", "meta"].forEach((provider) => {
+      const providerStatus = settings?.providers?.[provider] || {};
+      const configured = provider === "x"
+        ? Boolean(providerStatus.clientIdConfigured)
+        : Boolean(providerStatus.clientIdConfigured && providerStatus.clientSecretConfigured);
+      const badge = panel.querySelector(`[data-publishing-oauth-status="${provider}"]`);
+      if (badge) {
+        const xSecretNote = provider === "x"
+          ? providerStatus.clientSecretConfigured ? " · secret present" : " · PKCE only"
+          : "";
+        badge.textContent = providerStatus.source === "settings"
+          ? `Saved in settings${xSecretNote}`
+          : providerStatus.source === "environment"
+            ? configured ? `Server fallback${xSecretNote}` : "Incomplete server fallback"
+            : configured ? "Configured" : "Not configured";
+        badge.classList.toggle("is-waiting", !configured);
+      }
+      const form = panel.querySelector(`[data-publishing-oauth-provider="${provider}"]`);
+      form?.querySelectorAll("input, button").forEach((control) => {
+        const removeButton = control.matches?.("[data-publishing-oauth-remove]");
+        control.disabled = socialOAuthSettingsBusy
+          || !settingsAvailable
+          || (removeButton && providerStatus.source !== "settings");
+      });
+    });
+
+    if (!settingsAvailable) {
+      setPublishingOAuthFeedback("Apply the latest Supabase migration before saving keys from this page.", true);
+    }
+  }
+  function setPublishingOAuthFeedback(message, isError = false) {
+    const feedbackNode = document.getElementById("publishingOAuthFeedback");
+    if (!feedbackNode) return;
+    feedbackNode.textContent = message;
+    feedbackNode.classList.toggle("is-error", isError);
+  }
+  function applySocialConnectionStatus(data) {
+    socialConnectionState = {
+      configured: data?.configured || {},
+      connections: Array.isArray(data?.connections) ? data.connections : [],
+      canManageOAuth: data?.canManageOAuth === true,
+      oauthSettings: data?.oauthSettings && typeof data.oauthSettings === "object"
+        ? data.oauthSettings
+        : null,
+      statusKnown: true,
+      statusError: "",
+    };
+    setPublishingOAuthFeedback("Saving rotated keys may require members to reconnect affected social accounts.");
   }
   function renderSocialConnections() {
     renderSettingsOAuthReadiness();
@@ -599,6 +725,10 @@
       throw new Error("Sign in before connecting Social providers.");
     }
     return appState;
+  }
+  function currentSocialUserId() {
+    const appState = window.state ?? window.__SIGNAL_SHARE_STATE__;
+    return `${appState?.currentUser?.id || ""}`.trim();
   }
   async function socialConnectRequest(body) {
     const appState = socialAppState();
@@ -663,26 +793,126 @@
     }, 500);
   }
   async function refreshSocialConnections() {
+    const refreshId = ++socialConnectionsRefreshId;
     let appState = null;
     try { appState = socialAppState(); } catch (_error) {}
     if (!appState) {
-      socialConnectionState = { configured: {}, connections: [] };
+      socialConnectionState = {
+        configured: {},
+        connections: [],
+        canManageOAuth: false,
+        oauthSettings: null,
+        statusKnown: false,
+        statusError: "",
+      };
       socialConnectionsLoading = false;
       renderSocialConnections();
       return;
     }
+    const requestedUserId = currentSocialUserId();
+    socialConnectionState = {
+      configured: {},
+      connections: [],
+      canManageOAuth: false,
+      oauthSettings: null,
+      statusKnown: false,
+      statusError: "",
+    };
     socialConnectionsLoading = true;
     renderSocialConnections();
     try {
       const data = await socialConnectRequest({ action: "status" });
-      socialConnectionState = {
-        configured: data.configured || {},
-        connections: Array.isArray(data.connections) ? data.connections : [],
-      };
+      if (refreshId !== socialConnectionsRefreshId || currentSocialUserId() !== requestedUserId) return;
+      applySocialConnectionStatus(data);
     } catch (error) {
-      setFeedback(error?.message || "Social connections could not be loaded.", true);
+      if (refreshId !== socialConnectionsRefreshId || currentSocialUserId() !== requestedUserId) return;
+      const message = error?.message || "Social connections could not be loaded.";
+      socialConnectionState = {
+        configured: {},
+        connections: [],
+        canManageOAuth: false,
+        oauthSettings: null,
+        statusKnown: false,
+        statusError: message,
+      };
+      setPublishingOAuthFeedback(message, true);
+      setFeedback(message, true);
     } finally {
+      if (refreshId !== socialConnectionsRefreshId || currentSocialUserId() !== requestedUserId) return;
       socialConnectionsLoading = false;
+      renderSocialConnections();
+    }
+  }
+  function publishingOAuthProviderName(provider) {
+    if (provider === "x") return "X";
+    if (provider === "linkedin") return "LinkedIn";
+    return "Meta";
+  }
+  function clearPublishingOAuthDrafts() {
+    document.querySelectorAll("#publishingOAuthAdminPanel [data-publishing-oauth-provider]").forEach((form) => {
+      if (form instanceof HTMLFormElement) form.reset();
+    });
+  }
+  async function savePublishingOAuthProvider(form) {
+    if (socialOAuthSettingsBusy || !(form instanceof HTMLFormElement)) return;
+    const provider = `${form.dataset.publishingOauthProvider || ""}`.trim().toLowerCase();
+    if (!["x", "linkedin", "meta"].includes(provider)) return;
+
+    const clientIdInput = form.elements.namedItem("clientId");
+    const clientSecretInput = form.elements.namedItem("clientSecret");
+    const clearSecretInput = form.elements.namedItem("clearClientSecret");
+    const clientId = clientIdInput instanceof HTMLInputElement ? clientIdInput.value.trim() : "";
+    const clientSecret = clientSecretInput instanceof HTMLInputElement ? clientSecretInput.value.trim() : "";
+    const clearClientSecret = clearSecretInput instanceof HTMLInputElement && clearSecretInput.checked;
+
+    socialOAuthSettingsBusy = true;
+    setPublishingOAuthFeedback(`Saving ${publishingOAuthProviderName(provider)} keys to encrypted server storage…`);
+    renderPublishingOAuthManager();
+    try {
+      const data = await socialConnectRequest({
+        action: "save-oauth-config",
+        provider,
+        clientId,
+        clientSecret,
+        clearClientSecret,
+      });
+      applySocialConnectionStatus(data);
+      form.reset();
+      setPublishingOAuthFeedback(
+        `${publishingOAuthProviderName(provider)} OAuth keys saved securely. Existing accounts may need to reconnect after a credential rotation.`
+      );
+      toast(`${publishingOAuthProviderName(provider)} OAuth settings saved`);
+    } catch (error) {
+      setPublishingOAuthFeedback(error?.message || "OAuth keys could not be saved.", true);
+    } finally {
+      socialOAuthSettingsBusy = false;
+      renderSocialConnections();
+    }
+  }
+  async function removePublishingOAuthProvider(provider) {
+    if (socialOAuthSettingsBusy || !["x", "linkedin", "meta"].includes(provider)) return;
+    const label = publishingOAuthProviderName(provider);
+    if (!window.confirm(`Remove the ${label} keys saved in Publishing settings? Existing server environment keys, if any, will become active again.`)) {
+      return;
+    }
+
+    socialOAuthSettingsBusy = true;
+    setPublishingOAuthFeedback(`Removing saved ${label} keys…`);
+    renderPublishingOAuthManager();
+    try {
+      const data = await socialConnectRequest({ action: "remove-oauth-config", provider });
+      applySocialConnectionStatus(data);
+      const activeSource = data?.oauthSettings?.providers?.[provider]?.source;
+      setPublishingOAuthFeedback(
+        activeSource === "environment"
+          ? `${label} keys were removed from Publishing settings. The existing server environment fallback is active.`
+          : `${label} keys were removed from Publishing settings.`
+      );
+      toast(`${label} saved OAuth keys removed`);
+    } catch (error) {
+      setPublishingOAuthFeedback(error?.message || "Saved OAuth keys could not be removed.", true);
+    } finally {
+      socialOAuthSettingsBusy = false;
       renderSocialConnections();
     }
   }
@@ -714,10 +944,7 @@
   }
   async function disconnectSocialProvider(provider) {
     const data = await socialConnectRequest({ action: "disconnect", provider });
-    socialConnectionState = {
-      configured: data.configured || socialConnectionState.configured,
-      connections: Array.isArray(data.connections) ? data.connections : [],
-    };
+    applySocialConnectionStatus(data);
     renderSocialConnections();
     toast(`${providerName(provider)} disconnected`);
   }
@@ -758,10 +985,7 @@
 
       // Refresh connection state
       socialConnectRequest({ action: "status" }).then(data => {
-        socialConnectionState = {
-          configured: data.configured || socialConnectionState.configured,
-          connections: Array.isArray(data.connections) ? data.connections : [],
-        };
+        applySocialConnectionStatus(data);
         renderSocialConnections();
       }).catch(console.error);
     }
@@ -1409,6 +1633,35 @@
     selectedSocialConnectionIds[select.dataset.socialProvider] = select.value;
     renderSocialConnections();
   });
+  document.getElementById("publishingOAuthAdminPanel")?.addEventListener("submit", (event) => {
+    const form = event.target instanceof HTMLFormElement
+      ? event.target.closest("[data-publishing-oauth-provider]")
+      : null;
+    if (!form) return;
+    event.preventDefault();
+    void savePublishingOAuthProvider(form);
+  });
+  document.getElementById("publishingOAuthAdminPanel")?.addEventListener("click", (event) => {
+    const button = event.target instanceof Element
+      ? event.target.closest("[data-publishing-oauth-remove]")
+      : null;
+    if (!button) return;
+    void removePublishingOAuthProvider(`${button.dataset.publishingOauthRemove || ""}`.trim().toLowerCase());
+  });
+  window.addEventListener("signal-share:settings-page", (event) => {
+    if (event.detail?.open === false || event.detail?.page !== "publishing") {
+      clearPublishingOAuthDrafts();
+      return;
+    }
+    void refreshSocialConnections();
+  });
+  window.addEventListener("signal-share:auth-state", () => {
+    const nextIdentity = currentSocialUserId();
+    if (nextIdentity === socialAuthIdentity) return;
+    clearPublishingOAuthDrafts();
+    socialAuthIdentity = nextIdentity;
+    void refreshSocialConnections();
+  });
   shareButton?.addEventListener("click", () => {
     const item = draft();
     if (!validateFields()) return;
@@ -2000,6 +2253,7 @@
     selectFamily: renderFamily,
     selectOption,
     runSelectedAction: runAction,
+    refreshSocialConnections,
     getActivity: activities,
     clearActivity: () => { localStorage.removeItem(ACTIVITY_KEY); toast("Activity cleared"); }
   };

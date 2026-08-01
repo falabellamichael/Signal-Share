@@ -1666,6 +1666,9 @@ export function createAppUi(context) {
     state.settingsActivePage = normalizeSettingsPage(page);
     setMobileHeaderHidden(false);
     renderSettingsPanel();
+    window.dispatchEvent(new CustomEvent("signal-share:settings-page", {
+      detail: { page: state.settingsActivePage, open: true }
+    }));
     requestAnimationFrame(() => {
       const activeTab = elements.settingsPageTabs.find((tab) => tab.dataset.settingsPage === state.settingsActivePage);
       if (options.focusTab && activeTab instanceof HTMLElement) activeTab.focus();
@@ -1673,7 +1676,7 @@ export function createAppUi(context) {
     });
   }
 
-  function closeSettingsPanel(options = {}) { const { restoreFocus = true } = options; if (!state.settingsPanelOpen) return; state.settingsPanelOpen = false; state.themePickerOpen = false; renderSettingsPanel(); if (restoreFocus) elements.settingsToggleButton.focus(); }
+  function closeSettingsPanel(options = {}) { const { restoreFocus = true } = options; if (!state.settingsPanelOpen) return; const activePage = state.settingsActivePage; state.settingsPanelOpen = false; state.themePickerOpen = false; renderSettingsPanel(); window.dispatchEvent(new CustomEvent("signal-share:settings-page", { detail: { page: activePage, open: false } })); if (restoreFocus) elements.settingsToggleButton.focus(); }
 
   function toggleSettingsPanel(event) { if (event) { event.preventDefault(); event.stopPropagation(); } if (state.settingsPanelOpen) closeSettingsPanel(); else openSettingsPanel(); }
 
@@ -1686,6 +1689,9 @@ export function createAppUi(context) {
 
     state.settingsActivePage = activePage;
     renderSettingsPanel();
+    window.dispatchEvent(new CustomEvent("signal-share:settings-page", {
+      detail: { page: activePage, open: true }
+    }));
     if (options.focusTab) {
       requestAnimationFrame(() => {
         const activeTab = elements.settingsPageTabs.find((tab) => tab.dataset.settingsPage === activePage);

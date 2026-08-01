@@ -126,22 +126,28 @@ After that:
 
 The Publish overlay can save Social drafts locally without provider setup. Direct Social posting uses per-user provider connections so users connect their own accounts once, then later posts can be sent from the website or Android wrapper without a provider share handoff.
 
-Apply `supabase/schema.sql` so Supabase creates the private `social_connections` and `social_oauth_states` tables used by the Edge Functions. Deploy both Social functions and keep their names in `config.js`:
+Apply `supabase/schema.sql` so Supabase creates the private `social_connections` and `social_oauth_states` tables plus the service-role-only Vault helpers used by the Edge Functions. Deploy both Social functions and keep their names in `config.js`:
 
 - `supabase/functions/social-connect/index.ts`
 - `supabase/functions/social-publish/index.ts`
 
-The checked-in `supabase/config.toml` disables gateway JWT verification only for `social-connect`, because provider callbacks do not carry a Supabase user JWT. The function still verifies the signed-in user inside every browser `status`, `start`, and `disconnect` POST. `social-publish` keeps gateway JWT verification enabled. After deployment, `supabase functions list` must show `social-connect` with `verify_jwt` set to `false` and `social-publish` set to `true`.
+The checked-in `supabase/config.toml` disables gateway JWT verification only for `social-connect`, because provider callbacks do not carry a Supabase user JWT. The function still verifies the signed-in user inside every browser POST, and it performs an additional database-backed administrator check before accepting OAuth configuration changes. `social-publish` keeps gateway JWT verification enabled. After deployment, `supabase functions list` must show `social-connect` with `verify_jwt` set to `false` and `social-publish` set to `true`.
 
 The connected-account implementation supports direct posting through X, LinkedIn, Facebook Pages, and Instagram accounts returned by each user's OAuth connection. If a provider returns multiple connected accounts, the Socials panel lets the user choose the account before posting.
 
-Set these Edge Function secrets before users connect providers:
+Keep these service-level values in Edge Function secrets:
 
 - `SOCIAL_TOKEN_ENCRYPTION_KEY`: a long random secret used to encrypt stored provider tokens
 - `SOCIAL_ALLOWED_RETURN_ORIGINS`: comma-separated production browser origins allowed after OAuth callbacks. Use origins only, without a path, for example `https://owner.github.io`. Local `localhost` / `127.0.0.1` URLs and `capacitor://localhost` are handled as explicit development app returns.
-- X OAuth: `X_OAUTH_CLIENT_ID`, optional `X_OAUTH_CLIENT_SECRET`
-- LinkedIn OAuth: `LINKEDIN_OAUTH_CLIENT_ID`, `LINKEDIN_OAUTH_CLIENT_SECRET`
-- Meta OAuth for Facebook Pages and Instagram accounts: `META_OAUTH_APP_ID`, `META_OAUTH_APP_SECRET`, optional `META_GRAPH_API_VERSION`
+- `META_GRAPH_API_VERSION`: the Meta Graph API version shared by connect and publish operations. Publishing settings manages app keys only, so version upgrades remain server-controlled.
+
+A signed-in Signal Share administrator can add or rotate provider application keys under **Settings > Publishing**:
+
+- X OAuth client ID and optional client secret
+- LinkedIn OAuth client ID and client secret
+- Meta app ID and app secret shared by Facebook and Instagram
+
+The browser sends these values only to `social-connect`. The function verifies that the caller is an unbanned member of `site_admins`, writes the normalized provider configuration to the encrypted `signal_share_social_oauth_config` entry in Supabase Vault, and returns only presence/source metadata to the settings page. Provider updates are merged under a database transaction lock so simultaneous edits cannot discard another provider's keys. Client secrets are never returned; client IDs appear only where OAuth requires them in the provider authorization redirect. Existing `X_OAUTH_*`, `LINKEDIN_OAUTH_*`, and `META_OAUTH_*` Edge Function secrets remain supported as a backward-compatible fallback until equivalent values are saved from Publishing settings.
 
 There are two different redirect allowlists and they must not be mixed up:
 

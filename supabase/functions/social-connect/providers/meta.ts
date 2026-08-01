@@ -6,50 +6,53 @@ import {
   recordValue, 
   TokenPayload
 } from "../shared.ts";
+import type { MetaOAuthConfig } from "../../_shared/social-oauth-config.ts";
 
-const META_OAUTH_APP_ID = readString(Deno.env.get("META_OAUTH_APP_ID"), 500);
-const META_OAUTH_APP_SECRET = readString(Deno.env.get("META_OAUTH_APP_SECRET"), 2000);
-const META_GRAPH_API_VERSION = readString(Deno.env.get("META_GRAPH_API_VERSION"), 32);
-
-export function metaIsConfigured() {
-  return Boolean(META_OAUTH_APP_ID && META_OAUTH_APP_SECRET);
+export function metaIsConfigured(config: MetaOAuthConfig) {
+  return Boolean(config.clientId && config.clientSecret);
 }
 
-function metaGraphVersion() {
-  const version = META_GRAPH_API_VERSION.replace(/^v?/i, "").replace(/^\/+|\/+$/g, "");
+function metaGraphVersion(config: MetaOAuthConfig) {
+  const version = config.graphApiVersion.replace(/^v?/i, "").replace(/^\/+|\/+$/g, "");
   return version ? `v${version}` : "v22.0";
 }
 
-function metaGraphUrl(path: string) {
-  return `https://graph.facebook.com/${metaGraphVersion()}/${path.replace(/^\/+/, "")}`;
+function metaGraphUrl(config: MetaOAuthConfig, path: string) {
+  return `https://graph.facebook.com/${metaGraphVersion(config)}/${path.replace(/^\/+/, "")}`;
 }
 
-export function metaAuthorizeUrl(provider: "facebook" | "instagram", state: string, redirectUri: string) {
+export function metaAuthorizeUrl(
+  config: MetaOAuthConfig,
+  provider: "facebook" | "instagram",
+  state: string,
+  redirectUri: string
+) {
   const scope = provider === "facebook"
     ? "pages_show_list,pages_read_engagement,pages_manage_posts,business_management"
     : "pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,business_management";
   const params = new URLSearchParams({
-    client_id: META_OAUTH_APP_ID,
+    client_id: config.clientId,
     redirect_uri: redirectUri,
     response_type: "code",
     state,
     scope,
   });
-  return `https://www.facebook.com/${metaGraphVersion()}/dialog/oauth?${params.toString()}`;
+  return `https://www.facebook.com/${metaGraphVersion(config)}/dialog/oauth?${params.toString()}`;
 }
 
 export async function connectMeta(
+  config: MetaOAuthConfig,
   provider: "facebook" | "instagram",
   code: string,
   redirectUri: string
 ): Promise<ConnectedAccount[]> {
   const tokenParams = new URLSearchParams({
-    client_id: META_OAUTH_APP_ID,
-    client_secret: META_OAUTH_APP_SECRET,
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
     redirect_uri: redirectUri,
     code,
   });
-  const token = await providerJson(metaGraphUrl(`oauth/access_token?${tokenParams.toString()}`), {
+  const token = await providerJson(metaGraphUrl(config, `oauth/access_token?${tokenParams.toString()}`), {
     method: "GET",
   }) as TokenPayload;
   const userAccessToken = requireAccessToken(token);
@@ -57,7 +60,7 @@ export async function connectMeta(
     fields: "id,name,access_token,instagram_business_account{id,username,name}",
     access_token: userAccessToken,
   });
-  const accountsPayload = await providerJson(metaGraphUrl(`me/accounts?${accountsParams.toString()}`), {
+  const accountsPayload = await providerJson(metaGraphUrl(config, `me/accounts?${accountsParams.toString()}`), {
     method: "GET",
   });
   const pages = Array.isArray(accountsPayload.data) ? accountsPayload.data.map(recordValue) : [];

@@ -15,6 +15,12 @@ import {
 import { xIsConfigured, xAuthorizeUrl, connectX } from "./providers/x.ts";
 import { linkedinIsConfigured, linkedinAuthorizeUrl, connectLinkedIn } from "./providers/linkedin.ts";
 import { metaIsConfigured, metaAuthorizeUrl, connectMeta } from "./providers/meta.ts";
+import {
+  SocialOAuthConfig,
+  StoredSocialOAuthConfig,
+  loadSocialOAuthConfig,
+  saveSocialOAuthProviderConfig,
+} from "../_shared/social-oauth-config.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -48,7 +54,46 @@ Deno.serve(async (request) => {
   const action = readString(payload.action, 40).toLowerCase() || "status";
 
   if (action === "status") {
-    return statusResponse(adminClient, auth.user.id);
+    return statusResponse(adminClient, auth.client, auth.user.id, url);
+  }
+
+  if (action === "save-oauth-config" || action === "remove-oauth-config") {
+    if (!await callerCanManageOAuth(auth.client, auth.user.id)) {
+      return jsonResponse({ error: "Only Signal Share administrators can manage publishing OAuth keys." }, 403);
+    }
+
+    const provider = readOAuthConfigProvider(payload.provider);
+    if (!provider) {
+      return jsonResponse({ error: "Choose X, LinkedIn, or Meta OAuth settings." }, 400);
+    }
+
+    const loaded = await loadSocialOAuthConfig(adminClient);
+    if (!loaded.settingsAvailable) {
+      return jsonResponse({ error: "Apply the latest Supabase migration before saving OAuth settings." }, 503);
+    }
+
+    if (action === "remove-oauth-config") {
+      try {
+        await saveSocialOAuthProviderConfig(adminClient, provider, null);
+      } catch (error) {
+        return oauthSettingsWriteErrorResponse(error);
+      }
+    } else {
+      let nextProviderConfig: NonNullable<StoredSocialOAuthConfig[keyof StoredSocialOAuthConfig]>;
+      try {
+        if (provider === "x") nextProviderConfig = nextOAuthProviderConfig("x", payload, loaded.config);
+        else if (provider === "linkedin") nextProviderConfig = nextOAuthProviderConfig("linkedin", payload, loaded.config);
+        else nextProviderConfig = nextOAuthProviderConfig("meta", payload, loaded.config);
+      } catch (error) {
+        return jsonResponse({ error: error instanceof Error ? error.message : "OAuth settings are invalid." }, 400);
+      }
+      try {
+        await saveSocialOAuthProviderConfig(adminClient, provider, nextProviderConfig);
+      } catch (error) {
+        return oauthSettingsWriteErrorResponse(error);
+      }
+    }
+    return statusResponse(adminClient, auth.client, auth.user.id, url);
   }
 
   const provider = readConnectProvider(payload.provider);
@@ -65,12 +110,13 @@ Deno.serve(async (request) => {
       console.error("[Social Connect] Disconnect failed:", error.message);
       return jsonResponse({ error: "Social connection could not be removed." }, 500);
     }
-    return statusResponse(adminClient, auth.user.id);
+    return statusResponse(adminClient, auth.client, auth.user.id, url);
   }
   if (action !== "start") {
     return jsonResponse({ error: "Unsupported Social connection action." }, 400);
   }
-  if (!providerIsConfigured(provider)) {
+  const oauth = await loadSocialOAuthConfig(adminClient);
+  if (!providerIsConfigured(provider, oauth.config)) {
     return jsonResponse({ error: `${providerLabel(provider)} OAuth is not configured yet.` }, 501);
   }
   if (!SOCIAL_TOKEN_ENCRYPTION_KEY) {
@@ -102,7 +148,7 @@ Deno.serve(async (request) => {
   const codeChallenge = await sha256Base64Url(codeVerifier);
   return jsonResponse({
     provider,
-    authorizeUrl: providerAuthorizeUrl(provider, stateToken, redirectUri, codeChallenge),
+    authorizeUrl: providerAuthorizeUrl(oauth.config, provider, stateToken, redirectUri, codeChallenge),
   });
 });
 
@@ -137,7 +183,8 @@ async function finishOAuth(url: URL) {
 
   try {
     const redirectUri = callbackUrl(url);
-    const connections = await providerConnections(state.provider, code, state.code_verifier, redirectUri);
+    const oauth = await loadSocialOAuthConfig(adminClient);
+    const connections = await providerConnections(oauth.config, state.provider, code, state.code_verifier, redirectUri);
     const rows = await Promise.all(connections.map(async (connection) => ({
       user_id: state.user_id,
       provider: connection.provider || state.provider,
@@ -169,34 +216,55 @@ async function finishOAuth(url: URL) {
 }
 
 async function providerConnections(
+  config: SocialOAuthConfig,
   provider: ConnectProvider,
   code: string,
   codeVerifier: string,
   redirectUri: string
 ): Promise<ConnectedAccount[]> {
-  if (provider === "x") return [await connectX(code, codeVerifier, redirectUri)];
-  if (provider === "linkedin") return [await connectLinkedIn(code, codeVerifier, redirectUri)];
-  return connectMeta(provider, code, redirectUri);
+  if (provider === "x") return [await connectX(config.x, code, codeVerifier, redirectUri)];
+  if (provider === "linkedin") return [await connectLinkedIn(config.linkedin, code, codeVerifier, redirectUri)];
+  return connectMeta(config.meta, provider, code, redirectUri);
 }
 
-async function statusResponse(adminClient: ReturnType<typeof createAdminClient>, userId: string) {
-  const { data, error } = await adminClient
-    .from("social_connections")
-    .select("id, provider, provider_account_id, provider_account_label, scopes, token_expires_at, updated_at")
-    .eq("user_id", userId)
-    .in("provider", ["x", "linkedin", "facebook", "instagram"])
-    .order("updated_at", { ascending: false });
+async function statusResponse(
+  adminClient: ReturnType<typeof createAdminClient>,
+  callerClient: ReturnType<typeof createAdminClient>,
+  userId: string,
+  requestUrl: URL
+) {
+  const [connectionsResult, oauth, canManageOAuth] = await Promise.all([
+    adminClient
+      .from("social_connections")
+      .select("id, provider, provider_account_id, provider_account_label, scopes, token_expires_at, updated_at")
+      .eq("user_id", userId)
+      .in("provider", ["x", "linkedin", "facebook", "instagram"])
+      .order("updated_at", { ascending: false }),
+    loadSocialOAuthConfig(adminClient),
+    callerCanManageOAuth(callerClient, userId),
+  ]);
+  const { data, error } = connectionsResult;
   if (error) {
     console.error("[Social Connect] Connection status failed:", error.message);
     return jsonResponse({ error: "Social connections could not be loaded." }, 500);
   }
   return jsonResponse({
     configured: {
-      x: xIsConfigured(),
-      linkedin: linkedinIsConfigured(),
-      facebook: metaIsConfigured(),
-      instagram: metaIsConfigured(),
+      x: xIsConfigured(oauth.config.x),
+      linkedin: linkedinIsConfigured(oauth.config.linkedin),
+      facebook: metaIsConfigured(oauth.config.meta),
+      instagram: metaIsConfigured(oauth.config.meta),
     },
+    canManageOAuth,
+    oauthSettings: canManageOAuth ? {
+      settingsAvailable: oauth.settingsAvailable,
+      callbackUrl: callbackUrl(requestUrl),
+      providers: {
+        x: oauthProviderStatus(oauth, "x"),
+        linkedin: oauthProviderStatus(oauth, "linkedin"),
+        meta: oauthProviderStatus(oauth, "meta"),
+      },
+    } : undefined,
     connections: Array.isArray(data) ? data.map((row) => ({
       id: readString(row.id, 300),
       provider: readString(row.provider, 40),
@@ -211,13 +279,32 @@ async function statusResponse(adminClient: ReturnType<typeof createAdminClient>,
 
 async function authenticateCaller(request: Request) {
   const authorization = request.headers.get("Authorization");
-  if (!authorization) return { user: null };
+  if (!authorization) return { user: null, client: null };
   const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: authorization } },
   });
   const { data, error } = await client.auth.getUser();
-  return { user: error ? null : data.user };
+  return { user: error ? null : data.user, client };
+}
+
+async function callerCanManageOAuth(
+  callerClient: ReturnType<typeof createAdminClient> | null,
+  userId: string
+) {
+  if (!callerClient) return false;
+  const [adminResult, banResult] = await Promise.all([
+    callerClient.rpc("is_signal_share_admin"),
+    callerClient.rpc("is_signal_share_banned", { target_user_id: userId }),
+  ]);
+  if (adminResult.error || banResult.error) {
+    console.error(
+      "[Social Connect] Publishing admin check failed:",
+      readString(adminResult.error?.code || banResult.error?.code, 80) || "unknown"
+    );
+    return false;
+  }
+  return adminResult.data === true && banResult.data !== true;
 }
 
 function createAdminClient() {
@@ -227,14 +314,15 @@ function createAdminClient() {
 }
 
 function providerAuthorizeUrl(
+  config: SocialOAuthConfig,
   provider: ConnectProvider,
   state: string,
   redirectUri: string,
   codeChallenge: string
 ) {
-  if (provider === "x") return xAuthorizeUrl(state, redirectUri, codeChallenge);
-  if (provider === "linkedin") return linkedinAuthorizeUrl(state, redirectUri, codeChallenge);
-  return metaAuthorizeUrl(provider, state, redirectUri);
+  if (provider === "x") return xAuthorizeUrl(config.x, state, redirectUri, codeChallenge);
+  if (provider === "linkedin") return linkedinAuthorizeUrl(config.linkedin, state, redirectUri, codeChallenge);
+  return metaAuthorizeUrl(config.meta, provider, state, redirectUri);
 }
 
 function callbackUrl(url: URL) {
@@ -248,10 +336,66 @@ function callbackUrl(url: URL) {
   return `${protocol}//${url.host}${pathname}`;
 }
 
-function providerIsConfigured(provider: ConnectProvider) {
-  if (provider === "x") return xIsConfigured();
-  if (provider === "linkedin") return linkedinIsConfigured();
-  return metaIsConfigured();
+function providerIsConfigured(provider: ConnectProvider, config: SocialOAuthConfig) {
+  if (provider === "x") return xIsConfigured(config.x);
+  if (provider === "linkedin") return linkedinIsConfigured(config.linkedin);
+  return metaIsConfigured(config.meta);
+}
+
+function readOAuthConfigProvider(value: unknown): keyof StoredSocialOAuthConfig | "" {
+  const provider = readString(value, 40).toLowerCase();
+  return provider === "x" || provider === "linkedin" || provider === "meta" ? provider : "";
+}
+
+function nextOAuthProviderConfig<Provider extends keyof SocialOAuthConfig>(
+  provider: Provider,
+  payload: Record<string, unknown>,
+  current: SocialOAuthConfig
+): NonNullable<StoredSocialOAuthConfig[Provider]> {
+  const clientId = readString(payload.clientId, 500) || current[provider].clientId;
+  const submittedSecret = readString(payload.clientSecret, 2000);
+  const clearClientSecret = payload.clearClientSecret === true;
+  const clientSecret = clearClientSecret ? "" : submittedSecret || current[provider].clientSecret;
+
+  if (!clientId) {
+    throw new Error(`${oauthProviderLabel(provider)} needs a client or app ID.`);
+  }
+  if (provider !== "x" && !clientSecret) {
+    throw new Error(`${oauthProviderLabel(provider)} needs a client or app secret.`);
+  }
+  if (provider === "meta") {
+    return {
+      clientId,
+      clientSecret,
+    } as NonNullable<StoredSocialOAuthConfig[Provider]>;
+  }
+  return { clientId, clientSecret } as NonNullable<StoredSocialOAuthConfig[Provider]>;
+}
+
+function oauthProviderStatus(
+  oauth: Awaited<ReturnType<typeof loadSocialOAuthConfig>>,
+  provider: keyof StoredSocialOAuthConfig
+) {
+  const config = oauth.config[provider];
+  return {
+    clientIdConfigured: Boolean(config.clientId),
+    clientSecretConfigured: Boolean(config.clientSecret),
+    source: Object.prototype.hasOwnProperty.call(oauth.stored, provider)
+      ? "settings"
+      : config.clientId || config.clientSecret ? "environment" : "none",
+  };
+}
+
+function oauthProviderLabel(provider: keyof StoredSocialOAuthConfig) {
+  if (provider === "x") return "X";
+  if (provider === "linkedin") return "LinkedIn";
+  return "Meta";
+}
+
+function oauthSettingsWriteErrorResponse(error: unknown) {
+  const message = error instanceof Error ? error.message : "OAuth settings could not be saved securely.";
+  const status = message.includes("latest Supabase migration") ? 503 : 500;
+  return jsonResponse({ error: message }, status);
 }
 
 function providerLabel(provider: ConnectProvider) {

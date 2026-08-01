@@ -8,18 +8,16 @@ import {
   readScopes, 
   expiresAt 
 } from "../shared.ts";
+import type { XOAuthConfig } from "../../_shared/social-oauth-config.ts";
 
-const X_OAUTH_CLIENT_ID = readString(Deno.env.get("X_OAUTH_CLIENT_ID"), 500);
-const X_OAUTH_CLIENT_SECRET = readString(Deno.env.get("X_OAUTH_CLIENT_SECRET"), 2000);
-
-export function xIsConfigured() {
-  return Boolean(X_OAUTH_CLIENT_ID);
+export function xIsConfigured(config: XOAuthConfig) {
+  return Boolean(config.clientId);
 }
 
-export function xAuthorizeUrl(state: string, redirectUri: string, codeChallenge: string) {
+export function xAuthorizeUrl(config: XOAuthConfig, state: string, redirectUri: string, codeChallenge: string) {
   const params = new URLSearchParams({
     response_type: "code",
-    client_id: X_OAUTH_CLIENT_ID,
+    client_id: config.clientId,
     redirect_uri: redirectUri,
     scope: "tweet.read tweet.write users.read media.write offline.access",
     state,
@@ -30,10 +28,15 @@ export function xAuthorizeUrl(state: string, redirectUri: string, codeChallenge:
   return `https://x.com/i/oauth2/authorize?${params.toString().replace(/\+/g, "%20")}`;
 }
 
-export async function connectX(code: string, codeVerifier: string, redirectUri: string): Promise<ConnectedAccount> {
+export async function connectX(
+  config: XOAuthConfig,
+  code: string,
+  codeVerifier: string,
+  redirectUri: string
+): Promise<ConnectedAccount> {
   const token = await exchangeToken("https://api.x.com/2/oauth2/token", {
-    clientId: X_OAUTH_CLIENT_ID,
-    clientSecret: X_OAUTH_CLIENT_SECRET,
+    clientId: config.clientId,
+    clientSecret: config.clientSecret,
     code,
     codeVerifier,
     redirectUri,

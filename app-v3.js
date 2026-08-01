@@ -1163,6 +1163,7 @@ async function initialize() {
       } catch (settingsError) { console.error("Site settings could not be loaded", settingsError); }
       const { data: { session } } = await state.supabase.auth.getSession();
       state.currentUser = session?.user ?? null;
+      notifyPublishingAuthState("SESSION_RESTORED");
       state.authRestoring = false;
       await refreshCurrentUserBanState(state, APP_CONFIG);
       if (isMessagingEnabled(state)) {
@@ -1223,9 +1224,16 @@ function bindAuthStateListener() {
   state.supabase.auth.onAuthStateChange((event, session) => void handleAuthStateChange(event, session));
 }
 
+function notifyPublishingAuthState(event = "AUTH_UPDATED") {
+  window.dispatchEvent(new CustomEvent("signal-share:auth-state", {
+    detail: { event, signedIn: Boolean(state.currentUser) }
+  }));
+}
+
 async function handleAuthStateChange(event, session) {
   const previousUser = state.currentUser;
   state.currentUser = session?.user ?? null;
+  notifyPublishingAuthState(event);
   state.authRestoring = false;
   if (!state.currentUser) {
     state.currentUserBanned = false;
@@ -1289,7 +1297,10 @@ async function handleSignUpClick() {
   });
   if (error) { showAuthFeedback(error.message, true); return; }
   state.pendingActivationEmail = data.user?.email ?? email;
-  if (data.session?.user) state.currentUser = data.session.user;
+  if (data.session?.user) {
+    state.currentUser = data.session.user;
+    notifyPublishingAuthState("SIGNED_IN");
+  }
   elements.authPasswordInput.value = "";
   elements.authTermsCheckbox.checked = false;
   showAuthFeedback(data.session ? "Account created and signed in." : `Account created. Check ${state.pendingActivationEmail} for the activation email.`);
@@ -1302,6 +1313,7 @@ async function handleSignOutClick() {
   const { error } = await state.supabase.auth.signOut({ scope: "local" });
   if (error) { showAuthFeedback(error.message, true); return; }
   state.currentUser = null;
+  notifyPublishingAuthState("SIGNED_OUT");
   state.currentUserBanned = false;
   state.bannedUserIds = [];
   state.adminBanPanelOpen = false;

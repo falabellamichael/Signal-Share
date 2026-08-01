@@ -22,7 +22,7 @@
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=124" />
+    <link rel="stylesheet" href="./styles.css?v=125" />
     <link rel="stylesheet" href="./studio-overlays.css?v=1.0" />
     <link rel="stylesheet" href="./studio-auth-overlay.css?v=1.0" />
     <link rel="stylesheet" href="./studio-publish-overlay.css?v=1.5" />
@@ -403,7 +403,112 @@
                 <div class="settings-connection-card settings-publishing-card">
                   <span class="settings-status-badge is-waiting">Checking OAuth readiness</span>
                   <strong id="publishingOAuthStatus">Sign in to check provider configuration</strong>
-                  <p>Each publishing provider reports its own readiness. Client-side fields cannot safely hold provider secrets; keys and callback configuration belong in the publishing service.</p>
+                  <p>Each provider reports its own readiness. Client secrets are encrypted by Supabase Vault and are never returned; client IDs are used only in provider authorization redirects.</p>
+                </div>
+
+                <p class="settings-live-status" id="publishingOAuthAccessNote" role="status" aria-live="polite">
+                  Sign in with a Signal Share administrator account to manage publishing OAuth keys.
+                </p>
+
+                <div class="publishing-oauth-manager" id="publishingOAuthAdminPanel" hidden>
+                  <div class="publishing-oauth-manager-head">
+                    <div>
+                      <p class="eyebrow">Administrator</p>
+                      <h4>OAuth application keys</h4>
+                    </div>
+                    <span class="settings-status-badge" id="publishingOAuthVaultBadge">Encrypted server storage</span>
+                  </div>
+                  <p class="publishing-oauth-security-note">
+                    Values are sent only to the authenticated publishing service. Secret fields are never prefilled, cached, or stored in browser preferences. Leave a field blank to keep its current server value.
+                  </p>
+
+                  <div class="publishing-oauth-callback">
+                    <span>Provider callback URL</span>
+                    <code id="publishingOAuthCallbackUrl">Loading secure callback…</code>
+                    <small>Register this exact callback URL in the X, LinkedIn, and Meta developer consoles.</small>
+                  </div>
+
+                  <div class="publishing-oauth-grid">
+                    <form class="publishing-oauth-provider" data-publishing-oauth-provider="x" autocomplete="off">
+                      <div class="publishing-oauth-provider-head">
+                        <div>
+                          <strong>X</strong>
+                          <small>OAuth 2.0 with PKCE</small>
+                        </div>
+                        <span class="settings-status-badge is-waiting" data-publishing-oauth-status="x">Not configured</span>
+                      </div>
+                      <label class="settings-field">
+                        <span>Client ID</span>
+                        <span class="settings-field-copy">Leave blank to keep the currently active ID.</span>
+                        <input id="publishingXClientId" name="clientId" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="500" placeholder="Paste X OAuth client ID" />
+                      </label>
+                      <label class="settings-field">
+                        <span>Client secret <small>(optional)</small></span>
+                        <span class="settings-field-copy">Public PKCE apps can run without a client secret.</span>
+                        <input id="publishingXClientSecret" name="clientSecret" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="2000" placeholder="Leave blank to keep current secret" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" />
+                      </label>
+                      <label class="publishing-oauth-clear-secret">
+                        <input name="clearClientSecret" type="checkbox" />
+                        <span>Save X without a client secret</span>
+                      </label>
+                      <div class="publishing-oauth-actions">
+                        <button class="button button-primary" type="submit">Save X keys</button>
+                        <button class="button button-secondary" type="button" data-publishing-oauth-remove="x">Remove saved keys</button>
+                      </div>
+                    </form>
+
+                    <form class="publishing-oauth-provider" data-publishing-oauth-provider="linkedin" autocomplete="off">
+                      <div class="publishing-oauth-provider-head">
+                        <div>
+                          <strong>LinkedIn</strong>
+                          <small>Member publishing access</small>
+                        </div>
+                        <span class="settings-status-badge is-waiting" data-publishing-oauth-status="linkedin">Not configured</span>
+                      </div>
+                      <label class="settings-field">
+                        <span>Client ID</span>
+                        <span class="settings-field-copy">Leave blank to keep the currently active ID.</span>
+                        <input id="publishingLinkedInClientId" name="clientId" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="500" placeholder="Paste LinkedIn client ID" />
+                      </label>
+                      <label class="settings-field">
+                        <span>Client secret</span>
+                        <span class="settings-field-copy">Required by LinkedIn and never returned after saving.</span>
+                        <input id="publishingLinkedInClientSecret" name="clientSecret" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="2000" placeholder="Leave blank to keep current secret" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" />
+                      </label>
+                      <div class="publishing-oauth-actions">
+                        <button class="button button-primary" type="submit">Save LinkedIn keys</button>
+                        <button class="button button-secondary" type="button" data-publishing-oauth-remove="linkedin">Remove saved keys</button>
+                      </div>
+                    </form>
+
+                    <form class="publishing-oauth-provider" data-publishing-oauth-provider="meta" autocomplete="off">
+                      <div class="publishing-oauth-provider-head">
+                        <div>
+                          <strong>Meta</strong>
+                          <small>Shared by Facebook and Instagram</small>
+                        </div>
+                        <span class="settings-status-badge is-waiting" data-publishing-oauth-status="meta">Not configured</span>
+                      </div>
+                      <label class="settings-field">
+                        <span>App ID</span>
+                        <span class="settings-field-copy">One Meta app configures both destinations.</span>
+                        <input id="publishingMetaAppId" name="clientId" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="500" placeholder="Paste Meta app ID" />
+                      </label>
+                      <label class="settings-field">
+                        <span>App secret</span>
+                        <span class="settings-field-copy">Required by Meta and never returned after saving.</span>
+                        <input id="publishingMetaAppSecret" name="clientSecret" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="2000" placeholder="Leave blank to keep current secret" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" />
+                      </label>
+                      <div class="publishing-oauth-actions">
+                        <button class="button button-primary" type="submit">Save Meta keys</button>
+                        <button class="button button-secondary" type="button" data-publishing-oauth-remove="meta">Remove saved keys</button>
+                      </div>
+                    </form>
+                  </div>
+
+                  <p class="settings-live-status publishing-oauth-feedback" id="publishingOAuthFeedback" role="status" aria-live="polite">
+                    Saving rotated keys may require members to reconnect affected social accounts.
+                  </p>
                 </div>
 
                 <div class="settings-actions">
@@ -1806,11 +1911,11 @@
     <script src="amd-optimizations.js?v=1.0"></script>
     <script src="arcade-chat-context.js?v=1.1"></script>
     <script src="arcade-chat.js?v=1.62" defer></script>
-    <script type="module" src="app-v3.js?v=1.41"></script>
+    <script type="module" src="app-v3.js?v=1.42"></script>
     <script src="./studio-overlays.js?v=1.0" defer></script>
     <script src="./studio-auth-overlay.js?v=1.0" defer></script>
     <script src="./studio-publish-fields.js?v=1.1" defer></script>
-    <script src="./studio-publish-overlay.js?v=1.4" defer></script>
+    <script src="./studio-publish-overlay.js?v=1.5" defer></script>
     <script>
         // Signal Share Android Optimization Suite - Detection
         (function() {

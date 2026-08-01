@@ -1,4 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  loadSocialOAuthConfig,
+  type XOAuthConfig,
+} from "../_shared/social-oauth-config.ts";
 
 type SocialProvider = "facebook" | "instagram" | "x" | "linkedin";
 type SocialMediaKind = "image" | "gif" | "video" | "document";
@@ -70,8 +74,6 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SOCIAL_TOKEN_ENCRYPTION_KEY = Deno.env.get("SOCIAL_TOKEN_ENCRYPTION_KEY") ?? "";
-const X_OAUTH_CLIENT_ID = readString(Deno.env.get("X_OAUTH_CLIENT_ID"), 500);
-const X_OAUTH_CLIENT_SECRET = readString(Deno.env.get("X_OAUTH_CLIENT_SECRET"), 2000);
 const META_GRAPH_API_VERSION = readString(Deno.env.get("META_GRAPH_API_VERSION"), 32);
 const LINKEDIN_API_VERSION = readString(Deno.env.get("LINKEDIN_API_VERSION"), 16) || "202603";
 const MAX_REMOTE_MEDIA_BYTES = 100 * 1024 * 1024;
@@ -542,25 +544,29 @@ async function connectionForPublish(
   if (!connection.token_expires_at || Date.parse(connection.token_expires_at) > Date.now() + 60_000) {
     return connection;
   }
-  if (connection.provider === "x" && connection.refresh_token && X_OAUTH_CLIENT_ID) {
-    return refreshXConnection(adminClient, connection);
+  if (connection.provider === "x" && connection.refresh_token) {
+    const oauth = await loadSocialOAuthConfig(adminClient);
+    if (oauth.config.x.clientId) {
+      return refreshXConnection(adminClient, connection, oauth.config.x);
+    }
   }
   throw new Error(`${providerLabel(connection.provider)} connection expired. Connect it again.`);
 }
 
 async function refreshXConnection(
   adminClient: ReturnType<typeof createAdminClient>,
-  connection: SocialConnection
+  connection: SocialConnection,
+  oauth: XOAuthConfig
 ) {
   const refreshToken = await decryptToken(connection.refresh_token || "");
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
-    client_id: X_OAUTH_CLIENT_ID,
+    client_id: oauth.clientId,
   });
   const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded" };
-  if (X_OAUTH_CLIENT_SECRET) {
-    headers.Authorization = `Basic ${btoa(`${X_OAUTH_CLIENT_ID}:${X_OAUTH_CLIENT_SECRET}`)}`;
+  if (oauth.clientSecret) {
+    headers.Authorization = `Basic ${btoa(`${oauth.clientId}:${oauth.clientSecret}`)}`;
   }
   const token = recordValue(await requestProviderJson("https://api.x.com/2/oauth2/token", {
     method: "POST",
