@@ -152,8 +152,18 @@ function normalizeActionName(value = "") {
 }
 
 function isAllowedSystemUri(value = "") {
-  const uri = `${value || ""}`.trim().toLowerCase();
-  return ["http:", "https:", "spotify:", "ms-phone:", "yourphone:", "mobilephonelink:"].some((protocol) => uri.startsWith(protocol));
+  const uri = `${value || ""}`.trim();
+  if (!uri || uri.length > 2048 || /[\r\n\0]/.test(uri)) return false;
+  try {
+    const parsed = new URL(uri);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return Boolean(parsed.hostname) && !parsed.username && !parsed.password;
+    }
+    if (parsed.protocol === "spotify:") return true;
+  } catch (_error) {
+    // Fixed Windows schemes below are valid without a URL host.
+  }
+  return /^(?:ms-phone|yourphone|mobilephonelink):$/i.test(uri);
 }
 
 function toPowerShellSingleQuoted(value = "") {
@@ -602,7 +612,7 @@ export function createStrictAiTools({ isAuthorized, fetchWithTimeout }) {
 
   router.post("/api/system-media/action", async (req, res) => {
     try {
-      if (!isAuthorized(req)) return res.json({ ok: false, error: "Unauthorized bridge request." });
+      if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized bridge request." });
 
       const action = normalizeActionName(req.body?.action || "");
       if (action === "open_uri") {

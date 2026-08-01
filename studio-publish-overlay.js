@@ -185,7 +185,7 @@
       badge: "Signal Share",
       title: "Signal Share feed",
       copy: "Create a media post for the Signal Share feed.",
-      detailsText: "Feed metadata plus post composer.",
+      detailsText: "Uses the existing feed composer fields.",
       usesPostComposer: true,
       options: [{
         id: "signal-feed",
@@ -194,10 +194,7 @@
         note: "Media post",
         button: "Publish post",
         hint: "Uses the existing creator, title, caption, media, and tags feed pipeline.",
-        fields: [
-          field("audience", { label: "Audience", mode: "select", value: "public", options: [["public", "Public feed"], ["followers", "Followers"], ["private", "Private draft"]] }),
-          field("publishNote", { label: "Internal note", placeholder: "Optional note for moderation or routing" })
-        ]
+        fields: []
       }]
     },
     local: {
@@ -262,6 +259,9 @@
   let socialConnectionState = { configured: {}, connections: [] };
   const selectedSocialConnectionIds = {};
   let socialConnectionsLoading = false;
+  let socialOAuthPopup = null;
+  let socialOAuthProvider = "";
+  let socialOAuthPopupWatcher = null;
   const readJson = (value, fallback) => { try { return value ? JSON.parse(value) : fallback; } catch { return fallback; } };
   const getValue = (selector) => `${$(selector)?.value || ""}`.trim();
   const activeFamily = () => families[activeFamilyId];
@@ -522,12 +522,33 @@
   }
   function directSocialProviderNote(provider) {
     if (socialConnectionsLoading) return "Checking connection.";
+    const appState = window.state ?? window.__SIGNAL_SHARE_STATE__;
+    if (!appState?.currentUser) return "Sign in to connect.";
     const connection = socialConnection(provider);
     if (connection) return connection.label || "Connected";
-    if (!socialConnectionState.configured?.[provider]) return "OAuth setup required.";
+    if (!socialConnectionState.configured?.[provider]) return "Waiting for OAuth keys.";
     return "Not connected.";
   }
+  function renderSettingsOAuthReadiness() {
+    const status = document.getElementById("publishingOAuthStatus");
+    if (!status) return;
+    const providers = ["x", "linkedin", "facebook", "instagram"];
+    const ready = providers.filter((provider) => Boolean(socialConnectionState.configured?.[provider]));
+    const waiting = providers.filter((provider) => !socialConnectionState.configured?.[provider]);
+    const names = (items) => items.map(providerName).join(", ");
+    status.textContent = waiting.length === 0
+      ? `OAuth server configuration is ready for ${names(ready)}.`
+      : ready.length > 0
+        ? `${names(ready)} ready. Waiting for OAuth keys: ${names(waiting)}.`
+        : `Waiting for OAuth keys: ${names(waiting)}.`;
+    const badge = status.closest(".settings-publishing-card")?.querySelector(".settings-status-badge");
+    if (badge) {
+      badge.textContent = waiting.length === 0 ? "OAuth configured" : "OAuth keys pending";
+      badge.classList.toggle("is-waiting", waiting.length > 0);
+    }
+  }
   function renderSocialConnections() {
+    renderSettingsOAuthReadiness();
     if (!socialConnectionsPanel) return;
     const directMode = socialDeliveryMode() !== "draft";
     socialConnectionsPanel.hidden = activeFamilyId !== "social" || !directMode;
@@ -564,7 +585,9 @@
       button.type = "button";
       button.dataset.socialConnectionAction = connected ? "disconnect" : "connect";
       button.dataset.socialProvider = provider;
-      button.disabled = socialConnectionsLoading || (!connected && !socialConnectionState.configured?.[provider]);
+      button.disabled = socialConnectionsLoading
+        || Boolean(socialOAuthProvider)
+        || (!connected && !socialConnectionState.configured?.[provider]);
       button.textContent = connected ? "Disconnect" : "Connect";
       row.append(button);
       return row;
@@ -582,6 +605,62 @@
     const { data, error } = await appState.supabase.functions.invoke(socialConnectFunctionName(), { body });
     if (error || data?.error) throw new Error(await socialPublishErrorMessage(error, data));
     return data || {};
+  }
+  function isNativeCapacitorApp() {
+    const platform = window.Capacitor?.getPlatform?.();
+    return Boolean(platform && platform !== "web");
+  }
+  function socialMessageOrigin() {
+    return /^https?:$/.test(location.protocol) ? location.origin : "";
+  }
+  function clearSocialOAuthPopup(options = {}) {
+    const { close = false } = options;
+    const popup = socialOAuthPopup;
+    socialOAuthPopup = null;
+    socialOAuthProvider = "";
+    if (socialOAuthPopupWatcher !== null) {
+      window.clearInterval(socialOAuthPopupWatcher);
+      socialOAuthPopupWatcher = null;
+    }
+    if (close && popup && !popup.closed) {
+      try { popup.close(); } catch (_error) {}
+    }
+    renderSocialConnections();
+  }
+  function preopenSocialOAuthPopup(provider) {
+    if (isNativeCapacitorApp() || !socialMessageOrigin()) return null;
+    const width = 600;
+    const height = 750;
+    const left = Math.max(0, (window.innerWidth - width) / 2 + window.screenX);
+    const top = Math.max(0, (window.innerHeight - height) / 2 + window.screenY);
+    const popup = window.open(
+      "about:blank",
+      "signalShareSocialAuth",
+      `popup=yes,width=${width},height=${height},top=${top},left=${left}`
+    );
+    if (!popup) return null;
+    socialOAuthPopup = popup;
+    socialOAuthProvider = provider;
+    renderSocialConnections();
+    try {
+      popup.document.title = `Connect ${providerName(provider)}`;
+      popup.document.body.textContent = `Preparing ${providerName(provider)} sign-in…`;
+    } catch (_error) {}
+    return popup;
+  }
+  function watchSocialOAuthPopup(popup, provider) {
+    if (!popup || popup !== socialOAuthPopup) return;
+    if (socialOAuthPopupWatcher !== null) window.clearInterval(socialOAuthPopupWatcher);
+    socialOAuthPopupWatcher = window.setInterval(() => {
+      if (popup !== socialOAuthPopup) {
+        window.clearInterval(socialOAuthPopupWatcher);
+        socialOAuthPopupWatcher = null;
+        return;
+      }
+      if (!popup.closed) return;
+      clearSocialOAuthPopup();
+      setFeedback(`${providerName(provider)} connection window closed before completion.`, true);
+    }, 500);
   }
   async function refreshSocialConnections() {
     let appState = null;
@@ -607,16 +686,31 @@
       renderSocialConnections();
     }
   }
-  async function connectSocialProvider(provider) {
+  async function connectSocialProvider(provider, popup = null) {
     const returnTo = window.SIGNAL_SHARE_CONFIG?.authRedirectUrl || location.href;
-    const data = await socialConnectRequest({ action: "start", provider, returnTo });
-    if (!data.authorizeUrl) throw new Error(`${providerName(provider)} connection could not be started.`);
-    
-    const width = 600;
-    const height = 750;
-    const left = (window.innerWidth - width) / 2 + window.screenX;
-    const top = (window.innerHeight - height) / 2 + window.screenY;
-    window.open(data.authorizeUrl, "socialAuth", `width=${width},height=${height},top=${top},left=${left}`);
+    try {
+      const data = await socialConnectRequest({ action: "start", provider, returnTo });
+      if (!data.authorizeUrl) throw new Error(`${providerName(provider)} connection could not be started.`);
+
+      if (popup && popup === socialOAuthPopup && !popup.closed) {
+        try {
+          popup.location.replace(data.authorizeUrl);
+          popup.focus();
+          watchSocialOAuthPopup(popup, provider);
+          setFeedback(`Finish connecting ${providerName(provider)} in the opened window.`);
+          return;
+        } catch (_popupError) {
+          clearSocialOAuthPopup({ close: true });
+        }
+      }
+
+      clearSocialOAuthPopup({ close: true });
+      setFeedback(`Popup unavailable. Continuing ${providerName(provider)} connection in this window.`);
+      location.assign(data.authorizeUrl);
+    } catch (error) {
+      if (popup && popup === socialOAuthPopup) clearSocialOAuthPopup({ close: true });
+      throw error;
+    }
   }
   async function disconnectSocialProvider(provider) {
     const data = await socialConnectRequest({ action: "disconnect", provider });
@@ -633,8 +727,9 @@
     const message = url.searchParams.get("signal_social_message");
     if (!status && !message) return;
 
-    if (window.opener && window.opener !== window) {
-      window.opener.postMessage({ type: "signal_social_result", status, message }, "*");
+    const targetOrigin = socialMessageOrigin();
+    if (window.opener && window.opener !== window && targetOrigin) {
+      window.opener.postMessage({ type: "signal_social_result", status, message }, targetOrigin);
       window.close();
       return;
     }
@@ -648,12 +743,19 @@
   }
 
   window.addEventListener("message", (event) => {
-    if (event.data?.type === "signal_social_result") {
+    if (
+      event.data?.type === "signal_social_result"
+      && socialOAuthPopup
+      && event.source === socialOAuthPopup
+      && event.origin === socialMessageOrigin()
+      && ["connected", "error"].includes(event.data.status)
+    ) {
       const { status, message } = event.data;
       const finalMessage = message || (status === "connected" ? "Social provider connected." : "Social connection failed.");
+      clearSocialOAuthPopup({ close: true });
       setFeedback(finalMessage, status !== "connected");
       toast(finalMessage);
-      
+
       // Refresh connection state
       socialConnectRequest({ action: "status" }).then(data => {
         socialConnectionState = {
@@ -691,11 +793,9 @@
           activitySaved = true;
           toast(options.length === 1 ? "Social draft saved" : `${options.length} Social drafts saved`);
         } else {
+          await publishSocialOptions(options, item);
           saveActivity(record);
           activitySaved = true;
-
-          await publishSocialOptions(options, item);
-          
           toast(options.length === 1 ? "Social post completed" : `${options.length} Social posts completed`);
         }
       } else if (activeFamilyId === "github") {
@@ -1293,9 +1393,11 @@
     if (!button) return;
     const provider = button.dataset.socialProvider;
     button.disabled = true;
-    const task = button.dataset.socialConnectionAction === "disconnect"
-      ? disconnectSocialProvider(provider)
-      : connectSocialProvider(provider);
+    const connecting = button.dataset.socialConnectionAction !== "disconnect";
+    const popup = connecting ? preopenSocialOAuthPopup(provider) : null;
+    const task = connecting
+      ? connectSocialProvider(provider, popup)
+      : disconnectSocialProvider(provider);
     void task.catch((error) => {
       button.disabled = false;
       setFeedback(error?.message || "Social connection action failed.", true);
@@ -1510,15 +1612,16 @@
             if (connection) {
               let url = "";
               if (provider === "facebook") {
-                url = `https://facebook.com/${connection.provider_account_id}`;
+                url = connection.accountId ? `https://facebook.com/${encodeURIComponent(connection.accountId)}` : "https://facebook.com";
               } else if (provider === "instagram") {
-                const username = connection.metadata?.username || connection.provider_account_label?.replace("@", "") || "";
+                const label = `${connection.label || ""}`.trim();
+                const username = label.startsWith("@") ? label.slice(1) : "";
                 url = username ? `https://instagram.com/${username}` : "https://instagram.com";
               }
-              if (url) window.open(url, "_blank");
+              if (url) window.open(url, "_blank", "noopener,noreferrer");
             } else {
               const fallbackUrl = provider === "facebook" ? "https://facebook.com" : "https://instagram.com";
-              window.open(fallbackUrl, "_blank");
+              window.open(fallbackUrl, "_blank", "noopener,noreferrer");
             }
           });
         }

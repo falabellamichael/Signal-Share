@@ -406,23 +406,14 @@ function isBridgeFeatureEnabled() {
         localStorage.getItem('ss_bridge_enabled')
         ?? localStorage.getItem('signal-share-bridge-enabled')
     );
-    if (explicitFlag !== null) return explicitFlag;
 
     const customBridgeUrl = `${window.SignalShareLocalLlm?.getBridgeBaseUrl?.() || localStorage.getItem('signal-share-bridge-url') || ''}`.trim();
-    if (customBridgeUrl) return true;
-
     const bridgeSecret = `${localStorage.getItem('signal-share-bridge-secret') || ''}`.trim()
         || `${localStorage.getItem('ss_bridge_secret') || ''}`.trim();
-    if (bridgeSecret) return true;
-
-    const preferredModel = `${localStorage.getItem(CHAT_MODEL_PREFERENCE_KEY) || ''}`.trim().toLowerCase();
-    if (preferredModel && preferredModel !== 'auto') return true;
-
-    if (window.Capacitor && typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() !== 'web') {
-        return false;
-    }
-
-    return isLoopbackSiteOrigin() || isPrivateNetworkOrigin();
+    const localToken = `${window.SignalShareLocalLlm?.getLocalLlmToken?.() || localStorage.getItem('ss_local_llm_token') || ''}`.trim();
+    const hasBridgeConfiguration = Boolean(customBridgeUrl || bridgeSecret || localToken);
+    if (!hasBridgeConfiguration) return false;
+    return explicitFlag !== false;
 }
 
 function toModelDisplayName(modelId = '') {
@@ -433,62 +424,64 @@ function toModelDisplayName(modelId = '') {
         .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-async function hydrateChatModelSelect({ forceRefresh = false } = {}) {
+function renderChatModelCatalog(details = {}) {
     const select = document.getElementById('chat-model-select');
-    if (!select) return;
-    if (!isBridgeFeatureEnabled()) return;
-    if (!forceRefresh && bridgePollNextAllowedAt && Date.now() < bridgePollNextAllowedAt) return;
+    if (!select) return false;
+    const providerPreference = getAiProviderPreference();
+    const catalogRows = Array.isArray(details?.models) ? details.models : [];
+    const providerRows = providerPreference === 'auto'
+        ? catalogRows
+        : catalogRows.filter((row) => `${row?.provider || ''}`.trim().toLowerCase() === providerPreference);
+    const rows = providerRows.filter((row) => row?.chatCapable !== false
+        && !/(?:^|[\/_:.-])embed(?:ding)?(?:$|[\/_:.-])/i.test(`${row?.id || ''}`));
+    const selectedBefore = `${localStorage.getItem(CHAT_MODEL_PREFERENCE_KEY) || select.value || 'auto'}`.trim();
+    select.innerHTML = '';
 
+    const autoOption = document.createElement('option');
+    autoOption.value = 'auto';
+    autoOption.textContent = 'Auto-Select';
+    select.appendChild(autoOption);
+
+    if (rows.length === 0) {
+        const unavailable = document.createElement('option');
+        unavailable.value = '';
+        unavailable.disabled = true;
+        unavailable.textContent = providerPreference === 'auto' ? 'No local models found' : `No ${providerPreference} model found`;
+        select.appendChild(unavailable);
+        select.value = 'auto';
+        updateEngineStatus(false, details || {});
+        return false;
+    }
+    updateEngineStatus(true, details || {});
+
+    const seen = new Set(['auto']);
+    for (const row of rows) {
+        const modelId = `${row?.id || ''}`.trim();
+        if (!modelId) continue;
+        const key = modelId.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const provider = `${row?.provider || ''}`.trim().toLowerCase();
+        const option = document.createElement('option');
+        option.value = modelId;
+        option.dataset.provider = provider;
+        option.dataset.source = `${row?.source || details?.source || ''}`.trim();
+        option.textContent = provider && provider !== 'unknown'
+            ? `${toModelDisplayName(modelId)} (${provider.toUpperCase()})`
+            : toModelDisplayName(modelId);
+        select.appendChild(option);
+    }
+
+    const hasSelected = Array.from(select.options).some((opt) => opt.value === selectedBefore);
+    select.value = hasSelected ? selectedBefore : 'auto';
+    return true;
+}
+
+async function hydrateChatModelSelect({ forceRefresh = false } = {}) {
     try {
-        const querySuffix = forceRefresh ? '?force=true' : '';
-        const modelCatalogPaths = [`/api/local-llm/models${querySuffix}`, `/api/llm/models${querySuffix}`];
-        let response = null;
-        for (const path of modelCatalogPaths) {
-            const next = await bridgeFetch(path, {
-                method: 'GET',
-                timeoutMs: 2200,
-                suppressNetworkErrors: true
-            });
-            if (next.ok || next.status !== 404 || path === modelCatalogPaths[modelCatalogPaths.length - 1]) {
-                response = next;
-                break;
-            }
-        }
-
-        if (!response || !response.ok) return;
-        updateEngineStatus(true);
-
-        const payload = await response.json().catch(() => null);
-        const rows = Array.isArray(payload?.models) ? payload.models : [];
-        if (rows.length === 0) return;
-
-        const selectedBefore = `${localStorage.getItem(CHAT_MODEL_PREFERENCE_KEY) || select.value || 'auto'}`.trim();
-        select.innerHTML = '';
-
-        const autoOption = document.createElement('option');
-        autoOption.value = 'auto';
-        autoOption.textContent = 'Auto-Select';
-        select.appendChild(autoOption);
-
-        const seen = new Set(['auto']);
-        for (const row of rows) {
-            const modelId = `${row?.id || ''}`.trim();
-            if (!modelId) continue;
-            const key = modelId.toLowerCase();
-            if (seen.has(key)) continue;
-            seen.add(key);
-
-            const provider = `${row?.provider || ''}`.trim().toLowerCase();
-            const option = document.createElement('option');
-            option.value = modelId;
-            option.textContent = provider && provider !== 'unknown'
-                ? `${toModelDisplayName(modelId)} (${provider.toUpperCase()})`
-                : toModelDisplayName(modelId);
-            select.appendChild(option);
-        }
-
-        const hasSelected = Array.from(select.options).some((opt) => opt.value === selectedBefore);
-        select.value = hasSelected ? selectedBefore : 'auto';
+        const details = await inspectAiConnectivity({ timeoutMs: 3000, forceRefresh });
+        renderChatModelCatalog(details);
     } catch (_error) {
         // Keep static options on failure.
     }
@@ -497,6 +490,11 @@ async function hydrateChatModelSelect({ forceRefresh = false } = {}) {
 function setupChatModelSelect() {
     const select = document.getElementById('chat-model-select');
     if (!select) return;
+
+    // Static model names quickly become misleading. Keep only automatic routing
+    // until a direct endpoint or the optional PC Bridge returns a live catalog.
+    const autoOption = Array.from(select.options).find((option) => option.value === 'auto') || new Option('Auto-Select', 'auto');
+    select.replaceChildren(autoOption);
 
     const savedModel = `${localStorage.getItem(CHAT_MODEL_PREFERENCE_KEY) || ''}`.trim();
     if (savedModel) {
@@ -507,10 +505,6 @@ function setupChatModelSelect() {
     select.addEventListener('change', () => {
         const nextModel = `${select.value || 'auto'}`.trim();
         localStorage.setItem(CHAT_MODEL_PREFERENCE_KEY, nextModel);
-        if (nextModel && nextModel !== 'auto') {
-            localStorage.setItem('ss_bridge_enabled', '1');
-        }
-        void hydrateChatModelSelect({ forceRefresh: true });
     });
 
     void hydrateChatModelSelect();
@@ -815,6 +809,8 @@ async function retryPublishWithAI(userPrompt = '', customRetryPrompt = '', signa
     const payload = JSON.stringify({
         message: buildProtocolAwareUserMessage(userPrompt),
         model: requestModel,
+        provider: getAiProviderPreference(),
+        endpointBaseUrl: getCustomEndpointBaseUrl(),
         customInstructions,
         attachment: null,
         history: [],
@@ -824,11 +820,27 @@ async function retryPublishWithAI(userPrompt = '', customRetryPrompt = '', signa
     });
 
     const chatPaths = ['/api/local-llm/chat', '/api/llm/chat'];
+    let directAttempted = false;
+    const bridgePreferred = await shouldPreferPcBridgeForAi({ signal, timeoutMs: 2500 });
+    if (!bridgePreferred) {
+        directAttempted = true;
+        try {
+            const direct = await requestDirectEndpointChat(payload, {
+                signal: signal?.aborted ? undefined : signal,
+                timeoutMs: 180000
+            });
+            const directReply = `${direct?.reply || ''}`.trim();
+            if (directReply) return directReply;
+        } catch (error) {
+            if (signal?.aborted) throw error;
+            console.warn('[Arcade Chat] Direct endpoint publish retry failed:', error);
+        }
+    }
     for (const chatPath of chatPaths) {
         try {
             const response = await bridgeFetch(chatPath, {
                 method: 'POST',
-                timeoutMs: 0,
+                timeoutMs: bridgePreferred ? 180000 : 10000,
                 // Do not pass signal here to prevent "signal is aborted without reason" errors during auto-retry
                 body: payload
             });
@@ -842,6 +854,18 @@ async function retryPublishWithAI(userPrompt = '', customRetryPrompt = '', signa
             if (signal?.aborted) throw error;
             console.warn('[Arcade Chat] Workshop publish retry failed:', error);
         }
+    }
+
+    try {
+        if (directAttempted) return '';
+        const direct = await requestDirectEndpointChat(payload, {
+            signal: signal?.aborted ? undefined : signal,
+            timeoutMs: 180000
+        });
+        return `${direct?.reply || ''}`.trim();
+    } catch (error) {
+        if (signal?.aborted) throw error;
+        console.warn('[Arcade Chat] Direct endpoint publish retry failed:', error);
     }
 
     return '';
@@ -863,6 +887,8 @@ async function retryWorkshopEditWithEditorContext(userPrompt = '', richContext =
     const payload = JSON.stringify({
         message: buildProtocolAwareUserMessage(userPrompt),
         model: requestModel,
+        provider: getAiProviderPreference(),
+        endpointBaseUrl: getCustomEndpointBaseUrl(),
         customInstructions,
         attachment: null,
         history: [],
@@ -872,11 +898,24 @@ async function retryWorkshopEditWithEditorContext(userPrompt = '', richContext =
     });
 
     const chatPaths = ['/api/local-llm/chat', '/api/llm/chat'];
+    let directAttempted = false;
+    const bridgePreferred = await shouldPreferPcBridgeForAi({ signal, timeoutMs: 2500 });
+    if (!bridgePreferred) {
+        directAttempted = true;
+        try {
+            const direct = await requestDirectEndpointChat(payload, { signal, timeoutMs: 180000 });
+            const directReply = `${direct?.reply || ''}`.trim();
+            if (directReply) return directReply;
+        } catch (error) {
+            if (signal?.aborted) throw error;
+            console.warn('[Arcade Chat] Direct endpoint edit retry failed:', error);
+        }
+    }
     for (const chatPath of chatPaths) {
         try {
             const response = await bridgeFetch(chatPath, {
                 method: 'POST',
-                timeoutMs: 0,
+                timeoutMs: bridgePreferred ? 180000 : 10000,
                 signal,
                 body: payload
             });
@@ -890,6 +929,15 @@ async function retryWorkshopEditWithEditorContext(userPrompt = '', richContext =
             if (signal?.aborted) throw error;
             console.warn('[Arcade Chat] Workshop edit retry failed:', error);
         }
+    }
+
+    try {
+        if (directAttempted) return '';
+        const direct = await requestDirectEndpointChat(payload, { signal, timeoutMs: 180000 });
+        return `${direct?.reply || ''}`.trim();
+    } catch (error) {
+        if (signal?.aborted) throw error;
+        console.warn('[Arcade Chat] Direct endpoint edit retry failed:', error);
     }
 
     return '';
@@ -915,10 +963,51 @@ function getBridgeTargetAddressSpace(baseUrl = "") {
 }
 
 function getBridgeSecret() {
-    return localStorage.getItem("SIGNAL_SHARE_BRIDGE_SECRET")
+    const helperSecret = window.SignalShareLocalLlm?.getBridgeSecret?.();
+    if (helperSecret) return helperSecret;
+    return localStorage.getItem("ss_bridge_secret")
         || localStorage.getItem("signal-share-bridge-secret")
-        || localStorage.getItem("ss_bridge_secret")
+        || localStorage.getItem("SIGNAL_SHARE_BRIDGE_SECRET")
         || "";
+}
+
+function getAiProviderPreference() {
+    return window.SignalShareLocalLlm?.getProviderPreference?.()
+        || `${localStorage.getItem('ss_ai_provider') || 'auto'}`.trim().toLowerCase()
+        || 'auto';
+}
+
+function getCustomEndpointBaseUrl() {
+    const provider = getAiProviderPreference();
+    const directBaseUrl = window.SignalShareLocalLlm?.getDirectEndpointBaseUrl?.(provider);
+    if (directBaseUrl) return directBaseUrl;
+    if (provider !== 'openai-compatible') return '';
+    return window.SignalShareLocalLlm?.getCustomEndpointBaseUrl?.()
+        || `${localStorage.getItem('ss_openai_compatible_base_url') || ''}`.trim();
+}
+
+async function requestDirectEndpointChat(payload, options = {}) {
+    const directChat = window.SignalShareLocalLlm?.chatDirect;
+    if (typeof directChat !== 'function') {
+        throw new Error('Direct endpoint chat is unavailable in this build.');
+    }
+    const body = typeof payload === 'string' ? JSON.parse(payload) : { ...(payload || {}) };
+    body.provider = body.provider || getAiProviderPreference();
+    body.endpointBaseUrl = undefined;
+    body.lmStudioMcpTools = [];
+    return directChat(body, {
+        signal: options.signal,
+        timeoutMs: options.timeoutMs || 180000
+    });
+}
+
+function buildModelCatalogQuery({ forceRefresh = false } = {}) {
+    const params = new URLSearchParams();
+    params.set('provider', getAiProviderPreference());
+    const endpointBaseUrl = getCustomEndpointBaseUrl();
+    if (endpointBaseUrl) params.set('endpointBaseUrl', endpointBaseUrl);
+    if (forceRefresh) params.set('force', 'true');
+    return `?${params.toString()}`;
 }
 
 function getLocalLlmToken() {
@@ -1018,28 +1107,56 @@ async function retryWorkshopRewriteWithEditorContext(userPrompt = '', richContex
         ? getAiCore().getStoredCustomInstructions()
         : `${localStorage.getItem('ss_ai_custom_instructions') || ''}`.trim().slice(0, 2000);
     const activeConversationId = ensureCurrentChatId();
+    const payload = JSON.stringify({
+        message: buildProtocolAwareUserMessage(userPrompt),
+        model: requestModel,
+        provider: getAiProviderPreference(),
+        endpointBaseUrl: getCustomEndpointBaseUrl(),
+        customInstructions,
+        attachment: null,
+        history: [],
+        conversationId: activeConversationId,
+        lmStudioMcpTools: getSelectedLmStudioMcpTools(),
+        pageContext: retryContext.slice(0, 24000)
+    });
+
+    let directAttempted = false;
+    const bridgePreferred = await shouldPreferPcBridgeForAi({ signal, timeoutMs: 2500 });
+    if (!bridgePreferred) {
+        directAttempted = true;
+        try {
+            const direct = await requestDirectEndpointChat(payload, { signal, timeoutMs: 180000 });
+            const directReply = `${direct?.reply || ''}`.trim();
+            if (directReply) return directReply;
+        } catch (error) {
+            if (signal?.aborted) throw error;
+            console.warn('[Arcade Chat] Direct endpoint rewrite retry failed:', error);
+        }
+    }
 
     try {
         const response = await bridgeFetch('/api/local-llm/chat', {
             method: 'POST',
-            timeoutMs: 0,
+            timeoutMs: bridgePreferred ? 180000 : 10000,
             signal,
-            body: JSON.stringify({
-                message: buildProtocolAwareUserMessage(userPrompt),
-                model: requestModel,
-                customInstructions,
-                attachment: null,
-                history: [],
-                conversationId: activeConversationId,
-                lmStudioMcpTools: getSelectedLmStudioMcpTools(),
-                pageContext: retryContext.slice(0, 24000)
-            })
+            body: payload
         });
-        if (!response?.ok) return '';
-        const data = await response.json().catch(() => null);
-        return typeof data?.reply === 'string' ? data.reply.trim() : '';
+        if (response?.ok) {
+            const data = await response.json().catch(() => null);
+            const bridgeReply = typeof data?.reply === 'string' ? data.reply.trim() : '';
+            if (bridgeReply) return bridgeReply;
+        }
     } catch (error) {
         console.warn('[Arcade Chat] Workshop rewrite retry failed:', error);
+    }
+
+    try {
+        if (directAttempted) return '';
+        const direct = await requestDirectEndpointChat(payload, { signal, timeoutMs: 180000 });
+        return `${direct?.reply || ''}`.trim();
+    } catch (error) {
+        if (signal?.aborted) throw error;
+        console.warn('[Arcade Chat] Direct endpoint rewrite retry failed:', error);
         return '';
     }
 }
@@ -1061,13 +1178,13 @@ async function bridgeFetch(path, options = {}) {
     } = options || {};
 
     const method = optionMethod || "GET";
-    const localLlmHeaders = window.SignalShareLocalLlm?.getRequestHeaders?.() || {};
+    const sharedBridgeHeaders = window.SignalShareLocalLlm?.getRequestHeaders?.() || {};
     const headers = {
         ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
-        ...(getBridgeSecret() ? { "X-Bridge-Secret": getBridgeSecret() } : {}),
-        ...(getLocalLlmToken() ? { "X-Local-LLM-Token": getLocalLlmToken() } : localLlmHeaders),
+        ...sharedBridgeHeaders,
+        ...(!sharedBridgeHeaders["X-Bridge-Secret"] && getBridgeSecret() ? { "X-Bridge-Secret": getBridgeSecret() } : {}),
+        ...(!sharedBridgeHeaders["X-Local-LLM-Token"] && getLocalLlmToken() ? { "X-Local-LLM-Token": getLocalLlmToken() } : {}),
         ...(getDeviceId() ? { "X-Device-Id": getDeviceId() } : {}),
-        "Access-Control-Request-Private-Network": "true",
         ...(optionHeaders || {}),
     };
     const candidates = resolveBridgeBaseCandidates();
@@ -1115,12 +1232,6 @@ async function bridgeFetch(path, options = {}) {
                 targetAddressSpace: targetAddressSpace || "private"
             });
 
-            if (!response) {
-                const error = new Error(`No response from bridge endpoint: ${endpoint}`);
-                networkFailures.push({ baseUrl, error });
-                lastNetworkError = error;
-                continue;
-            }
             if (!response) {
                 const error = new Error(`No response from bridge endpoint: ${endpoint}`);
                 networkFailures.push({ baseUrl, error });
@@ -1201,6 +1312,12 @@ if (typeof window !== "undefined") {
     window.resolveChatRequestModel = resolveChatRequestModel;
     window.isBridgeFeatureEnabled = isBridgeFeatureEnabled;
     window.getSelectedLmStudioMcpTools = getSelectedLmStudioMcpTools;
+    window.inspectBridgeConnectivity = inspectBridgeConnectivity;
+    window.inspectAiConnectivity = inspectAiConnectivity;
+    window.checkBridgeConnectivity = checkBridgeConnectivity;
+    window.updateEngineStatus = updateEngineStatus;
+    window.isPcBridgeKnownOnline = () => lastBridgeStatusWasOnline;
+    window.shouldPreferPcBridgeForAi = shouldPreferPcBridgeForAi;
 }
 
 async function getDesktopBridgeSnapshot({ suppressNetworkErrors = false } = {}) {
@@ -1211,41 +1328,179 @@ async function getDesktopBridgeSnapshot({ suppressNetworkErrors = false } = {}) 
     return res.json();
 }
 
-async function checkBridgeConnectivity({ signal, timeoutMs = 3500 } = {}) {
-    const probes = [
-        "/api/local-llm/models",
-        "/api/llm/models",
-        "/api/local-llm/health"
-    ];
-    let sawAuthFailure = false;
+async function inspectBridgeConnectivity({ signal, timeoutMs = 3500, forceRefresh = false } = {}) {
+    const selectedProvider = getAiProviderPreference();
+    const result = {
+        reachable: false,
+        online: false,
+        authFailed: false,
+        provider: selectedProvider,
+        models: [],
+        health: null,
+        message: "PC Bridge is not reachable."
+    };
 
-    for (const path of probes) {
+    try {
+        const healthResponse = await bridgeFetch("/api/local-llm/health", {
+            method: "GET",
+            timeoutMs,
+            signal,
+            suppressNetworkErrors: true
+        });
+        const healthStatus = Number(healthResponse?.status || 0);
+        if (healthStatus === 401 || healthStatus === 403) {
+            result.reachable = true;
+            result.authFailed = true;
+            result.message = "PC Bridge found, but its secret or token does not match.";
+            return result;
+        }
+        if (healthResponse?.ok) {
+            result.reachable = true;
+            result.health = await healthResponse.json().catch(() => null);
+        }
+    } catch (_error) {
+        // Model discovery below is a compatible fallback for older bridge versions.
+    }
+
+    const suffix = buildModelCatalogQuery({ forceRefresh });
+    for (const path of [`/api/local-llm/models${suffix}`, `/api/llm/models${suffix}`]) {
         try {
-            const res = await bridgeFetch(path, {
+            const response = await bridgeFetch(path, {
                 method: "GET",
                 timeoutMs,
                 signal,
                 suppressNetworkErrors: true
             });
-            if (res?.ok) {
-                // If we get a 200 OK from any endpoint, the bridge is alive. 
-                // No need to keep probing other paths.
-                return true;
-            }
-
-            const status = Number(res?.status || 0);
+            const status = Number(response?.status || 0);
             if (status === 401 || status === 403) {
-                sawAuthFailure = true;
+                result.reachable = true;
+                result.authFailed = true;
+                result.message = "PC Bridge found, but its secret or token does not match.";
+                return result;
             }
+            if (!response?.ok) {
+                if (status === 404) continue;
+                break;
+            }
+            result.reachable = true;
+            const payload = await response.json().catch(() => null);
+            const allModels = Array.isArray(payload?.models) ? payload.models : [];
+            result.models = selectedProvider === "auto"
+                ? allModels
+                : allModels.filter((row) => `${row?.provider || ""}`.trim().toLowerCase() === selectedProvider);
+            result.online = result.models.length > 0;
+            result.message = result.online
+                ? `${result.models.length} local model${result.models.length === 1 ? "" : "s"} ready.`
+                : selectedProvider === "auto"
+                    ? "PC Bridge is connected. Start LM Studio or Ollama and load a model."
+                    : `PC Bridge is connected, but ${selectedProvider} has no loaded model.`;
+            return result;
         } catch (_error) {
-            // Try the next probe.
+            // Try the compatible model route.
         }
     }
 
-    if (sawAuthFailure) {
+    if (result.reachable) {
+        result.message = "PC Bridge is connected, but model discovery is unavailable.";
+    }
+    return result;
+}
+
+async function inspectAiConnectivity({ signal, timeoutMs = 3500, forceRefresh = false } = {}) {
+    const selectedProvider = getAiProviderPreference();
+    const directInspector = window.SignalShareLocalLlm?.discoverDirectModels;
+    const bridgePromise = isBridgeFeatureEnabled()
+        ? inspectBridgeConnectivity({ signal, timeoutMs, forceRefresh })
+        : Promise.resolve({
+            reachable: false,
+            online: false,
+            authFailed: false,
+            provider: selectedProvider,
+            models: [],
+            message: 'PC Bridge is not enabled.'
+        });
+    const directPromise = typeof directInspector === 'function'
+        ? directInspector({ provider: selectedProvider, signal, timeoutMs })
+        : Promise.resolve({
+            available: false,
+            reachable: false,
+            provider: selectedProvider,
+            models: [],
+            errors: [],
+            message: 'Direct endpoint support is unavailable.'
+        });
+    const [bridge, direct] = await Promise.all([bridgePromise, directPromise]);
+    const mergedModels = [];
+    const seen = new Set();
+    for (const row of [...(direct?.models || []), ...(bridge?.models || [])]) {
+        const id = `${row?.id || ''}`.trim();
+        const provider = `${row?.provider || selectedProvider || 'local'}`.trim().toLowerCase();
+        if (!id) continue;
+        const key = `${provider}::${id.toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        mergedModels.push({ ...row, id, provider, source: row?.source || (direct?.models?.includes?.(row) ? 'direct' : 'bridge') });
+    }
+
+    const directChatModels = (direct?.models || []).filter((row) => row?.chatCapable !== false);
+    const directAvailable = Boolean(direct?.available && directChatModels.length);
+    const bridgeAvailable = Boolean(bridge?.online && bridge?.models?.length);
+    const source = directAvailable && bridgeAvailable
+        ? 'direct+bridge'
+        : directAvailable
+            ? 'direct'
+            : bridgeAvailable
+                ? 'bridge'
+                : 'offline';
+    const online = directAvailable || bridgeAvailable;
+    let message = '';
+    if (directAvailable && bridgeAvailable) {
+        message = `${directChatModels.length} direct chat model${directChatModels.length === 1 ? '' : 's'} ready. PC Bridge is connected for desktop tools.`;
+    } else if (directAvailable) {
+        message = `${directChatModels.length} direct chat model${directChatModels.length === 1 ? '' : 's'} ready. PC Bridge is optional and currently unavailable.`;
+    } else if (bridgeAvailable) {
+        message = `${bridge.models.length} model${bridge.models.length === 1 ? '' : 's'} ready through PC Bridge. Direct browser access is unavailable or blocked by CORS.`;
+    } else if (bridge?.authFailed) {
+        message = 'PC Bridge credentials do not match, and no direct endpoint is ready.';
+    } else {
+        message = direct?.message || bridge?.message || 'No local AI endpoint is reachable.';
+    }
+
+    return {
+        reachable: Boolean(direct?.reachable || bridge?.reachable),
+        online,
+        authFailed: Boolean(bridge?.authFailed),
+        provider: selectedProvider,
+        models: mergedModels,
+        source,
+        directAvailable,
+        bridgeAvailable,
+        direct,
+        bridge,
+        health: bridge?.health || null,
+        message
+    };
+}
+
+async function checkBridgeConnectivity(options = {}) {
+    const details = await inspectBridgeConnectivity(options);
+    lastBridgeStatusWasOnline = Boolean(details.online);
+    if (details.authFailed) {
         console.warn("[Arcade Chat] Bridge reachable but authentication failed. Verify Bridge Secret / Local LLM Token.");
     }
-    return false;
+    return details.online;
+}
+
+async function shouldPreferPcBridgeForAi({ signal, timeoutMs = 2500 } = {}) {
+    if (!lastBridgeStatusWasOnline || !isBridgeFeatureEnabled()) return false;
+    try {
+        const details = await inspectBridgeConnectivity({ signal, timeoutMs });
+        lastBridgeStatusWasOnline = Boolean(details.online);
+        return lastBridgeStatusWasOnline;
+    } catch (_error) {
+        lastBridgeStatusWasOnline = false;
+        return false;
+    }
 }
 
 async function sendDesktopBridgeAction(action, appPackage = "") {
@@ -1271,7 +1526,7 @@ let bridgePollNextAllowedAt = 0;
 function startDesktopBridgePolling() {
     if (!isBridgeFeatureEnabled()) {
         bridgeEnabled = false;
-        updateEngineStatus(false);
+        lastBridgeStatusWasOnline = false;
         return;
     }
 
@@ -1305,11 +1560,14 @@ async function pollDesktopBridge() {
 
     bridgePollInFlight = true;
     try {
-        // Engine status should be based on LLM endpoint connectivity, not media endpoint health.
-        const online = await checkBridgeConnectivity();
-        updateEngineStatus(online);
+        // AI status includes direct endpoints; desktop snapshots remain Bridge-only.
+        const connectivity = await inspectAiConnectivity();
+        const online = connectivity.online;
+        const bridgeOnline = connectivity.bridgeAvailable;
+        lastBridgeStatusWasOnline = bridgeOnline;
+        updateEngineStatus(online, connectivity);
 
-        if (!online) {
+        if (!bridgeOnline) {
             bridgePollFailureCount += 1;
             const backoffMs = Math.min(120000, 15000 * Math.pow(2, Math.max(0, bridgePollFailureCount - 1)));
             bridgePollNextAllowedAt = Date.now() + backoffMs;
@@ -1405,25 +1663,47 @@ function updateChatPlaceholder() {
 
 /**
  * Updates the Engine Status UI indicator if it exists on the page.
- * @param {boolean} online - Whether the bridge is connected
+ * @param {boolean} online - Whether a selected local model is ready
+ * @param {{reachable?: boolean, authFailed?: boolean, source?: string, direct?: object}} details - AI endpoint state
  */
-function updateEngineStatus(online) {
-    const statusKey = online ? 'online' : 'offline';
-    const nextStyle = online
-        ? { text: 'LOCAL LLM ONLINE', color: '#75b022', dot: '#75b022', glow: '0 0 8px #75b022' }
-        : { text: 'LLM BRIDGE DISCONNECTED', color: '#e74c3c', dot: '#e74c3c', glow: '0 0 8px #e74c3c' };
+function updateEngineStatus(online, details = {}) {
+    const source = `${details?.source || ''}`.trim().toLowerCase();
+    const statusKey = online
+        ? 'online'
+        : details.authFailed
+            ? 'auth'
+            : details.reachable
+                ? 'no-model'
+                : 'offline';
+    const onlineText = source === 'direct'
+        ? 'DIRECT AI ENDPOINT ONLINE'
+        : source === 'direct+bridge'
+            ? 'AI + PC BRIDGE ONLINE'
+            : source === 'bridge'
+                ? 'AI VIA PC BRIDGE ONLINE'
+                : 'LOCAL AI ONLINE';
+    const noModelText = details?.direct?.reachable
+        ? 'ENDPOINT ONLINE · LOAD A MODEL'
+        : 'PC BRIDGE ONLINE · LOAD A MODEL';
+    const styles = {
+        online: { text: onlineText, color: '#75b022', dot: '#75b022', glow: '0 0 8px #75b022' },
+        auth: { text: 'BRIDGE AUTH REQUIRED', color: '#ffb86c', dot: '#ffb86c', glow: '0 0 8px #ffb86c' },
+        'no-model': { text: noModelText, color: '#ffcc66', dot: '#ffcc66', glow: '0 0 8px #ffcc66' },
+        offline: { text: 'AI ENDPOINT OFFLINE', color: '#e74c3c', dot: '#e74c3c', glow: '0 0 8px #e74c3c' }
+    };
+    const nextStyle = styles[statusKey];
 
-    const containers = Array.from(document.querySelectorAll('#engine-status-container'));
-    const textNodes = Array.from(document.querySelectorAll('#engine-status-text'));
-    const dotNodes = Array.from(document.querySelectorAll('#engine-status-dot'));
+    const containers = Array.from(document.querySelectorAll('.engine-status-container'));
+    const textNodes = Array.from(document.querySelectorAll('.engine-status-text'));
+    const dotNodes = Array.from(document.querySelectorAll('.engine-status-dot'));
     const widgetCount = Math.max(containers.length, textNodes.length, dotNodes.length);
 
     if (widgetCount === 0) return;
 
     for (let i = 0; i < widgetCount; i += 1) {
         const container = containers[i] || null;
-        const statusText = container?.querySelector('#engine-status-text') || textNodes[i] || null;
-        const statusDot = container?.querySelector('#engine-status-dot') || dotNodes[i] || null;
+        const statusText = container?.querySelector('.engine-status-text') || textNodes[i] || null;
+        const statusDot = container?.querySelector('.engine-status-dot') || dotNodes[i] || null;
         if (!statusText || !statusDot) continue;
 
         // Only repaint when the effective status changes.
@@ -1441,19 +1721,18 @@ function updateEngineStatus(online) {
         statusText.dataset.bridgeStatus = statusKey;
     }
 
-    lastBridgeStatusWasOnline = online;
 }
 
 function isEngineStatusOffline() {
-    const containers = Array.from(document.querySelectorAll('#engine-status-container'));
-    const textNodes = Array.from(document.querySelectorAll('#engine-status-text'));
+    const containers = Array.from(document.querySelectorAll('.engine-status-container'));
+    const textNodes = Array.from(document.querySelectorAll('.engine-status-text'));
     const nodeCount = Math.max(containers.length, textNodes.length);
 
     if (nodeCount === 0) return false;
 
     for (let i = 0; i < nodeCount; i += 1) {
         const container = containers[i] || null;
-        const statusText = container?.querySelector('#engine-status-text') || textNodes[i] || null;
+        const statusText = container?.querySelector('.engine-status-text') || textNodes[i] || null;
         const statusKey = `${container?.dataset?.bridgeStatus || statusText?.dataset?.bridgeStatus || ''}`.trim().toLowerCase();
         if (statusKey === 'offline') return true;
 
@@ -1515,10 +1794,9 @@ window.toggleChatSecurity = function () {
         }
         if (localLlmTokenInput) localLlmTokenInput.value = getLocalLlmToken();
 
-        void window.refreshLmStudioMcpTools?.();
-
-        // Refresh IP bans
-        refreshBannedIps();
+        void inspectBridgeConnectivity({ timeoutMs: 2500 }).then((details) => {
+            if (details.online) void window.refreshLmStudioMcpTools?.();
+        });
     }
 };
 
@@ -1532,15 +1810,24 @@ window.saveSecurityDashboard = function () {
     const localLlmTokenInput = document.getElementById('sidebar-local-llm-token');
     const status = document.getElementById('security-save-status');
 
-    if (!secretInput || !deviceInput) return;
+    if (!secretInput) return;
 
     const secret = secretInput.value.trim();
-    const deviceId = deviceInput.value.trim();
+    const deviceId = deviceInput ? deviceInput.value.trim() : "";
     const bridgeUrl = bridgeUrlInput ? bridgeUrlInput.value.trim() : "";
     const localLlmToken = localLlmTokenInput ? localLlmTokenInput.value.trim() : "";
 
-    localStorage.setItem('SIGNAL_SHARE_BRIDGE_SECRET', secret);
-    localStorage.setItem('SIGNAL_SHARE_DEVICE_ID', deviceId);
+    if (window.SignalShareLocalLlm?.setBridgeSecret) {
+        window.SignalShareLocalLlm.setBridgeSecret(secret);
+    } else if (secret) {
+        localStorage.setItem('ss_bridge_secret', secret);
+    } else {
+        localStorage.removeItem('ss_bridge_secret');
+    }
+    if (deviceInput) {
+        if (deviceId) localStorage.setItem('SIGNAL_SHARE_DEVICE_ID', deviceId);
+        else localStorage.removeItem('SIGNAL_SHARE_DEVICE_ID');
+    }
     if (window.SignalShareLocalLlm?.setBridgeBaseUrl) {
         window.SignalShareLocalLlm.setBridgeBaseUrl(bridgeUrl);
     } else if (bridgeUrl) {
@@ -2872,10 +3159,6 @@ window.sendChatMessage = async function (promptOverride = '') {
             const customInstructions = typeof getAiCore()?.getStoredCustomInstructions === 'function'
                 ? getAiCore().getStoredCustomInstructions()
                 : `${localStorage.getItem('ss_ai_custom_instructions') || ''}`.trim().slice(0, 2000);
-            if (!isBridgeFeatureEnabled()) {
-                // User explicitly asked the companion for an AI reply, so enable bridge attempts.
-                localStorage.setItem('ss_bridge_enabled', '1');
-            }
             const shouldBridgeSendPreflight = false;
             if (shouldBridgeSendPreflight) {
                 const bridgeOnlineOnSend = await checkBridgeConnectivity({ signal, timeoutMs: 1500 });
@@ -2911,6 +3194,8 @@ window.sendChatMessage = async function (promptOverride = '') {
                     body: JSON.stringify({
                         message: protocolAwareMessage,
                         model: requestModel,
+                        provider: getAiProviderPreference(),
+                        endpointBaseUrl: getCustomEndpointBaseUrl(),
                         customInstructions,
                         attachment,
                         history: compactHistory,
@@ -2923,14 +3208,36 @@ window.sendChatMessage = async function (promptOverride = '') {
 
             const chatPaths = ['/api/local-llm/chat', '/api/llm/chat'];
             const attemptErrors = [];
+            const bridgePreferred = await shouldPreferPcBridgeForAi({ signal, timeoutMs: 2500 });
+            let directResult = null;
+            let directAttempted = false;
+
+            if (!bridgePreferred && !signal.aborted) {
+                directAttempted = true;
+                try {
+                    directResult = await requestDirectEndpointChat(payloadVariants[0].body, {
+                        signal,
+                        timeoutMs: 180000
+                    });
+                    const candidateReply = `${directResult?.reply || ''}`.trim();
+                    if (candidateReply) reply = candidateReply;
+                } catch (directError) {
+                    attemptErrors.push(formatAttemptError(
+                        'direct:endpoint',
+                        `${directError?.message || directError || 'request failed'}`.trim(),
+                        extractStackLocation(directError) || captureClientSourceLocation()
+                    ));
+                }
+            }
 
             for (const payloadVariant of payloadVariants) {
+                if (reply !== null) break;
                 for (const chatPath of chatPaths) {
                     const attemptPath = `${payloadVariant.label}:${chatPath}`;
                     try {
                         const nextResponse = await bridgeFetch(chatPath, {
                             method: 'POST',
-                            timeoutMs: 0,
+                            timeoutMs: bridgePreferred ? 180000 : 10000,
                             signal,
                             body: payloadVariant.body
                         });
@@ -2992,15 +3299,35 @@ window.sendChatMessage = async function (promptOverride = '') {
                 if (reply !== null) break;
             }
 
+            if (reply === null && !directAttempted && !signal.aborted) {
+                directAttempted = true;
+                try {
+                    directResult = await requestDirectEndpointChat(payloadVariants[0].body, {
+                        signal,
+                        timeoutMs: 180000
+                    });
+                    const candidateReply = `${directResult?.reply || ''}`.trim();
+                    if (candidateReply) reply = candidateReply;
+                } catch (directError) {
+                    attemptErrors.push(formatAttemptError(
+                        'direct:endpoint',
+                        `${directError?.message || directError || 'request failed'}`.trim(),
+                        extractStackLocation(directError) || captureClientSourceLocation()
+                    ));
+                }
+            }
+
             if (reply !== null) {
-                updateEngineStatus(true);
-                bridgePollFailureCount = 0;
-                bridgePollNextAllowedAt = 0;
+                updateEngineStatus(true, { source: directResult ? 'direct' : 'bridge', reachable: true });
+                if (!directResult) {
+                    bridgePollFailureCount = 0;
+                    bridgePollNextAllowedAt = 0;
+                }
             } else {
                 const isAbort = attemptErrors.some(err => err.toLowerCase().includes('abort') || err.toLowerCase().includes('cancel'));
                 lastError = isAbort ? 'Request cancelled by user' : (attemptErrors.length > 0
                     ? attemptErrors.join(" | ")
-                    : "Bridge did not return an AI reply");
+                    : "No local AI endpoint returned a reply");
                 updateEngineStatus(false);
             }
         } catch (err) {
@@ -4434,7 +4761,12 @@ window.toggleChat = function () {
 
     if (!sidebar) return;
 
-    const isCollapsed = sidebar.classList.toggle('collapsed');
+    // Treat either collapsed marker as authoritative. This also repairs any
+    // stale mixed state left behind by a previous page version.
+    const willOpen = !isChatOpen();
+    if (willOpen) setEndpointHelperOpen(false);
+    const isCollapsed = !willOpen;
+    sidebar.classList.toggle('collapsed', isCollapsed);
     document.body.classList.toggle('chat-collapsed', isCollapsed);
 
     // Randomize placeholder when opening
@@ -4458,7 +4790,11 @@ window.toggleChat = function () {
     const messengerBtn = document.querySelector('.messenger-launcher');
     const messengerSection = document.querySelector('.messenger-section');
 
-    if (toggleBtn) toggleBtn.style.right = '';
+    if (toggleBtn) {
+        toggleBtn.style.right = '';
+        toggleBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        toggleBtn.setAttribute('aria-label', willOpen ? 'Close Companion' : 'Open Companion');
+    }
     if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets();
     if (messengerSection) messengerSection.style.setProperty('right', '', '');
 
@@ -4470,7 +4806,7 @@ window.toggleChat = function () {
 function isChatOpen() {
     const sidebar = document.querySelector('.steam-chat-sidebar');
     if (!sidebar) return false;
-    return !sidebar.classList.contains('collapsed');
+    return !sidebar.classList.contains('collapsed') && !document.body.classList.contains('chat-collapsed');
 }
 
 window.closeArcadeChat = function (options = {}) {
@@ -4484,14 +4820,346 @@ window.closeArcadeChat = function (options = {}) {
     return true;
 };
 
+function ensureArcadeEdgePanelUi() {
+    let tabs = document.getElementById('arcadeEdgeTabs');
+    if (!tabs) {
+        tabs = document.createElement('nav');
+        tabs.id = 'arcadeEdgeTabs';
+        tabs.className = 'arcade-edge-tabs';
+        tabs.setAttribute('aria-label', 'Arcade panels');
+        document.body.appendChild(tabs);
+    }
+
+    let endpointToggle = document.getElementById('endpointHelperToggle');
+    if (!endpointToggle) {
+        endpointToggle = document.createElement('button');
+        endpointToggle.id = 'endpointHelperToggle';
+        endpointToggle.className = 'arcade-edge-tab endpoint-helper-toggle';
+        endpointToggle.type = 'button';
+        endpointToggle.setAttribute('aria-controls', 'endpointHelperPanel');
+        endpointToggle.setAttribute('aria-expanded', 'false');
+        endpointToggle.innerHTML = '<span class="arcade-edge-tab-label">Endpoints</span>';
+        tabs.appendChild(endpointToggle);
+    }
+
+    let helper = document.getElementById('endpointHelper');
+    if (!helper) {
+        helper = document.createElement('aside');
+        helper.id = 'endpointHelper';
+        helper.className = 'endpoint-helper';
+        helper.setAttribute('aria-hidden', 'true');
+        helper.setAttribute('aria-label', 'Companion endpoints');
+        helper.innerHTML = `
+            <section id="endpointHelperPanel" class="endpoint-helper-panel" aria-labelledby="endpointHelperTitle">
+                <header class="endpoint-helper-head">
+                    <div>
+                        <p class="endpoint-helper-eyebrow">Companion setup</p>
+                        <h2 id="endpointHelperTitle">AI endpoints</h2>
+                        <p>Connect straight to a local provider for models and normal chat. The PC Bridge is optional and only adds desktop capabilities.</p>
+                    </div>
+                    <button class="endpoint-helper-close" id="endpointHelperClose" type="button">Close</button>
+                </header>
+                <div class="endpoint-helper-body">
+                    <div class="endpoint-provider-group" role="group" aria-label="Endpoint provider">
+                        <button class="endpoint-provider-button is-active" type="button" data-endpoint-provider="auto" aria-pressed="true"><strong>Auto</strong><span>Try available local providers</span></button>
+                        <button class="endpoint-provider-button" type="button" data-endpoint-provider="lm-studio" aria-pressed="false"><strong>LM Studio</strong><span>Local server on port 1234</span></button>
+                        <button class="endpoint-provider-button" type="button" data-endpoint-provider="ollama" aria-pressed="false"><strong>Ollama</strong><span>Local server on port 11434</span></button>
+                        <button class="endpoint-provider-button" type="button" data-endpoint-provider="openai-compatible" aria-pressed="false"><strong>OpenAI-compatible</strong><span>Private direct /v1 API</span></button>
+                    </div>
+                    <label class="endpoint-field" data-endpoint-custom-url hidden>
+                        <span id="endpointDirectBaseUrlLabel">Direct endpoint URL</span>
+                        <small id="endpointDirectBaseUrlHelp">Browser requests never include Bridge credentials.</small>
+                        <input id="endpointCustomBaseUrlInput" type="url" inputmode="url" autocomplete="url" placeholder="http://127.0.0.1:8000/v1">
+                    </label>
+                    <label class="endpoint-field"><span>Optional PC Bridge URL</span><small>Used only for desktop tools and PC actions, not for direct endpoint chat.</small><input id="endpointBridgeUrlInput" type="url" inputmode="url" autocomplete="url" placeholder="http://127.0.0.1:3000"></label>
+                    <label class="endpoint-field"><span>Optional Bridge secret</span><small>Optional handshake secret configured by the PC bridge.</small><input id="endpointBridgeSecretInput" type="password" autocomplete="off" placeholder="Optional bridge secret"></label>
+                    <label class="endpoint-field"><span>Local LLM token</span><small>Optional token for an authenticated LAN bridge.</small><input id="endpointLocalLlmTokenInput" type="password" autocomplete="off" placeholder="Optional local LLM token"></label>
+                    <div class="endpoint-helper-actions">
+                        <button class="endpoint-action-primary" id="endpointTestButton" type="button">Test direct endpoint</button>
+                        <button class="endpoint-action-secondary" id="endpointRefreshButton" type="button">Refresh direct models</button>
+                        <a class="endpoint-action-secondary" id="endpointSetupLink" href="./setup-companion.bat" download>Optional PC Bridge setup</a>
+                    </div>
+                    <p id="endpointStatus" class="endpoint-status" role="status" aria-live="polite">Not tested. Start LM Studio or Ollama, then test the direct endpoint.</p>
+                    <section class="endpoint-models" aria-labelledby="endpointModelsTitle">
+                        <div class="endpoint-models-head"><h3 id="endpointModelsTitle">Available models</h3><span>Reported by the selected endpoint</span></div>
+                        <ul id="endpointModelList"><li class="endpoint-model-empty">No models loaded yet.</li></ul>
+                    </section>
+                </div>
+            </section>`;
+        document.body.appendChild(helper);
+    }
+
+    return { tabs, endpointToggle, helper };
+}
+
+function setEndpointStatus(message, state = 'idle', { includeBridgeStatus = false } = {}) {
+    const nodes = [document.getElementById('endpointStatus')];
+    if (includeBridgeStatus) nodes.push(document.getElementById('bridgeConnectionStatus'));
+    for (const node of nodes) {
+        if (!node) continue;
+        node.textContent = message;
+        node.dataset.state = state;
+    }
+}
+
+function setBridgeStatus(message, state = 'idle') {
+    const node = document.getElementById('bridgeConnectionStatus');
+    if (!node) return;
+    node.textContent = message;
+    node.dataset.state = state;
+}
+
+function syncBridgeConfigUi() {
+    const helper = window.SignalShareLocalLlm;
+    const bridgeUrl = helper?.getBridgeBaseUrl?.() || '';
+    const bridgeSecret = helper?.getBridgeSecret?.() || getBridgeSecret();
+    const localToken = helper?.getLocalLlmToken?.() || getLocalLlmToken();
+    const provider = helper?.getProviderPreference?.() || getAiProviderPreference();
+    const directBaseUrl = provider === 'auto'
+        ? ''
+        : helper?.getDirectEndpointBaseUrl?.(provider) || getCustomEndpointBaseUrl();
+    const values = new Map([
+        ['bridgeUrlInput', bridgeUrl],
+        ['endpointBridgeUrlInput', bridgeUrl],
+        ['sidebar-bridge-url', bridgeUrl],
+        ['bridgeSecretInput', bridgeSecret],
+        ['endpointBridgeSecretInput', bridgeSecret],
+        ['sidebar-bridge-secret', bridgeSecret],
+        ['localLlmTokenInput', localToken],
+        ['endpointLocalLlmTokenInput', localToken],
+        ['sidebar-local-llm-token', localToken],
+        ['aiProviderSelect', provider],
+        ['endpointCustomBaseUrlInput', directBaseUrl]
+    ]);
+    for (const [id, value] of values) {
+        const input = document.getElementById(id);
+        if (!input || document.activeElement === input) continue;
+        input.value = value;
+    }
+    document.querySelectorAll('[data-endpoint-provider]').forEach((button) => {
+        const active = button.dataset.endpointProvider === provider;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-endpoint-custom-url]').forEach((wrap) => {
+        wrap.hidden = provider === 'auto';
+    });
+    const directLabel = document.getElementById('endpointDirectBaseUrlLabel');
+    const directHelp = document.getElementById('endpointDirectBaseUrlHelp');
+    if (directLabel) {
+        directLabel.textContent = provider === 'lm-studio'
+            ? 'LM Studio endpoint URL'
+            : provider === 'ollama'
+                ? 'Ollama endpoint URL'
+                : 'OpenAI-compatible endpoint URL';
+    }
+    if (directHelp) {
+        directHelp.textContent = provider === 'ollama'
+            ? 'Direct browser connection. Default: http://127.0.0.1:11434'
+            : provider === 'lm-studio'
+                ? 'Direct browser connection. Default: http://127.0.0.1:1234/v1'
+                : 'Direct browser connection to a private or loopback /v1 API. Browser requests never include Bridge credentials.';
+    }
+}
+
+function saveBridgeConfigFromUi(source = document, { validateDirect = true } = {}) {
+    const helper = window.SignalShareLocalLlm;
+    const read = (...ids) => {
+        for (const id of ids) {
+            const node = source?.getElementById?.(id) || document.getElementById(id);
+            if (node) return `${node.value || ''}`.trim();
+        }
+        return '';
+    };
+    const bridgeUrl = read('endpointBridgeUrlInput', 'bridgeUrlInput', 'sidebar-bridge-url');
+    const bridgeSecret = read('endpointBridgeSecretInput', 'bridgeSecretInput', 'sidebar-bridge-secret');
+    const localToken = read('endpointLocalLlmTokenInput', 'localLlmTokenInput', 'sidebar-local-llm-token');
+    const provider = helper?.getProviderPreference?.() || getAiProviderPreference();
+    const directBaseUrl = read('endpointCustomBaseUrlInput');
+    const directInput = document.getElementById('endpointCustomBaseUrlInput');
+    const normalizedDirectBaseUrl = provider === 'auto' || !directBaseUrl
+        ? directBaseUrl
+        : helper?.normalizeDirectEndpointBaseUrl?.(directBaseUrl, provider) || '';
+    if (validateDirect && provider !== 'auto' && directBaseUrl && !normalizedDirectBaseUrl) {
+        directInput?.setAttribute('aria-invalid', 'true');
+        return {
+            directEndpointValid: false,
+            provider,
+            message: 'Use a private or loopback HTTP(S) endpoint URL without credentials, a query string, or a fragment.'
+        };
+    }
+    directInput?.removeAttribute('aria-invalid');
+    helper?.setBridgeBaseUrl?.(bridgeUrl);
+    helper?.setBridgeSecret?.(bridgeSecret);
+    helper?.setLocalLlmToken?.(localToken);
+    if (provider !== 'auto' && (normalizedDirectBaseUrl || !directBaseUrl)) {
+        helper?.setDirectEndpointBaseUrl?.(provider, normalizedDirectBaseUrl);
+    }
+    if (bridgeUrl || bridgeSecret || localToken) resolveBridgeBaseCandidates();
+    syncBridgeConfigUi();
+    return { directEndpointValid: true, provider };
+}
+
+function renderEndpointModels(models = []) {
+    const list = document.getElementById('endpointModelList');
+    if (!list) return;
+    list.replaceChildren();
+    if (!Array.isArray(models) || models.length === 0) {
+        const empty = document.createElement('li');
+        empty.className = 'endpoint-model-empty';
+        empty.textContent = 'No model is loaded for this endpoint.';
+        list.appendChild(empty);
+        return;
+    }
+    for (const row of models) {
+        const item = document.createElement('li');
+        const provider = `${row?.provider || 'local'}`.trim();
+        item.className = 'endpoint-model-row';
+        item.textContent = `${row?.id || 'Unnamed model'} · ${provider}${row?.chatCapable === false ? ' · embedding only' : ''}`;
+        list.appendChild(item);
+    }
+}
+
+async function testDirectEndpoint({ forceRefresh = false } = {}) {
+    const saved = saveBridgeConfigFromUi();
+    if (saved?.directEndpointValid === false) {
+        renderEndpointModels([]);
+        setEndpointStatus(saved.message, 'invalid');
+        return { available: false, reachable: false, models: [], invalid: true, message: saved.message };
+    }
+    setEndpointStatus('Testing the selected provider directly…', 'testing');
+    const provider = getAiProviderPreference();
+    const direct = await window.SignalShareLocalLlm?.discoverDirectModels?.({
+        provider,
+        timeoutMs: 5000,
+        forceRefresh
+    });
+    const details = direct || {
+        available: false,
+        reachable: false,
+        models: [],
+        message: 'Direct endpoint support is unavailable in this build.'
+    };
+    renderEndpointModels(details.models);
+    updateEngineStatus(Boolean(details.available), {
+        source: details.available ? 'direct' : 'offline',
+        reachable: details.reachable,
+        direct: details
+    });
+    setEndpointStatus(
+        details.message,
+        details.available ? 'online' : details.reachable ? 'no-model' : 'offline'
+    );
+    if (details.available) renderChatModelCatalog({ ...details, online: true, source: 'direct' });
+    return details;
+}
+
+async function testBridgeConnection({ forceRefresh = false, downloadOnFailure = false } = {}) {
+    saveBridgeConfigFromUi(document, { validateDirect: false });
+    setBridgeStatus('Testing the optional PC Bridge…', 'testing');
+    localStorage.setItem('ss_bridge_enabled', '1');
+    const details = await inspectBridgeConnectivity({ timeoutMs: 4000, forceRefresh });
+    lastBridgeStatusWasOnline = Boolean(details.online);
+    setBridgeStatus(
+        details.online
+            ? `${details.message} Desktop and PC tools are enabled through the Bridge.`
+            : details.message,
+        details.online ? 'online' : details.authFailed ? 'auth' : details.reachable ? 'no-model' : 'offline'
+    );
+    if (details.online) {
+        updateEngineStatus(true, { ...details, source: 'bridge' });
+        bridgePollFailureCount = 0;
+        bridgePollNextAllowedAt = 0;
+        renderChatModelCatalog({ ...details, source: 'bridge' });
+    } else if (downloadOnFailure && (!details.reachable || details.authFailed)) {
+        const setupLink = document.getElementById('endpointSetupLink') || document.querySelector('a[href$="setup-companion.bat"]');
+        setupLink?.click?.();
+        setBridgeStatus(
+            details.authFailed
+                ? 'Setup downloaded. Run it once to re-pair this browser with the optional PC Bridge.'
+                : 'Setup downloaded. Run it once; it will pair this browser and start the optional PC Bridge.',
+            'setup'
+        );
+    }
+    return details;
+}
+
+function setEndpointHelperOpen(open, { restoreFocus = false } = {}) {
+    const { endpointToggle, helper } = ensureArcadeEdgePanelUi();
+    const shouldOpen = Boolean(open);
+    if (shouldOpen && isChatOpen()) window.closeArcadeChat({ restoreFocus: false });
+    helper.classList.toggle('is-open', shouldOpen);
+    helper.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+    endpointToggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    document.body.classList.toggle('endpoint-helper-open', shouldOpen);
+    if (shouldOpen) {
+        syncBridgeConfigUi();
+        requestAnimationFrame(() => document.getElementById('endpointHelperClose')?.focus?.());
+    } else if (restoreFocus) {
+        endpointToggle.focus?.();
+    }
+}
+
+window.toggleEndpointHelper = function () {
+    const helper = ensureArcadeEdgePanelUi().helper;
+    setEndpointHelperOpen(!helper.classList.contains('is-open'), { restoreFocus: true });
+};
+
+window.openEndpointHelper = function () {
+    setEndpointHelperOpen(true);
+};
+
+window.closeEndpointHelper = function (options = {}) {
+    setEndpointHelperOpen(false, options);
+};
+
+function setupEndpointHelper() {
+    const { endpointToggle, helper } = ensureArcadeEdgePanelUi();
+    endpointToggle.addEventListener('click', window.toggleEndpointHelper);
+    document.getElementById('endpointHelperClose')?.addEventListener('click', () => window.closeEndpointHelper({ restoreFocus: true }));
+    document.getElementById('openEndpointHelperButton')?.addEventListener('click', () => {
+        document.getElementById('settingsCloseButton')?.click?.();
+        window.openEndpointHelper();
+    });
+    document.getElementById('endpointTestButton')?.addEventListener('click', () => void testDirectEndpoint());
+    document.getElementById('endpointRefreshButton')?.addEventListener('click', () => void testDirectEndpoint({ forceRefresh: true }));
+    document.getElementById('bridgeConnectButton')?.addEventListener('click', () => void testBridgeConnection({ forceRefresh: true, downloadOnFailure: true }));
+    document.querySelectorAll('[data-endpoint-provider]').forEach((button) => {
+        button.addEventListener('click', () => {
+            window.SignalShareLocalLlm?.setProviderPreference?.(button.dataset.endpointProvider || 'auto');
+            syncBridgeConfigUi();
+            void testDirectEndpoint({ forceRefresh: true });
+        });
+    });
+    for (const id of ['endpointBridgeUrlInput', 'endpointBridgeSecretInput', 'endpointLocalLlmTokenInput', 'endpointCustomBaseUrlInput']) {
+        document.getElementById(id)?.addEventListener('change', () => {
+            const saved = saveBridgeConfigFromUi(helper);
+            if (saved?.directEndpointValid === false) setEndpointStatus(saved.message, 'invalid');
+        });
+    }
+    window.addEventListener('signal-share:bridge-config-change', syncBridgeConfigUi);
+    window.addEventListener('storage', (event) => {
+        if (`${event.key || ''}`.startsWith('ss_') || `${event.key || ''}`.includes('bridge')) syncBridgeConfigUi();
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && helper.classList.contains('is-open')) window.closeEndpointHelper({ restoreFocus: true });
+    });
+    syncBridgeConfigUi();
+}
+
 
 function setupToggle() {
+    const { tabs, endpointToggle } = ensureArcadeEdgePanelUi();
     // Create toggle button regardless of mode, CSS will handle visibility
     if (!document.querySelector('.chat-toggle-btn')) {
         const btn = document.createElement('button');
 
         // Unified Tab Mode for all pages
         btn.className = 'chat-toggle-btn chat-tab-mode';
+        btn.type = 'button';
+        btn.setAttribute('aria-controls', 'arcadeCompanionSidebar');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.setAttribute('aria-label', 'Open Companion');
         btn.innerHTML = `
             <div class="tab-label" style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.7rem; font-weight: 800; letter-spacing: 2px; color: var(--arc-accent); text-transform: uppercase; pointer-events: none; margin-bottom: 12px; font-family: 'Inter', system-ui, sans-serif;">Companion</div>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="color: var(--arc-accent); pointer-events: none;">
@@ -4500,7 +5168,13 @@ function setupToggle() {
         `;
 
         btn.onclick = window.toggleChat;
-        document.body.appendChild(btn);
+        tabs.insertBefore(btn, endpointToggle || null);
+    } else {
+        const existingToggle = document.querySelector('.chat-toggle-btn');
+        existingToggle?.setAttribute('aria-controls', 'arcadeCompanionSidebar');
+        existingToggle?.setAttribute('aria-expanded', 'false');
+        existingToggle?.setAttribute('aria-label', 'Open Companion');
+        if (existingToggle?.parentElement !== tabs) tabs.insertBefore(existingToggle, endpointToggle || null);
     }
 }
 
@@ -4544,6 +5218,7 @@ function setupCloseParityHandlers() {
     }
     setupResizing();
     setupToggle();
+    setupEndpointHelper();
     setupCloseParityHandlers();
     setupChatModelSelect();
     startDesktopBridgePolling();
@@ -4815,10 +5490,10 @@ function getArcadeProtocolOfflineResponse(message) {
     }
 
     const fallbacks = [
-        "📶 [Signal Share]: My advanced logic core is currently out of range. Check if your companion bridge is running on your PC!",
-        "📡 [Signal Share]: Communication with the intelligence core is unstable. Ensure the bridge server is active and try again.",
-        "🌐 [Signal Share]: Sync failed. I'm running on cached data only. If you're on a real device, check your bridge settings!",
-        "💬 [Signal Share]: My logic processors are running local-only (bridge unreachable). I can still help with tips about the feed, messaging, media, and arcade!"
+        "📶 [Signal Share]: No local AI endpoint is reachable. Start LM Studio or Ollama, then check the Endpoints tab.",
+        "📡 [Signal Share]: The selected model endpoint is unavailable or blocked by browser CORS. The PC Bridge is optional for normal chat.",
+        "🌐 [Signal Share]: Sync failed, so I'm running on cached data only. Check the provider URL and load a model.",
+        "💬 [Signal Share]: The AI endpoint is offline. I can still help with cached tips about the feed, messaging, media, and Arcade."
     ];
 
     return fallbacks[Math.floor(Math.random() * fallbacks.length)];

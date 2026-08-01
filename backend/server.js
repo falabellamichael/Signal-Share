@@ -1,4 +1,6 @@
 import express from "express";
+import crypto from "node:crypto";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -13,26 +15,113 @@ const projectRoot = path.resolve(__dirname, "..");
 dotenv.config({ path: path.resolve(process.cwd(), "backend", ".env") });
 dotenv.config();
 
-import mediaController from "./controllers/mediaController.js";
-
 // Import strict AI tools for LLM/chat functionality
 import { createStrictAiTools } from "./strict-ai-tools.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
-const BRIDGE_SECRET = process.env.SIGNAL_SHARE_BRIDGE_SECRET || "";
-const LOCAL_LLM_TOKEN = process.env.SIGNAL_SHARE_LOCAL_LLM_TOKEN || "";
+const BRIDGE_SECRET = `${process.env.SIGNAL_SHARE_BRIDGE_SECRET || ""}`.trim();
+const LOCAL_LLM_TOKEN = `${process.env.SIGNAL_SHARE_LOCAL_LLM_TOKEN || ""}`.trim();
+const BRIDGE_DEVICE_ID = `${process.env.SIGNAL_SHARE_DEVICE_ID || ""}`.trim();
 
 const OLLAMA_BASE_URL = process.env.SIGNAL_SHARE_OLLAMA_BASE_URL || process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
 const DEFAULT_OLLAMA_MODEL = process.env.SIGNAL_SHARE_OLLAMA_MODEL || process.env.OLLAMA_MODEL || "llama3.1";
 const LM_STUDIO_BASE_URL = process.env.SIGNAL_SHARE_LM_STUDIO_BASE_URL || process.env.LM_STUDIO_BASE_URL || process.env.LMSTUDIO_BASE_URL || "http://127.0.0.1:1234";
 const LM_STUDIO_API_TOKEN = `${process.env.SIGNAL_SHARE_LM_STUDIO_API_TOKEN || process.env.LM_STUDIO_API_TOKEN || ""}`.trim();
+const OPENAI_COMPATIBLE_BASE_URL = `${process.env.SIGNAL_SHARE_AI_BASE_URL || process.env.SIGNAL_SHARE_OPENAI_COMPATIBLE_BASE_URL || ""}`.trim();
+const OPENAI_COMPATIBLE_API_TOKEN = `${process.env.SIGNAL_SHARE_AI_API_TOKEN || process.env.LM_API_TOKEN || ""}`.trim();
 const LM_STUDIO_MCP_CONFIG_PATH = path.join(os.homedir(), ".lmstudio", "mcp.json");
 const LM_STUDIO_MCP_CONTEXT_LENGTH = parseBoundedInteger(process.env.SIGNAL_SHARE_LM_STUDIO_MCP_CONTEXT_LENGTH, 8000, 1024, 131072);
 const LM_STUDIO_MAX_MCP_SELECTIONS = 16;
 const AI_TEMPERATURE = Number.isFinite(Number(process.env.SIGNAL_SHARE_AI_TEMPERATURE))
   ? Number(process.env.SIGNAL_SHARE_AI_TEMPERATURE)
   : 0.7;
+const BRIDGE_LAN_ENABLED = parseBoolean(process.env.SIGNAL_SHARE_BRIDGE_LAN, false);
+const BRIDGE_LISTEN_HOST = resolveBridgeListenHost();
+const DEFAULT_ALLOWED_ORIGINS = Object.freeze([
+  "https://falabellamichael.github.io",
+  "https://signalshare.io",
+  "https://www.signalshare.io",
+  "https://signal-share.pages.dev",
+  "capacitor://localhost",
+  "ionic://localhost"
+]);
+const EXTRA_ALLOWED_ORIGINS = `${process.env.SIGNAL_SHARE_ALLOWED_ORIGINS || ""}`
+  .split(",")
+  .map((value) => normalizeOrigin(value))
+  .filter(Boolean);
+const ALLOWED_ORIGINS = new Set([...DEFAULT_ALLOWED_ORIGINS, ...EXTRA_ALLOWED_ORIGINS]);
+const MAX_ATTACHMENT_DATA_URL_CHARS = 12 * 1024 * 1024;
+const MAX_ATTACHMENT_TEXT_CHARS = 12000;
+
+function parseBoolean(value, fallback = false) {
+  const normalized = `${value ?? ""}`.trim().toLowerCase();
+  if (["1", "true", "yes", "on", "enabled"].includes(normalized)) return true;
+  if (["0", "false", "no", "off", "disabled"].includes(normalized)) return false;
+  return fallback;
+}
+
+function isLoopbackBindHost(value = "") {
+  const host = `${value || ""}`.trim().toLowerCase();
+  return host === "127.0.0.1" || host === "localhost" || host === "::1" || host === "[::1]";
+}
+
+function resolveBridgeListenHost() {
+  const requestedHost = `${process.env.SIGNAL_SHARE_BRIDGE_BIND || ""}`.trim();
+  const hasCredential = Boolean(BRIDGE_SECRET || LOCAL_LLM_TOKEN);
+  if (requestedHost && isLoopbackBindHost(requestedHost)) return requestedHost;
+  if (BRIDGE_LAN_ENABLED && hasCredential) return requestedHost || "0.0.0.0";
+  if (requestedHost && !isLoopbackBindHost(requestedHost)) {
+    console.warn("[Bridge] Ignoring non-loopback bind: LAN mode requires an explicit opt-in and a configured credential.");
+  }
+  if (BRIDGE_LAN_ENABLED && !hasCredential) {
+    console.warn("[Bridge] LAN mode requested without a bridge secret or local LLM token; using loopback only.");
+  }
+  return "127.0.0.1";
+}
+
+function normalizeOrigin(value = "") {
+  const raw = `${value || ""}`.trim();
+  if (!raw) return "";
+  try {
+    return new URL(raw).origin;
+  } catch (_error) {
+    return "";
+  }
+}
+
+function isAllowedOrigin(origin = "") {
+  const raw = `${origin || ""}`.trim();
+  if (!raw) return true;
+  if (ALLOWED_ORIGINS.has(raw)) return true;
+  try {
+    const url = new URL(raw);
+    const protocol = url.protocol.toLowerCase();
+    const hostname = url.hostname.toLowerCase();
+    if ((protocol === "http:" || protocol === "https:")
+      && (hostname === "localhost" || hostname.endsWith(".localhost") || hostname === "127.0.0.1" || hostname === "::1")) {
+      return true;
+    }
+  } catch (_error) {
+    return false;
+  }
+  return false;
+}
+
+function isTrustedLocalOrigin(origin = "") {
+  const raw = `${origin || ""}`.trim();
+  if (!raw) return true;
+  if (raw === "capacitor://localhost" || raw === "ionic://localhost") return true;
+  try {
+    const url = new URL(raw);
+    const protocol = url.protocol.toLowerCase();
+    const hostname = url.hostname.toLowerCase();
+    return (protocol === "http:" || protocol === "https:")
+      && (hostname === "localhost" || hostname.endsWith(".localhost") || hostname === "127.0.0.1" || hostname === "::1");
+  } catch (_error) {
+    return false;
+  }
+}
 
 function parseBoundedInteger(value, fallback, minimum, maximum) {
   const parsed = Number(value);
@@ -119,6 +208,117 @@ function normalizeBaseUrl(value = "") {
   }
 }
 
+function normalizeProvider(value = "auto") {
+  const provider = `${value || "auto"}`.trim().toLowerCase();
+  const aliases = {
+    auto: "auto",
+    lmstudio: "lm-studio",
+    "lm-studio": "lm-studio",
+    ollama: "ollama",
+    openai: "openai-compatible",
+    "openai-compatible": "openai-compatible"
+  };
+  return aliases[provider] || "";
+}
+
+function isPrivateOrLoopbackHostname(hostname = "") {
+  const host = `${hostname || ""}`.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  if (!host) return false;
+  if (host === "localhost" || host.endsWith(".localhost") || host === "::1") return true;
+  if (/^127(?:\.\d{1,3}){3}$/.test(host)) return true;
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const octets = ipv4.slice(1).map(Number);
+    if (octets.some((part) => part < 0 || part > 255)) return false;
+    if (octets[0] === 10 || octets[0] === 127) return true;
+    if (octets[0] === 192 && octets[1] === 168) return true;
+    if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return true;
+    return false;
+  }
+  return host.startsWith("fc") || host.startsWith("fd");
+}
+
+function normalizePrivateEndpointBaseUrl(value = "") {
+  const raw = `${value || ""}`.trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `http://${raw}`);
+    if (!["http:", "https:"].includes(url.protocol.toLowerCase())) return "";
+    if (url.username || url.password || url.search || url.hash) return "";
+    if (!isPrivateOrLoopbackHostname(url.hostname)) return "";
+    return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
+  } catch (_error) {
+    return "";
+  }
+}
+
+function buildProviderUrl(baseUrl = "", pathname = "") {
+  const base = normalizeBaseUrl(baseUrl);
+  if (!base) return "";
+  const url = new URL(`${base}/`);
+  const prefix = url.pathname.replace(/\/+$/, "");
+  let suffix = `/${`${pathname || ""}`.replace(/^\/+/, "")}`;
+  if (prefix.endsWith("/v1") && suffix.startsWith("/v1/")) suffix = suffix.slice(3);
+  if (prefix.endsWith("/api") && suffix.startsWith("/api/")) suffix = suffix.slice(4);
+  url.pathname = `${prefix}${suffix}`.replace(/\/{2,}/g, "/");
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+function getOpenAiCompatibleHeaders(provider = "lm-studio") {
+  const token = provider === "openai-compatible" ? OPENAI_COMPATIBLE_API_TOKEN : LM_STUDIO_API_TOKEN;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function getProviderCatalogTargets(provider = "auto", endpointBaseUrl = "") {
+  const selectedProvider = normalizeProvider(provider);
+  if (!selectedProvider) {
+    throw new Error("Unsupported AI provider. Choose auto, lm-studio, ollama, or openai-compatible.");
+  }
+  const requestedBase = `${endpointBaseUrl || ""}`.trim();
+  const privateBase = requestedBase ? normalizePrivateEndpointBaseUrl(requestedBase) : "";
+  if (requestedBase && !privateBase) {
+    throw new Error("Custom AI endpoints must be private or loopback HTTP(S) URLs without credentials, query parameters, or fragments.");
+  }
+
+  const targets = [];
+  const addOpenAi = (id, label, base, tokenProvider = id) => {
+    const normalizedBase = normalizeBaseUrl(base);
+    if (!normalizedBase) return;
+    targets.push({
+      id,
+      label,
+      type: "openai-compatible",
+      baseUrl: normalizedBase,
+      headers: getOpenAiCompatibleHeaders(tokenProvider)
+    });
+  };
+  const addOllama = (base) => {
+    const normalizedBase = normalizeBaseUrl(base);
+    if (!normalizedBase) return;
+    targets.push({ id: "ollama", label: "Ollama", type: "ollama", baseUrl: normalizedBase, headers: {} });
+  };
+
+  if (privateBase) {
+    if (selectedProvider === "auto" || selectedProvider === "lm-studio") {
+      addOpenAi(selectedProvider === "auto" ? "openai-compatible" : "lm-studio", selectedProvider === "auto" ? "OpenAI-compatible" : "LM Studio", privateBase, selectedProvider === "auto" ? "openai-compatible" : "lm-studio");
+    }
+    if (selectedProvider === "auto" || selectedProvider === "ollama") addOllama(privateBase);
+    if (selectedProvider === "openai-compatible") addOpenAi("openai-compatible", "OpenAI-compatible", privateBase, "openai-compatible");
+    return targets;
+  }
+
+  if (selectedProvider === "auto" || selectedProvider === "lm-studio") {
+    addOpenAi("lm-studio", "LM Studio", LM_STUDIO_BASE_URL, "lm-studio");
+  }
+  if (selectedProvider === "auto" || selectedProvider === "ollama") addOllama(OLLAMA_BASE_URL);
+  if (selectedProvider === "auto" || selectedProvider === "openai-compatible") {
+    addOpenAi("openai-compatible", "OpenAI-compatible", OPENAI_COMPATIBLE_BASE_URL, "openai-compatible");
+  }
+  return targets;
+}
+
 function normalizeConversationId(value = "") {
   return `${value || ""}`.trim();
 }
@@ -145,7 +345,90 @@ function sanitizeHistoryForConversation(history, conversationId = "") {
     .slice(-12);
 }
 
-function buildMessages({ message = "", history = [], pageContext = "", customInstructions = "", conversationId = "" } = {}) {
+function parseAttachmentDataUrl(value = "") {
+  const dataUrl = `${value || ""}`.trim();
+  if (!dataUrl) return null;
+  if (dataUrl.length > MAX_ATTACHMENT_DATA_URL_CHARS) {
+    throw new Error("The attachment is too large for the local companion bridge (12 MB data limit).");
+  }
+  const match = dataUrl.match(/^data:([^;,\s]+)?((?:;[^,]*)*?),(.*)$/is);
+  if (!match) return null;
+  const mimeType = `${match[1] || "application/octet-stream"}`.toLowerCase();
+  const attributes = `${match[2] || ""}`.toLowerCase();
+  const payload = `${match[3] || ""}`;
+  const isBase64 = attributes.split(";").includes("base64");
+  return { dataUrl, mimeType, payload, isBase64 };
+}
+
+function normalizeAttachment(attachment) {
+  if (!attachment || typeof attachment !== "object") return null;
+  const name = `${attachment.name || "attachment"}`.replace(/[\r\n\t]+/g, " ").trim().slice(0, 160) || "attachment";
+  const parsed = parseAttachmentDataUrl(attachment.data);
+  const declaredKind = `${attachment.type || "file"}`.trim().toLowerCase();
+  const mimeType = parsed?.mimeType || `${attachment.mimeType || ""}`.trim().toLowerCase();
+  const kind = mimeType.startsWith("image/")
+    ? "image"
+    : mimeType.startsWith("text/") || ["application/json", "application/xml", "application/javascript"].includes(mimeType)
+      ? "text"
+      : ["image", "text", "file", "audio", "video"].includes(declaredKind) ? declaredKind : "file";
+  let textContent = "";
+  if (parsed && kind === "text") {
+    try {
+      textContent = parsed.isBase64
+        ? Buffer.from(parsed.payload.replace(/\s+/g, ""), "base64").toString("utf8")
+        : decodeURIComponent(parsed.payload.replace(/\+/g, "%20"));
+      textContent = textContent.replace(/\0/g, "").slice(0, MAX_ATTACHMENT_TEXT_CHARS);
+    } catch (_error) {
+      textContent = "";
+    }
+  }
+  const imageDataUrl = parsed && kind === "image" ? parsed.dataUrl : "";
+  const ollamaImage = parsed && kind === "image" && parsed.isBase64
+    ? parsed.payload.replace(/\s+/g, "")
+    : "";
+  return {
+    name,
+    kind,
+    mimeType: mimeType || "application/octet-stream",
+    textContent,
+    imageDataUrl,
+    ollamaImage
+  };
+}
+
+function describeAttachmentForModel(attachment) {
+  if (!attachment) return "";
+  if (attachment.kind === "text" && attachment.textContent) {
+    return `Attached text file: ${attachment.name} (${attachment.mimeType}).\n\n${attachment.textContent}`;
+  }
+  if (attachment.kind === "image" && attachment.imageDataUrl) {
+    return `Attached image: ${attachment.name} (${attachment.mimeType}). Inspect the image if this model supports vision; otherwise state that limitation.`;
+  }
+  return `Attached file metadata: ${attachment.name} (${attachment.mimeType}, ${attachment.kind}). The file content is not available to this model, so do not claim to have inspected it.`;
+}
+
+function addOpenAiAttachment(messages, attachment) {
+  if (!attachment?.imageDataUrl) return messages;
+  const cloned = messages.map((entry) => ({ ...entry }));
+  const lastUserIndex = cloned.findLastIndex((entry) => entry.role === "user");
+  if (lastUserIndex < 0) return cloned;
+  const text = typeof cloned[lastUserIndex].content === "string" ? cloned[lastUserIndex].content : "Inspect the attached image.";
+  cloned[lastUserIndex].content = [
+    { type: "text", text },
+    { type: "image_url", image_url: { url: attachment.imageDataUrl } }
+  ];
+  return cloned;
+}
+
+function addOllamaAttachment(messages, attachment) {
+  if (!attachment?.ollamaImage) return messages;
+  const cloned = messages.map((entry) => ({ ...entry }));
+  const lastUserIndex = cloned.findLastIndex((entry) => entry.role === "user");
+  if (lastUserIndex >= 0) cloned[lastUserIndex].images = [attachment.ollamaImage];
+  return cloned;
+}
+
+function buildMessages({ message = "", history = [], pageContext = "", customInstructions = "", conversationId = "", attachment = null } = {}) {
   const messages = [];
   messages.push({ role: "system", content: `You are a helpful assistant for Signal Share — a social platform.` });
   messages.push({ role: "system", content: "Never emit [LIST_FILES], [READ_FILE], or [WRITE_FILE] action tags. File MCP tools are available only when explicitly authorized for the current user request." });
@@ -159,8 +442,11 @@ function buildMessages({ message = "", history = [], pageContext = "", customIns
     messages.push(entry);
   }
   const userMessage = `${message || ""}`.trim();
+  const attachmentContext = describeAttachmentForModel(attachment);
   if (userMessage) {
-    messages.push({ role: "user", content: userMessage });
+    messages.push({ role: "user", content: [userMessage, attachmentContext].filter(Boolean).join("\n\n") });
+  } else if (attachmentContext) {
+    messages.push({ role: "user", content: attachmentContext });
   } else if (!messages.some(m => m.role === "user")) {
     messages.push({ role: "user", content: "Continue" });
   }
@@ -182,46 +468,13 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 180000) {
   }
 }
 
-async function getProviderCandidates(model = "auto", { lmStudioMcpIntegrations = [] } = {}) {
-  const candidates = [];
-  const lmStudioBase = normalizeBaseUrl(LM_STUDIO_BASE_URL);
-  const lmStudioModels = await getLmStudioModelIds();
-  if (lmStudioBase && lmStudioModels.length > 0) {
-    if (isLmStudioMcpReady(lmStudioMcpIntegrations)) {
-      candidates.push({
-        id: "lm-studio-mcp",
-        type: "lm-studio-mcp",
-        model: model === "auto" ? lmStudioModels[0] : model,
-        providerLabel: "LM Studio MCP provider"
-      });
-      return candidates;
-    }
-    candidates.push({
-      id: "lm-studio",
-      type: "openai-compatible",
-      chatUrl: `${lmStudioBase}/v1/chat/completions`,
-      model: model === "auto" ? lmStudioModels[0] : model,
-      providerLabel: "LM Studio provider"
-    });
-  }
-  const ollamaModels = await getOllamaModelIds();
-  if (ollamaModels.length > 0) {
-    candidates.push({
-      id: "ollama",
-      type: "ollama",
-      model: model === "auto" ? ollamaModels[0] : model
-    });
-  }
-  return candidates;
-}
-
-async function getLmStudioModelIds() {
-  const base = normalizeBaseUrl(LM_STUDIO_BASE_URL);
+async function getOpenAiCompatibleModelIds(baseUrl = LM_STUDIO_BASE_URL, headers = getLmStudioRequestHeaders()) {
+  const base = normalizeBaseUrl(baseUrl);
   if (!base) return [];
   try {
-    const response = await fetchWithTimeout(`${base}/v1/models`, {
+    const response = await fetchWithTimeout(buildProviderUrl(base, "/v1/models"), {
       method: "GET",
-      headers: getLmStudioRequestHeaders()
+      headers
     }, 1500);
     if (!response.ok) return [];
     const data = await response.json().catch(() => null);
@@ -234,11 +487,15 @@ async function getLmStudioModelIds() {
   }
 }
 
-async function getOllamaModelIds() {
-  const base = normalizeBaseUrl(OLLAMA_BASE_URL);
+async function getLmStudioModelIds(baseUrl = LM_STUDIO_BASE_URL) {
+  return getOpenAiCompatibleModelIds(baseUrl, getLmStudioRequestHeaders());
+}
+
+async function getOllamaModelIds(baseUrl = OLLAMA_BASE_URL) {
+  const base = normalizeBaseUrl(baseUrl);
   if (!base) return [];
   try {
-    const response = await fetchWithTimeout(`${base}/api/tags`, { method: "GET" }, 1500);
+    const response = await fetchWithTimeout(buildProviderUrl(base, "/api/tags"), { method: "GET" }, 1500);
     if (!response.ok) return [];
     const data = await response.json().catch(() => null);
     const models = Array.isArray(data?.models) ? data.models : [];
@@ -250,17 +507,62 @@ async function getOllamaModelIds() {
   }
 }
 
-async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperature }) {
+async function probeProviderTarget(target) {
+  const models = target.type === "ollama"
+    ? await getOllamaModelIds(target.baseUrl)
+    : await getOpenAiCompatibleModelIds(target.baseUrl, target.headers);
+  return { ...target, models, available: models.length > 0 };
+}
+
+async function getProviderCandidates(model = "auto", {
+  provider = "auto",
+  endpointBaseUrl = "",
+  lmStudioMcpIntegrations = []
+} = {}) {
+  const selectedProvider = normalizeProvider(provider);
+  if (!selectedProvider) {
+    throw new Error("Unsupported AI provider. Choose auto, lm-studio, ollama, or openai-compatible.");
+  }
+  if (lmStudioMcpIntegrations.length > 0 && !["auto", "lm-studio"].includes(selectedProvider)) {
+    throw new Error("LM Studio MCP tools can only be used with the LM Studio provider.");
+  }
+  const targets = getProviderCatalogTargets(selectedProvider, endpointBaseUrl);
+  const probes = await Promise.all(targets.map((target) => probeProviderTarget(target)));
+  const candidates = [];
+  for (const target of probes) {
+    if (!target.available) continue;
+    const selectedModel = `${model || "auto"}`.trim() === "auto" ? target.models[0] : `${model}`.trim();
+    if (target.id === "lm-studio" && isLmStudioMcpReady(lmStudioMcpIntegrations)) {
+      candidates.push({
+        id: "lm-studio-mcp",
+        type: "lm-studio-mcp",
+        baseUrl: target.baseUrl,
+        model: selectedModel,
+        providerLabel: "LM Studio MCP provider"
+      });
+      return candidates;
+    }
+    candidates.push({
+      ...target,
+      model: selectedModel,
+      providerLabel: `${target.label} provider`
+    });
+  }
+  return candidates;
+}
+
+async function callOpenAiCompatibleProvider({ baseUrl, headers = {}, messages, model, temperature, providerLabel = "OpenAI-compatible provider" }) {
   const selectedModel = `${model || ""}`.trim();
+  const chatUrl = buildProviderUrl(baseUrl, "/v1/chat/completions");
   if (!chatUrl || !selectedModel) {
-    throw new Error("LM Studio chat model is unavailable.");
+    throw new Error(`${providerLabel} chat model is unavailable.`);
   }
 
   const response = await fetchWithTimeout(chatUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...getLmStudioRequestHeaders()
+      ...headers
     },
     body: JSON.stringify({
       model: selectedModel,
@@ -271,7 +573,7 @@ async function callOpenAiCompatibleProvider({ chatUrl, messages, model, temperat
   });
   const raw = await response.text();
   if (!response.ok) {
-    throw new Error(`LM Studio provider returned HTTP ${response.status}: ${raw.slice(0, 240)}`);
+    throw new Error(`${providerLabel} returned HTTP ${response.status}: ${raw.slice(0, 240)}`);
   }
 
   const data = JSON.parse(raw);
@@ -344,8 +646,8 @@ function extractLmStudioMcpReply(data) {
   return "";
 }
 
-async function callLmStudioMcpProvider({ messages, model, temperature, integrations = [] }) {
-  const base = normalizeBaseUrl(LM_STUDIO_BASE_URL);
+async function callLmStudioMcpProvider({ baseUrl = LM_STUDIO_BASE_URL, messages, model, temperature, integrations = [] }) {
+  const base = normalizeBaseUrl(baseUrl);
   const selectedModel = `${model || ""}`.trim();
   if (!base || !selectedModel) {
     throw new Error("LM Studio MCP chat model is unavailable.");
@@ -354,7 +656,7 @@ async function callLmStudioMcpProvider({ messages, model, temperature, integrati
     throw new Error("LM Studio MCP tools require a user selection and an API token.");
   }
 
-  const response = await fetchWithTimeout(`${base}/api/v1/chat`, {
+  const response = await fetchWithTimeout(buildProviderUrl(base, "/api/v1/chat"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -384,16 +686,16 @@ async function callLmStudioMcpProvider({ messages, model, temperature, integrati
   return reply;
 }
 
-async function callOllamaProvider({ messages, model, temperature }) {
-  const base = normalizeBaseUrl(OLLAMA_BASE_URL);
+async function callOllamaProvider({ baseUrl = OLLAMA_BASE_URL, messages, model, temperature }) {
+  const base = normalizeBaseUrl(baseUrl);
   if (!base) throw new Error("Ollama base URL is not configured.");
-  const availableModels = await getOllamaModelIds();
+  const availableModels = await getOllamaModelIds(base);
   const requested = `${model || ""}`.trim();
   const selectedModel = requested && requested !== "auto"
     ? requested
     : (availableModels[0] || DEFAULT_OLLAMA_MODEL);
   if (!selectedModel) throw new Error("No Ollama model is available.");
-  const response = await fetchWithTimeout(`${base}/api/chat`, {
+  const response = await fetchWithTimeout(buildProviderUrl(base, "/api/chat"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -418,9 +720,21 @@ async function callOllamaProvider({ messages, model, temperature }) {
   return data?.message?.content || data?.response || "";
 }
 
-async function getChatResponse({ message, history, pageContext, customInstructions, conversationId, model, lmStudioMcpIntegrations = [] } = {}) {
-  const messages = buildMessages({ message, history, pageContext, customInstructions, conversationId });
-  const providers = await getProviderCandidates(model, { lmStudioMcpIntegrations });
+async function getChatResponse({
+  message,
+  history,
+  pageContext,
+  customInstructions,
+  conversationId,
+  attachment,
+  model,
+  provider = "auto",
+  endpointBaseUrl = "",
+  lmStudioMcpIntegrations = []
+} = {}) {
+  const normalizedAttachment = normalizeAttachment(attachment);
+  const messages = buildMessages({ message, history, pageContext, customInstructions, conversationId, attachment: normalizedAttachment });
+  const providers = await getProviderCandidates(model, { provider, endpointBaseUrl, lmStudioMcpIntegrations });
   if (lmStudioMcpIntegrations.length > 0 && !providers.some((provider) => provider.type === "lm-studio-mcp")) {
     throw new Error("Selected LM Studio MCP tools require a running LM Studio server with an available chat model.");
   }
@@ -432,21 +746,25 @@ async function getChatResponse({ message, history, pageContext, customInstructio
   for (const provider of providers) {
     try {
       const reply = provider.type === "lm-studio-mcp"
-        ? await callLmStudioMcpProvider({
+          ? await callLmStudioMcpProvider({
+            baseUrl: provider.baseUrl,
             messages,
             model: provider.model,
             temperature: AI_TEMPERATURE,
             integrations: lmStudioMcpIntegrations
           })
-        : provider.type === "openai-compatible"
+          : provider.type === "openai-compatible"
           ? await callOpenAiCompatibleProvider({
-            chatUrl: provider.chatUrl,
-            messages,
+            baseUrl: provider.baseUrl,
+            headers: provider.headers,
+            messages: addOpenAiAttachment(messages, normalizedAttachment),
             model: provider.model,
-            temperature: AI_TEMPERATURE
+            temperature: AI_TEMPERATURE,
+            providerLabel: provider.providerLabel
           })
         : await callOllamaProvider({
-            messages,
+            baseUrl: provider.baseUrl,
+            messages: addOllamaAttachment(messages, normalizedAttachment),
             model: provider.model,
             temperature: AI_TEMPERATURE
           });
@@ -463,104 +781,55 @@ async function getChatResponse({ message, history, pageContext, customInstructio
 const STRICT_TOOL_POLICY = `STRICT TOOL USAGE: Only respond when explicitly requested with /publish or matching intent. Otherwise, respond conversationally.`;
 
 function hasAuthorizedBridgeCredential(req) {
-  const bridgeSecret = req.headers["x-bridge-secret"] || req.headers["X-Bridge-Secret"] || "";
-  const localToken = req.headers["x-local-llm-token"] || req.headers["X-Local-LLM-Token"] || "";
-  return Boolean((BRIDGE_SECRET && bridgeSecret === BRIDGE_SECRET) || (LOCAL_LLM_TOKEN && localToken === LOCAL_LLM_TOKEN));
+  const bridgeSecret = `${req.get("x-bridge-secret") || ""}`;
+  const localToken = `${req.get("x-local-llm-token") || ""}`;
+  const deviceId = `${req.get("x-device-id") || ""}`;
+  const matches = (actual, expected) => {
+    if (!actual || !expected) return false;
+    const actualBuffer = Buffer.from(actual);
+    const expectedBuffer = Buffer.from(expected);
+    return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+  };
+  const credentialMatches = matches(bridgeSecret, BRIDGE_SECRET) || matches(localToken, LOCAL_LLM_TOKEN);
+  if (!credentialMatches) return false;
+  return !BRIDGE_DEVICE_ID || matches(deviceId, BRIDGE_DEVICE_ID);
 }
 
 function isAuthorized(req) {
-  const isLoopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
-  if (isLoopback) return true;
-  if (!BRIDGE_SECRET && !LOCAL_LLM_TOKEN) return true;
-  return hasAuthorizedBridgeCredential(req);
+  const remoteAddress = `${req.socket?.remoteAddress || req.ip || ""}`.toLowerCase();
+  const isLoopback = remoteAddress === "127.0.0.1" || remoteAddress === "::1" || remoteAddress === "::ffff:127.0.0.1";
+  if (hasAuthorizedBridgeCredential(req)) return true;
+  const origin = `${req.get("origin") || ""}`.trim();
+  if (origin) {
+    if (BRIDGE_SECRET || LOCAL_LLM_TOKEN) return false;
+    if (!isTrustedLocalOrigin(origin)) return false;
+  }
+  return isLoopback;
 }
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 app.use((req, res, next) => {
-  const origin = req.headers.origin || "";
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, x-bridge-secret, X-Local-LLM-Token, x-local-llm-token, Authorization, Target-Address-Space");
+  const origin = `${req.headers.origin || ""}`.trim();
+  if (origin && !isAllowedOrigin(origin)) {
+    return res.status(403).json({ ok: false, error: "This web origin is not allowed to use the companion bridge." });
+  }
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Secret, X-Local-LLM-Token, X-Device-Id, Authorization, Target-Address-Space, Access-Control-Request-Private-Network");
   res.setHeader("Access-Control-Allow-Private-Network", "true");
-  if (req.method === "OPTIONS") return res.status(200).end();
+  res.setHeader("Access-Control-Max-Age", "600");
+  if (req.method === "OPTIONS") return res.status(204).end();
   next();
 });
 
 // Initialize strict AI tools router after shared parsing and CORS middleware.
 const strictAiTools = createStrictAiTools({ isAuthorized, fetchWithTimeout });
 app.use(strictAiTools.router);
-
-// Media action endpoint for Play/Pause, Next/Previous commands
-app.post("/api/system/media/action", async (req, res) => {
-  try {
-    const { action } = req.body || {};
-    
-    if (!action) {
-      return res.status(400).json({ ok: false, error: "Action parameter is required" });
-    }
-
-    console.log(`[Media] Received command for action: ${action}`);
-    
-    const result = await mediaController.executeMediaAction(action);
-    
-    if (result.ok) {
-      return res.json({ 
-        ok: true, 
-        message: `Successfully executed ${action}`,
-        sessionId: result.sessionId || 'unknown',
-        sourceAppId: result.sourceAppId || ''
-      });
-    } else {
-      return res.status(500).json({ 
-        ok: false, 
-        error: result.error || "Media action failed",
-        details: result.details || null
-      });
-    }
-  } catch (error) {
-    console.error("[Media] Action endpoint error:", error.message);
-    return res.status(500).json({ 
-      ok: false, 
-      error: `Failed to execute media action: ${error.message}` 
-    });
-  }
-});
-
-// New endpoint for opening media URIs (Spotify links, Phone Link)
-app.post("/api/system/media/open-uri", async (req, res) => {
-  try {
-    const { uri } = req.body || {};
-    
-    if (!uri) {
-      return res.status(400).json({ ok: false, error: "URI parameter is required" });
-    }
-
-    console.log(`[Media] Opening URI: ${uri}`);
-    
-    const result = await mediaController.openMediaUri(uri);
-    
-    if (result.ok) {
-      return res.json({ 
-        ok: true, 
-        message: `Opened ${uri}`,
-        openedUri: result.openedUri || ''
-      });
-    } else {
-      return res.status(500).json({ 
-        ok: false, 
-        error: result.error || "Failed to open URI" 
-      });
-    }
-  } catch (error) {
-    console.error("[Media] Open URI endpoint error:", error.message);
-    return res.status(500).json({ 
-      ok: false, 
-      error: `Failed to open media URI: ${error.message}` 
-    });
-  }
-});
 
 // SMTC Query handler (existing functionality)
 let smtcCache = { timestamp: 0, data: null, pendingPromise: null };
@@ -628,21 +897,35 @@ function mapPlaybackState(playbackStatus) {
   }
 }
 
-async function getLocalModelCatalog() {
-  const lmStudioModels = await getLmStudioModelIds();
-  const ollamaModels = await getOllamaModelIds();
-  const rows = [];
-  for (const modelId of lmStudioModels) rows.push({ id: modelId, provider: "lm-studio" });
-  for (const modelId of ollamaModels) rows.push({ id: modelId, provider: "ollama" });
+async function getLocalModelCatalog({ provider = "auto", endpointBaseUrl = "" } = {}) {
+  const selectedProvider = normalizeProvider(provider);
+  if (!selectedProvider) {
+    throw new Error("Unsupported AI provider. Choose auto, lm-studio, ollama, or openai-compatible.");
+  }
+  const targets = getProviderCatalogTargets(selectedProvider, endpointBaseUrl);
+  const probes = await Promise.all(targets.map((target) => probeProviderTarget(target)));
+  const rows = probes.flatMap((target) => target.models.map((modelId) => ({ id: modelId, provider: target.id })));
   return {
-    all: [...lmStudioModels, ...ollamaModels],
+    selectedProvider,
+    all: [...new Set(rows.map((row) => row.id))],
     rows,
-    configured: rows.length > 0,
+    configured: targets.length > 0,
+    available: rows.length > 0,
+    providers: probes.map((target) => ({
+      id: target.id,
+      label: target.label,
+      baseUrl: target.baseUrl,
+      configured: true,
+      available: target.available,
+      status: target.available ? "ready" : "no-model",
+      models: target.models
+    })),
     checkedAt: new Date().toISOString()
   };
 }
 
 app.get("/api/system-media/current", async (req, res) => {
+  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized bridge request." });
   const isWindows = process.platform === "win32";
   const base = { source: "windows-smtc", available: isWindows, active: false, playbackState: "none", title: "", meta: "", appPackage: "", smtcHealthy: isWindows, smtcFailureCount: 0, smtcError: "" };
   
@@ -697,13 +980,21 @@ app.get("/api/system-media/current", async (req, res) => {
   }
 });
 
-app.get("/api/system/tabs", (_req, res) => {
+app.get("/api/system/tabs", (req, res) => {
+  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized bridge request." });
   res.json({ tabs: [] });
 });
 
 app.get("/api/health", async (_req, res) => {
   const catalog = await getLocalModelCatalog();
-  res.json({ ok: true, configured: catalog.configured, service: "Signal Share Backend", time: new Date().toISOString() });
+  res.json({
+    ok: true,
+    configured: catalog.configured,
+    aiAvailable: catalog.available,
+    service: "Signal Share Companion",
+    bindHost: BRIDGE_LISTEN_HOST,
+    time: new Date().toISOString()
+  });
 });
 
 // Strict chat tool enforcement (existing functionality)
@@ -745,20 +1036,19 @@ async function postLocalStrictTool(pathname, body = {}) {
   return data;
 }
 
-app.use((req, res, next) => {
-  const origin = req.headers.origin || "";
-  const isWhitelisted = origin && ["https://signal-share.pages.dev", "http://localhost"].some(allowed => origin.startsWith(allowed));
-  res.setHeader("Access-Control-Allow-Origin", isWhitelisted ? (origin || "*") : "*");
-  if (req.method === "OPTIONS") return res.status(200).end();
-  next();
-});
-
 async function handleChatRoute(req, res) {
   try {
     if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized bridge request." });
-    const { message, history, pageContext, attachment, model, customInstructions, lmStudioMcpTools } = req.body || {};
+    const { message, history, pageContext, attachment, model, customInstructions, lmStudioMcpTools, endpointBaseUrl } = req.body || {};
+    const requestedProvider = normalizeProvider(req.body?.provider || "auto");
     const conversationId = normalizeConversationId(req.body?.conversationId || req.body?.chatId || "");
-    if (!message && (!Array.isArray(history) || history.length === 0)) {
+    if (!requestedProvider) {
+      return res.status(400).json({ ok: false, error: "Unsupported AI provider. Choose auto, lm-studio, ollama, or openai-compatible." });
+    }
+    if (`${endpointBaseUrl || ""}`.trim() && !normalizePrivateEndpointBaseUrl(endpointBaseUrl)) {
+      return res.status(400).json({ ok: false, error: "Custom AI endpoints must be private or loopback HTTP(S) URLs without credentials, query parameters, or fragments." });
+    }
+    if (!message && !attachment && (!Array.isArray(history) || history.length === 0)) {
       return res.status(400).json({ ok: false, error: "No message provided." });
     }
     const requestedLmStudioMcpTools = normalizeLmStudioMcpSelection(lmStudioMcpTools);
@@ -783,39 +1073,30 @@ async function handleChatRoute(req, res) {
       }
     }
 
-    // Check for media actions first
-    const intent = normalizeIntentText(message);
-    const mediaActions = ["play", "pause", "next", "previous", "spotify", "youtube"];
-    if (mediaActions.some(action => intent.includes(action.toLowerCase()))) {
-      await handleStrictChatToolTurn(req, res, message);
-    } else if (intent.startsWith("open ")) {
-        const app = intent.split(/\s+/)[1].toLowerCase();
-        if (app === "spotify") {
-            const result = await mediaController.openMediaUri("spotify:");
-            return res.json({ ok: true, reply: `Opening Spotify in your default player...`, strictTool: true });
-        }
-    } else {
-      // Call AI chat endpoint
-      try {
-        const reply = await getChatResponse({
-          message,
-          history,
-          pageContext,
-          customInstructions,
-          conversationId,
-          model,
-          lmStudioMcpIntegrations
-        });
-        return res.json({ ok: true, reply });
-      } catch (chatError) {
-        console.warn("[Chat] AI endpoint error:", chatError.message);
-        return res.status(503).json({ 
-          ok: false, 
-          error: chatError?.message || "AI chat unavailable - try /api/system/media/action for media commands" 
-        });
-      }
-    }
+    const handledByStrictTool = await handleStrictChatToolTurn(req, res, message);
+    if (handledByStrictTool) return handledByStrictTool;
 
+    try {
+      const reply = await getChatResponse({
+        message,
+        history,
+        pageContext,
+        customInstructions,
+        conversationId,
+        attachment,
+        model,
+        provider: requestedProvider,
+        endpointBaseUrl,
+        lmStudioMcpIntegrations
+      });
+      return res.json({ ok: true, reply, provider: requestedProvider });
+    } catch (chatError) {
+      console.warn("[Chat] AI endpoint error:", chatError.message);
+      return res.status(503).json({
+        ok: false,
+        error: chatError?.message || "Local AI chat is unavailable. Start a configured provider and load a model."
+      });
+    }
   } catch (error) {
     console.error("[Chat] Route error:", error);
     return res.status(500).json({ ok: false, error: "Chat request failed." });
@@ -824,9 +1105,25 @@ async function handleChatRoute(req, res) {
 
 app.post("/api/llm/chat", handleChatRoute);
 app.post("/api/local-llm/chat", handleChatRoute);
-app.get("/api/llm/models", async (_req, res) => {
-  const catalog = await getLocalModelCatalog();
-  res.json({ ok: true, models: catalog.rows });
+app.get("/api/llm/models", async (req, res) => {
+  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized local LLM request." });
+  try {
+    const catalog = await getLocalModelCatalog({
+      provider: req.query.provider || "auto",
+      endpointBaseUrl: req.query.endpointBaseUrl || ""
+    });
+    return res.json({
+      ok: true,
+      configured: catalog.configured,
+      aiAvailable: catalog.available,
+      models: catalog.rows,
+      providers: catalog.providers,
+      message: catalog.available ? "AI provider and model are ready." : "The companion is reachable, but no configured AI provider currently has a loaded model.",
+      checkedAt: catalog.checkedAt
+    });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: error?.message || "Invalid model catalog request." });
+  }
 });
 
 app.get("/api/local-llm/models", async (req, res) => {
@@ -834,19 +1131,23 @@ app.get("/api/local-llm/models", async (req, res) => {
     return res.status(401).json({ ok: false, error: "Unauthorized local LLM request." });
   }
   try {
-    const catalog = await getLocalModelCatalog();
+    const catalog = await getLocalModelCatalog({
+      provider: req.query.provider || "auto",
+      endpointBaseUrl: req.query.endpointBaseUrl || ""
+    });
     const models = Array.isArray(catalog?.rows) ? catalog.rows : [];
     return res.json({
       ok: true,
+      configured: catalog.configured,
+      aiAvailable: catalog.available,
       models,
-      providers: {
-        local: catalog?.all || []
-      },
+      providers: catalog.providers,
+      message: catalog.available ? "AI provider and model are ready." : "The companion is reachable, but no configured AI provider currently has a loaded model.",
       checkedAt: catalog?.checkedAt || new Date().toISOString()
     });
   } catch (error) {
     console.error("[Bridge] /api/local-llm/models error:", error);
-    return res.status(500).json({ ok: false, error: "Failed to read local model catalog." });
+    return res.status(400).json({ ok: false, error: error?.message || "Failed to read local model catalog." });
   }
 });
 
@@ -869,34 +1170,50 @@ app.get("/api/local-llm/mcp-tools", async (req, res) => {
   }
 });
 
-app.get("/api/local-llm/health", (req, res) => {
+app.get("/api/local-llm/health", async (req, res) => {
   if (!isAuthorized(req)) {
     return res.status(401).json({ ok: false, error: "Unauthorized local LLM request." });
   }
-  return res.json({
-    ok: true,
-    authMode: LOCAL_LLM_TOKEN ? "token-or-bridge-secret" : "bridge-secret-or-loopback",
-    lmStudioMcp: {
-      selectionMode: "local-user",
-      apiTokenConfigured: Boolean(LM_STUDIO_API_TOKEN),
-      bridgeCredentialRequired: true,
-      explicitToolDirectiveRequired: true
-    },
-    checkedAt: new Date().toISOString()
-  });
+  try {
+    const catalog = await getLocalModelCatalog({
+      provider: req.query.provider || "auto",
+      endpointBaseUrl: req.query.endpointBaseUrl || ""
+    });
+    return res.json({
+      ok: true,
+      configured: catalog.configured,
+      aiAvailable: catalog.available,
+      authMode: LOCAL_LLM_TOKEN ? "token-or-bridge-secret-or-loopback" : "bridge-secret-or-loopback",
+      selectedProvider: catalog.selectedProvider,
+      providers: catalog.providers,
+      models: catalog.rows,
+      message: catalog.available ? "AI provider and model are ready." : "The companion is running, but no configured AI provider has a loaded model.",
+      lmStudioMcp: {
+        selectionMode: "local-user",
+        apiTokenConfigured: Boolean(LM_STUDIO_API_TOKEN),
+        bridgeCredentialRequired: true,
+        explicitToolDirectiveRequired: true
+      },
+      checkedAt: catalog.checkedAt
+    });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: error?.message || "Invalid health request." });
+  }
 });
 
 // Express static file serving and route fallback
-app.use(express.static(projectRoot));
+if (existsSync(path.join(projectRoot, "index.html"))) app.use(express.static(projectRoot));
 app.use((req, res) => {
   if (req.path.startsWith("/api/")) return res.status(404).json({ ok: false, error: "API route not found." });
-  return res.sendFile(path.join(projectRoot, "index.html"));
+  const indexPath = path.join(projectRoot, "index.html");
+  if (!existsSync(indexPath)) return res.status(404).send("Signal Share companion API is running.");
+  return res.sendFile(indexPath);
 });
 
 // Server handle storage for Express 5 compatibility
-const globalServer = app.listen(port, () => {
-  console.log(`[Bridge] Signal Share backend listening on port ${port} (IPv4 and IPv6)`);
-  console.log(`[Bridge] AI endpoint: ${OLLAMA_BASE_URL}`);
+const globalServer = app.listen(port, BRIDGE_LISTEN_HOST, () => {
+  console.log(`[Bridge] Signal Share companion listening on http://${BRIDGE_LISTEN_HOST}:${port}`);
+  console.log(`[Bridge] Default providers: LM Studio ${normalizeBaseUrl(LM_STUDIO_BASE_URL)}; Ollama ${normalizeBaseUrl(OLLAMA_BASE_URL)}`);
   if (LM_STUDIO_API_TOKEN && (BRIDGE_SECRET || LOCAL_LLM_TOKEN)) {
     console.log("[Bridge] LM Studio MCP access is ready for authenticated user selections.");
   } else if (LM_STUDIO_API_TOKEN) {

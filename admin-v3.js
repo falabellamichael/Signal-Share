@@ -68,23 +68,8 @@ export function normalizeEmailForMatch(value) {
 
 export function getCurrentUserEmailCandidates(currentUser) {
   if (!currentUser) return [];
-  const candidates = new Set();
-  const addEmail = (v) => {
-    if (typeof v === "string") {
-      const n = normalizeEmailForMatch(v);
-      if (n) candidates.add(n);
-    }
-  };
-  addEmail(currentUser.email);
-  addEmail(currentUser.new_email);
-  if (currentUser.user_metadata) addEmail(currentUser.user_metadata.email);
-  if (Array.isArray(currentUser.identities)) {
-    currentUser.identities.forEach((i) => {
-      if (i?.identity_data) addEmail(i.identity_data.email);
-      else if (i?.email) addEmail(i.email);
-    });
-  }
-  return Array.from(candidates);
+  const verifiedAccountEmail = normalizeEmailForMatch(currentUser.email);
+  return verifiedAccountEmail ? [verifiedAccountEmail] : [];
 }
 
 export function isCurrentUserAdmin(state, appConfig) {

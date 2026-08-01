@@ -173,7 +173,7 @@ export async function loadProfilesFromSupabase() {
   try {
     const client = getSupabaseClientOrThrow();
     const data = await runSupabaseQuery(
-      client.from("profiles").select("*").order("display_name", { ascending: true }),
+      client.rpc("get_signal_share_profile_directory"),
       "Supabase profiles request failed."
     );
     return (Array.isArray(data) ? data : []).map(normalizeProfile);
@@ -496,8 +496,7 @@ export async function resumableUploadFile(filePath, file, onProgress) {
         endpoint: url,
         retryDelays: [0, 3000, 5000, 10000, 20000],
         headers: {
-          authorization: `Bearer ${token}`,
-          'x-upsert': 'true'
+          authorization: `Bearer ${token}`
         },
         uploadDataDuringCreation: true,
         removeFingerprintOnSuccess: true,

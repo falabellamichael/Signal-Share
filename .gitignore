@@ -24,15 +24,19 @@ Thumbs.db
 
 .env
 .env.*
+*.env
 
 supabase/.temp/
 .supabase/.temp/
 
-# Private backend / companion files
-backend/
-.env
-.env.*
-*.env
-node_modules/
+# Private backend configuration and unrelated local backend experiments
+backend/*
+!backend/server.js
+!backend/strict-ai-tools.js
+!backend/smtc-query.js
+backend/.env
+backend/.env.*
+backend/*.log
+backend/*.pid
 downloads/SignalShareDesktopCompanion/
 downloads/SignalShareDesktopCompanion.zip

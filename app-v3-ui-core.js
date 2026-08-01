@@ -89,6 +89,12 @@ export function createAppUi(context) {
     keyboardShortcutsBackdrop: document.querySelector("#keyboardShortcutsBackdrop"),
     keyboardShortcutsCloseButton: document.querySelector("#keyboardShortcutsCloseButton"),
     settingsMainPage: document.querySelector("#settingsMainPage"),
+    settingsTabList: document.querySelector(".settings-nav[role='tablist']"),
+    settingsPageTabs: Array.from(document.querySelectorAll("[data-settings-page]")),
+    settingsPagePanels: Array.from(document.querySelectorAll("[data-settings-page-panel]")),
+    settingsPublishStudioButton: document.querySelector("#settingsPublishStudioButton"),
+    settingsAccountButton: document.querySelector("#settingsAccountButton"),
+    companionOpenAiSettingsButton: document.querySelector("#companionOpenAiSettingsButton"),
     shortcutsList: document.querySelector("#shortcutsList"),
     themePicker: document.querySelector("#themePicker"),
     themePickerButton: document.querySelector("#themePickerButton"),
@@ -105,6 +111,7 @@ export function createAppUi(context) {
     bridgeSecretInput: document.getElementById("bridgeSecretInput"),
     bridgeUrlInput: document.getElementById("bridgeUrlInput"),
     localLlmTokenInput: document.getElementById("localLlmTokenInput"),
+    aiProviderSelect: document.getElementById("aiProviderSelect"),
     aiCustomInstructionsInput: document.getElementById("aiCustomInstructionsInput"),
     resetPlayerPositionButton: document.getElementById("resetPlayerPositionButton"),
     resetPreferencesButton: document.querySelector("#resetPreferencesButton"),
@@ -453,6 +460,35 @@ export function createAppUi(context) {
     elements.settingsToggleButton.addEventListener("click", toggleSettingsPanel);
     elements.settingsBackdrop.addEventListener("click", closeSettingsPanel);
     elements.settingsCloseButton.addEventListener("click", closeSettingsPanel);
+    elements.settingsPageTabs.forEach((tab, tabIndex, tabs) => {
+      tab.addEventListener("click", () => window.showSettingsPage?.(tab.dataset.settingsPage));
+      tab.addEventListener("keydown", (event) => {
+        const nextKeys = new Set(["ArrowRight", "ArrowDown"]);
+        const previousKeys = new Set(["ArrowLeft", "ArrowUp"]);
+        let nextIndex = tabIndex;
+
+        if (nextKeys.has(event.key)) nextIndex = (tabIndex + 1) % tabs.length;
+        else if (previousKeys.has(event.key)) nextIndex = (tabIndex - 1 + tabs.length) % tabs.length;
+        else if (event.key === "Home") nextIndex = 0;
+        else if (event.key === "End") nextIndex = tabs.length - 1;
+        else return;
+
+        event.preventDefault();
+        const nextTab = tabs[nextIndex];
+        window.showSettingsPage?.(nextTab.dataset.settingsPage, { focusTab: true });
+      });
+    });
+
+    [elements.settingsPublishStudioButton, elements.settingsAccountButton].forEach((button) => {
+      button?.addEventListener("click", () => closeSettingsPanel({ restoreFocus: false }));
+    });
+
+    elements.companionOpenAiSettingsButton?.addEventListener("click", () => {
+      const securityView = document.querySelector("#chat-security");
+      if (securityView?.style.display !== "none") window.toggleChatSecurity?.();
+      window.closeArcadeChat?.({ restoreFocus: false });
+      window.showSettingsPage?.("ai", { focusTab: true });
+    });
 
     // Listeners for bell button are now handled inline in index.html to prevent conflicts
     if (elements.keyboardShortcutsButton) elements.keyboardShortcutsButton.addEventListener("click", () => window.openKeyboardShortcutsPanel && window.openKeyboardShortcutsPanel());
@@ -475,10 +511,10 @@ export function createAppUi(context) {
     elements.showEmailToggle.addEventListener("change", handleShowEmailToggle);
 
     const syncBridgeEnabledToggle = () => {
-      const hasSecret = `${localStorage.getItem("ss_bridge_secret") || ""}`.trim().length > 0
-        || `${localStorage.getItem("signal-share-bridge-secret") || ""}`.trim().length > 0;
-      const hasBridgeUrl = `${window.SignalShareLocalLlm?.getBridgeBaseUrl?.() || localStorage.getItem("signal-share-bridge-url") || ""}`.trim().length > 0;
-      const hasLocalToken = `${window.SignalShareLocalLlm?.getLocalLlmToken?.() || localStorage.getItem("ss_local_llm_token") || ""}`.trim().length > 0;
+      const helper = window.SignalShareLocalLlm;
+      const hasSecret = `${helper?.getBridgeSecret?.() || localStorage.getItem("ss_bridge_secret") || ""}`.trim().length > 0;
+      const hasBridgeUrl = `${helper?.getBridgeBaseUrl?.() || localStorage.getItem("signal-share-bridge-url") || ""}`.trim().length > 0;
+      const hasLocalToken = `${helper?.getLocalLlmToken?.() || localStorage.getItem("ss_local_llm_token") || ""}`.trim().length > 0;
       if (hasSecret || hasBridgeUrl || hasLocalToken) {
         localStorage.setItem("ss_bridge_enabled", "1");
       } else {
@@ -486,13 +522,36 @@ export function createAppUi(context) {
       }
     };
 
+    const syncSettingsBridgeConfigUi = () => {
+      const helper = window.SignalShareLocalLlm;
+      const syncValue = (input, value) => {
+        if (input && document.activeElement !== input) input.value = `${value || ""}`;
+      };
+      syncValue(elements.bridgeSecretInput, helper?.getBridgeSecret?.() || localStorage.getItem("ss_bridge_secret") || "");
+      syncValue(elements.bridgeUrlInput, helper?.getBridgeBaseUrl?.() || localStorage.getItem("signal-share-bridge-url") || "");
+      syncValue(elements.localLlmTokenInput, helper?.getLocalLlmToken?.() || localStorage.getItem("ss_local_llm_token") || "");
+      if (elements.aiProviderSelect && document.activeElement !== elements.aiProviderSelect) {
+        elements.aiProviderSelect.value = helper?.getProviderPreference?.() || localStorage.getItem("ss_ai_provider") || "auto";
+      }
+      syncBridgeEnabledToggle();
+    };
+
     if (elements.bridgeSecretInput) {
-      elements.bridgeSecretInput.value = localStorage.getItem("ss_bridge_secret") || "";
+      elements.bridgeSecretInput.value = window.SignalShareLocalLlm?.getBridgeSecret?.()
+        || localStorage.getItem("ss_bridge_secret")
+        || "";
       elements.bridgeSecretInput.addEventListener("input", (event) => {
-        const secret = event.target.value.trim();
-        localStorage.setItem("ss_bridge_secret", secret);
+        const secret = `${event.target.value || ""}`;
+        if (window.SignalShareLocalLlm?.setBridgeSecret) {
+          window.SignalShareLocalLlm.setBridgeSecret(secret);
+        } else if (secret.trim()) {
+          localStorage.setItem("ss_bridge_secret", secret.trim());
+        } else {
+          localStorage.removeItem("ss_bridge_secret");
+        }
         syncBridgeEnabledToggle();
       });
+      elements.bridgeSecretInput.addEventListener("blur", syncSettingsBridgeConfigUi);
     }
 
     if (elements.bridgeUrlInput) {
@@ -512,6 +571,7 @@ export function createAppUi(context) {
         }
         syncBridgeEnabledToggle();
       });
+      elements.bridgeUrlInput.addEventListener("blur", syncSettingsBridgeConfigUi);
     }
 
     if (elements.localLlmTokenInput) {
@@ -531,7 +591,26 @@ export function createAppUi(context) {
         }
         syncBridgeEnabledToggle();
       });
+      elements.localLlmTokenInput.addEventListener("blur", syncSettingsBridgeConfigUi);
     }
+
+    if (elements.aiProviderSelect) {
+      elements.aiProviderSelect.value = window.SignalShareLocalLlm?.getProviderPreference?.()
+        || localStorage.getItem("ss_ai_provider")
+        || "auto";
+      elements.aiProviderSelect.addEventListener("change", (event) => {
+        const provider = `${event.target.value || "auto"}`;
+        if (window.SignalShareLocalLlm?.setProviderPreference) {
+          window.SignalShareLocalLlm.setProviderPreference(provider);
+        } else {
+          localStorage.setItem("ss_ai_provider", provider);
+        }
+        syncBridgeEnabledToggle();
+      });
+    }
+
+    window.addEventListener("signal-share:bridge-config-change", syncSettingsBridgeConfigUi);
+    syncSettingsBridgeConfigUi();
 
     if (elements.aiCustomInstructionsInput) {
       const coreGetInstructions = window.SignalShareAiCore?.getStoredCustomInstructions;
@@ -1574,15 +1653,45 @@ export function createAppUi(context) {
     document.documentElement.style.scrollBehavior = preferences.motion === "calm" ? "auto" : "smooth";
   }
 
-  function openSettingsPanel() { state.settingsPanelOpen = true; state.settingsActivePage = "main"; setMobileHeaderHidden(false); renderSettingsPanel(); requestAnimationFrame(() => elements.settingsCloseButton?.focus?.()); }
+  const SETTINGS_PAGE_KEYS = new Set(["appearance", "ai", "publishing", "accessibility"]);
+
+  function normalizeSettingsPage(page) {
+    const normalized = `${page || ""}`.trim().toLowerCase();
+    if (normalized === "main") return "appearance";
+    return SETTINGS_PAGE_KEYS.has(normalized) ? normalized : "appearance";
+  }
+
+  function openSettingsPanel(page = "appearance", options = {}) {
+    state.settingsPanelOpen = true;
+    state.settingsActivePage = normalizeSettingsPage(page);
+    setMobileHeaderHidden(false);
+    renderSettingsPanel();
+    requestAnimationFrame(() => {
+      const activeTab = elements.settingsPageTabs.find((tab) => tab.dataset.settingsPage === state.settingsActivePage);
+      if (options.focusTab && activeTab instanceof HTMLElement) activeTab.focus();
+      else elements.settingsCloseButton?.focus?.();
+    });
+  }
 
   function closeSettingsPanel(options = {}) { const { restoreFocus = true } = options; if (!state.settingsPanelOpen) return; state.settingsPanelOpen = false; state.themePickerOpen = false; renderSettingsPanel(); if (restoreFocus) elements.settingsToggleButton.focus(); }
 
   function toggleSettingsPanel(event) { if (event) { event.preventDefault(); event.stopPropagation(); } if (state.settingsPanelOpen) closeSettingsPanel(); else openSettingsPanel(); }
 
-  window.showSettingsPage = function (page) {
-    state.settingsActivePage = page;
+  window.showSettingsPage = function (page, options = {}) {
+    const activePage = normalizeSettingsPage(page);
+    if (!state.settingsPanelOpen) {
+      openSettingsPanel(activePage, options);
+      return;
+    }
+
+    state.settingsActivePage = activePage;
     renderSettingsPanel();
+    if (options.focusTab) {
+      requestAnimationFrame(() => {
+        const activeTab = elements.settingsPageTabs.find((tab) => tab.dataset.settingsPage === activePage);
+        if (activeTab instanceof HTMLElement) activeTab.focus();
+      });
+    }
   };
 
   function renderSettingsPanel() {
@@ -1598,7 +1707,22 @@ export function createAppUi(context) {
     if (window.syncArcadeSidebarOffsets) window.syncArcadeSidebarOffsets(); syncOverlayBodyState();
 
     if (isOpen) {
-      if (elements.settingsMainPage) elements.settingsMainPage.style.display = 'block';
+      const activePage = normalizeSettingsPage(state.settingsActivePage);
+      state.settingsActivePage = activePage;
+      if (activePage !== "appearance") state.themePickerOpen = false;
+      if (elements.settingsMainPage) elements.settingsMainPage.style.display = "grid";
+      elements.settingsTabList?.setAttribute("aria-orientation", window.matchMedia?.("(max-width: 900px)")?.matches ? "horizontal" : "vertical");
+      elements.settingsPageTabs.forEach((tab) => {
+        const isActive = tab.dataset.settingsPage === activePage;
+        tab.classList.toggle("is-active", isActive);
+        tab.setAttribute("aria-selected", isActive ? "true" : "false");
+        tab.tabIndex = isActive ? 0 : -1;
+      });
+      elements.settingsPagePanels.forEach((panel) => {
+        const isActive = panel.dataset.settingsPagePanel === activePage;
+        panel.hidden = !isActive;
+        panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+      });
 
       if (elements.densitySelect) elements.densitySelect.value = state.preferences.density;
       if (elements.motionSelect) elements.motionSelect.value = state.preferences.motion;

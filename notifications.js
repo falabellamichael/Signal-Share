@@ -656,14 +656,16 @@
       const senderIds = Array.from(new Set(messageRows.map((row) => row.sender_id).filter(Boolean)));
       const senderNameById = new Map();
       if (senderIds.length) {
-        const { data: profileRows } = await supabase
-          .from("profiles")
-          .select("id,display_name")
-          .in("id", senderIds);
+        const { data: profileRows, error: profileError } = await supabase
+          .rpc("get_signal_share_profile_directory");
+        if (profileError) {
+          console.warn("[Notifications] Profile directory could not be loaded", profileError);
+        }
+        const senderIdSet = new Set(senderIds.map((id) => String(id)));
         if (Array.isArray(profileRows)) {
           profileRows.forEach((profile) => {
             const profileId = String(profile?.id ?? "");
-            if (!profileId) return;
+            if (!profileId || !senderIdSet.has(profileId)) return;
             const displayName = String(profile?.display_name ?? "").trim() || "Someone";
             senderNameById.set(profileId, displayName);
           });

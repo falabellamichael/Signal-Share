@@ -94,76 +94,6 @@ export function createHeroMediaPlayerController(options) {
   let companionPromptDismissed = localStorage.getItem("ss_companion_dismissed") === "true";
   const DESKTOP_ACTION_COOLDOWN_MS = 0;
   const NATIVE_ACTION_COOLDOWN_MS = 0;
-  const COMPANION_SETUP_SCRIPT = `@echo off
-setlocal
-title Signal Share Companion
-color 0B
-
-echo.
-echo  --------------------------------------------------------
-echo    SIGNAL SHARE COMPANION
-echo    Secure Desktop Media Bridge
-echo  --------------------------------------------------------
-echo.
-
-:: Check for Administrator privileges
-net session >nul 2>&1
-if %errorlevel% == 0 (
-    color 0E
-    echo  [!] WARNING: Running as Administrator is NOT recommended.
-    echo  For better security, please run this script as a normal user.
-    echo.
-    choice /C YN /M "Do you want to continue as Admin anyway?"
-    if errorlevel 2 exit /b 1
-    color 0B
-)
-
-:: Check for Node.js
-node -v >nul 2>&1
-if %errorlevel% neq 0 (
-    color 0C
-    echo  [!] ERROR: Node.js was not found.
-    echo.
-    echo  The companion requires Node.js to run. 
-    echo  Please download it from: https://nodejs.org/
-    echo.
-    pause
-    exit /b 1
-)
-
-echo  [1/2] Preparing components...
-echo.
-call npm install --no-audit --no-fund --quiet
-if %errorlevel% neq 0 (
-    color 0C
-    echo  [!] ERROR: Failed to install components.
-    echo.
-    pause
-    exit /b 1
-)
-
-echo.
-echo  [2/2] Launching Secured Bridge...
-echo.
-echo  --------------------------------------------------------
-echo    SUCCESS! The bridge is now active.
-echo.
-echo    SECURITY HARDENING ACTIVE:
-echo    - Binding to 127.0.0.1 (Local loopback only)
-echo    - CORS Whitelisting enabled
-echo    - Rate limiting enabled
-echo    - External port exposure disabled
-echo.
-echo    IMPORTANT: Keep this window open!
-echo    If you close it, PC Media control will stop.
-echo  --------------------------------------------------------
-echo.
-
-npm start
-echo.
-echo  The bridge has stopped.
-pause`.trim();
-
   const COMPANION_SECURITY_README = `
 # Signal Share Companion Security
 
@@ -171,14 +101,13 @@ The companion bridge is designed with several security layers to keep your PC sa
 
 ## Active Safety Measures
 
-1.  **Local Loopback Only**: The bridge binds only to 127.0.0.1. It is not accessible from other devices on your network or the internet.
-2.  **CORS Protection**: Only requests from the official Signal Share domain or localhost are allowed.
-3.  **Authentication Required**: Every action (Play, Pause, Skip) requires a local secret token stored in your browser.
-4.  **Disabled URI Opening**: The ability to open arbitrary links is disabled by default to prevent malicious URL injection.
-5.  **Rate Limiting**: Commands are rate-limited to prevent automated spamming of your system media controls.
-6.  **No Admin Required**: The companion should never be run as an Administrator. It runs with your normal user permissions.
-7.  **Port Safety**: The bridge port is not exposed through UPnP or firewall rules automatically.
-8.  **Remote Sync Control**: Remote control via Supabase is disabled by default and requires explicit user activation.
+1.  **Loopback by default**: The bridge binds to 127.0.0.1 unless you explicitly enable LAN mode and keep a credential configured.
+2.  **CORS protection**: Only official Signal Share, local development, and Capacitor origins are allowed.
+3.  **Paired browser access**: When a credential is configured, every browser origin must send it. Only no-origin command-line requests remain loopback-trusted.
+4.  **Allowlisted PC actions**: Media controls, applications, and URI schemes are validated against fixed allowlists before Windows is asked to act.
+5.  **No admin required**: The companion installs and runs with your normal Windows user permissions.
+6.  **No automatic port exposure**: Setup does not add firewall, router, UPnP, or port-forwarding rules.
+7.  **Remote Sync Control**: Remote control via Supabase is disabled by default and requires explicit user activation.
 
 `.trim();
 
@@ -2644,15 +2573,12 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function downloadCompanion() {
-    const blob = new Blob([COMPANION_SETUP_SCRIPT], { type: "application/x-bat" });
-    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
+    a.href = `setup-companion.bat?v=${encodeURIComponent(window.SIGNAL_SHARE_VERSION || "latest")}`;
     a.download = "setup-companion.bat";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 
     companionPromptDismissed = true;
     localStorage.setItem("ss_companion_dismissed", "true");

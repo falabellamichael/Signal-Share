@@ -22,7 +22,7 @@
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=122" />
+    <link rel="stylesheet" href="./styles.css?v=124" />
     <link rel="stylesheet" href="./studio-overlays.css?v=1.0" />
     <link rel="stylesheet" href="./studio-auth-overlay.css?v=1.0" />
     <link rel="stylesheet" href="./studio-publish-overlay.css?v=1.5" />
@@ -38,7 +38,7 @@
     </style>
     <link rel="stylesheet" href="./notifications.css?v=1.3" />
     <link rel="stylesheet" href="./android-optimizations.css?v=1.8" />
-    <link rel="stylesheet" href="arcade-chat.css?v=1.14">
+    <link rel="stylesheet" href="arcade-chat.css?v=1.19">
     <link rel="stylesheet" href="./questions-guide.css?v=1.6">
     <script>
       // Early SDK placeholders for async script loading
@@ -147,7 +147,7 @@
 
 
       <section class="settings-panel" id="settingsPanel" aria-hidden="true" hidden>
-        <div class="settings-backdrop" id="settingsBackdrop"></div>
+        <div class="settings-backdrop" id="settingsBackdrop" aria-hidden="true"></div>
 
         <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
           <button
@@ -159,219 +159,305 @@
             Close
           </button>
 
-          <div class="settings-head">
-            <p class="eyebrow">Preferences</p>
-            <h2 id="settingsTitle">Shape your view</h2>
-            <p>
-              Personalize the interface without changing the shared feed. Theme, motion, spacing,
-              and dock position stay saved in this browser.
-            </p>
+          <div class="settings-head settings-shell-head">
+            <p class="eyebrow">Settings</p>
+            <h2 id="settingsTitle">Signal Share preferences</h2>
+            <p>Choose a category on the left. Browser preferences save automatically; service credentials stay on your PC or server.</p>
           </div>
 
-          <div id="settingsMainPage">
-            <div class="settings-section">
-              <div class="settings-section-head">
-                <strong>Theme</strong>
-                <span>Pick the room you want to work in.</span>
-              </div>
-
-              <div class="theme-picker" id="themePicker">
+          <div class="settings-layout" id="settingsMainPage">
+            <nav class="settings-navigation" aria-label="Settings categories">
+              <div class="settings-nav" role="tablist" aria-orientation="vertical">
                 <button
-                  class="theme-picker-trigger"
-                  id="themePickerButton"
+                  class="settings-nav-item is-active"
+                  id="settingsTabAppearance"
                   type="button"
-                  aria-haspopup="listbox"
-                  aria-expanded="false"
-                  aria-controls="themePickerMenu"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="settingsPageAppearance"
+                  data-settings-page="appearance"
                 >
-                  <span class="theme-preview theme-preview-sunset" id="themePickerPreview" aria-hidden="true"></span>
-                  <span class="theme-picker-copy">
-                    <strong id="themePickerLabel">Sunset</strong>
-                    <span id="themePickerDescription">Warm default</span>
-                  </span>
-                  <span class="theme-picker-chevron" aria-hidden="true">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="m6 9 6 6 6-9"/>
-                    </svg>
-                  </span>
+                  <strong>General &amp; appearance</strong>
+                  <span>Theme, density, and display</span>
                 </button>
-
-                <div class="theme-picker-menu" id="themePickerMenu" role="listbox" aria-label="Theme" hidden>
-                  <button class="theme-option-tile" data-theme-option="sunset" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-sunset" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>Sunset</strong>
-                      <span>Warm default</span>
-                    </span>
-                  </button>
-
-                  <button class="theme-option-tile" data-theme-option="midnight" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-midnight" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>Midnight</strong>
-                      <span>Dark mode</span>
-                    </span>
-                  </button>
-
-                  <button class="theme-option-tile" data-theme-option="gallery" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-gallery" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>Gallery</strong>
-                      <span>Neutral light</span>
-                    </span>
-                  </button>
-
-                  <button class="theme-option-tile" data-theme-option="aurora" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-aurora" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>Aurora</strong>
-                      <span>Cool studio</span>
-                    </span>
-                  </button>
-
-                  <button class="theme-option-tile" data-theme-option="contrast" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-contrast" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>High Contrast</strong>
-                      <span>Blackout signal</span>
-                    </span>
-                  </button>
-
-                  <button class="theme-option-tile" data-theme-option="ember" type="button" role="option" aria-selected="false">
-                    <span class="theme-preview theme-preview-ember" aria-hidden="true"></span>
-                    <span class="theme-option-copy">
-                      <strong>Ember Red</strong>
-                      <span>Companion glow</span>
-                    </span>
-                  </button>
-                </div>
+                <button
+                  class="settings-nav-item"
+                  id="settingsTabAi"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="settingsPageAi"
+                  tabindex="-1"
+                  data-settings-page="ai"
+                >
+                  <strong>AI &amp; PC Bridge</strong>
+                  <span>Provider, endpoint, and connection</span>
+                </button>
+                <button
+                  class="settings-nav-item"
+                  id="settingsTabPublishing"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="settingsPagePublishing"
+                  tabindex="-1"
+                  data-settings-page="publishing"
+                >
+                  <strong>Publishing</strong>
+                  <span>Destinations and OAuth readiness</span>
+                </button>
+                <button
+                  class="settings-nav-item"
+                  id="settingsTabAccessibility"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="settingsPageAccessibility"
+                  tabindex="-1"
+                  data-settings-page="accessibility"
+                >
+                  <strong>Accessibility</strong>
+                  <span>Motion, privacy, and shortcuts</span>
+                </button>
               </div>
-            </div>
+              <p class="settings-nav-note">Nothing is sent to an AI provider until you connect and test an endpoint.</p>
+            </nav>
 
-            <div class="settings-fields">
-              <label class="settings-field">
-                <span>Density</span>
-                <select id="densitySelect">
-                  <option value="airy">Airy</option>
-                  <option value="compact">Compact</option>
-                </select>
-              </label>
-
-              <label class="settings-field">
-                <span>Motion</span>
-                <select id="motionSelect">
-                  <option value="full">Full motion</option>
-                  <option value="calm">Calm motion</option>
-                </select>
-              </label>
-
-              <label class="settings-field settings-toggle-field" for="statusBarStripToggle">
-                <span>Status bar strip</span>
-                <span class="settings-field-copy">Reserve a black strip at the top, or let the theme background show through.</span>
-                <span class="settings-switch">
-                  <input id="statusBarStripToggle" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-              
-              <label class="settings-field settings-toggle-field" for="notificationHideSenderToggle">
-                <span>Hide sender name</span>
-                <span class="settings-field-copy">Show "Someone" instead of the sender's name in notifications.</span>
-                <span class="settings-switch">
-                  <input id="notificationHideSenderToggle" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-
-              <label class="settings-field settings-toggle-field" for="notificationHideBodyToggle">
-                <span>Hide message text</span>
-                <span class="settings-field-copy">Show "New message" instead of the message content in notifications.</span>
-                <span class="settings-switch">
-                  <input id="notificationHideBodyToggle" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-
-              <label class="settings-field settings-toggle-field" for="showEmailToggle">
-                <span>Show Email</span>
-                <span class="settings-field-copy">Admins see full emails. Other members see encrypted email masks.</span>
-                <span class="settings-switch">
-                  <input id="showEmailToggle" type="checkbox" />
-                  <span class="settings-switch-ui" aria-hidden="true"></span>
-                </span>
-              </label>
-
-              <label class="settings-field" style="margin-top: 10px;">
-                <span>Bridge Secret</span>
-                <span class="settings-field-copy" style="margin-bottom: 8px;">Key for local media bridge. Default: ss_bridge_secret_v1</span>
-                <input
-                  id="bridgeSecretInput"
-                  type="password"
-                  placeholder="Enter bridge secret"
-                  style="width: 100%;"
-                />
-              </label>
-
-              <label class="settings-field" style="margin-top: 10px;">
-                <span>Bridge URL (PC IP)</span>
-                <span class="settings-field-copy" style="margin-bottom: 8px;">Example: http://192.168.1.50:3000</span>
-                <input
-                  id="bridgeUrlInput"
-                  type="text"
-                  placeholder="http://192.168.x.x:3000"
-                  style="width: 100%;"
-                />
-              </label>
-
-              <label class="settings-field" style="margin-top: 10px;">
-                <span>Local LLM Token</span>
-                <span class="settings-field-copy" style="margin-bottom: 8px;">Optional shared token for secure LAN access.</span>
-                <input
-                  id="localLlmTokenInput"
-                  type="password"
-                  placeholder="Optional local LLM token"
-                  style="width: 100%;"
-                />
-              </label>
-
-
-              <label class="settings-field" style="margin-top: 10px;">
-                <span>AI Custom Instructions</span>
-                <span class="settings-field-copy" style="margin-bottom: 8px;">Optional behavior rules used by both companions (main page and mini-games).</span>
-                <textarea
-                  id="aiCustomInstructionsInput"
-                  rows="5"
-                  placeholder="Example: Always include model/provider when asked which model you are using."
-                  style="width: 100%; resize: vertical;"
-                ></textarea>
-              </label>
-            </div>
-
-            <div class="settings-actions">
-              <button
-                class="button button-secondary"
-                id="resetPlayerPositionButton"
-                type="button"
+            <div class="settings-detail">
+              <section
+                class="settings-page"
+                id="settingsPageAppearance"
+                role="tabpanel"
+                aria-labelledby="settingsTabAppearance"
+                data-settings-page-panel="appearance"
               >
-                Reset player dock
-              </button>
-              <button
-                class="button button-secondary"
-                id="resetPreferencesButton"
-                type="button"
+                <div class="settings-page-head">
+                  <p class="eyebrow">General &amp; appearance</p>
+                  <h3>Shape your view</h3>
+                  <p>These changes affect this browser only and do not change the shared feed.</p>
+                </div>
+
+                <div class="settings-section">
+                  <div class="settings-section-head">
+                    <strong>Theme</strong>
+                    <span>Pick the room you want to work in.</span>
+                  </div>
+
+                  <div class="theme-picker" id="themePicker">
+                    <button
+                      class="theme-picker-trigger"
+                      id="themePickerButton"
+                      type="button"
+                      aria-haspopup="listbox"
+                      aria-expanded="false"
+                      aria-controls="themePickerMenu"
+                    >
+                      <span class="theme-preview theme-preview-sunset" id="themePickerPreview" aria-hidden="true"></span>
+                      <span class="theme-picker-copy">
+                        <strong id="themePickerLabel">Sunset</strong>
+                        <span id="themePickerDescription">Warm default</span>
+                      </span>
+                      <span class="theme-picker-chevron" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="m6 9 6 6 6-9"/>
+                        </svg>
+                      </span>
+                    </button>
+
+                    <div class="theme-picker-menu" id="themePickerMenu" role="listbox" aria-label="Theme" hidden>
+                      <button class="theme-option-tile" data-theme-option="sunset" type="button" role="option" aria-selected="false">
+                        <span class="theme-preview theme-preview-sunset" aria-hidden="true"></span>
+                        <span class="theme-option-copy"><strong>Sunset</strong><span>Warm default</span></span>
+                      </button>
+                      <button class="theme-option-tile" data-theme-option="midnight" type="button" role="option" aria-selected="false">
+                        <span class="theme-preview theme-preview-midnight" aria-hidden="true"></span>
+                        <span class="theme-option-copy"><strong>Midnight</strong><span>Dark mode</span></span>
+                      </button>
+                      <button class="theme-option-tile" data-theme-option="gallery" type="button" role="option" aria-selected="false">
+                        <span class="theme-preview theme-preview-gallery" aria-hidden="true"></span>
+                        <span class="theme-option-copy"><strong>Gallery</strong><span>Neutral light</span></span>
+                      </button>
+                      <button class="theme-option-tile" data-theme-option="aurora" type="button" role="option" aria-selected="false">
+                        <span class="theme-preview theme-preview-aurora" aria-hidden="true"></span>
+                        <span class="theme-option-copy"><strong>Aurora</strong><span>Cool studio</span></span>
+                      </button>
+                      <button class="theme-option-tile" data-theme-option="contrast" type="button" role="option" aria-selected="false">
+                        <span class="theme-preview theme-preview-contrast" aria-hidden="true"></span>
+                        <span class="theme-option-copy"><strong>High Contrast</strong><span>Blackout signal</span></span>
+                      </button>
+                      <button class="theme-option-tile" data-theme-option="ember" type="button" role="option" aria-selected="false">
+                        <span class="theme-preview theme-preview-ember" aria-hidden="true"></span>
+                        <span class="theme-option-copy"><strong>Ember Red</strong><span>Companion glow</span></span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-fields">
+                  <label class="settings-field">
+                    <span>Density</span>
+                    <select id="densitySelect">
+                      <option value="airy">Airy</option>
+                      <option value="compact">Compact</option>
+                    </select>
+                  </label>
+                  <label class="settings-field settings-toggle-field" for="statusBarStripToggle">
+                    <span>Status bar strip</span>
+                    <span class="settings-field-copy">Reserve a black strip at the top, or let the theme background show through.</span>
+                    <span class="settings-switch">
+                      <input id="statusBarStripToggle" type="checkbox" />
+                      <span class="settings-switch-ui" aria-hidden="true"></span>
+                    </span>
+                  </label>
+                  <label class="settings-field settings-toggle-field" for="showEmailToggle">
+                    <span>Show email</span>
+                    <span class="settings-field-copy">Admins see full emails. Other members see encrypted email masks.</span>
+                    <span class="settings-switch">
+                      <input id="showEmailToggle" type="checkbox" />
+                      <span class="settings-switch-ui" aria-hidden="true"></span>
+                    </span>
+                  </label>
+                </div>
+
+                <div class="settings-actions">
+                  <button class="button button-secondary" id="resetPlayerPositionButton" type="button">Reset player dock</button>
+                  <button class="button button-secondary" id="resetPreferencesButton" type="button">Reset preferences</button>
+                </div>
+              </section>
+
+              <section
+                class="settings-page"
+                id="settingsPageAi"
+                role="tabpanel"
+                aria-labelledby="settingsTabAi"
+                data-settings-page-panel="ai"
+                hidden
               >
-                Reset preferences
-              </button>
-              <button
-                class="button button-secondary button-full"
-                id="keyboardShortcutsButton"
-                type="button"
+                <div class="settings-page-head">
+                  <p class="eyebrow">AI &amp; PC Bridge</p>
+                  <h3>Use AI directly; add the PC Bridge for desktop tools</h3>
+                  <p>LM Studio, Ollama, and private OpenAI-compatible endpoints can power normal chat directly from the browser. The optional PC Bridge adds desktop, media, local-tool, and MCP capabilities.</p>
+                </div>
+
+                <div class="settings-connection-card">
+                  <span class="settings-status-badge">Optional PC Bridge</span>
+                  <strong>Extra desktop capabilities</strong>
+                  <p>Direct AI endpoints do not require the Bridge. Install it only for PC actions; Signal Share cannot launch a downloaded program without your operating-system confirmation.</p>
+                </div>
+
+                <div class="settings-fields settings-fields-ai">
+                  <label class="settings-field">
+                    <span>Provider preference</span>
+                    <span class="settings-field-copy">Auto tries available local providers. Choose one to keep tests explicit.</span>
+                    <select id="aiProviderSelect">
+                      <option value="auto">Auto</option>
+                      <option value="lm-studio">LM Studio</option>
+                      <option value="ollama">Ollama</option>
+                      <option value="openai-compatible">OpenAI-compatible</option>
+                    </select>
+                  </label>
+                  <label class="settings-field">
+                    <span>Bridge URL</span>
+                    <span class="settings-field-copy">Use loopback on this PC, or an explicit LAN address you trust.</span>
+                    <input id="bridgeUrlInput" type="url" inputmode="url" autocomplete="url" placeholder="http://127.0.0.1:3000" />
+                  </label>
+                  <label class="settings-field">
+                    <span>Bridge secret</span>
+                    <span class="settings-field-copy">Optional handshake secret configured by your PC bridge. No default secret is assumed.</span>
+                    <input id="bridgeSecretInput" type="password" autocomplete="off" placeholder="Optional bridge secret" />
+                  </label>
+                  <label class="settings-field">
+                    <span>Local LLM token</span>
+                    <span class="settings-field-copy">Optional shared token for a bridge configured for authenticated LAN access.</span>
+                    <input id="localLlmTokenInput" type="password" autocomplete="off" placeholder="Optional local LLM token" />
+                  </label>
+                  <label class="settings-field settings-field-wide">
+                    <span>AI custom instructions</span>
+                    <span class="settings-field-copy">Optional behavior rules used by Companion on the main page and in Arcade.</span>
+                    <textarea id="aiCustomInstructionsInput" rows="5" maxlength="2000" placeholder="Example: Include the active model and provider when I ask which model is running."></textarea>
+                  </label>
+                </div>
+
+                <div class="settings-actions settings-connection-actions">
+                  <button class="button button-primary" id="bridgeConnectButton" type="button">Connect/test PC Bridge</button>
+                  <a class="button button-secondary" id="bridgeSetupDownloadLink" href="./setup-companion.bat" download>Download PC bridge setup</a>
+                  <button class="button button-secondary" id="openEndpointHelperButton" type="button">Open endpoints</button>
+                </div>
+                <p class="settings-live-status" id="bridgeConnectionStatus" role="status" aria-live="polite">Optional and not tested. Direct endpoints can still run normal AI chat.</p>
+              </section>
+
+              <section
+                class="settings-page"
+                id="settingsPagePublishing"
+                role="tabpanel"
+                aria-labelledby="settingsTabPublishing"
+                data-settings-page-panel="publishing"
+                hidden
               >
-                Keyboard shortcuts
-              </button>
+                <div class="settings-page-head">
+                  <p class="eyebrow">Publishing</p>
+                  <h3>Destinations and access</h3>
+                  <p>Compose local and Signal Share posts now. Direct social publishing remains unavailable until the matching OAuth provider is configured on the server.</p>
+                </div>
+
+                <div class="settings-connection-card settings-publishing-card">
+                  <span class="settings-status-badge is-waiting">Checking OAuth readiness</span>
+                  <strong id="publishingOAuthStatus">Sign in to check provider configuration</strong>
+                  <p>Each publishing provider reports its own readiness. Client-side fields cannot safely hold provider secrets; keys and callback configuration belong in the publishing service.</p>
+                </div>
+
+                <div class="settings-actions">
+                  <button class="button button-primary" id="settingsPublishStudioButton" type="button" data-studio-overlay-open="publish">Open Publish Studio</button>
+                  <button class="button button-secondary" id="settingsAccountButton" type="button" data-studio-overlay-open="account">Open account</button>
+                </div>
+              </section>
+
+              <section
+                class="settings-page"
+                id="settingsPageAccessibility"
+                role="tabpanel"
+                aria-labelledby="settingsTabAccessibility"
+                data-settings-page-panel="accessibility"
+                hidden
+              >
+                <div class="settings-page-head">
+                  <p class="eyebrow">Accessibility</p>
+                  <h3>Motion, privacy, and keyboard control</h3>
+                  <p>Calm animations, reduce notification detail, or review every keyboard shortcut.</p>
+                </div>
+
+                <div class="settings-fields">
+                  <label class="settings-field">
+                    <span>Motion</span>
+                    <select id="motionSelect">
+                      <option value="full">Full motion</option>
+                      <option value="calm">Calm motion</option>
+                    </select>
+                  </label>
+                  <label class="settings-field settings-toggle-field" for="notificationHideSenderToggle">
+                    <span>Hide sender name</span>
+                    <span class="settings-field-copy">Show “Someone” instead of the sender's name in notifications.</span>
+                    <span class="settings-switch">
+                      <input id="notificationHideSenderToggle" type="checkbox" />
+                      <span class="settings-switch-ui" aria-hidden="true"></span>
+                    </span>
+                  </label>
+                  <label class="settings-field settings-toggle-field" for="notificationHideBodyToggle">
+                    <span>Hide message text</span>
+                    <span class="settings-field-copy">Show “New message” instead of message content in notifications.</span>
+                    <span class="settings-switch">
+                      <input id="notificationHideBodyToggle" type="checkbox" />
+                      <span class="settings-switch-ui" aria-hidden="true"></span>
+                    </span>
+                  </label>
+                </div>
+
+                <div class="settings-actions">
+                  <button class="button button-secondary button-full" id="keyboardShortcutsButton" type="button">Keyboard shortcuts</button>
+                </div>
+              </section>
             </div>
           </div>
-
         </div>
       </section>
 
@@ -1704,7 +1790,7 @@
     </section>
 
     <script src="bridge-fetch-hardening.js?v=1.1"></script>
-    <script src="local-llm-connectivity.js?v=1.0"></script>
+    <script src="local-llm-connectivity.js?v=1.4"></script>
     <script src="messenger-realtime.js?v=1.5"></script>
     <script src="companion-ai-core.js?v=1.6"></script>
     <script src="arcade-commands/manager.js?v=1.2"></script>
@@ -1719,12 +1805,12 @@
     <script src="arcade-workshop-manager.js?v=1.0"></script>
     <script src="amd-optimizations.js?v=1.0"></script>
     <script src="arcade-chat-context.js?v=1.1"></script>
-    <script src="arcade-chat.js?v=1.54" defer></script>
-    <script type="module" src="app-v3.js?v=1.38"></script>
+    <script src="arcade-chat.js?v=1.62" defer></script>
+    <script type="module" src="app-v3.js?v=1.41"></script>
     <script src="./studio-overlays.js?v=1.0" defer></script>
     <script src="./studio-auth-overlay.js?v=1.0" defer></script>
     <script src="./studio-publish-fields.js?v=1.1" defer></script>
-    <script src="./studio-publish-overlay.js?v=1.3" defer></script>
+    <script src="./studio-publish-overlay.js?v=1.4" defer></script>
     <script>
         // Signal Share Android Optimization Suite - Detection
         (function() {
@@ -1800,6 +1886,93 @@
         <span>Signal Share Engineering Documentation</span><br>
         <span>&copy; 2026 Deep Dive Series</span>
     </div>
+
+    <nav class="arcade-edge-tabs" id="arcadeEdgeTabs" aria-label="Arcade panels">
+        <button
+            class="arcade-edge-tab endpoint-helper-toggle"
+            id="endpointHelperToggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="endpointHelperPanel"
+        >
+            <span class="arcade-edge-tab-label">Endpoints</span>
+        </button>
+    </nav>
+
+    <aside class="endpoint-helper" id="endpointHelper" aria-hidden="true" aria-label="Companion endpoints">
+        <section class="endpoint-helper-panel" id="endpointHelperPanel" aria-labelledby="endpointHelperTitle">
+            <header class="endpoint-helper-head">
+                <div>
+                    <p class="endpoint-helper-eyebrow">Companion setup</p>
+                    <h2 id="endpointHelperTitle">AI endpoints</h2>
+                    <p>Connect straight to a local provider for models and normal chat. The PC Bridge is optional and only adds desktop capabilities.</p>
+                </div>
+                <button class="endpoint-helper-close" id="endpointHelperClose" type="button">Close</button>
+            </header>
+
+            <div class="endpoint-helper-body">
+                <div class="endpoint-provider-group" role="group" aria-label="Endpoint provider">
+                    <button class="endpoint-provider-button is-active" type="button" data-endpoint-provider="auto" aria-pressed="true">
+                        <strong>Auto</strong>
+                        <span>Try available local providers</span>
+                    </button>
+                    <button class="endpoint-provider-button" type="button" data-endpoint-provider="lm-studio" aria-pressed="false">
+                        <strong>LM Studio</strong>
+                        <span>Local server on port 1234</span>
+                    </button>
+                    <button class="endpoint-provider-button" type="button" data-endpoint-provider="ollama" aria-pressed="false">
+                        <strong>Ollama</strong>
+                        <span>Local server on port 11434</span>
+                    </button>
+                    <button class="endpoint-provider-button" type="button" data-endpoint-provider="openai-compatible" aria-pressed="false">
+                        <strong>OpenAI-compatible</strong>
+                        <span>Private direct /v1 API</span>
+                    </button>
+                </div>
+
+                <label class="endpoint-field" data-endpoint-custom-url hidden>
+                    <span id="endpointDirectBaseUrlLabel">Direct endpoint URL</span>
+                    <small id="endpointDirectBaseUrlHelp">Browser requests never include Bridge credentials.</small>
+                    <input id="endpointCustomBaseUrlInput" type="url" inputmode="url" autocomplete="url" placeholder="http://127.0.0.1:8000/v1" />
+                </label>
+
+                <label class="endpoint-field">
+                    <span>Optional PC Bridge URL</span>
+                    <small>Used only for desktop tools and PC actions, not for direct endpoint chat.</small>
+                    <input id="endpointBridgeUrlInput" type="url" inputmode="url" autocomplete="url" placeholder="http://127.0.0.1:3000" />
+                </label>
+                <label class="endpoint-field">
+                    <span>Optional Bridge secret</span>
+                    <small>Optional handshake secret configured by the PC bridge.</small>
+                    <input id="endpointBridgeSecretInput" type="password" autocomplete="off" placeholder="Optional bridge secret" />
+                </label>
+                <label class="endpoint-field">
+                    <span>Local LLM token</span>
+                    <small>Optional token for an authenticated LAN bridge.</small>
+                    <input id="endpointLocalLlmTokenInput" type="password" autocomplete="off" placeholder="Optional local LLM token" />
+                </label>
+
+                <div class="endpoint-helper-actions">
+                    <button class="endpoint-action-primary" id="endpointTestButton" type="button">Test direct endpoint</button>
+                    <button class="endpoint-action-secondary" id="endpointRefreshButton" type="button">Refresh direct models</button>
+                    <a class="endpoint-action-secondary" id="endpointSetupLink" href="./setup-companion.bat" download>Optional PC Bridge setup</a>
+                </div>
+
+                <p class="endpoint-status" id="endpointStatus" role="status" aria-live="polite">Not tested. Start LM Studio or Ollama, then test the direct endpoint.</p>
+
+                <section class="endpoint-models" aria-labelledby="endpointModelsTitle">
+                    <div class="endpoint-models-head">
+                        <h3 id="endpointModelsTitle">Available models</h3>
+                        <span>Reported by the selected endpoint</span>
+                    </div>
+                    <ul id="endpointModelList">
+                        <li class="endpoint-model-empty">No models loaded yet.</li>
+                    </ul>
+                </section>
+            </div>
+        </section>
+    </aside>
+
     <div class="chat-resize-handle" id="chat-resize-handle"></div>
     <aside class="steam-chat-sidebar" id="arcadeCompanionSidebar">
                 <div class="chat-header">
@@ -1813,15 +1986,11 @@
                     <div style="width: 8px; height: 8px; flex-shrink: 0;"></div>
                     <select id="chat-model-select" style="background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 0.6rem; font-weight: 700; padding: 0; cursor: pointer; outline: none; text-transform: uppercase; margin: 0;">
                         <option value="auto" style="background: #1a1a1a;">Auto-Select</option>
-                        <option value="deepseek-r1-distill-qwen-1.5b" style="background: #1a1a1a;">DeepSeek R1 Distill (1.5B)</option>
-                        <option value="google/gemma-4-e2b" style="background: #1a1a1a;">Gemma 4 E2B</option>
-                        <option value="google/gemma-4-e4b" style="background: #1a1a1a;">Gemma 4 E4B</option>
-                        <option value="qwen/qwen3.5-9b" style="background: #1a1a1a;">Qwen 3.5 (9B)</option>
                     </select>
                 </div>
-                <div id="engine-status-container" style="display: flex; align-items: center; gap: 8px; font-size: 0.55rem; font-weight: 700; color: rgba(255,255,255,0.3);">
-                    <div id="engine-status-dot" style="width: 8px; height: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; flex-shrink: 0;"></div>
-                    <span id="engine-status-text">LLM BRIDGE DISCONNECTED</span>
+                <div id="engine-status-container" class="engine-status-container" style="display: flex; align-items: center; gap: 8px; font-size: 0.55rem; font-weight: 700; color: rgba(255,255,255,0.3);">
+                    <div id="engine-status-dot" class="engine-status-dot" style="width: 8px; height: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; flex-shrink: 0;"></div>
+                    <span id="engine-status-text" class="engine-status-text">AI ENDPOINT CHECKING</span>
                 </div>
             </div>
 
@@ -1841,69 +2010,35 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
         </div>
-        </div>
 
-                <div id="chat-security" class="chat-security-view" style="display: none; flex: 1; flex-direction: column; padding: 15px; overflow-y: auto; background: rgba(0,0,0,0.85); color: #fff; font-family: 'Space Grotesk', sans-serif;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#67c1f5" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                <h3 style="margin: 0; font-size: 1.1rem; color: #67c1f5;">Security Dashboard</h3>
+        <div id="chat-security" class="chat-security-view" style="display: none;">
+            <div class="chat-security-head">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                <div>
+                    <p>Companion controls</p>
+                    <h3>Connection &amp; privacy</h3>
+                </div>
             </div>
 
-            <div style="margin-bottom: 20px; padding: 12px; background: rgba(103, 193, 245, 0.1); border-radius: 8px; border: 1px solid rgba(103, 193, 245, 0.2);">
-                <p style="margin: 0; font-size: 0.8rem; line-height: 1.4; color: #ccc;">
-                    Manage your bridge handshake and lock this PC to your specific device. Settings are saved only in this browser.
-                </p>
+            <div class="chat-security-notice">
+                <strong>Bridge credentials have one home.</strong>
+                <p>Manage the bridge URL, optional secret, local token, and provider in Settings &gt; AI &amp; PC Bridge. Signal Share does not claim a browser-only hardware lock or IP-ban firewall.</p>
+                <button class="chat-security-primary" id="companionOpenAiSettingsButton" type="button">Open AI &amp; PC Bridge settings</button>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 15px;">
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Bridge Handshake Secret</label>
-                    <input type="password" id="sidebar-bridge-secret" placeholder="Optional secret key" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none;">
+            <div class="chat-security-notice is-muted">
+                <strong>Provider keys stay server-side.</strong>
+                <p>The endpoint helper stores connection preferences in this browser. OpenAI-compatible API credentials must remain in the PC bridge or server environment.</p>
+            </div>
+
+            <div class="chat-security-tools">
+                <div>
+                    <strong>LM Studio MCP tools</strong>
+                    <p>Select a server, then authorize one exact tool per request with <code>/mcp read_file</code>. No MCP tool is provided without that directive.</p>
                 </div>
-
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Bridge URL (PC IP)</label>
-                    <input type="text" id="sidebar-bridge-url" placeholder="http://192.168.x.x:3000" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none;">
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Local LLM Token</label>
-                    <input type="password" id="sidebar-local-llm-token" placeholder="Optional LAN auth token" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none;">
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px; background: rgba(103, 193, 245, 0.08); border: 1px solid rgba(103, 193, 245, 0.2); border-radius: 8px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.65);">LM Studio MCP Tools</label>
-                    <p style="margin: 0; font-size: 0.72rem; line-height: 1.4; color: rgba(255,255,255,0.6);">
-                        Select a server, then authorize one exact tool per request with <code>/mcp read_file</code>. Without that directive, no MCP tool is provided to the model.
-                    </p>
-                    <div id="sidebar-lm-studio-mcp-tools" style="min-height: 36px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 6px; font-size: 0.75rem; color: rgba(255,255,255,0.55);">
-                        Open Security Dashboard to load tools.
-                    </div>
-                    <button type="button" onclick="refreshLmStudioMcpTools()" style="padding: 8px; background: transparent; border: 1px solid #333; border-radius: 6px; color: #67c1f5; font-size: 0.7rem; font-weight: 700; cursor: pointer;">Refresh LM Studio Tools</button>
-                    <div id="sidebar-lm-studio-mcp-status" aria-live="polite" style="font-size: 0.7rem; line-height: 1.4; color: rgba(255,255,255,0.55);"></div>
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Device ID (Hardware Lock)</label>
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" id="sidebar-device-id" placeholder="Optional device token" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid #333; border-radius: 6px; color: white; outline: none; font-size: 0.75rem;">
-                        <button onclick="lockToThisDevice()" style="padding: 0 12px; background: #333; border: none; border-radius: 6px; color: #67c1f5; font-size: 0.7rem; font-weight: 700; cursor: pointer;">This PC</button>
-                    </div>
-                </div>
-
-                <button onclick="saveSecurityDashboard()" style="width: 100%; padding: 12px; background: #67c1f5; border: none; border-radius: 6px; color: #000; font-weight: 800; text-transform: uppercase; margin-top: 10px; cursor: pointer;">Save Security Settings</button>
-                
-                <div id="security-save-status" style="text-align: center; font-size: 0.75rem; height: 1.2rem;"></div>
-
-                <hr style="border: 0; border-top: 1px solid #222; margin: 15px 0;">
-
-                <div id="banned-ips-section">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.5);">Active IP Bans</label>
-                    <div id="banned-ips-list" style="margin-top: 10px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 0.75rem; color: #ff5555; border: 1px solid #440000; min-height: 40px; display: flex; align-items: center; justify-content: center;">
-                        No IPs currently banned.
-                    </div>
-                    <button onclick="refreshBannedIps()" style="width: 100%; margin-top: 10px; padding: 8px; background: transparent; border: 1px solid #333; border-radius: 6px; color: rgba(255,255,255,0.5); font-size: 0.7rem; cursor: pointer;">Refresh Ban List</button>
-                </div>
+                <div id="sidebar-lm-studio-mcp-tools">Connect LM Studio to load its available tools.</div>
+                <button class="chat-security-secondary" type="button" onclick="refreshLmStudioMcpTools()">Refresh LM Studio tools</button>
+                <div id="sidebar-lm-studio-mcp-status" role="status" aria-live="polite"></div>
             </div>
         </div>
         <div id="chat-messages" class="chat-messages">

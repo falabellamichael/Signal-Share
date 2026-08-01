@@ -1,0 +1,18 @@
+{
+  "name": "signal-share-companion",
+  "private": true,
+  "version": "1.1.0",
+  "description": "Local Signal Share AI and Windows media companion.",
+  "type": "module",
+  "scripts": {
+    "start": "node backend/server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@coooookies/windows-smtc-monitor": "1.0.12",
+    "dotenv": "17.4.2",
+    "express": "5.2.1"
+  }
+}

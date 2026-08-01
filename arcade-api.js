@@ -70,7 +70,6 @@ window.saveGameScore = saveGameScore;
 export async function getLeaderboard(gameId, limit = 10) {
     if (!supabase) return [];
 
-    // Join with profiles to get display names
     const { data, error } = await supabase
         .from('game_stats')
         .select(`
@@ -78,11 +77,7 @@ export async function getLeaderboard(gameId, limit = 10) {
             score,
             created_at,
             metadata,
-            user_id,
-            profiles!game_stats_user_id_profiles_fkey (
-                display_name,
-                id
-            )
+            user_id
         `)
         .eq('game_id', gameId)
         .order('score', { ascending: false })
@@ -93,15 +88,21 @@ export async function getLeaderboard(gameId, limit = 10) {
         return [];
     }
 
-    return data.map(row => {
-        // Disambiguate profile data which might come as an object or array depending on relationship hints
-        const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    const { data: profileRows, error: profileError } = await supabase.rpc('get_signal_share_profile_directory');
+    if (profileError) {
+        console.warn('[Arcade API] Profile directory unavailable:', profileError.message || profileError);
+    }
+    const displayNameByUserId = new Map(
+        (Array.isArray(profileRows) ? profileRows : []).map(profile => [profile.id, profile.display_name])
+    );
+
+    return (Array.isArray(data) ? data : []).map(row => {
         return {
             id: row.id,
             score: row.score,
             createdAt: row.created_at,
             metadata: row.metadata,
-            displayName: profile?.display_name || 'Anonymous Player',
+            displayName: displayNameByUserId.get(row.user_id) || 'Anonymous Player',
             userId: row.user_id
         };
     });

@@ -32,7 +32,7 @@ Deno.serve(async (request) => {
 
   const url = new URL(request.url);
   if (request.method === "GET" && url.searchParams.has("state")) {
-    return finishOAuth(request, url);
+    return finishOAuth(url);
   }
   if (request.method !== "POST") {
     return jsonResponse({ error: "Method not allowed." }, 405);
@@ -77,7 +77,7 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: "Social token encryption is not configured." }, 500);
   }
 
-  const returnTo = safeReturnTo(payload.returnTo, request.headers.get("Origin"));
+  const returnTo = safeReturnTo(payload.returnTo);
   if (!returnTo) {
     return jsonResponse({ error: "Social connection return URL is not allowed." }, 400);
   }
@@ -106,7 +106,7 @@ Deno.serve(async (request) => {
   });
 });
 
-async function finishOAuth(request: Request, url: URL) {
+async function finishOAuth(url: URL) {
   const adminClient = createAdminClient();
   const stateToken = readString(url.searchParams.get("state"), 500);
   const { data: state, error: stateError } = await adminClient
@@ -115,7 +115,7 @@ async function finishOAuth(request: Request, url: URL) {
     .eq("state_token", stateToken)
     .maybeSingle<SocialStateRecord>();
 
-  const fallbackReturnTo = safeReturnTo(state?.return_to, request.headers.get("Origin"));
+  const fallbackReturnTo = safeReturnTo(state?.return_to);
   if (stateError || !state || Date.parse(state.expires_at) <= Date.now()) {
     if (state?.id) await adminClient.from("social_oauth_states").delete().eq("id", state.id);
     return redirectResult(fallbackReturnTo, "error", "Social connection expired. Start it again.");
@@ -268,7 +268,7 @@ function readConnectProvider(value: unknown): ConnectProvider | "" {
 }
 
 function redirectResult(returnTo: string, status: "connected" | "error", message: string) {
-  const target = safeReturnTo(returnTo, "");
+  const target = safeReturnTo(returnTo);
   if (!target) {
     return jsonResponse({ status, error: status === "error" ? message : undefined, message }, status === "error" ? 400 : 200);
   }
@@ -278,20 +278,19 @@ function redirectResult(returnTo: string, status: "connected" | "error", message
   return Response.redirect(url.toString(), 303);
 }
 
-function safeReturnTo(value: unknown, requestOrigin: string | null) {
+function safeReturnTo(value: unknown) {
   const raw = readString(value, 2048);
   if (!raw) return "";
   try {
     const url = new URL(raw);
-    if (url.protocol !== "http:" && url.protocol !== "https:" && url.protocol !== "capacitor:") return "";
-    
-    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+    const isLocalHost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if ((url.protocol === "http:" || url.protocol === "https:") && isLocalHost) {
       return url.toString();
     }
+    if (url.protocol === "capacitor:" && isLocalHost) return url.toString();
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
 
     const allowed = new Set(SOCIAL_ALLOWED_RETURN_ORIGINS);
-    const origin = normalizeOrigin(requestOrigin);
-    if (origin) allowed.add(origin);
     return allowed.has(url.origin) ? url.toString() : "";
   } catch (_error) {
     return "";
@@ -308,7 +307,7 @@ function readOriginList(value: unknown) {
 function normalizeOrigin(value: unknown) {
   try {
     const url = new URL(readString(value, 2048));
-    return url.protocol === "http:" || url.protocol === "https:" || url.protocol === "capacitor:" ? url.origin : "";
+    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : "";
   } catch (_error) {
     return "";
   }

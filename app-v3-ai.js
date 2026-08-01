@@ -333,7 +333,8 @@ export async function handleAiThreadMessageSubmit({
         text: body,
         history,
         pageContext: fullContext,
-        attachment: aiAttachment
+        attachment: aiAttachment,
+        conversationId: state.activeThreadId
       });
     } finally {
       state.activeMessages = state.activeMessages.filter((message) => message.id !== thinkingId);
@@ -378,7 +379,8 @@ async function callLocalAI({
   text,
   history = [],
   pageContext = "",
-  attachment = null
+  attachment = null,
+  conversationId = ""
 }) {
   let abortController = new AbortController();
   let stopRequested = false;
@@ -402,25 +404,31 @@ async function callLocalAI({
   const customInstructions = typeof coreInstructions === "function"
     ? coreInstructions()
     : `${localStorage.getItem("ss_ai_custom_instructions") || ""}`.trim().slice(0, 2000);
+  const provider = window.SignalShareLocalLlm?.getProviderPreference?.() || "auto";
+  const endpointBaseUrl = window.SignalShareLocalLlm?.getDirectEndpointBaseUrl?.(provider)
+    || (provider === "openai-compatible" ? window.SignalShareLocalLlm?.getCustomEndpointBaseUrl?.() : "")
+    || "";
+  const aiPayload = {
+    message: text,
+    model: requestModel,
+    provider,
+    endpointBaseUrl,
+    customInstructions,
+    attachment,
+    history: Array.isArray(history) ? history : [],
+    conversationId: `${conversationId || ""}`.trim(),
+    lmStudioMcpTools: typeof window.getSelectedLmStudioMcpTools === "function"
+      ? window.getSelectedLmStudioMcpTools()
+      : [],
+    pageContext: pageContext || "Signal Share"
+  };
 
-  if (typeof window.isBridgeFeatureEnabled === "function" && !window.isBridgeFeatureEnabled()) {
-    localStorage.setItem("ss_bridge_enabled", "1");
-  }
-
-  if (typeof window.bridgeFetch !== "function") {
-    lastError = "Bridge fetch unavailable";
-  } else {
-    const bridgePayload = JSON.stringify({
-      message: text,
-      model: requestModel,
-      customInstructions,
-      attachment,
-      history: Array.isArray(history) ? history : [],
-      lmStudioMcpTools: typeof window.getSelectedLmStudioMcpTools === "function"
-        ? window.getSelectedLmStudioMcpTools()
-        : [],
-      pageContext: pageContext || "Signal Share"
-    });
+  const tryBridgeAi = async (timeoutMs = 180000) => {
+    if (typeof window.bridgeFetch !== "function") {
+      lastError = "Bridge fetch unavailable";
+      return false;
+    }
+    const bridgePayload = JSON.stringify(aiPayload);
     const candidateChatPaths = ["/api/local-llm/chat", "/api/llm/chat"];
 
     for (const chatPath of candidateChatPaths) {
@@ -428,7 +436,7 @@ async function callLocalAI({
         const response = await window.bridgeFetch(chatPath, {
           method: "POST",
           signal: abortController.signal,
-          timeoutMs: 0,
+          timeoutMs,
           body: bridgePayload
         });
 
@@ -456,7 +464,7 @@ async function callLocalAI({
         }
       } catch (error) {
         if (stopRequested) {
-          return "🛑 [Signal Protocol] AI request stopped.";
+          return false;
         }
         const bridgeDisabled = error?.name === "BridgeDisabledError";
         let nextError = bridgeDisabled
@@ -483,6 +491,44 @@ async function callLocalAI({
 
       if (reply !== null) break;
     }
+    return reply !== null;
+  };
+
+  const bridgePreferred = typeof window.shouldPreferPcBridgeForAi === "function"
+    ? await window.shouldPreferPcBridgeForAi({ signal: abortController.signal, timeoutMs: 2500 })
+    : window.isPcBridgeKnownOnline?.() === true;
+  if (bridgePreferred) await tryBridgeAi(180000);
+
+  if (reply === null && !stopRequested && typeof window.SignalShareLocalLlm?.chatDirect === "function") {
+    try {
+      const direct = await window.SignalShareLocalLlm.chatDirect({
+        ...aiPayload,
+        endpointBaseUrl: undefined,
+        lmStudioMcpTools: []
+      }, {
+        signal: abortController?.signal,
+        timeoutMs: 180000
+      });
+      const directReply = `${direct?.reply || ""}`.trim();
+      if (directReply) {
+        reply = directReply;
+        window.updateEngineStatus?.(true, { source: "direct", reachable: true });
+      }
+    } catch (error) {
+      if (stopRequested || error?.name === "AbortError") {
+        return "🛑 [Signal Protocol] AI request stopped.";
+      }
+      lastError = error?.message || "Direct endpoint request failed";
+      console.warn("[AI Messenger] Direct endpoint request failed:", error);
+    }
+  }
+
+  if (reply === null && !stopRequested && !bridgePreferred) {
+    await tryBridgeAi(10000);
+  }
+
+  if (stopRequested) {
+    return "🛑 [Signal Protocol] AI request stopped.";
   }
 
   if (reply !== null) {
@@ -490,7 +536,7 @@ async function callLocalAI({
   }
 
   if (lastError && lastError !== "Bridge disabled") {
-    console.warn(`[AI Messenger] Primary bridge failed (${lastError}). Switching to Offline Protocol.`);
+    console.warn(`[AI Messenger] Local AI failed (${lastError}). Switching to Offline Protocol.`);
   }
 
   return getGlobalProtocolOfflineResponse(text);
@@ -533,9 +579,9 @@ function getGlobalProtocolOfflineResponse(text) {
   }
 
   const fallbacks = [
-    "📶 [Arcade Protocol]: My advanced logic core is currently out of range. Check if your Arcade Companion bridge is running on your PC!",
-    "📡 [Arcade Protocol]: Communication with the main intelligence core is unstable. Ensure the bridge server is active and try again.",
-    "🕹️ [Arcade Protocol]: Sync failed. I'm relying on cached arcade data. If you're on a real device, check your bridge IP settings!",
+    "📶 [Arcade Protocol]: No local AI endpoint is reachable. Start LM Studio or Ollama, then check the Endpoints tab.",
+    "📡 [Arcade Protocol]: The selected model endpoint is unavailable or blocked by browser CORS. The PC Bridge is optional for normal chat.",
+    "🕹️ [Arcade Protocol]: Sync failed, so I'm relying on cached arcade data. Check the provider URL and load a model.",
     "🎮 [Arcade Protocol]: My logic processors are running local-only. (Bridge unreachable). I can still help with game tips though!"
   ];
 

@@ -102,7 +102,8 @@ To enable hosted posting on GitHub Pages:
 3. In Supabase Authentication, enable Email as a sign-in provider and keep Confirm email turned on if you want activation emails.
 4. In Supabase Authentication > URL Configuration:
    - Set `Site URL` to your GitHub Pages URL
-   - Add your GitHub Pages URL to `Redirect URLs`
+   - Add the complete GitHub Pages app URL to `Redirect URLs`
+   - Add each local app URL you actually use for Supabase Auth testing. For this app, use entries such as `http://localhost:3000/**` and `http://127.0.0.1:3000/**` when you need any local path. Do not enter the literal placeholder `http://localhost/:<port>`.
 5. In Supabase Storage, confirm the `media` bucket exists and is public.
 6. Open `config.js`.
 7. Fill in:
@@ -130,21 +131,26 @@ Apply `supabase/schema.sql` so Supabase creates the private `social_connections`
 - `supabase/functions/social-connect/index.ts`
 - `supabase/functions/social-publish/index.ts`
 
-Deploy `social-connect` with `--no-verify-jwt` so X and LinkedIn can reach its OAuth callback. Signed-in connection actions are still checked inside the function. Keep normal JWT verification on `social-publish`.
+The checked-in `supabase/config.toml` disables gateway JWT verification only for `social-connect`, because provider callbacks do not carry a Supabase user JWT. The function still verifies the signed-in user inside every browser `status`, `start`, and `disconnect` POST. `social-publish` keeps gateway JWT verification enabled. After deployment, `supabase functions list` must show `social-connect` with `verify_jwt` set to `false` and `social-publish` set to `true`.
 
 The connected-account implementation supports direct posting through X, LinkedIn, Facebook Pages, and Instagram accounts returned by each user's OAuth connection. If a provider returns multiple connected accounts, the Socials panel lets the user choose the account before posting.
 
 Set these Edge Function secrets before users connect providers:
 
 - `SOCIAL_TOKEN_ENCRYPTION_KEY`: a long random secret used to encrypt stored provider tokens
-- `SOCIAL_ALLOWED_RETURN_ORIGINS`: comma-separated browser origins allowed after OAuth callbacks, for example the hosted site origin and local dev origin
+- `SOCIAL_ALLOWED_RETURN_ORIGINS`: comma-separated production browser origins allowed after OAuth callbacks. Use origins only, without a path, for example `https://owner.github.io`. Local `localhost` / `127.0.0.1` URLs and `capacitor://localhost` are handled as explicit development app returns.
 - X OAuth: `X_OAUTH_CLIENT_ID`, optional `X_OAUTH_CLIENT_SECRET`
 - LinkedIn OAuth: `LINKEDIN_OAUTH_CLIENT_ID`, `LINKEDIN_OAUTH_CLIENT_SECRET`
 - Meta OAuth for Facebook Pages and Instagram accounts: `META_OAUTH_APP_ID`, `META_OAUTH_APP_SECRET`, optional `META_GRAPH_API_VERSION`
 
-Register the Social connect callback URL in each provider app before testing OAuth:
+There are two different redirect allowlists and they must not be mixed up:
 
-- `https://<project-ref>.supabase.co/functions/v1/social-connect`
+- Supabase Auth > URL Configuration controls where Supabase sign-in returns to the Signal Share app. Put the production app URL and any local Supabase Auth test URLs there.
+- X, LinkedIn, and Meta developer settings control where those providers return after account connection. Register this exact Edge Function callback URL in every provider app:
+
+- `https://gswptxeikjmihdjxoiar.supabase.co/functions/v1/social-connect`
+
+Do not register a GitHub Pages URL or localhost URL as the X, LinkedIn, or Meta provider callback. The Edge Function validates OAuth state, stores the connection, and then returns the browser to an allowed Signal Share app origin.
 
 X must grant user scopes for posting and refreshable access, including `tweet.write` and `offline.access`. LinkedIn must grant `w_member_social`; the current connection flow also requests OpenID profile scopes so it can identify the connected member. Meta OAuth needs Page post access for Facebook and Instagram publishing access for Instagram accounts available to that Meta user. Facebook, X, and LinkedIn accept text with an optional link URL in the Social fields. Instagram direct publishing still needs a public image URL.
 
@@ -246,43 +252,44 @@ Signal Share features a deeply integrated, "stacked" AI assistant called the **A
     - **Messenger Integration**: Use the `[COMPOSE]` tool to draft messages and focus the communication dock.
 - **Multimodal Support**: Attach images, videos, or documents to your chat for the AI to analyze and discuss using vision-capable local models.
 
-### Local LLM & Fortress Mode Setup
+### Direct Local AI and Optional PC Bridge
 
-The Arcade Companion is designed to run primarily on **Local LLM** infrastructure to ensure maximum privacy and zero latency. To enable the full "stacked" AI experience:
+Normal model discovery and chat do not require the Signal Share PC Bridge. Open the **Endpoints** tab, choose a provider, and test it directly:
 
-#### 1. Configure the Bridge
-The bridge acts as the secure tunnel between the website and your computer.
-- Navigate to the `backend/` directory.
-- Create a `.env` file (see `.env.example` if available) and define your secrets:
-  ```env
-  SIGNAL_SHARE_BRIDGE_SECRET=your_secure_passphrase
-  SIGNAL_SHARE_DEVICE_ID=your_hardware_fingerprint
-  SIGNAL_SHARE_LOCAL_LLM_TOKEN=shared_phone_token
-  # Optional LAN mode for phone access:
-  SIGNAL_SHARE_BRIDGE_LAN=true
-  # Optional explicit bind override:
-  # SIGNAL_SHARE_BRIDGE_BIND=0.0.0.0
-  ```
-- Install dependencies and start the bridge:
-  ```powershell
-  npm install
-  node backend/server.js
-  ```
-- In the app settings, set:
-  - `Bridge URL (PC IP)` to your computer bridge URL, for example `http://192.168.1.50:3000`
-  - `Local LLM Token` to the same value as `SIGNAL_SHARE_LOCAL_LLM_TOKEN`
+- **LM Studio** defaults to `http://127.0.0.1:1234/v1` and uses its OpenAI-compatible model and chat endpoints.
+- **Ollama** defaults to `http://127.0.0.1:11434` and uses `/api/tags` plus `/api/chat`.
+- **OpenAI-compatible** accepts an explicit private or loopback `/v1` base URL. Public URLs, URL credentials, query strings, and fragments are rejected.
 
-#### 2. Secure with Fortress Mode
-Fortress Mode protects your computer from unauthorized remote access:
-- **Handshake Secret**: Only devices providing the matching `X-Bridge-Secret` header can execute system commands.
-- **Hardware Locking**: Use the **Security Dashboard** in the Arcade Sidebar to lock the bridge to your specific device ID. The server will reject any commands coming from other hardware, even if they have your secret key.
-- **Automatic IP Banning**: The `SecurityEngine` automatically applies permanent IP bans to any address attempting path traversal or brute-forcing your handshake.
+Direct mode sends only ordinary model/chat JSON. It never forwards the PC Bridge secret, local LLM token, device identifiers, browser auth tokens, or provider API keys. Direct mode therefore has no desktop control, media control, app launching, local-file tools, or MCP. Install the PC Bridge only when those extra capabilities are wanted.
 
-#### 3. Connect your LLM
-The bridge is compatible with any OpenAI-standard local server:
-- **Ollama**: Run `ollama serve` and ensure your model is pulled.
-- **LM Studio / LocalAI**: Start the local server on port `1234` or `8080`.
-- In the Arcade Companion UI, select your model from the dropdown (e.g., Qwen 3.5, Gemma 4, or DeepSeek R1).
+Browser access requires the provider to allow the Signal Share page origin:
+
+- Start LM Studio with web CORS enabled, for example `lms server start --cors`. Keep it bound to `127.0.0.1` unless LAN access is intentionally required.
+- Ollama already permits loopback web origins. For the published site or another origin, add only the exact trusted origin before starting Ollama. In PowerShell, use `$env:OLLAMA_ORIGINS="https://falabellamichael.github.io"; ollama serve`.
+- A browser may ask for Local Network Access before a public HTTPS site can contact localhost or a LAN endpoint. This permission is separate from Signal Share sign-in.
+
+#### Optional: Install the PC Bridge
+
+Select **Optional PC Bridge setup**, run the downloaded installer once, and allow the normal Windows confirmation. The installer creates a per-user runtime, starts it, and pairs the browser without requiring an administrator account. The default listener is loopback-only.
+
+For a manual or explicit LAN setup, create `backend/.env` and configure a matching credential before enabling LAN mode:
+
+```env
+SIGNAL_SHARE_BRIDGE_SECRET=your_secure_passphrase
+SIGNAL_SHARE_LOCAL_LLM_TOKEN=shared_phone_token
+SIGNAL_SHARE_BRIDGE_LAN=true
+# Optional explicit bind override:
+# SIGNAL_SHARE_BRIDGE_BIND=0.0.0.0
+```
+
+Then install dependencies and start the Bridge:
+
+```powershell
+npm install
+node backend/server.js
+```
+
+In Settings, enter the Bridge URL and matching credential, then select **Connect/test PC Bridge**. Do not expose the Bridge to a LAN without a secret or local LLM token.
 
 #### Optional: Use LM Studio MCP Tools
 
@@ -311,12 +318,6 @@ Normal local chat continues to use the OpenAI-compatible endpoint; messages with
    The backend sends `allowed_tools: ["read_file"]` for that request only. A selected server receives no MCP-enabled request unless the message contains an explicit `/mcp <tool_name>` directive. To authorize a write-capable tool, the message must explicitly name that write tool.
 
 The filesystem MCP example is not a web search tool; web search requires a separate MCP server that provides web access. Do not store the LM Studio API token in frontend files, browser local storage, or source control. Signal Share's existing strict application and media tools continue to use their current bridge allowlists.
-
-#### 4. Dashboard Management
-Monitor your security status in real-time:
-- Open the **Arcade Companion Sidebar**.
-- Click the **Security** button (shield icon) or use the shortcut in the **Main Settings** panel.
-- View live audit logs, manage active IP bans, and verify your hardware lock status.
 
 ## Remote Media & PC Bridge
 

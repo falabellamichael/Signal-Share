@@ -1554,6 +1554,354 @@ h1 {
   display: none;
 }
 
+/* Comfy-style settings shell: categories stay left on desktop and move above
+   the active detail page on narrower screens. Scoped to the main settings
+   dialog so notification and keyboard-shortcut dialogs keep their compact size. */
+#settingsPanel .settings-dialog {
+  width: min(1120px, calc(100vw - 48px));
+  height: min(780px, calc(var(--viewport-visible-height, 100dvh) - 48px));
+  max-height: calc(var(--viewport-visible-height, 100dvh) - 48px);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 20px;
+  overflow: hidden;
+  padding: 28px;
+}
+
+#settingsPanel .settings-shell-head {
+  gap: 6px;
+  margin: 0;
+  padding-right: 64px;
+}
+
+#settingsPanel .settings-shell-head h2 {
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+}
+
+#settingsPanel .settings-shell-head p:last-child {
+  max-width: 780px;
+  font-size: 0.92rem;
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(210px, 248px) minmax(0, 1fr);
+  gap: 24px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.settings-navigation {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  padding-right: 18px;
+  border-right: 1px solid var(--line);
+  scrollbar-width: thin;
+}
+
+.settings-nav {
+  display: grid;
+  gap: 9px;
+}
+
+.settings-nav-item {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  min-height: 72px;
+  padding: 13px 14px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.settings-nav-item strong {
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.settings-nav-item span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.settings-nav-item:hover,
+.settings-nav-item:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  transform: translateX(2px);
+}
+
+.settings-nav-item.is-active,
+.settings-nav-item[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--line));
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.settings-nav-note {
+  margin: auto 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.settings-detail {
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 2px 12px 8px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 35%, transparent) transparent;
+}
+
+.settings-page {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+  padding-bottom: 8px;
+}
+
+.settings-page[hidden] {
+  display: none !important;
+}
+
+.settings-page-head {
+  display: grid;
+  gap: 7px;
+}
+
+.settings-page-head h3 {
+  margin: 0;
+  font-size: clamp(1.45rem, 2.5vw, 2rem);
+  line-height: 1.1;
+}
+
+.settings-page-head p {
+  margin: 0;
+}
+
+.settings-page-head p:last-child {
+  max-width: 720px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.settings-field-wide {
+  grid-column: 1 / -1;
+}
+
+.settings-field textarea {
+  resize: vertical;
+}
+
+.settings-connection-card {
+  display: grid;
+  gap: 8px;
+  padding: 17px 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.settings-connection-card strong {
+  font-size: 1rem;
+}
+
+.settings-connection-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.settings-status-badge {
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-status-badge.is-waiting {
+  background: rgba(217, 133, 23, 0.13);
+  color: #9b5a06;
+}
+
+.settings-publishing-card {
+  border-color: rgba(217, 133, 23, 0.25);
+  background: rgba(217, 133, 23, 0.06);
+}
+
+.settings-connection-actions .button {
+  flex: 1 1 180px;
+}
+
+.settings-live-status {
+  margin: -4px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+  #settingsPanel .settings-dialog {
+    width: calc(100vw - 24px) !important;
+    height: min(820px, calc(var(--viewport-visible-height, 100dvh) - 24px));
+    max-height: calc(var(--viewport-visible-height, 100dvh) - 24px);
+    gap: 16px !important;
+    padding: 20px !important;
+    border-radius: 24px !important;
+  }
+
+  #settingsPanel .settings-shell-head {
+    padding-right: 52px;
+  }
+
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .settings-navigation {
+    overflow: visible;
+    padding: 0 0 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .settings-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .settings-nav-item {
+    min-height: 62px;
+    padding: 10px;
+  }
+
+  .settings-nav-item:hover,
+  .settings-nav-item:focus-visible {
+    transform: translateY(-1px);
+  }
+
+  .settings-nav-item.is-active,
+  .settings-nav-item[aria-selected="true"] {
+    box-shadow: inset 0 -3px 0 var(--accent);
+  }
+
+  .settings-nav-note {
+    display: none;
+  }
+
+  .settings-detail {
+    padding-right: 6px;
+  }
+}
+
+@media (max-width: 620px) {
+  #settingsPanel {
+    align-items: stretch;
+    padding: 6px;
+  }
+
+  #settingsPanel .settings-dialog {
+    width: 100% !important;
+    height: calc(var(--viewport-visible-height, 100dvh) - 12px);
+    max-height: calc(var(--viewport-visible-height, 100dvh) - 12px);
+    gap: 12px !important;
+    padding: 16px !important;
+    border-radius: 18px !important;
+  }
+
+  #settingsPanel .settings-close {
+    top: 14px;
+    right: 14px;
+    width: 40px;
+    height: 40px;
+  }
+
+  #settingsPanel .settings-shell-head {
+    gap: 3px;
+    padding-right: 46px;
+  }
+
+  #settingsPanel .settings-shell-head h2 {
+    font-size: 1.45rem;
+  }
+
+  #settingsPanel .settings-shell-head p:last-child {
+    display: none;
+  }
+
+  .settings-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-nav-item {
+    min-height: 48px;
+    gap: 0;
+    padding: 9px 10px;
+    border-radius: 12px;
+  }
+
+  .settings-nav-item span {
+    display: none;
+  }
+
+  .settings-detail {
+    padding: 0 3px 8px 0;
+  }
+
+  .settings-page {
+    gap: 16px;
+  }
+
+  .settings-page-head h3 {
+    font-size: 1.35rem;
+  }
+
+  .settings-page-head p:last-child {
+    font-size: 0.84rem;
+  }
+
+  .settings-fields {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 14px !important;
+  }
+
+  .settings-actions .button {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+}
+
 @media (max-width: 980px) and (orientation: landscape) {
   .settings-dialog {
     top: calc(34px + var(--status-bar-safe-space));

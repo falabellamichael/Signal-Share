@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png?v=5" />
     <link rel="stylesheet" href="./questions-guide.css?v=1.5">
     <link rel="stylesheet" href="./android-optimizations.css?v=1.6">
-    <link rel="stylesheet" href="arcade-chat.css?v=1.14">
+    <link rel="stylesheet" href="arcade-chat.css?v=1.19">
     <link rel="stylesheet" href="workshop-editor-ai-fix.css?v=1.0">
     <script>
         // Signal Share Android Optimization Suite - Detection
@@ -1325,9 +1325,9 @@
                     <button type="button" class="workshop-mode-btn" id="workshop-mode-edit-sidebar" data-workshop-mode="edit" aria-selected="false" onclick="setWorkshopTileMode('edit')">Edit</button>
                 </div>
                 <div style="font-size: 0.7rem; color: rgba(255,255,255,0.4); margin-bottom: 8px;">ENGINE STATUS</div>
-                <div id="engine-status-container" style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; font-weight: 700; color: #75b022;">
-                    <div id="engine-status-dot" style="width: 8px; height: 8px; background: #75b022; border-radius: 50%;"></div>
-                    <span id="engine-status-text">LOCAL LLM ONLINE</span>
+                <div class="engine-status-container" style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; font-weight: 700; color: rgba(255,255,255,0.3);">
+                    <div class="engine-status-dot" style="width: 8px; height: 8px; background: rgba(255,255,255,0.2); border-radius: 50%;"></div>
+                    <span class="engine-status-text">AI ENDPOINT CHECKING</span>
                 </div>
             </div>
         </aside>
@@ -1926,16 +1926,12 @@
                         <div style="width: 8px; height: 8px; flex-shrink: 0;"></div>
                         <select id="chat-model-select" style="background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 0.6rem; font-weight: 700; padding: 0; cursor: pointer; outline: none; text-transform: uppercase; margin: 0;">
                             <option value="auto" style="background: #1a1a1a;">Auto-Select</option>
-                            <option value="deepseek-r1-distill-qwen-1.5b" style="background: #1a1a1a;">DeepSeek R1 Distill (1.5B)</option>
-                            <option value="google/gemma-4-e2b" style="background: #1a1a1a;">Gemma 4 E2B</option>
-                            <option value="google/gemma-4-e4b" style="background: #1a1a1a;">Gemma 4 E4B</option>
-                            <option value="qwen/qwen3.5-9b" style="background: #1a1a1a;">Qwen 3.5 (9B)</option>
                         </select>
                     </div>
                     <!-- Bridge Engine Status Row -->
-                    <div id="engine-status-container" style="display: flex; align-items: center; gap: 8px; font-size: 0.55rem; font-weight: 700; color: rgba(255,255,255,0.3);">
-                        <div id="engine-status-dot" style="width: 8px; height: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; flex-shrink: 0;"></div>
-                        <span id="engine-status-text">LLM BRIDGE DISCONNECTED</span>
+                    <div id="engine-status-container" class="engine-status-container" style="display: flex; align-items: center; gap: 8px; font-size: 0.55rem; font-weight: 700; color: rgba(255,255,255,0.3);">
+                        <div id="engine-status-dot" class="engine-status-dot" style="width: 8px; height: 8px; background: rgba(255,255,255,0.2); border-radius: 50%; flex-shrink: 0;"></div>
+                        <span id="engine-status-text" class="engine-status-text">AI ENDPOINT CHECKING</span>
                     </div>
                 </div>
                 <div style="display: flex; gap: 8px;">
@@ -2022,7 +2018,7 @@
     </div>
 
     <script src="config.js?v=1.5"></script>
-    <script src="local-llm-connectivity.js?v=1.0"></script>
+    <script src="local-llm-connectivity.js?v=1.4"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="leaderboard-metrics.js?v=1.1"></script>
     <script type="module">
@@ -2144,7 +2140,7 @@
     <script src="arcade-commands/plan.js?v=1.0"></script>
     <script src="ai-chatbot.js?v=1.0"></script>
     <script src="arcade-chat-context.js?v=1.0"></script>
-    <script src="arcade-chat.js?v=1.53" defer></script>
+    <script src="arcade-chat.js?v=1.62" defer></script>
     <script>
         window.resetArcadeChat = window.startNewChat;
     </script>

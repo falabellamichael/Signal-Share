@@ -1,66 +1,60 @@
 @echo off
-setlocal
+setlocal EnableExtensions DisableDelayedExpansion
 title Signal Share Companion Setup
-
-:: Color 0B is Aqua on Black, looks modern
 color 0B
 
 echo.
-echo  --------------------------------------------------------
+echo  ========================================================
 echo    SIGNAL SHARE COMPANION
-echo    Desktop Media Bridge Setup
-echo  --------------------------------------------------------
+echo    One-click AI and Windows media bridge setup
+echo  ========================================================
 echo.
-echo  This tool will prepare your PC to sync YouTube, Spotify,
-echo  and other system media with the Signal Share player.
+echo  This installs under your Windows user profile, preserves
+echo  existing settings, starts the bridge, verifies it, and
+echo  securely pairs the Signal Share website. No admin needed.
 echo.
 
-:: Check for Node.js
-node -v >nul 2>&1
-if %errorlevel% neq 0 (
-    color 0C
-    echo  [!] ERROR: Node.js was not found.
-    echo.
-    echo  The companion requires Node.js to run. 
-    echo  Please download it from: https://nodejs.org/
-    echo.
-    pause
-    exit /b 1
+set "SS_POWERSHELL=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
+if not exist "%SS_POWERSHELL%" (
+  color 0C
+  echo  [ERROR] Windows PowerShell was not found.
+  pause
+  exit /b 1
 )
 
-echo  [STEP 1] Installing core components...
-echo  (This may take a minute on the first run)
-echo.
-call npm install --no-audit --no-fund --quiet
-if %errorlevel% neq 0 (
-    color 0C
-    echo  [!] ERROR: Failed to install components.
-    echo  Check your internet connection and try again.
-    echo.
-    pause
-    exit /b 1
+set "SS_RUNTIME_BASE=https://falabellamichael.github.io/Signal-Share/companion-runtime"
+if defined SIGNAL_SHARE_COMPANION_RUNTIME_BASE_URL set "SS_RUNTIME_BASE=%SIGNAL_SHARE_COMPANION_RUNTIME_BASE_URL%"
+set "SS_SITE_URL=https://falabellamichael.github.io/Signal-Share/"
+if defined SIGNAL_SHARE_SITE_URL set "SS_SITE_URL=%SIGNAL_SHARE_SITE_URL%"
+set "SS_SETUP_FILE=%TEMP%\SignalShareCompanionSetup-%RANDOM%-%RANDOM%.ps1"
+
+echo  [1/2] Downloading the current companion installer...
+"%SS_POWERSHELL%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri '%SS_RUNTIME_BASE%/setup.ps1' -OutFile '%SS_SETUP_FILE%'"
+if errorlevel 1 (
+  color 0C
+  echo.
+  echo  [ERROR] Setup could not be downloaded from the official site.
+  echo  Check your internet connection and try again.
+  if exist "%SS_SETUP_FILE%" del /q "%SS_SETUP_FILE%" >nul 2>&1
+  pause
+  exit /b 1
 )
 
-echo.
-echo  [STEP 2] Launching the Media Bridge...
-echo.
-echo  --------------------------------------------------------
-echo    SUCCESS! The bridge is now active.
-echo.
-echo    WHAT IS HAPPENING?
-echo    We are running 'npm start', which triggers a local
-echo    web server on your PC. This server securely bridges
-echo    the Signal Share website to your Windows media keys.
-echo.
-echo    IMPORTANT: Keep this window open!
-echo    If you close it, the Media Player won't be able
-echo    to control your PC playback.
-echo  --------------------------------------------------------
-echo.
+echo  [2/2] Installing, starting, and pairing the companion...
+"%SS_POWERSHELL%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SS_SETUP_FILE%" -RuntimeBaseUrl "%SS_RUNTIME_BASE%" -SiteUrl "%SS_SITE_URL%"
+set "SS_EXIT=%ERRORLEVEL%"
+del /q "%SS_SETUP_FILE%" >nul 2>&1
 
-:: Run the bridge
-npm start
+if not "%SS_EXIT%"=="0" (
+  color 0C
+  echo.
+  echo  Setup did not complete. Review the error above, then try again.
+  pause
+  exit /b %SS_EXIT%
+)
 
+color 0A
 echo.
-echo  The bridge has stopped.
-pause
+echo  Setup is complete. Signal Share has opened in your browser.
+timeout /t 8 /nobreak >nul
+exit /b 0

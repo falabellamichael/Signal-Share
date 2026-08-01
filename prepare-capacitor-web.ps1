@@ -24,7 +24,7 @@ $excludeFiles = @(
 )
 
 # Specific directories to copy entirely
-$directories = @("icons", "arcade-commands", "src")
+$directories = @("icons", "arcade-commands", "src", "companion-runtime")
 
 # Clean and recreate dist
 if (Test-Path -LiteralPath $dist) {
@@ -58,6 +58,26 @@ foreach ($directory in $directories) {
   }
 }
 
+Write-Host "`n--- Packaging Companion Installer ---" -ForegroundColor Cyan
+$companionSetupSource = Join-Path $root "setup-companion.bat"
+$companionManifestSource = Join-Path $root "companion-runtime-package.json"
+$companionRuntimeDest = Join-Path $dist "companion-runtime"
+$companionBackendDest = Join-Path $companionRuntimeDest "backend"
+New-Item -ItemType Directory -Path $companionBackendDest -Force | Out-Null
+
+if (-not (Test-Path -LiteralPath $companionSetupSource)) { throw "Missing companion installer: setup-companion.bat" }
+if (-not (Test-Path -LiteralPath $companionManifestSource)) { throw "Missing companion runtime manifest: companion-runtime-package.json" }
+Copy-Item -LiteralPath $companionSetupSource -Destination (Join-Path $dist "setup-companion.bat") -Force
+Copy-Item -LiteralPath $companionManifestSource -Destination (Join-Path $companionRuntimeDest "package.json") -Force
+
+$companionBackendFiles = @("server.js", "strict-ai-tools.js", "smtc-query.js")
+foreach ($file in $companionBackendFiles) {
+  $source = Join-Path (Join-Path $root "backend") $file
+  if (-not (Test-Path -LiteralPath $source)) { throw "Missing companion backend file: backend/$file" }
+  Copy-Item -LiteralPath $source -Destination (Join-Path $companionBackendDest $file) -Force
+  Write-Host "[Companion] backend/$file"
+}
+
 Write-Host "`n--- Verifying Critical Dist Files ---" -ForegroundColor DarkCyan
 $criticalDistFiles = @(
   "index.html",
@@ -70,6 +90,13 @@ $criticalDistFiles = @(
   "hero-media-player.js",
   "config.js",
   "notifications.js",
+  "setup-companion.bat",
+  "companion-runtime/setup.ps1",
+  "companion-runtime/start.ps1",
+  "companion-runtime/package.json",
+  "companion-runtime/backend/server.js",
+  "companion-runtime/backend/strict-ai-tools.js",
+  "companion-runtime/backend/smtc-query.js",
   "arcade-commands/manager.js",
   "arcade-commands/edit.js",
   "arcade-commands/rewrite.js",

@@ -8,15 +8,30 @@ if (!(Test-Path $BackendDir)) {
   throw "Backend folder not found: $BackendDir"
 }
 
-$envContent = @"
-PORT=3000
-SIGNAL_SHARE_LM_STUDIO_BASE_URL=http://127.0.0.1:1234
-LM_STUDIO_BASE_URL=http://127.0.0.1:1234
-SIGNAL_SHARE_AI_TEMPERATURE=0.7
-"@
+function Set-DotEnvValue {
+  param(
+    [Parameter(Mandatory = $true)][string]$Content,
+    [Parameter(Mandatory = $true)][string]$Key,
+    [Parameter(Mandatory = $true)][string]$Value
+  )
 
-Set-Content -Path $EnvPath -Value $envContent -Encoding UTF8
-Write-Host "Wrote LM Studio bridge config to $EnvPath"
+  $line = "$Key=$Value"
+  $pattern = "(?m)^$([regex]::Escape($Key))=.*$"
+  if ($Content -match $pattern) {
+    return [regex]::Replace($Content, $pattern, $line)
+  }
+  if (!$Content) { return $line }
+  return "$($Content.TrimEnd())`r`n$line"
+}
+
+$envContent = if (Test-Path -LiteralPath $EnvPath) { Get-Content -LiteralPath $EnvPath -Raw } else { "" }
+$envContent = Set-DotEnvValue -Content $envContent -Key "PORT" -Value "3000"
+$envContent = Set-DotEnvValue -Content $envContent -Key "SIGNAL_SHARE_LM_STUDIO_BASE_URL" -Value "http://127.0.0.1:1234"
+$envContent = Set-DotEnvValue -Content $envContent -Key "LM_STUDIO_BASE_URL" -Value "http://127.0.0.1:1234"
+$envContent = Set-DotEnvValue -Content $envContent -Key "SIGNAL_SHARE_AI_TEMPERATURE" -Value "0.7"
+
+Set-Content -LiteralPath $EnvPath -Value $envContent.Trim() -Encoding UTF8
+Write-Host "Updated LM Studio values in $EnvPath without replacing existing bridge credentials."
 
 Write-Host "Checking LM Studio local server at http://127.0.0.1:1234/v1/models ..."
 try {

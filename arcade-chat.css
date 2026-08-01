@@ -1004,3 +1004,574 @@ body.runner-open .chat-resize-handle {
 .message-user {
     margin-top: 4px;
 }
+
+/* Right-edge Arcade panel stack. The generated Companion tab is moved into
+   #arcadeEdgeTabs by arcade-chat.js; Endpoints uses the same compact geometry. */
+.arcade-edge-tabs {
+    position: fixed;
+    top: 50%;
+    right: 0;
+    z-index: 192;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    transform: translateY(-50%);
+}
+
+.arcade-edge-tab,
+.arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode {
+    position: relative !important;
+    inset: auto !important;
+    display: flex !important;
+    width: 36px !important;
+    height: 142px !important;
+    min-width: 36px;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px;
+    margin: 0 !important;
+    padding: 12px 0 !important;
+    border: 1px solid color-mix(in srgb, var(--arc-accent) 24%, transparent) !important;
+    border-right: 0 !important;
+    border-radius: 10px 0 0 10px !important;
+    background: color-mix(in srgb, var(--arc-bg) 97%, transparent) !important;
+    color: var(--arc-accent) !important;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35) !important;
+    cursor: pointer;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    transform: none !important;
+    transition:
+        width 160ms ease,
+        background-color 160ms ease,
+        border-color 160ms ease !important;
+}
+
+body:not(.chat-collapsed) .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode,
+body.chat-collapsed .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode {
+    display: flex !important;
+}
+
+.arcade-edge-tab:hover,
+.arcade-edge-tab:focus-visible,
+.arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode:hover,
+.arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode:focus-visible {
+    width: 41px !important;
+    border-color: color-mix(in srgb, var(--arc-accent) 58%, transparent) !important;
+    background: color-mix(in srgb, var(--arc-msg-ai-bg) 92%, #000) !important;
+    outline: none;
+    transform: none !important;
+}
+
+.arcade-edge-tab-label,
+.arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode .tab-label {
+    margin: 0 !important;
+    color: var(--arc-accent) !important;
+    font-family: 'Space Grotesk', system-ui, sans-serif !important;
+    font-size: 0.62rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 1.7px !important;
+    line-height: 1 !important;
+    text-transform: uppercase !important;
+    writing-mode: vertical-rl !important;
+    transform: rotate(180deg) !important;
+}
+
+.arcade-edge-tabs svg {
+    flex: 0 0 auto;
+    color: var(--arc-accent) !important;
+    filter: none !important;
+    pointer-events: none;
+}
+
+.endpoint-helper {
+    position: fixed;
+    inset: 0;
+    z-index: 191;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.endpoint-helper-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: grid;
+    width: min(430px, 100vw);
+    height: 100vh;
+    height: 100dvh;
+    grid-template-rows: auto minmax(0, 1fr);
+    border-left: 1px solid var(--arc-border);
+    background: var(--arc-bg);
+    color: var(--arc-msg-ai-text);
+    box-shadow: -18px 0 48px var(--arc-shadow);
+    transform: translateX(100%);
+    transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.endpoint-helper.is-open {
+    pointer-events: auto;
+}
+
+.endpoint-helper.is-open .endpoint-helper-panel {
+    transform: translateX(0);
+}
+
+.endpoint-helper-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 18px 18px;
+    border-bottom: 1px solid var(--arc-border);
+    background: var(--arc-header-bg);
+}
+
+.endpoint-helper-head>div {
+    display: grid;
+    gap: 6px;
+}
+
+.endpoint-helper-head h2,
+.endpoint-helper-head p,
+.endpoint-models-head h3,
+.endpoint-models-head span {
+    margin: 0;
+}
+
+.endpoint-helper-head h2 {
+    color: var(--arc-msg-ai-text);
+    font-size: 1.35rem;
+    line-height: 1.1;
+}
+
+.endpoint-helper-head p:last-child {
+    color: color-mix(in srgb, var(--arc-msg-ai-text) 63%, transparent);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.endpoint-helper-eyebrow {
+    color: var(--arc-accent) !important;
+    font-size: 0.66rem !important;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.endpoint-helper-close {
+    display: inline-flex;
+    width: auto;
+    min-width: 58px;
+    height: 38px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    border: 1px solid var(--arc-border);
+    border-radius: 999px;
+    background: var(--arc-input-area-bg);
+    color: var(--arc-msg-ai-text);
+    font-size: 0.7rem;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.endpoint-helper-close:hover,
+.endpoint-helper-close:focus-visible {
+    border-color: var(--arc-accent);
+    outline: none;
+}
+
+.endpoint-helper-body {
+    display: grid;
+    align-content: start;
+    gap: 17px;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+    scrollbar-width: thin;
+    scrollbar-color: rgba(103, 193, 245, 0.45) transparent;
+}
+
+.endpoint-provider-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+}
+
+.endpoint-provider-button {
+    display: grid;
+    gap: 4px;
+    min-height: 74px;
+    padding: 12px;
+    border: 1px solid var(--arc-border);
+    border-radius: 12px;
+    background: var(--arc-input-area-bg);
+    color: var(--arc-msg-ai-text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.endpoint-provider-button strong {
+    font-size: 0.82rem;
+}
+
+.endpoint-provider-button span {
+    color: color-mix(in srgb, var(--arc-msg-ai-text) 56%, transparent);
+    font-size: 0.69rem;
+    line-height: 1.35;
+}
+
+.endpoint-provider-button:hover,
+.endpoint-provider-button:focus-visible,
+.endpoint-provider-button.is-active,
+.endpoint-provider-button[aria-pressed="true"] {
+    border-color: color-mix(in srgb, var(--arc-accent) 72%, transparent);
+    background: color-mix(in srgb, var(--arc-accent) 10%, transparent);
+    outline: none;
+}
+
+.endpoint-field {
+    display: grid;
+    gap: 6px;
+    color: var(--arc-msg-ai-text);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.endpoint-field[hidden] {
+    display: none !important;
+}
+
+.endpoint-field small {
+    color: color-mix(in srgb, var(--arc-msg-ai-text) 55%, transparent);
+    font-size: 0.69rem;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+.endpoint-field input {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 11px;
+    border: 1px solid var(--arc-border);
+    border-radius: 9px;
+    background: var(--arc-input-wrapper-bg);
+    color: var(--arc-msg-ai-text);
+    font: inherit;
+    font-weight: 500;
+    outline: none;
+}
+
+.endpoint-field input:focus {
+    border-color: var(--arc-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--arc-accent) 12%, transparent);
+}
+
+.endpoint-field input[aria-invalid="true"] {
+    border-color: #ff6b6b;
+    box-shadow: 0 0 0 3px color-mix(in srgb, #ff6b6b 14%, transparent);
+}
+
+.endpoint-helper-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+}
+
+.endpoint-helper-actions button,
+.endpoint-helper-actions a {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 11px;
+    border-radius: 9px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.endpoint-action-primary {
+    border: 1px solid var(--arc-accent);
+    background: var(--arc-accent);
+    color: var(--arc-msg-user-text);
+}
+
+.endpoint-action-secondary {
+    border: 1px solid color-mix(in srgb, var(--arc-accent) 35%, transparent);
+    background: transparent;
+    color: var(--arc-accent);
+}
+
+#endpointSetupLink {
+    grid-column: 1 / -1;
+}
+
+.endpoint-status {
+    margin: 0;
+    padding: 11px 12px;
+    border: 1px solid var(--arc-border);
+    border-radius: 10px;
+    background: var(--arc-input-area-bg);
+    color: color-mix(in srgb, var(--arc-msg-ai-text) 64%, transparent);
+    font-size: 0.72rem;
+    line-height: 1.45;
+}
+
+.endpoint-status[data-state="invalid"] {
+    border-color: color-mix(in srgb, #ff6b6b 55%, var(--arc-border));
+    color: #ff8b8b;
+}
+
+.endpoint-models {
+    display: grid;
+    gap: 10px;
+    padding-top: 2px;
+}
+
+.endpoint-models-head {
+    display: grid;
+    gap: 3px;
+}
+
+.endpoint-models-head h3 {
+    color: var(--arc-msg-ai-text);
+    font-size: 0.88rem;
+}
+
+.endpoint-models-head span {
+    color: color-mix(in srgb, var(--arc-msg-ai-text) 50%, transparent);
+    font-size: 0.68rem;
+}
+
+#endpointModelList {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+#endpointModelList li {
+    padding: 10px 11px;
+    border: 1px solid var(--arc-border);
+    border-radius: 9px;
+    background: var(--arc-input-area-bg);
+    color: color-mix(in srgb, var(--arc-msg-ai-text) 74%, transparent);
+    font-size: 0.72rem;
+    overflow-wrap: anywhere;
+}
+
+.endpoint-model-empty {
+    font-style: italic;
+}
+
+/* The main site uses split handles: Endpoints on the left, Companion on the
+   right. Arcade/mini-games keeps the shared stacked rail on the right. */
+body.main-page .arcade-edge-tabs {
+    position: static;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    transform: none;
+}
+
+body.main-page .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode,
+body.main-page .arcade-edge-tabs>.endpoint-helper-toggle {
+    position: fixed !important;
+    top: 50% !important;
+    z-index: 190;
+    pointer-events: auto !important;
+    transform: translateY(-50%) !important;
+}
+
+body.main-page .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode {
+    right: 0 !important;
+    left: auto !important;
+}
+
+body.main-page .arcade-edge-tabs>.endpoint-helper-toggle {
+    right: auto !important;
+    left: 0 !important;
+    border-right: 1px solid color-mix(in srgb, var(--arc-accent) 24%, transparent) !important;
+    border-left: 0 !important;
+    border-radius: 0 10px 10px 0 !important;
+    box-shadow: 8px 0 24px var(--arc-shadow) !important;
+}
+
+body.main-page .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode:hover,
+body.main-page .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode:focus-visible,
+body.main-page .arcade-edge-tabs>.endpoint-helper-toggle:hover,
+body.main-page .arcade-edge-tabs>.endpoint-helper-toggle:focus-visible {
+    transform: translateY(-50%) !important;
+}
+
+body.main-page .endpoint-helper-panel {
+    right: auto;
+    left: 0;
+    border-right: 1px solid var(--arc-border);
+    border-left: 0;
+    box-shadow: 18px 0 48px var(--arc-shadow);
+    transform: translateX(-100%);
+}
+
+body.main-page .endpoint-helper.is-open .endpoint-helper-panel {
+    transform: translateX(0);
+}
+
+/* Companion security now reports real connection boundaries and sends bridge
+   configuration to the canonical Settings page instead of duplicating fields. */
+.chat-security-view {
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto;
+    padding: 16px;
+    background: color-mix(in srgb, var(--arc-bg) 88%, #000);
+    color: var(--arc-msg-ai-text);
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+
+.chat-security-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--arc-accent);
+}
+
+.chat-security-head>div {
+    display: grid;
+    gap: 2px;
+}
+
+.chat-security-head p,
+.chat-security-head h3,
+.chat-security-notice p,
+.chat-security-tools p {
+    margin: 0;
+}
+
+.chat-security-head p {
+    color: color-mix(in srgb, var(--arc-msg-ai-text) 52%, transparent);
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+}
+
+.chat-security-head h3 {
+    color: var(--arc-accent);
+    font-size: 1rem;
+}
+
+.chat-security-notice,
+.chat-security-tools {
+    display: grid;
+    gap: 10px;
+    padding: 13px;
+    border: 1px solid color-mix(in srgb, var(--arc-accent) 25%, transparent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--arc-accent) 7%, transparent);
+}
+
+.chat-security-notice.is-muted,
+.chat-security-tools {
+    border-color: var(--arc-border);
+    background: var(--arc-input-area-bg);
+}
+
+.chat-security-notice strong,
+.chat-security-tools strong {
+    color: var(--arc-msg-ai-text);
+    font-size: 0.78rem;
+}
+
+.chat-security-notice p,
+.chat-security-tools p {
+    color: color-mix(in srgb, var(--arc-msg-ai-text) 65%, transparent);
+    font-size: 0.72rem;
+    line-height: 1.5;
+}
+
+.chat-security-primary,
+.chat-security-secondary {
+    min-height: 38px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.chat-security-primary {
+    border: 1px solid var(--arc-accent);
+    background: var(--arc-accent);
+    color: var(--arc-msg-user-text);
+}
+
+.chat-security-secondary {
+    border: 1px solid color-mix(in srgb, var(--arc-accent) 35%, transparent);
+    background: transparent;
+    color: var(--arc-accent);
+}
+
+#sidebar-lm-studio-mcp-tools {
+    min-height: 42px;
+    padding: 9px;
+    border-radius: 7px;
+    background: rgba(0, 0, 0, 0.2);
+    color: color-mix(in srgb, var(--arc-msg-ai-text) 58%, transparent);
+    font-size: 0.7rem;
+    line-height: 1.4;
+}
+
+#sidebar-lm-studio-mcp-status {
+    color: color-mix(in srgb, var(--arc-msg-ai-text) 58%, transparent);
+    font-size: 0.68rem;
+    line-height: 1.4;
+}
+
+@media (max-width: 620px) {
+    .arcade-edge-tabs {
+        gap: 6px;
+    }
+
+    .arcade-edge-tab,
+    .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode {
+        width: 30px !important;
+        min-width: 30px;
+        height: 112px !important;
+        padding: 8px 0 !important;
+    }
+
+    .arcade-edge-tab:hover,
+    .arcade-edge-tab:focus-visible,
+    .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode:hover,
+    .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode:focus-visible {
+        width: 34px !important;
+    }
+
+    .arcade-edge-tab-label,
+    .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode .tab-label {
+        font-size: 0.52rem !important;
+        letter-spacing: 1.35px !important;
+    }
+
+    .endpoint-helper-panel {
+        width: 100vw;
+    }
+
+    .endpoint-provider-group {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
