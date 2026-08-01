@@ -4892,6 +4892,20 @@ function ensureArcadeEdgePanelUi() {
     return { tabs, endpointToggle, helper };
 }
 
+function syncBridgeSetupUiForRuntime() {
+    if (!isAndroidRuntime()) return;
+    const setupLinks = document.querySelectorAll('#bridgeSetupDownloadLink, #endpointSetupLink, a[href$="setup-companion.bat"]');
+    setupLinks.forEach((link) => {
+        link.removeAttribute('href');
+        link.removeAttribute('download');
+        link.setAttribute('aria-disabled', 'true');
+        link.setAttribute('title', 'Install the optional PC Bridge on a Windows PC, then connect to that PC over your trusted LAN.');
+        link.textContent = link.id === 'bridgeSetupDownloadLink'
+            ? 'Install PC Bridge from a Windows PC'
+            : 'PC Bridge setup requires Windows';
+    });
+}
+
 function setEndpointStatus(message, state = 'idle', { includeBridgeStatus = false } = {}) {
     const nodes = [document.getElementById('endpointStatus')];
     if (includeBridgeStatus) nodes.push(document.getElementById('bridgeConnectionStatus'));
@@ -5071,6 +5085,11 @@ async function testBridgeConnection({ forceRefresh = false, downloadOnFailure = 
         bridgePollFailureCount = 0;
         bridgePollNextAllowedAt = 0;
         renderChatModelCatalog({ ...details, source: 'bridge' });
+    } else if (downloadOnFailure && (!details.reachable || details.authFailed) && isAndroidRuntime()) {
+        setBridgeStatus(
+            'PC Bridge not found. Install it on a Windows PC, then enter that PC\'s trusted LAN address here. Direct endpoint chat remains available without the Bridge.',
+            'offline'
+        );
     } else if (downloadOnFailure && (!details.reachable || details.authFailed)) {
         const setupLink = document.getElementById('endpointSetupLink') || document.querySelector('a[href$="setup-companion.bat"]');
         setupLink?.click?.();
@@ -5115,6 +5134,7 @@ window.closeEndpointHelper = function (options = {}) {
 
 function setupEndpointHelper() {
     const { endpointToggle, helper } = ensureArcadeEdgePanelUi();
+    syncBridgeSetupUiForRuntime();
     endpointToggle.addEventListener('click', window.toggleEndpointHelper);
     document.getElementById('endpointHelperClose')?.addEventListener('click', () => window.closeEndpointHelper({ restoreFocus: true }));
     document.getElementById('openEndpointHelperButton')?.addEventListener('click', () => {

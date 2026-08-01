@@ -2039,6 +2039,7 @@ The companion bridge is designed with several security layers to keep your PC sa
   function attachEventListeners() {
     if (listenersAttached || !hasUi()) return;
     listenersAttached = true;
+    syncCompanionSetupUiForRuntime();
 
     elements.heroPlayerPlayPauseButton.addEventListener("click", (event) => {
       handlePlayPause();
@@ -2572,7 +2573,46 @@ The companion bridge is designed with several security layers to keep your PC sa
     }
   }
 
+  function isAndroidNativeRuntime() {
+    return isNativeCapacitorApp() && getCapacitorPlatform() === "android";
+  }
+
+  function syncCompanionSetupUiForRuntime() {
+    if (!isAndroidNativeRuntime()) return;
+
+    const promptYes = document.getElementById("companionPromptYes");
+    const promptInstructions = document.getElementById("companionPromptInstructions");
+    const downloadLink = document.getElementById("companionDownloadLink");
+    if (promptYes) promptYes.textContent = "Setup on Windows";
+    if (promptInstructions) promptInstructions.textContent = "Connection Help";
+    if (downloadLink) {
+      downloadLink.removeAttribute("href");
+      downloadLink.setAttribute("aria-disabled", "true");
+      downloadLink.textContent = "a Windows PC";
+    }
+
+    const setupTitle = document.getElementById("companionSetupTitle");
+    const setupSubtitle = document.getElementById("companionSetupSubtitle");
+    const androidNotice = document.getElementById("companionAndroidSetupNotice");
+    const windowsSteps = document.getElementById("companionWindowsSetupSteps");
+    const windowsCommand = document.getElementById("companionWindowsSetupCommand");
+    if (setupTitle) setupTitle.textContent = "Connect the optional PC Bridge";
+    if (setupSubtitle) setupSubtitle.textContent = "The Bridge runs on Windows; Android connects to it over your trusted local network.";
+    if (androidNotice) androidNotice.hidden = false;
+    if (windowsSteps) windowsSteps.hidden = true;
+    if (windowsCommand) windowsCommand.hidden = true;
+  }
+
   function downloadCompanion() {
+    if (isAndroidNativeRuntime()) {
+      hideCompanionPrompt();
+      companionPromptDismissed = true;
+      localStorage.setItem("ss_companion_dismissed", "true");
+      showSetupInstructions();
+      render();
+      return;
+    }
+
     const a = document.createElement("a");
     a.href = `setup-companion.bat?v=${encodeURIComponent(window.SIGNAL_SHARE_VERSION || "latest")}`;
     a.download = "setup-companion.bat";
@@ -2598,6 +2638,7 @@ The companion bridge is designed with several security layers to keep your PC sa
   }
 
   function showSetupInstructions() {
+    syncCompanionSetupUiForRuntime();
     const overlay = document.getElementById("companionSetupOverlay");
     if (overlay) overlay.hidden = false;
   }

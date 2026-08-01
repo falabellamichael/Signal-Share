@@ -224,6 +224,85 @@ html.platform-android .messenger-section {
     z-index: 9000 !important;
 }
 
+/* Keep the new full-screen settings shell inside Android's edge-to-edge
+   viewport, including display cutouts, gesture navigation, and the keyboard. */
+@media (max-width: 620px) {
+    html.platform-android #settingsPanel {
+        align-items: stretch !important;
+        padding:
+            calc(max(var(--viewport-offset-top, 0px), var(--safe-area-top)) + 6px)
+            calc(var(--safe-area-right) + 6px)
+            calc(max(var(--viewport-offset-bottom, 0px), var(--safe-area-bottom)) + 6px)
+            calc(var(--safe-area-left) + 6px) !important;
+    }
+
+    html.platform-android #settingsPanel .settings-dialog {
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        flex: 1 1 auto !important;
+    }
+
+    html.platform-android #settingsPanel .settings-layout,
+    html.platform-android #settingsPanel .settings-detail,
+    html.platform-android #settingsPanel .settings-page,
+    html.platform-android #settingsPanel .publishing-oauth-manager,
+    html.platform-android #settingsPanel .publishing-oauth-provider {
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
+    html.platform-android #settingsPanel .publishing-oauth-actions .button {
+        width: 100% !important;
+    }
+
+    html.platform-android #bridgeSetupDownloadLink[aria-disabled="true"] {
+        cursor: not-allowed !important;
+        opacity: 0.64 !important;
+        pointer-events: none !important;
+    }
+
+    html.platform-android #settingsMainPage {
+        gap: 12px !important;
+    }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+    html.platform-android #settingsPanel {
+        align-items: stretch !important;
+        padding:
+            calc(max(var(--viewport-offset-top, 0px), var(--safe-area-top)) + 4px)
+            calc(var(--safe-area-right) + 6px)
+            calc(max(var(--viewport-offset-bottom, 0px), var(--safe-area-bottom)) + 4px)
+            calc(var(--safe-area-left) + 6px) !important;
+    }
+
+    html.platform-android #settingsPanel .settings-dialog {
+        top: auto !important;
+        right: auto !important;
+        left: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        flex: 1 1 auto !important;
+        gap: 10px !important;
+        padding: 12px !important;
+        border-radius: 16px !important;
+    }
+
+    html.platform-android #settingsPanel .settings-shell-head p:last-child,
+    html.platform-android #settingsPanel .settings-nav-item span {
+        display: none !important;
+    }
+
+    html.platform-android #settingsPanel .settings-nav-item {
+        min-height: 40px !important;
+        padding: 7px 8px !important;
+    }
+}
+
 /* 13. SET METHOD: Robust Fitting for Signal Share Applications */
 
 /* Global App Shell */
@@ -381,4 +460,31 @@ html.platform-android .theme-picker .theme-preview {
     width: auto !important;
     height: 72px !important;
     border-radius: 18px !important;
+}
+
+/* The general responsive stylesheet uses a single-column theme menu on phones.
+   Preserve that layout instead of forcing the desktop two-column popout. */
+@media (max-width: 599px) {
+    html.platform-android .theme-picker-trigger {
+        grid-template-columns: 76px minmax(0, 1fr) auto !important;
+        gap: 10px !important;
+        min-height: 80px !important;
+        padding: 10px !important;
+    }
+
+    html.platform-android .theme-picker-menu {
+        position: static !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        max-height: min(48dvh, 420px) !important;
+    }
+
+    html.platform-android .theme-option-tile {
+        grid-template-columns: 72px minmax(0, 1fr) !important;
+        min-height: 78px !important;
+    }
+
+    html.platform-android .theme-picker .theme-preview {
+        height: 60px !important;
+        border-radius: 12px !important;
+    }
 }

@@ -37,8 +37,8 @@
       }
     </style>
     <link rel="stylesheet" href="./notifications.css?v=1.3" />
-    <link rel="stylesheet" href="./android-optimizations.css?v=1.8" />
-    <link rel="stylesheet" href="arcade-chat.css?v=1.19">
+    <link rel="stylesheet" href="./android-optimizations.css?v=1.9" />
+    <link rel="stylesheet" href="arcade-chat.css?v=1.24">
     <link rel="stylesheet" href="./questions-guide.css?v=1.6">
     <script>
       // Early SDK placeholders for async script loading
@@ -1910,8 +1910,8 @@
     <script src="arcade-workshop-manager.js?v=1.0"></script>
     <script src="amd-optimizations.js?v=1.0"></script>
     <script src="arcade-chat-context.js?v=1.1"></script>
-    <script src="arcade-chat.js?v=1.62" defer></script>
-    <script type="module" src="app-v3.js?v=1.42"></script>
+    <script src="arcade-chat.js?v=1.63" defer></script>
+    <script type="module" src="app-v3.js?v=1.43"></script>
     <script src="./studio-overlays.js?v=1.0" defer></script>
     <script src="./studio-auth-overlay.js?v=1.0" defer></script>
     <script src="./studio-publish-fields.js?v=1.1" defer></script>
@@ -1943,9 +1943,19 @@
 
     <section class="companion-prompt-overlay" id="companionSetupOverlay" hidden>
       <div class="companion-prompt-dialog companion-setup-dialog">
-        <h3>Setup Companion</h3>
-        <p style="font-size: 0.85rem; opacity: 0.7; margin-top: -12px; margin-bottom: 20px; text-align: center; width: 100%;">OR use our Android App or Webview on Mobile to control PC/Phone media</p>
-        <div class="setup-steps">
+        <h3 id="companionSetupTitle">Setup Companion</h3>
+        <p id="companionSetupSubtitle" style="font-size: 0.85rem; opacity: 0.7; margin-top: -12px; margin-bottom: 20px; text-align: center; width: 100%;">OR use our Android App or Webview on Mobile to control PC/Phone media</p>
+        <div class="setup-steps" id="companionAndroidSetupNotice" hidden>
+          <div class="setup-step">
+            <strong>Install on a Windows PC</strong>
+            <p>Open Signal Share on that PC and use its one-click Bridge setup. Android cannot run the Windows setup script.</p>
+          </div>
+          <div class="setup-step">
+            <strong>Connect over your trusted LAN</strong>
+            <p>In Settings &gt; AI &amp; PC Bridge, enter the Windows PC's local network address. Direct AI endpoints remain available without the Bridge.</p>
+          </div>
+        </div>
+        <div class="setup-steps" id="companionWindowsSetupSteps">
           <div class="setup-step">
             <strong>1. Install Node.js</strong>
             <p>Ensure you have <a href="https://nodejs.org/" target="_blank" style="color: var(--accent); text-decoration: underline;">Node.js</a> installed on your PC.</p>
@@ -1967,7 +1977,7 @@
             </p>
           </div>
         </div>
-        <div class="setup-command-box">
+        <div class="setup-command-box" id="companionWindowsSetupCommand">
           <p>Run in terminal:</p>
           <code id="setupCommand">npm install && npm start</code>
           <button class="button button-secondary button-small" id="copySetupCommand">Copy</button>

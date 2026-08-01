@@ -127,8 +127,7 @@ body>.steam-chat-sidebar {
     position: fixed;
     top: 0;
     right: 0;
-    height: 100vh;
-    height: 100dvh;
+    height: var(--mini-vh, var(--viewport-visible-height, 100dvh));
     box-shadow: -10px 0 30px var(--arc-shadow);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
 }
@@ -370,8 +369,7 @@ body[data-theme="aurora"] #chat-model-select {
         position: fixed !important;
         top: 0;
         right: 0;
-        height: 100vh;
-        height: 100dvh;
+        height: var(--mini-vh, var(--viewport-visible-height, 100dvh));
         width: 100% !important;
         z-index: 10002;
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
@@ -1019,6 +1017,14 @@ body.runner-open .chat-resize-handle {
     transform: translateY(-50%);
 }
 
+/* Keep modal settings and account surfaces unobstructed on compact screens. */
+body.viewer-open .arcade-edge-tabs,
+body:has(.companion-prompt-overlay:not([hidden])) .arcade-edge-tabs {
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+}
+
 .arcade-edge-tab,
 .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode {
     position: relative !important;
@@ -1101,9 +1107,11 @@ body.chat-collapsed .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode {
     right: 0;
     display: grid;
     width: min(430px, 100vw);
-    height: 100vh;
+    max-width: 100%;
+    min-width: 0;
     height: 100dvh;
     grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
     border-left: 1px solid var(--arc-border);
     background: var(--arc-bg);
     color: var(--arc-msg-ai-text);
@@ -1133,6 +1141,7 @@ body.chat-collapsed .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode {
 .endpoint-helper-head>div {
     display: grid;
     gap: 6px;
+    min-width: 0;
 }
 
 .endpoint-helper-head h2,
@@ -1416,6 +1425,7 @@ body.main-page .arcade-edge-tabs>.endpoint-helper-toggle:focus-visible {
 }
 
 body.main-page .endpoint-helper-panel {
+    top: var(--viewport-offset-top, 0px);
     right: auto;
     left: 0;
     border-right: 1px solid var(--arc-border);
@@ -1569,9 +1579,77 @@ body.main-page .endpoint-helper.is-open .endpoint-helper-panel {
 
     .endpoint-helper-panel {
         width: 100vw;
+        max-width: 100%;
     }
 
     .endpoint-provider-group {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .endpoint-helper-head {
+        gap: 12px;
+        padding:
+            calc(14px + env(safe-area-inset-top, 0px))
+            calc(14px + env(safe-area-inset-right, 0px))
+            14px
+            calc(14px + env(safe-area-inset-left, 0px));
+    }
+
+    .endpoint-helper-body {
+        padding:
+            14px
+            calc(14px + env(safe-area-inset-right, 0px))
+            calc(18px + env(safe-area-inset-bottom, 0px))
+            calc(14px + env(safe-area-inset-left, 0px));
+    }
+
+    html.platform-android .endpoint-helper-panel {
+        bottom: max(var(--viewport-offset-bottom, 0px), env(safe-area-inset-bottom, 0px));
+        height: auto;
+    }
+
+    html.platform-android .steam-chat-sidebar {
+        top: max(var(--viewport-offset-top, 0px), env(safe-area-inset-top, 0px)) !important;
+        right: env(safe-area-inset-right, 0px) !important;
+        bottom: max(var(--viewport-offset-bottom, 0px), env(safe-area-inset-bottom, 0px)) !important;
+        left: env(safe-area-inset-left, 0px) !important;
+        width: auto !important;
+        height: auto !important;
+        max-width: none !important;
+    }
+
+    html.platform-android .chat-input-area {
+        padding-bottom: max(15px, calc(8px + env(safe-area-inset-bottom, 0px)));
+    }
+
+    .endpoint-action-secondary[aria-disabled="true"] {
+        cursor: not-allowed;
+        opacity: 0.64;
+        pointer-events: none;
+    }
+}
+
+@media (max-width: 380px) {
+    .endpoint-helper-head p:last-child {
+        display: none;
+    }
+
+    .endpoint-helper-actions {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #endpointSetupLink {
+        grid-column: auto;
+    }
+}
+
+@media (max-height: 500px) {
+    body:not(.main-page) .arcade-edge-tabs {
+        gap: 4px;
+    }
+
+    body:not(.main-page) .arcade-edge-tab,
+    body:not(.main-page) .arcade-edge-tabs>.chat-toggle-btn.chat-tab-mode {
+        height: min(88px, calc((100dvh - 28px) / 2)) !important;
     }
 }

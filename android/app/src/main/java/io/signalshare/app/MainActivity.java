@@ -19,6 +19,8 @@ import java.nio.charset.StandardCharsets;
 public class MainActivity extends BridgeActivity {
     private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 1001;
     private static final int BLUETOOTH_CONNECT_PERMISSION_REQUEST_CODE = 1002;
+    private static final String WEB_ASSET_CACHE_PREFERENCES = "signal_share_web_assets";
+    private static final String WEB_ASSET_CACHE_VERSION_KEY = "version_code";
     private static final String NATIVE_BRIDGE_OBJECT = "NativeBridge";
     private static final String NATIVE_BRIDGE_READY_EVENT_JS =
             "window.dispatchEvent(new Event('signal:nativeBridgeReady'));";
@@ -108,9 +110,49 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void load() {
         injectNativeBridgeInterface();
+        clearWebAssetCacheOnVersionChange();
         super.load();
         configurePullToRefresh();
         dispatchNativeBridgeReadyEvent();
+    }
+
+    private void clearWebAssetCacheOnVersionChange() {
+        WebView webView = findViewById(com.getcapacitor.android.R.id.webview);
+        if (webView == null) {
+            return;
+        }
+
+        android.content.SharedPreferences preferences = getSharedPreferences(
+                WEB_ASSET_CACHE_PREFERENCES,
+                MODE_PRIVATE
+        );
+        long currentVersionCode = getCurrentVersionCode();
+        long cachedVersionCode = preferences.getLong(WEB_ASSET_CACHE_VERSION_KEY, -1L);
+        if (currentVersionCode >= 0 && cachedVersionCode == currentVersionCode) {
+            return;
+        }
+
+        // Clear only the WebView HTTP/resource cache. Cookies, local storage,
+        // Supabase sessions, and user preferences remain intact across updates.
+        webView.clearCache(true);
+        preferences.edit()
+                .putLong(WEB_ASSET_CACHE_VERSION_KEY, currentVersionCode)
+                .apply();
+    }
+
+    private long getCurrentVersionCode() {
+        try {
+            android.content.pm.PackageInfo packageInfo = getPackageManager().getPackageInfo(
+                    getPackageName(),
+                    0
+            );
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                return packageInfo.getLongVersionCode();
+            }
+            return packageInfo.versionCode;
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return -1L;
+        }
     }
 
     private void injectNativeBridgeInterface() {
